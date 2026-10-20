@@ -360,6 +360,11 @@ Luật khi dùng:
 - **Một lưới, hai bảng:** cần bảng tổng + bảng chia ngày của CÙNG dòng thì dựng hai
   `EditableGrid` từ cùng `rows` / `onCellCommit`, chia `columns` (cùng `rowMarkKey` ⇒ màu dòng
   hiện cả hai). Bảng đặt ở chỗ khác của màn ⇒ `createPortal` vào chỗ màn đưa (VD Cân đối).
+- **Nút thao tác của dòng — `GridRow.actions`** (2026-10-20): đặt cuối ô tên dòng, VD 🗑
+  `InlineConfirmDelete` — XOÁ NGAY TẠI DÒNG đang nhìn thấy: ô hỏi nhỏ cạnh nút, KHÔNG lớp
+  phủ / không làm mờ màn, nêu đích danh dòng, nút "Không" đứng trước (Esc = không xoá),
+  màn gọi vẫn bắn toast Hoàn tác. Thay cho hộp liệt kê mọi dòng để xoá (người dùng không nhớ
+  dòng nào là dòng nào). Xoá bản ghi ở nơi khác (danh mục, phiếu) vẫn `ConfirmDelete`.
 - **Hàng phụ GÕ ĐƯỢC — `GridRow.kind = "detail"`** (2026-10-19): thụt vào như dòng con,
   không ô tick tô màu, nhưng ô vẫn gõ được (khoá từng ô bằng `isLocked` của cột). VD hàng
   "Giá gửi (đ/kg)" theo ngày dưới dòng Gửi đông ở Cân đối (id `<id dòng>::price`; màn tự
@@ -518,7 +523,7 @@ theo màu**, không tự viết class màu lên nút.
 | Danh sách bản ghi | `RecordTable` — truyền `getSortValue` cho cột để bấm tiêu đề sắp xếp, truyền `getSearchText` để hiện ô tìm |
 | Nhập nhiều ô số một lúc (lưới ngày) | `EditableGrid` — cột tổng luôn `kind: "computed"` |
 | Danh mục có Thêm/Sửa/Xóa/Tìm | `CatalogCrud` — nhận `loading` để hiện `TableSkeleton` trong lúc tải, vẫn giữ header + nút Thêm. Hộp Thêm/Sửa (`CatalogEditDialog`) xếp trường thành **lưới** 2 cột (sm) / 3 cột (lg); danh mục nhiều trường ngắn khai `CatalogField.group` (tiêu đề nhóm) ⇒ 4 cột ở lg; trường chữ dài khai `span: "wide"` (2 ô) / `"full"` (trọn hàng) — đừng để form một cột dài phải cuộn (2026-10-15) |
-| Xóa bất kỳ thứ gì | `ConfirmDelete` |
+| Xóa bất kỳ thứ gì | `ConfirmDelete` · xoá DÒNG đang hiện trong lưới/bảng ⇒ `InlineConfirmDelete` (ô hỏi nhỏ tại dòng, không lớp phủ) |
 | Thao tác hệ trọng không phải xóa (đăng xuất · chốt sổ · ghi đè · lệnh xuất) | `ConfirmAction` — nêu đích danh việc sắp làm + hệ quả, nút an toàn đứng trước |
 | Form > 5 ô, nhập không thường xuyên | `StepForm` |
 | Form > 5 ô, nhập lặp nhiều lần/ngày | `Dialog` + nhóm ô, phần phụ gập lại |

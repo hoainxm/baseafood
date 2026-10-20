@@ -15,7 +15,9 @@ import {
   findOverlappingFamilyPeriods,
   getPeriodDates,
   filterEligibleImports,
+  selectPeriodImports,
   findUnpricedMaterialRows,
+  buildMaterialGridRows,
   suggestMaterialPrices,
   salesItemToOutput,
   isEmptyPulledSalesOutput,
@@ -73,10 +75,27 @@ describe("hút sổ nhập vào kỳ cân đối", () => {
     expect(grouped.get("Bạch tuộc 2 da")!.dailyQuantities).toEqual({ "2026-09-01": 7964, "2026-09-03": 5019, "2026-09-05": 2491 });
   });
 
-  test("chuyến đã thuộc kỳ khác không bị hút lại", () => {
+  test("kỳ CHỒNG NGÀY dùng chung chuyến của ngày trùng (chốt 2026-10-20) — dòng gán kỳ khác vẫn lấy", () => {
     const assigned = num.map((r) => (r.deliveryDate === "2026-09-01" ? { ...r, balancingPeriodId: "kyA" } : r));
     const eligible = filterEligibleImports(period("kyB", "2026-09-01", "2026-09-05"), assigned);
-    expect(eligible.some((r) => r.deliveryDate === "2026-09-01")).toBe(false);
+    expect(eligible.some((r) => r.deliveryDate === "2026-09-01")).toBe(true);
+  });
+
+  test("kỳ 1–5 và kỳ 2–6 cùng thấy chuyến ngày 2–5; ngày 1 chỉ kỳ đầu, ngày 6 chỉ kỳ sau", () => {
+    const rows = [1, 2, 3, 4, 5, 6].map((d) => makeImport(`2026-10-0${d}`, "Bạch tuộc 2 da lớn (80↑)", 100));
+    const a = selectPeriodImports(period("k1", "2026-10-01", "2026-10-05"), rows).map((r) => r.deliveryDate);
+    const b = selectPeriodImports(period("k2", "2026-10-02", "2026-10-06"), rows).map((r) => r.deliveryDate);
+    expect(a).toEqual(["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"]);
+    expect(b).toEqual(["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06"]);
+  });
+
+  test("dòng khác loại người dùng TỰ CHỌN vào kỳ vẫn thuộc kỳ đó; khác họ không tự vào", () => {
+    const rows = [
+      makeImport("2026-10-02", "2 da nguyên liệu", 50, "k1"),
+      makeImport("2026-10-02", "Bạch tuộc 1 da", 70),
+    ];
+    const got = selectPeriodImports(period("k1", "2026-10-01", "2026-10-05"), rows).map((r) => r.materialTypeName);
+    expect(got).toEqual(["2 da nguyên liệu"]);
   });
 });
 
@@ -231,37 +250,66 @@ describe("findUnpricedMaterialRows", () => {
 });
 
 describe("suggestMaterialPrices", () => {
+  const family = gridRow({ id: "ho", total: 5460, fromImports: true, sourceIds: ["i1"], unitPrice: null });
+  const thaw = gridRow({ id: "xa", total: 500, group: "Xả đông", stockLineKind: "thaw-out" });
+
+  test("dòng hút từ sổ nhập KHÔNG đoán giá (giá theo từng chuyến, thiếu thì điền ở Nhập hàng)", () => {
+    expect(suggestMaterialPrices([family]).has("ho")).toBe(false);
+  });
+  test("dòng mua đã có giá ⇒ xả đông lấy bình quân các dòng có giá, không đụng dòng đã có giá", () => {
+    const s = suggestMaterialPrices([{ ...family, unitPrice: 150000 }, thaw]);
+    expect(s.has("ho")).toBe(false);
+    expect(s.get("xa")).toBe(150000);
+  });
+  test("không dòng mua nào có giá ⇒ không đoán", () => {
+    expect(suggestMaterialPrices([family, thaw]).size).toBe(0);
+  });
+  test("dòng tay khác (bột, phế liệu) không đoán giá", () => {
+    const batterRow = gridRow({ id: "bot", total: 20, group: "Phụ gia" });
+    expect(suggestMaterialPrices([{ ...family, unitPrice: 150000 }, batterRow]).has("bot")).toBe(false);
+  });
+});
+
+describe("buildMaterialGridRows — giá NL theo TỪNG CHUYẾN (chốt 2026-10-20, không bình quân)", () => {
   /* Số thật của vòng audit: 5 chuyến 2 da (lớn + nhỏ) kỳ 12–16/10. */
   const imports = [
     pricedImport("i1", 1960, 148000),
     pricedImport("i2", 900, 148000),
-    pricedImport("i3", 600, 138000),
+    { ...pricedImport("i3", 600, 138000), materialTypeName: "Bạch tuộc 2 da nhỏ (80↓)" },
     pricedImport("i4", 1200, 155000),
     pricedImport("i5", 800, 140000),
   ];
-  const family = gridRow({ id: "ho", total: 5460, fromImports: true, sourceIds: ["i1", "i2", "i3", "i4", "i5"] });
-  const thaw = gridRow({ id: "xa", total: 500, group: "Xả đông", stockLineKind: "thaw-out" });
+  const input = {
+    id: "ho", periodId: "k", groupName: "Thủy sản" as const, name: "Bạch tuộc 2 da", quantityKg: 0,
+    unitPrice: 999, ratioPercentage: null, autoSource: "imports" as const,
+  };
 
-  test("dòng nhập gộp = bình quân gia quyền giá các chuyến nguồn", () => {
-    // (1960+900)×148.000 + 600×138.000 + 1200×155.000 + 800×140.000 = 804.080.000 ÷ 5460
-    expect(suggestMaterialPrices([family], imports).get("ho")).toBe(147267);
+  test("tiền dòng = Σ kg × giá từng chuyến; đơn giá không làm tròn ⇒ kg × đơn giá = đúng tổng tiền", () => {
+    const [h] = buildMaterialGridRows([input], imports);
+    // (1960+900)×148.000 + 600×138.000 + 1200×155.000 + 800×140.000 = 804.080.000
+    expect(h.total).toBe(5460);
+    expect(h.total * (h.unitPrice ?? 0)).toBeCloseTo(804_080_000, 3);
+    expect(h.tripPrices).toEqual([138000, 140000, 148000, 155000]);
+    expect(h.unpricedTripCount).toBe(0);
   });
-  test("dòng xả đông lô không giá = bình quân NL mua vào (tính cả giá vừa gợi ý)", () => {
-    const s = suggestMaterialPrices([family, thaw], imports);
-    expect(s.get("xa")).toBe(147267);
+  test("không còn lấy giá của chuyến CUỐI hay giá gõ tay cũ trên dòng", () => {
+    const [h] = buildMaterialGridRows([input], [pricedImport("i1", 100, 140000), pricedImport("i2", 100, 160000)]);
+    expect(h.total * (h.unitPrice ?? 0)).toBeCloseTo(30_000_000, 3); // không phải 200 × 160.000 hay 200 × 999
   });
-  test("dòng mua đã có giá ⇒ xả đông lấy bình quân các dòng có giá, không đụng dòng đã có giá", () => {
-    const s = suggestMaterialPrices([{ ...family, unitPrice: 150000 }, thaw], imports);
-    expect(s.has("ho")).toBe(false);
-    expect(s.get("xa")).toBe(150000);
+  test("chuyến chưa có giá ⇒ đếm để cảnh báo, dòng vào danh sách thiếu giá", () => {
+    const rows = buildMaterialGridRows([input], [pricedImport("i1", 100, 140000), pricedImport("i2", 50, null)]);
+    expect(rows[0].unpricedTripCount).toBe(1);
+    expect(findUnpricedMaterialRows(rows).map((r) => r.id)).toEqual(["ho"]);
   });
-  test("chuyến nguồn không có giá nào ⇒ không đoán", () => {
-    const s = suggestMaterialPrices([family, thaw], [pricedImport("i1", 1960, null)]);
-    expect(s.size).toBe(0);
+  test("mọi chuyến chưa có giá ⇒ đơn giá trống", () => {
+    const [h] = buildMaterialGridRows([input], [pricedImport("i1", 100, null)]);
+    expect(h.unitPrice).toBeNull();
+    expect(h.tripPrices).toEqual([]);
   });
-  test("dòng tay khác (bột, phế liệu) không đoán giá", () => {
-    const batterRow = gridRow({ id: "bot", total: 20, group: "Phụ gia" });
-    expect(suggestMaterialPrices([{ ...family, unitPrice: 150000 }, batterRow], imports).has("bot")).toBe(false);
+  test("dòng nhập tay giữ đơn giá của dòng", () => {
+    const [h] = buildMaterialGridRows([{ ...input, autoSource: "" as const, dailyQuantities: { "2026-10-15": 10 } }], imports);
+    expect(h.unitPrice).toBe(999);
+    expect(h.tripPrices).toBeUndefined();
   });
 });
 

@@ -8,7 +8,6 @@ import type { Customer, MaterialImportItem, Product, SalesChannel } from "@/type
 import {
   Button,
   Combobox,
-  ConfirmDelete,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -22,8 +21,7 @@ import {
   notify,
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
-import { OTHER_CUSTOMER_ID, type MaterialGridRow } from "@/lib/balancingGrid";
-import { Trash2 } from "lucide-react";
+import { OTHER_CUSTOMER_ID } from "@/lib/balancingGrid";
 
 /* ---------- Thêm dòng nguyên liệu / dòng giảm ---------- */
 
@@ -235,86 +233,6 @@ export function PickImportRowsDialog({
 
 /* ---------- Sửa / xoá dòng nhập tay của khối nguyên liệu ---------- */
 
-/**
- * Gom việc ít làm (xoá dòng tay, đổi kho nhận của dòng giảm) vào MỘT hộp — trước
- * đây là một dải thẻ dưới lưới lặp lại tên mọi dòng, làm khối nguyên liệu rối mắt.
- */
-export function ManualRowsDialog({
-  rows,
-  getRowName: rowLabelOf,
-  workshopWarehouses: workshopWarehouseOptions,
-  hasWarehouse: hasStock,
-  onChangeWarehouse,
-  onDelete,
-  onClose,
-}: {
-  rows: MaterialGridRow[];
-  getRowName: (h: MaterialGridRow) => string;
-  workshopWarehouses: { value: string; label: string }[];
-  /** Dòng giảm nào có ô "Kho nhận" — mặc định mọi dòng giảm (Bán nội địa: bán đi, không vào kho). */
-  hasWarehouse?: (h: MaterialGridRow) => boolean;
-  onChangeWarehouse: (id: string, warehouse: string) => void;
-  /** Không truyền ⇒ không có quyền xóa (`balancing.delete`): ẩn nút xóa dòng. */
-  onDelete?: (id: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Dòng nhập tay</DialogTitle>
-          <DialogDescription>
-            Dòng lấy từ sổ nhập hàng không xoá ở đây — sửa ở màn Nhập hàng.
-          </DialogDescription>
-        </DialogHeader>
-        <ul className="divide-y divide-border">
-          {rows.map((h) => (
-            <li key={h.id} className="flex flex-wrap items-center gap-3 py-2">
-              <span className="min-w-0 flex-1">
-                {rowLabelOf(h)}
-                <span className="tnum ml-2 text-sm text-muted-foreground">{num(h.total)} kg</span>
-              </span>
-              {h.isDecrease && !h.stockLineKind && (hasStock?.(h) ?? true) && (
-                <Combobox
-                  label={`Kho nhận — ${rowLabelOf(h)}`}
-                  hideLabel
-                  value={h.decreaseTarget}
-                  onChange={(v) => onChangeWarehouse(h.id, v)}
-                  options={workshopWarehouseOptions}
-                  placeholder="Chọn kho nhận"
-                  clearable={false}
-                  className="w-48"
-                />
-              )}
-              {onDelete && (
-                <ConfirmDelete
-                  recordDescription={`${rowLabelOf(h)} — ${num(h.total)} kg`}
-                  onConfirm={() => onDelete(h.id)}
-                  trigger={
-                    <Button
-                      title="Xoá dòng này khỏi lưới của kỳ (có Hoàn tác)."
-                      variant="danger"
-                      size="sm"
-                      className="min-h-11 min-w-11"
-                      aria-label={`Xoá dòng ${rowLabelOf(h)}`}
-                    >
-                      <Trash2 />
-                    </Button>
-                  }
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-        <DialogFooter>
-          <Button variant="outline" size="lg" onClick={onClose}>
-            Đóng
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /* ---------- Thêm mặt hàng vào lưới bán thành phẩm ---------- */
 

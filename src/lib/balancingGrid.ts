@@ -93,9 +93,11 @@ export function findOverlappingFamilyPeriods(
 /* ---------- Hút số liệu vào kỳ ---------- */
 
 /**
- * Dòng sổ nhập hàng đủ điều kiện vào kỳ: cùng họ nguyên liệu, ngày hàng về nằm
- * trong kỳ, và chưa bị kỳ nào khác giữ. Kỳ chưa khai ngày ⇒ không hút gì (tránh
- * kéo nhầm cả sổ vào một kỳ trống).
+ * Dòng sổ nhập hàng của kỳ theo KHOẢNG NGÀY: cùng họ nguyên liệu + ngày hàng về nằm trong kỳ
+ * — KHÔNG còn loại dòng "đang thuộc kỳ khác" (người dùng chốt 2026-10-20: kỳ 1–5/10 và kỳ
+ * 2–6/10 đều phải lấy được số sổ nhập để cân đối; trước đây mỗi dòng sổ nhập gán cứng MỘT kỳ
+ * qua `balancing_period_id` ⇒ kỳ trùng ngày chỉ thấy màn trống). Kỳ chưa khai ngày ⇒ không
+ * lấy gì (tránh kéo nhầm cả sổ vào một kỳ trống).
  */
 export function filterEligibleImports(
   period: BalancingPeriod,
@@ -104,11 +106,18 @@ export function filterEligibleImports(
   const dates = new Set(getPeriodDates(period));
   if (dates.size === 0) return [];
   return imports.filter(
-    (r) =>
-      dates.has(r.deliveryDate) &&
-      isSameMaterialFamily(r.materialTypeName, period.materialTypeName) &&
-      (!r.balancingPeriodId || r.balancingPeriodId === period.id)
+    (r) => dates.has(r.deliveryDate) && isSameMaterialFamily(r.materialTypeName, period.materialTypeName)
   );
+}
+
+/**
+ * Nguồn sổ nhập của MỘT kỳ = dòng cùng họ trong khoảng ngày (tự lấy, dùng chung giữa các kỳ
+ * chồng ngày) ∪ dòng người dùng TỰ CHỌN vào kỳ ở hộp "Chọn dòng nhập" (khác tên loại — vẫn
+ * gán `balancing_period_id`). Kỳ không còn "giữ" dòng sổ nhập cùng họ.
+ */
+export function selectPeriodImports(period: BalancingPeriod, imports: MaterialImportItem[]): MaterialImportItem[] {
+  const inRange = new Set(filterEligibleImports(period, imports).map((r) => r.id));
+  return imports.filter((r) => inRange.has(r.id) || r.balancingPeriodId === period.id);
 }
 
 /**
@@ -223,6 +232,13 @@ export interface MaterialGridRow {
    * ô ngày = giá ngày đó, các cột khác khoá.
    */
   priceRowOf?: string;
+  /**
+   * Dòng hút từ sổ nhập: các mức giá KHÁC NHAU của các chuyến nguồn (đã bỏ chuyến chưa có giá).
+   * Một mức ⇒ hiện đúng giá đó; nhiều mức ⇒ ô Đơn giá ghi "theo chuyến". `undefined` = dòng tay.
+   */
+  tripPrices?: number[];
+  /** Dòng hút từ sổ nhập: số chuyến nguồn có kg mà CHƯA có giá (điền ở màn Nhập hàng). */
+  unpricedTripCount?: number;
 }
 
 /**
@@ -306,6 +322,7 @@ export function buildMaterialGridRows(
   assignedImports: MaterialImportItem[]
 ): MaterialGridRow[] {
   const byType = groupImportsByMaterialType(assignedImports);
+  const importById = new Map(assignedImports.map((i) => [i.id, i]));
   return inputs.map((r) => {
     const isFromImports = r.autoSource === "imports";
     // Tra theo HỌ: gom nhập keyed theo họ, dòng lưới có thể mang tên họ (hút mới)
@@ -313,6 +330,16 @@ export function buildMaterialGridRows(
     const source = isFromImports ? byType.get(getMaterialFamily(r.name)) : undefined;
     const byDate = source ? source.dailyQuantities : (r.dailyQuantities ?? {});
     const carryOver = r.carryOverKg ?? 0;
+    /* GIÁ THEO TỪNG CHUYẾN (người dùng chốt 2026-10-20: "giá chuyến nào, nguyên liệu nào
+       thì ghi chính xác theo chuyến đó, không tự tính bình quân"): tiền dòng hút = Σ kg × giá
+       của TỪNG chuyến nguồn. Đơn giá dòng chỉ là tiền ÷ kg KHÔNG làm tròn để công thức kỳ
+       (kg × đơn giá) ra đúng tổng tiền các chuyến — màn KHÔNG hiện số này khi các chuyến
+       khác giá (ghi "theo chuyến"). Trước đây dòng giữ giá của chuyến CUỐI × tổng kg cả kỳ. */
+    const trips = source ? source.ids.flatMap((id) => importById.get(id) ?? []).filter((i) => i.quantityKg !== 0) : [];
+    const tripKg = trips.reduce((s, i) => s + i.quantityKg, 0);
+    const tripAmount = trips.reduce((s, i) => s + i.quantityKg * (i.unitPrice ?? 0), 0);
+    const pricedTrips = trips.filter((i) => i.unitPrice != null);
+    const unitPrice = source ? (pricedTrips.length > 0 && tripKg !== 0 ? tripAmount / tripKg : null) : r.unitPrice;
     return {
       id: r.id,
       name: r.name,
@@ -321,12 +348,18 @@ export function buildMaterialGridRows(
       dailyQuantities: byDate,
       carryOverKg: carryOver,
       total: sumGridRow(byDate, carryOver),
-      unitPrice: r.unitPrice,
+      unitPrice,
       ratio: r.ratioPercentage,
       isDecrease: Boolean(r.isReduction),
       decreaseTarget: r.reductionWarehouseId ?? "",
       fromImports: isFromImports,
       sourceIds: source?.ids ?? [],
+      ...(source
+        ? {
+            tripPrices: [...new Set(pricedTrips.map((i) => i.unitPrice as number))].sort((a, b) => a - b),
+            unpricedTripCount: trips.length - pricedTrips.length,
+          }
+        : {}),
     };
   });
 }
@@ -336,7 +369,8 @@ export function buildMaterialGridRows(
  * phần này (đơn giá trống = 0). Màn Cân đối cảnh báo thay vì hiện lãi/lỗ như số thật.
  */
 export function findUnpricedMaterialRows(rows: MaterialGridRow[]): MaterialGridRow[] {
-  return rows.filter((h) => h.total !== 0 && h.unitPrice == null);
+  // Dòng hút từ sổ nhập: thiếu giá dù CHỈ MỘT chuyến (tiền chuyến đó đang tính 0).
+  return rows.filter((h) => h.total !== 0 && (h.unitPrice == null || (h.unpricedTripCount ?? 0) > 0));
 }
 
 /** Bình quân gia quyền theo kg; không có cặp nào có giá ⇒ null. */
@@ -348,32 +382,18 @@ function weightedAveragePrice(pairs: { kg: number; price: number | null }[]): nu
 
 /**
  * Giá GỢI Ý cho các dòng NL chưa có giá (kế toán bấm "Điền giá gợi ý", vẫn sửa tay được):
- *  - Dòng hút từ sổ nhập (gộp 2 da lớn + nhỏ nên để trống giá) ⇒ bình quân gia quyền
- *    giá các chuyến nguồn của dòng đó.
  *  - Dòng Lấy xả đông / Gửi đông (lô kho chưa mang giá) ⇒ bình quân NL thủy sản MUA VÀO
- *    của kỳ (tính cả giá vừa gợi ý ở bước trên) — cùng cách app gợi ý giá gửi đông.
+ *    của kỳ — cùng cách app gợi ý giá gửi đông.
+ *  - Dòng hút từ sổ nhập KHÔNG đoán giá (2026-10-20: giá theo từng chuyến, chuyến thiếu giá
+ *    điền ở màn Nhập hàng — trước đây gợi ý bình quân gia quyền các chuyến).
  * Dòng khác (bột, phế liệu…) không đoán giá. Trả về Map id dòng → giá.
  */
-export function suggestMaterialPrices(
-  rows: MaterialGridRow[],
-  imports: MaterialImportItem[]
-): Map<string, number> {
-  const importById = new Map(imports.map((i) => [i.id, i]));
+export function suggestMaterialPrices(rows: MaterialGridRow[]): Map<string, number> {
   const out = new Map<string, number>();
-  for (const h of findUnpricedMaterialRows(rows)) {
-    if (!h.fromImports) continue;
-    const price = weightedAveragePrice(
-      h.sourceIds.flatMap((id) => {
-        const i = importById.get(id);
-        return i ? [{ kg: i.quantityKg, price: i.unitPrice }] : [];
-      })
-    );
-    if (price != null) out.set(h.id, price);
-  }
   const purchaseAverage = weightedAveragePrice(
     rows
       .filter((h) => !h.stockLineKind && !h.isDecrease && h.group === "Thủy sản")
-      .map((h) => ({ kg: h.total, price: h.unitPrice ?? out.get(h.id) ?? null }))
+      .map((h) => ({ kg: h.total, price: h.unitPrice }))
   );
   if (purchaseAverage != null) {
     for (const h of findUnpricedMaterialRows(rows)) if (h.stockLineKind && !out.has(h.id)) out.set(h.id, purchaseAverage);

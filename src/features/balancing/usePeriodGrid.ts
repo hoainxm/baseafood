@@ -40,6 +40,7 @@ import {
   suggestCustomerPrice,
   type FinishedGoodTemplateRow,
   filterEligibleImports,
+  selectPeriodImports,
   filterFreeImportsInPeriod,
   getPeriodDates,
   filterEligibleWips,
@@ -349,28 +350,37 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
 
   /* ---------- Sổ Nhập hàng ---------- */
 
-  const assignedImports = useMemo(
-    () => allImports.filter((r) => r.balancingPeriodId === period.id),
-    [allImports, period.id]
-  );
-  const importsToPull = useMemo(
-    () => filterEligibleImports(period, allImports).filter((r) => !r.balancingPeriodId),
-    [period, allImports]
-  );
+  /* Kỳ TỰ LẤY sổ nhập theo khoảng ngày + họ NL (chốt 2026-10-20) — không cần bấm "Lấy n dòng",
+     và kỳ chồng ngày cùng dùng chung các chuyến của ngày trùng (`selectPeriodImports`). */
+  const assignedImports = useMemo(() => selectPeriodImports(period, allImports), [period, allImports]);
+  /** Dòng lưới "hút từ sổ nhập" còn THIẾU: họ có chuyến trong kỳ mà kỳ chưa có dòng của họ đó. */
+  const importsToPull = useMemo(() => {
+    const families = new Set(
+      materialInRows.filter((r) => r.autoSource === "imports").map((r) => getMaterialFamily(r.name))
+    );
+    return filterEligibleImports(period, allImports).filter((r) => !families.has(getMaterialFamily(r.materialTypeName)));
+  }, [period, allImports, materialInRows]);
   /* Khớp theo tên loại NL hay trượt vì sổ nhập ghi tên tự do. Giữ sẵn danh sách
      "trong khoảng ngày nhưng khác loại" để người dùng tự tick, thay vì màn hình
      báo "không có gì để lấy" trong khi sổ đầy số. */
-  const otherTypeImports = useMemo(() => {
-    const suggestedIds = new Set(importsToPull.map((r) => r.id));
-    return filterFreeImportsInPeriod(period, allImports).filter((r) => !suggestedIds.has(r.id));
-  }, [period, allImports, importsToPull]);
+  const otherTypeImports = useMemo(
+    () =>
+      filterFreeImportsInPeriod(period, allImports).filter(
+        (r) => !isSameMaterialFamily(r.materialTypeName, period.materialTypeName)
+      ),
+    [period, allImports]
+  );
 
   /* Dòng đang bị kỳ KHÁC giữ. Không đếm được nhóm này thì khi người dùng lỡ hút
      vào nhầm kỳ, mọi kỳ sau chỉ thấy màn trống và không có manh mối nào. */
   const otherPeriodImports = useMemo(
     () =>
       filterAllImportsInPeriod(period, allImports).filter(
-        (r) => r.balancingPeriodId && r.balancingPeriodId !== period.id
+        (r) =>
+          r.balancingPeriodId &&
+          r.balancingPeriodId !== period.id &&
+          // Cùng họ thì kỳ này đã tự dùng chung — chỉ còn dòng khác loại do kỳ khác tự chọn.
+          !isSameMaterialFamily(r.materialTypeName, period.materialTypeName)
       ),
     [period, allImports]
   );
@@ -600,11 +610,9 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
      thì chạy tuần tự — bốn bảng ghi RỜI nhau nên số không đè, Ctrl+Z một lần
      trả cả hai vì ảnh chụp lấy trước cả hai thao tác. */
   const pullAllSources = useCallback(() => {
-    const hasImports = importsToPull.length > 0;
-    const hasProduction = pendingWips.length > 0;
-    if (hasImports) pullImports();
-    if (hasProduction) pullProduction();
-  }, [importsToPull.length, pendingWips.length, pullImports, pullProduction]);
+    // Sổ nhập TỰ lấy vào kỳ (effect bên dưới) — nút chung chỉ còn kéo sổ sản xuất.
+    if (pendingWips.length > 0) pullProduction();
+  }, [pendingWips.length, pullProduction]);
 
   const lockedDates = useMemo(
     () => new Set(productionLocks.filter((c) => c.isLocked).map((c) => c.lockDate)),
@@ -691,7 +699,13 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     () =>
       materialInRows.map((r) => {
         const h = materialRows.find((x) => x.id === r.id);
-        return h && h.total !== r.quantityKg ? { ...r, quantityKg: h.total } : r;
+        if (!h) return r;
+        /* Dòng hút từ sổ nhập: đơn giá = Σ kg × giá TỪNG chuyến ÷ kg (buildMaterialGridRows,
+           không làm tròn) ⇒ công thức kỳ ra đúng tổng tiền các chuyến — áp cho MỌI kỳ, kể cả
+           đã chốt (người dùng chốt 2026-10-20). Kỳ đã chốt chỉ TÍNH lại trên màn, không ghi
+           ngược (effect bên dưới). */
+        const unitPrice = h.fromImports ? h.unitPrice : r.unitPrice;
+        return h.total !== r.quantityKg || unitPrice !== r.unitPrice ? { ...r, quantityKg: h.total, unitPrice } : r;
       }),
     [materialInRows, materialRows]
   );
@@ -723,6 +737,42 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     if (isLocked || !materialSourcesReady) return;
     if (materialsForCalc.some((r, i) => r !== materialInRows[i])) writeMaterials(materialsForCalc, "");
   }, [materialsForCalc, materialInRows, writeMaterials, isLocked, materialSourcesReady]);
+
+  /* TỰ LẤY sổ nhập vào kỳ (người dùng chốt 2026-10-20: tạo kỳ là nguyên liệu tự vào, bỏ nút
+     "Lấy n dòng từ sổ nhập"): họ NL có chuyến trong khoảng ngày mà kỳ chưa có dòng ⇒ tạo dòng
+     lưới "hút từ sổ nhập" (số đọc thẳng từ sổ, không chép, không gán kỳ lên sổ nhập). Id CỐ
+     ĐỊNH theo kỳ + họ ⇒ hai máy cùng mở kỳ chỉ ghi đè cùng một dòng, không đẻ dòng trùng.
+     Cùng hai cổng như ghi ngược ở trên: nguồn đã nạp xong + kỳ chưa chốt (+ có quyền ghi). */
+  /* Chốt CHỐNG CHẠY HAI LẦN: kho ghi xong mới vẽ lại ⇒ effect có thể chạy lần nữa khi
+     `importsToPull` chưa kịp rỗng (đã thấy: toast "Đã tự lấy…" hiện đôi). Ghi theo kỳ + họ. */
+  const autoPulledRef = useRef("");
+  useEffect(() => {
+    if (isLocked || isReadOnly || !materialSourcesReady || importsToPull.length === 0) return;
+    const pullKey = `${period.id}|${[...new Set(importsToPull.map((r) => getMaterialFamily(r.materialTypeName)))].sort().join(",")}`;
+    if (autoPulledRef.current === pullKey) return;
+    autoPulledRef.current = pullKey;
+    const toAdd: BalancingInputItem[] = [];
+    for (const [family, o] of groupImportsByMaterialType(importsToPull)) {
+      toAdd.push({
+        id: `${period.id}-imports-${family}`,
+        periodId: period.id,
+        groupName: "Thủy sản",
+        name: family,
+        quantityKg: Object.values(o.dailyQuantities).reduce((s, v) => s + v, 0),
+        unitPrice: null, // giá theo từng chuyến (buildMaterialGridRows)
+        ratioPercentage: null,
+        sourceWarehouse: "",
+        dailyQuantities: {},
+        carryOverKg: 0,
+        isReduction: false,
+        reductionWarehouseId: "",
+        autoSource: "imports",
+      });
+    }
+    if (toAdd.length > 0 && writeMaterials([...materialInRows, ...toAdd], "")) {
+      notify.saved(`Đã tự lấy ${importsToPull.length} chuyến nhập trong khoảng ngày của kỳ`);
+    }
+  }, [importsToPull, isLocked, isReadOnly, materialSourcesReady, materialInRows, writeMaterials, period.id]);
   useEffect(() => {
     if (isLocked || !finishedGoodSourcesReady) return;
     if (finishedGoodsToCalc.some((r, i) => r !== finishedGoods[i])) writeFinishedGoods(finishedGoodsToCalc, "");

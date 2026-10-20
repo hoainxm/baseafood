@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { BalancingInputItem, DailyQuantities, InputGroup, MaterialImportItem, MaterialType } from "@/types";
-import { BSF1_WAREHOUSES, INPUT_GROUPS, sumGridRow } from "@/types";
+import { BSF1_WAREHOUSES, INPUT_GROUPS, calculateImportAmount, sumGridRow } from "@/types";
 import { uid } from "@/lib/db";
 import {
   OWN_WAREHOUSE,
@@ -26,12 +26,12 @@ import {
   isDomesticSaleRow,
 } from "@/lib/domesticSales";
 import { DAY_COLUMN_GROUPS, type DayCell, type PeriodGrid } from "./usePeriodGrid";
-import { PickImportRowsDialog, ManualRowsDialog, AddMaterialRowDialog } from "./gridDialogs";
+import { PickImportRowsDialog, AddMaterialRowDialog } from "./gridDialogs";
 import { CellShipments } from "./CellShipments";
+import { TripPriceList } from "./TripPriceList";
 import { RowNoteCell } from "./RowNoteCell";
 import { DepositTargetDialog, type DepositTargetValue } from "./DepositTargetDialog";
 import { useImportShipments } from "@/lib/catalogRepo";
-import { groupImportsBySupplier, groupImportsByMaterialType } from "@/lib/dailyShipments";
 import {
   DEFAULT_DEPOSIT_CATEGORY,
   depositPriceOn,
@@ -48,10 +48,11 @@ import {
   notify,
   type GridColumn,
   type GridRow,
+  InlineConfirmDelete,
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus, Users } from "lucide-react";
+import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Plus, Users } from "lucide-react";
 
 const WORKSHOP_WAREHOUSES = BSF1_WAREHOUSES.filter((w) => w.type === "workshop");
 
@@ -97,7 +98,6 @@ export function MaterialGrid({
     date: dates,
     inputs: materialInRows,
     materialRows,
-    pendingImports: importsToPull,
     otherTypeImports,
     otherPeriodImports,
     importDiagnostics: importDiagnosis,
@@ -110,7 +110,6 @@ export function MaterialGrid({
   } = grid;
   const allowed = useCan("balancing");
   const canViewPrice = allowed["view-price"];
-  const [isManualEditOpen, setIsManualEditOpen] = useState(false);
   /* ---------- Chuyến nhập NGAY TRONG lưới (chỉ đọc) ----------
      Ô ngày của dòng lấy từ sổ nhập có nút "n chuyến" (đại lý → chuyến của ô đó);
      dòng loại NL mở ra dòng con theo ĐẠI LÝ (kg theo ngày, cộng lại = dòng cha).
@@ -128,7 +127,10 @@ export function MaterialGrid({
   /** Dòng loại NL đang mở dòng con theo đại lý. */
   const [expandedSuppliers, setExpandedSuppliers] = useState<ReadonlySet<string>>(() => new Set());
   /** Dòng loại NL có dòng sổ nhập (mở được theo đại lý) — cho nút mở/gập tất cả. */
-  const idsWithSupplier = materialRows.filter((h) => h.fromImports && h.sourceIds.length > 0).map((h) => h.id);
+  /* Dòng sổ nhập gộp ≥ 2 LOẠI (2 da lớn + nhỏ) — mở ra được theo loại. */
+  const idsWithSupplier = materialRows
+    .filter((h) => h.fromImports && new Set(importRowsOf(h).filter((i) => i.quantityKg !== 0).map((i) => i.materialTypeName)).size > 1)
+    .map((h) => h.id);
   const hasSupplierRows = idsWithSupplier.length > 0;
   const allSuppliersExpanded = hasSupplierRows && idsWithSupplier.every((id) => expandedSuppliers.has(id));
   const toggleSupplierOpen = (id: string) =>
@@ -547,16 +549,27 @@ export function MaterialGrid({
       /* Gửi đông: đơn giá lưu là bình quân KHÔNG làm tròn (T.tiền khớp Σ kg×giá ngày) — chỉ
          HIỆN tròn đồng. Ô chỉ ghi khi người dùng gõ nên số hiện tròn không đè số lưu. */
       getValue: (h) => (h.stockLineKind === "freeze-deposit" && h.unitPrice != null ? Math.round(h.unitPrice) : h.unitPrice),
+      /* Dòng sổ nhập (+ dòng con chuyến): giá ĐÚNG theo chuyến — cùng một giá thì hiện giá đó,
+         nhiều giá ⇒ "theo chuyến" (không hiện số bình quân, chốt 2026-10-20). */
+      renderValue: (h) => {
+        const prices = h.fromImports ? (h.tripPrices ?? []) : h.unitPrice != null ? [h.unitPrice] : [];
+        // Bấm "theo chuyến" ⇒ bảng nhỏ giá từng chuyến của dòng (chỉ xem, 2026-10-20).
+        if (h.fromImports && prices.length > 1) return <TripPriceList rowName={h.name} trips={importRowsOf(h)} />;
+        const v = prices[0];
+        return v == null ? <span className="text-muted-foreground">—</span> : num(Math.round(v));
+      },
       /* Gửi đông có giá KHÁC nhau theo ngày ⇒ ô này là bình quân, KHOÁ: ô ghi theo từng phím
          (Esc trả số bình quân) nên để gõ được thì lỡ tay là san phẳng giá từng ngày. Giá cùng
          một mức ⇒ gõ được = một giá cho mọi ngày gửi. */
       isLocked: (h) => {
-        if (h.priceRowOf) return true;
+        if (h.priceRowOf || h.fromImports) return true;
         const original = h.stockLineKind === "freeze-deposit" ? getOriginal(h.id) : undefined;
         return Boolean(original && hasVaryingDepositPrices(original));
       },
       lockReason: (h) =>
-        h.priceRowOf
+        h.fromImports
+          ? "Giá theo TỪNG CHUYẾN của sổ Nhập hàng — tiền = Σ kg × giá từng chuyến. Sửa giá ở màn Nhập hàng; dòng gộp bấm 'n loại' dưới tên để xem từng loại."
+          : h.priceRowOf
           ? "Giá gửi gõ theo từng ngày ở hàng này; đơn giá bình quân nằm ở dòng Gửi đông ngay trên."
           : "Giá gửi khác nhau theo ngày — đây là bình quân theo kg. Sửa giá ở hàng Giá gửi ngay dưới (mở cột ngày nếu đang thu).",
       renderCellNote: (h) => {
@@ -678,11 +691,14 @@ export function MaterialGrid({
   /* Dòng có kg mà chưa có giá ⇒ cảnh báo + giá gợi ý (lib/balancingGrid.suggestMaterialPrices). */
   const unpricedRows = useMemo(() => findUnpricedMaterialRows(materialRows), [materialRows]);
   const priceSuggestions = useMemo(
-    () => suggestMaterialPrices(materialRows, grid.assignedImports),
-    [materialRows, grid.assignedImports]
+    () => suggestMaterialPrices(materialRows),
+    [materialRows]
   );
   /** Dòng kho ghi kèm lô / kho (hai dòng "Lấy xả đông" khác lô không trùng tên). */
   const unpricedRowLabel = (h: MaterialGridRow) => {
+    // Dòng sổ nhập: giá nằm ở từng chuyến — chỉ chỗ điền (màn Nhập hàng), không đoán bình quân.
+    if (h.fromImports)
+      return `${h.name} (${h.unitPrice == null ? "mọi" : num(h.unpricedTripCount ?? 0)} chuyến chưa có giá — điền ở màn Nhập hàng)`;
     const original = h.stockLineKind ? getOriginal(h.id) : undefined;
     const detail = original ? grid.describeStockLine(original) : "";
     return detail ? `${h.name} (${detail})` : h.name;
@@ -865,6 +881,46 @@ export function MaterialGrid({
     );
   };
 
+  /**
+   * XOÁ NGAY TẠI DÒNG (người dùng báo 2026-10-20: hộp "Sửa / xoá dòng tay" làm mờ cả màn,
+   * liệt kê mọi dòng ⇒ không nhớ dòng nào): mỗi dòng nhập tay (kể cả Lấy xả đông / Gửi
+   * đông đã thành dòng thật) có 🗑 cuối ô tên ⇒ ô hỏi nhỏ cạnh nút, không lớp phủ; xoá xong
+   * vẫn toast Hoàn tác. Dòng hút từ sổ nhập không xoá ở đây (sửa ở màn Nhập hàng).
+   */
+  const rowDeleteAction = (h: MaterialGridRow, label: string) =>
+    grid.isLocked || !allowed.delete || h.fromImports || aoTheoId.has(h.id) ? undefined : (
+      <InlineConfirmDelete
+        recordDescription={[`${label} — ${num(h.total)} kg`, ...manualRowDetails(h).slice(0, 2)].join(" · ")}
+        onConfirm={() => removeRow(h.id)}
+      />
+    );
+
+  /**
+   * Thông tin nhận diện một dòng (mô tả trong ô hỏi xoá) (người dùng báo 2026-10-20: ba dòng
+   * "Gửi đông / Lấy xả đông" chỉ có tên + tổng kg, không biết xoá dòng nào): lô / kho + NL gửi,
+   * nhóm, kg TỪNG NGÀY, đơn giá, ghi chú — đúng những gì thấy trên lưới.
+   */
+  const manualRowDetails = (h: MaterialGridRow): string[] => {
+    const original = getOriginal(h.id);
+    const out: string[] = [];
+    if (h.stockLineKind === "thaw-out") {
+      const lot = original ? grid.describeStockLine(original) : "";
+      out.push(lot ? `Lô: ${lot}` : "Chưa chọn lô");
+    } else if (h.stockLineKind === "freeze-deposit") {
+      const location = original ? grid.describeStockLine(original) : "";
+      out.push(`Kho: ${location || "chưa chọn"} · NL gửi: ${depositMaterialName(original)}`);
+    } else {
+      out.push(`Nhóm: ${h.isDecrease ? "Dòng giảm" : h.group}`);
+    }
+    const days = dates
+      .filter((iso) => (h.dailyQuantities[iso] ?? 0) !== 0)
+      .map((iso) => `${formatDayLabel(iso)}: ${num(h.dailyQuantities[iso])}`);
+    if (days.length) out.push(`Theo ngày: ${days.join(" · ")}`);
+    if (canViewPrice && h.unitPrice != null) out.push(`Đơn giá: ${num(Math.round(h.unitPrice))} đ/kg`);
+    if (original?.note?.trim()) out.push(`Ghi chú: ${original.note.trim()}`);
+    return out;
+  };
+
   /** Thêm một dòng kho nữa (lấy thêm lô khác / gửi thêm kho khác). */
   const addStockRow = (lineKind: BalancingStockLineKind) => {
     if (saveMaterials([...materialInRows, { ...stockLineTemplate(lineKind), id: uid() }]))
@@ -906,6 +962,10 @@ export function MaterialGrid({
         label: h.name === BALANCING_STOCK_LINE_NAMES[h.stockLineKind!] ? h.name : `${BALANCING_STOCK_LINE_NAMES[h.stockLineKind!]} · ${h.name}`,
         kind: h.stockLineKind === "freeze-deposit" ? "decrease" : undefined,
         subLabel: stockRowSubtext(h, i === 0, i === items.length - 1),
+        actions: rowDeleteAction(
+          h,
+          h.name === BALANCING_STOCK_LINE_NAMES[h.stockLineKind!] ? h.name : `${BALANCING_STOCK_LINE_NAMES[h.stockLineKind!]} · ${h.name}`
+        ),
       };
       const priceRow = h.stockLineKind === "freeze-deposit" ? depositPriceGridRow(h) : null;
       return priceRow ? [row, priceRow] : [row];
@@ -916,75 +976,72 @@ export function MaterialGrid({
   const gridRows: GridRow<MaterialGridRow>[] = [...stockGridRows(thawGridRows)];
   for (const g of groupsWithRows) {
     for (const h of g.rows) {
-      const rowImports = h.fromImports ? importRowsOf(h) : [];
-      const suppliers = rowImports.length ? groupImportsBySupplier(rowImports) : [];
-      /* Dòng gộp họ (VD "Bạch tuộc 2 da" = 2 da lớn + 2 da nhỏ) ⇒ vẫn mở ra theo ĐẠI LÝ (mỗi
-         đại lý MỘT dòng), dưới tên đại lý ghi rõ phần từng loại: "2 da lớn 3.091 · 2 da nhỏ
-         3.757" (người dùng chốt 2026-10-16 — không tách thêm dòng theo loại). */
-      const types = rowImports.length ? groupImportsByMaterialType(rowImports) : [];
-      const bySupplierOnly = types.length <= 1;
-      const open = expandedSuppliers.has(h.id);
+      /* Mở ra theo LOẠI (người dùng chốt 2026-10-20: "chỉ cần tách 2 dòng 2 da lớn, 2 da nhỏ,
+         mở ra đọc được là được, còn lại thu gọn"): dòng gộp họ ⇒ mỗi LOẠI một dòng con chỉ
+         xem — kg theo ngày, giá (các chuyến cùng giá ⇒ giá đó, khác giá ⇒ "theo chuyến"), tiền
+         = Σ kg × giá TỪNG chuyến (không bình quân). Chỉ một loại ⇒ không cần mở. Mặc định thu. */
+      const trips = (h.fromImports ? importRowsOf(h) : []).filter((i) => i.quantityKg !== 0);
+      const byType = new Map<string, MaterialImportItem[]>();
+      for (const i of trips) byType.set(i.materialTypeName, [...(byType.get(i.materialTypeName) ?? []), i]);
+      const types = [...byType.entries()].sort(([a], [b]) => a.localeCompare(b));
+      const open = types.length > 1 && expandedSuppliers.has(h.id);
       gridRows.push({
         id: h.id,
         data: h,
         label: h.name,
+        actions: rowDeleteAction(h, h.name),
         subLabel:
-          suppliers.length > 0 ? (
+          types.length > 1 ? (
             <button
               type="button"
               aria-expanded={open}
               onClick={() => toggleSupplierOpen(h.id)}
               title={
                 open
-                  ? "Thu gọn các dòng chi tiết của loại này."
-                  : bySupplierOnly
-                    ? `Tách dòng này theo ${suppliers.length} đại lý — mỗi đại lý một dòng, kg theo từng ngày (chỉ xem).`
-                    : `Tách dòng này theo ${types.length} loại (${types.map((t) => t.materialTypeName).join(", ")}), mỗi loại kèm đại lý — kg theo từng ngày (chỉ xem).`
+                  ? "Thu gọn — về lại một dòng gộp."
+                  : `Tách dòng này thành ${types.length} loại (${types.map(([t]) => t).join(", ")}) — kg, giá, tiền từng loại (chỉ xem).`
               }
               className="mt-0.5 inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
               <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden />
-              {suppliers.length} đại lý{bySupplierOnly ? "" : ` · ${types.length} loại`}
+              {types.length} loại
             </button>
           ) : undefined,
       });
       if (!open) continue;
-      /** Một dòng con chỉ xem (loại hoặc đại lý) — kg theo ngày, giá bình quân, tiền thật. */
-      const pushChild = (
-        id: string,
-        label: string,
-        d: { dailyAmounts: Record<string, number>; kg: number; amount: number; ids: string[] },
-        subLabel?: string
-      ) => {
-        const childRow: MaterialGridRow = {
-          ...h,
-          id,
-          name: label,
-          dailyQuantities: d.dailyAmounts,
-          total: d.kg,
-          // Giá bình quân trong kỳ, làm tròn đồng; thành tiền lấy số thật.
-          unitPrice: d.kg > 0 && d.amount > 0 ? Math.round(d.amount / d.kg) : null,
-          ratio: null,
-          carryOverKg: 0,
-          sourceIds: d.ids,
-        };
-        childRowAmount.set(childRow.id, d.amount);
-        gridRows.push({ id: childRow.id, data: childRow, label, kind: "child", subLabel });
-      };
-      /* Tên loại ngắn dưới tên đại lý: bỏ phần LOÀI đứng đầu tên dòng cha ("Bạch tuộc") —
+      /* Tên loại ngắn: bỏ phần LOÀI đứng đầu tên dòng cha ("Bạch tuộc") —
          "Bạch tuộc 2 da lớn (80↑)" ⇒ "2 da lớn (80↑)". */
       const species = h.name.split(/\s+(?=\S*\d)/)[0] ?? "";
       const shortType = (t: string) =>
         species && t.toLowerCase().startsWith(species.toLowerCase() + " ") ? t.slice(species.length + 1) : t;
-      for (const d of suppliers) {
-        const parts = bySupplierOnly
-          ? undefined
-          : types
-              .map((t) => ({ name: shortType(t.materialTypeName), kg: t.suppliers.find((x) => x.supplier === d.supplier)?.kg ?? 0 }))
-              .filter((x) => x.kg !== 0)
-              .map((x) => `${x.name} ${num(x.kg)}`)
-              .join(" · ");
-        pushChild(`${h.id}::dl::${d.supplier}`, d.supplier, d, parts);
+      for (const [typeName, rows] of types) {
+        const daily: DailyQuantities = {};
+        for (const i of rows) daily[i.deliveryDate] = (daily[i.deliveryDate] ?? 0) + i.quantityKg;
+        const kg = rows.reduce((sum, i) => sum + i.quantityKg, 0);
+        const amount = rows.reduce((sum, i) => sum + calculateImportAmount(i), 0);
+        const priced = rows.filter((i) => i.unitPrice != null);
+        const label = shortType(typeName);
+        const childRow: MaterialGridRow = {
+          ...h,
+          id: `${h.id}::type::${typeName}`,
+          name: label,
+          dailyQuantities: daily,
+          total: kg,
+          unitPrice: priced.length && kg ? amount / kg : null,
+          tripPrices: [...new Set(priced.map((i) => i.unitPrice as number))].sort((a, b) => a - b),
+          unpricedTripCount: rows.length - priced.length,
+          ratio: null,
+          carryOverKg: 0,
+          sourceIds: rows.map((i) => i.id),
+        };
+        childRowAmount.set(childRow.id, amount);
+        gridRows.push({
+          id: childRow.id,
+          data: childRow,
+          label,
+          kind: "child",
+          subLabel: rows.length > priced.length ? `${rows.length - priced.length} chuyến chưa có giá — điền ở Nhập hàng` : undefined,
+        });
       }
     }
   }
@@ -995,10 +1052,24 @@ export function MaterialGrid({
         data: h,
         label: h.name,
         kind: "decrease",
-        subLabel: isDomesticSale(h) ? domesticSaleSubtext(h) : WORKSHOP_WAREHOUSES.some((k) => k.id === h.decreaseTarget) ? undefined : (
-          <Tag variant="error" className="mt-0.5">
-            chưa chọn kho
-          </Tag>
+        actions: rowDeleteAction(h, h.name),
+        /* Kho nhận của dòng giảm chọn NGAY dưới tên (trước nằm trong hộp "Sửa / xoá dòng tay"). */
+        subLabel: isDomesticSale(h) ? (
+          domesticSaleSubtext(h)
+        ) : grid.isLocked ? (
+          WORKSHOP_WAREHOUSES.find((k) => k.id === h.decreaseTarget)?.name
+        ) : (
+          <span className="mt-1 block">
+            <Combobox
+              label={`Kho nhận — ${h.name}`}
+              hideLabel
+              value={h.decreaseTarget}
+              onChange={(v) => writeRow(h.id, { reductionWarehouseId: v })}
+              options={WORKSHOP_WAREHOUSES.map((k) => ({ value: k.id, label: k.name }))}
+              placeholder="Chọn kho nhận"
+              clearable={false}
+            />
+          </span>
         ),
       });
     }
@@ -1042,13 +1113,6 @@ export function MaterialGrid({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Nguyên liệu vào</h2>
         <div className="flex flex-wrap gap-2">
-          {!grid.isReadOnly && importsToPull.length > 0 && (
-            <Button
-              title="Hút mọi dòng nhập nguyên liệu trong khoảng ngày của kỳ từ sổ nhập hàng vào lưới này." onClick={() => pullImports()}>
-              <Download />
-              Lấy {importsToPull.length} dòng từ sổ nhập
-            </Button>
-          )}
           {!grid.isLocked && !domesticSaleRow?.isReduction && productionDomesticSales.totalKg > 0 && (
             <Button
               title="Tạo dòng giảm Bán nội địa và điền đúng từng ngày bằng số tổ trưởng ghi ở màn Sản xuất thành phẩm (NL bán thẳng, không chế biến)."
@@ -1085,13 +1149,13 @@ export function MaterialGrid({
               aria-pressed={allSuppliersExpanded}
               title={
                 allSuppliersExpanded
-                  ? "Thu gọn mọi dòng đại lý — lưới về lại mỗi loại nguyên liệu một dòng."
-                  : "Tách mọi loại nguyên liệu lấy từ sổ nhập theo đại lý — mỗi đại lý một dòng, kg theo từng ngày (chỉ xem)."
+                  ? "Thu gọn — mỗi họ nguyên liệu về lại một dòng gộp."
+                  : "Tách các dòng gộp (VD Bạch tuộc 2 da) thành từng loại: 2 da lớn, 2 da nhỏ — kg, giá, tiền từng loại (chỉ xem)."
               }
               onClick={() => setExpandedSuppliers(allSuppliersExpanded ? new Set() : new Set(idsWithSupplier))}
             >
               <Users />
-              {allSuppliersExpanded ? "Gộp đại lý" : "Tách theo đại lý"}
+              {allSuppliersExpanded ? "Gộp loại" : "Tách theo loại"}
             </Button>
           )}
         </div>
@@ -1136,10 +1200,12 @@ export function MaterialGrid({
         </p>
       )}
       {grid.overlappingPeriods.length > 0 && (
-        <p className="mb-3 rounded-lg bg-warning-surface px-4 py-2 text-sm font-medium text-destructive">
-          ⚠ Trùng ngày với kỳ {getMaterialFamily(grid.periodMaterialType)}{" "}
+        /* Kỳ chồng ngày DÙNG CHUNG chuyến nhập của ngày trùng (chốt 2026-10-20) — chỉ nhắc để
+           khỏi cộng hai kỳ lại thành một (số ngày trùng được tính ở cả hai). */
+        <p className="mb-3 rounded-lg bg-muted px-4 py-2 text-sm text-muted-foreground">
+          Trùng ngày với kỳ {getMaterialFamily(grid.periodMaterialType)}{" "}
           {grid.overlappingPeriods.map((k) => k.dateRangeDescription || `${k.startDate} – ${k.endDate}`).join("; ")}
-          {" "}— chuyến nhập những ngày đó đã thuộc kỳ kia.
+          {" "}— hai kỳ cùng tính các chuyến nhập của ngày trùng.
         </p>
       )}
       {importDiagnosis.inRangeCount === 0 && dates.length > 0 && materialTotalKg === 0 && (
@@ -1244,31 +1310,10 @@ export function MaterialGrid({
             <Plus />
             Dòng giảm
           </Button>
-          {materialRows.some((h) => !h.fromImports) && (
-            <Button
-              title="Xoá dòng nhập tay hoặc đổi kho nhận của dòng giảm."
-              variant="edit"
-              onClick={() => setIsManualEditOpen(true)}
-            >
-              <Pencil />
-              Sửa / xoá dòng tay
-            </Button>
-          )}
         </div>
       )}
 
 
-      {isManualEditOpen && (
-        <ManualRowsDialog
-          rows={materialRows.filter((h) => !h.fromImports)}
-          getRowName={(h) => (h.stockLineKind ? BALANCING_STOCK_LINE_NAMES[h.stockLineKind] : h.name)}
-          workshopWarehouses={WORKSHOP_WAREHOUSES.map((k) => ({ value: k.id, label: k.name }))}
-          hasWarehouse={(h) => !isDomesticSale(h)}
-          onChangeWarehouse={(id, warehouse) => writeRow(id, { reductionWarehouseId: warehouse })}
-          onDelete={allowed.delete ? removeRow : undefined}
-          onClose={() => setIsManualEditOpen(false)}
-        />
-      )}
 
       {addingGroup && (
         <AddMaterialRowDialog

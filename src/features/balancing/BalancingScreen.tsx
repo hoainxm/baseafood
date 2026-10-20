@@ -59,8 +59,6 @@ import {
   notify,
   type RecordTableColumn,
   type FieldError,
-  BarChart,
-  ProportionBar,
   ReadOnlyBadge,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
@@ -632,8 +630,8 @@ function PeriodDetail({
   /** Lệch giữa Tổng NL nhận (thông số kỳ) và Tổng NL vào lưới (khối 1) — hiện
    *  sẵn để khỏi nhẩm tay khi đối chiếu. */
   const materialDiff = period.totalInputKg != null ? period.totalInputKg - result.totalInputKg : null;
-  /** Số dòng ở hai sổ nguồn tự động còn chờ hút vào kỳ. */
-  const pendingSourceCount = grid.pendingImports.length + grid.pendingWips.length;
+  /** Số dòng sổ SẢN XUẤT còn chờ hút vào kỳ (sổ nhập tự lấy theo khoảng ngày, 2026-10-20). */
+  const pendingSourceCount = grid.pendingWips.length;
 
   return (
     <div className="space-y-6">
@@ -658,7 +656,7 @@ function PeriodDetail({
           {/* Một chạm kéo cả hai sổ nguồn tự động (nhập + sản xuất) vào kỳ. Không gộp sổ bán. */}
           {!grid.isLocked && pendingSourceCount > 0 && (
             <Button
-              title={`Hút ${grid.pendingImports.length} dòng sổ nhập hàng và ${grid.pendingWips.length} dòng sổ sản xuất trong khoảng ngày của kỳ vào lưới.`}
+              title={`Hút ${grid.pendingWips.length} dòng sổ sản xuất trong khoảng ngày của kỳ vào lưới bán thành phẩm (nguyên liệu sổ nhập đã tự vào).`}
               size="lg"
               onClick={grid.pullAllSources}
             >
@@ -997,36 +995,9 @@ function ResultNote({
           <KV k="Tỉ lệ thu hồi" v={result.yieldRate == null ? "—" : num(result.yieldRate)} />
         </div>
       </div>
-      {/* Lãi/lỗ đến từ đâu — hai thanh dễ đọc: tiền bán được vs tiền bỏ ra, và tiền bỏ
-          ra chia NL / chế biến. Cùng số calculateBalancing ở trên, không tính lại. */}
-      {canViewPrice && !hasNoFinishedGood && result.costOfGoods > 0 && (
-        <div className="mt-5 grid gap-3 border-t-2 border-border pt-4">
-          <h3 className="text-base font-semibold text-foreground">
-            Lãi/lỗ đến từ đâu:{" "}
-            <span className={isProfit ? "text-success" : "text-destructive"}>
-              {isProfit ? "bán được nhiều hơn tiền bỏ ra" : "tiền bỏ ra nhiều hơn bán được"} {num(Math.abs(result.profitOrLoss))} đ
-            </span>
-          </h3>
-          <BarChart
-            data={[
-              { label: "Tiền bán được", subLabel: "giá trị xuất", value: result.exportValue },
-              { label: "Tiền bỏ ra", subLabel: "nguyên liệu + chế biến", value: result.costOfGoods },
-            ]}
-            preserveOrder
-            showAverageLine={false}
-            unit="đ"
-          />
-          <p className="text-sm font-semibold text-foreground">Tiền bỏ ra gồm:</p>
-          <ProportionBar
-            unit="đ"
-            description="Giá thành chia theo tiền nguyên liệu và chi phí chế biến"
-            segments={[
-              { id: "nl", label: "Tiền nguyên liệu", value: result.materialValue, tone: "blue" },
-              { id: "cb", label: "Chi phí chế biến", value: result.costOfGoods - result.materialValue, tone: "purple" },
-            ]}
-          />
-        </div>
-      )}
+      {/* Khối "Lãi/lỗ đến từ đâu" (2 thanh + tỷ lệ giá thành) ĐÃ GỠ 2026-10-20: không có trong
+          file cân đối mẫu của kế toán, chỉ vẽ lại Giá thành · Giá trị xuất · Lãi đã có ở trên, cột
+          Ghi chú hẹp làm chữ đè thanh và "chi phí chế biến 100%" gây hiểu nhầm khi tiền NL âm. */}
     </section>
   );
 }

@@ -89,6 +89,11 @@ export interface GridRow<R> {
   label: React.ReactNode;
   /** Chú thích nhỏ dưới tên (VD "hút từ sổ nhập hàng"). */
   subLabel?: React.ReactNode;
+  /**
+   * Nút thao tác CỦA DÒNG đặt cuối ô tên (VD 🗑 `InlineConfirmDelete` — xoá ngay tại dòng
+   * đang nhìn thấy, 2026-10-20). Không truyền ⇒ như cũ.
+   */
+  actions?: React.ReactNode;
 }
 
 const TINT_CLASSES: Record<NonNullable<GridColumn<unknown>["tint"]>, string> = {
@@ -457,6 +462,7 @@ export function EditableGrid<R>({
                         <span className="block text-sm text-muted-foreground">{h.subLabel}</span>
                       )}
                     </div>
+                    {h.actions && <span className="shrink-0">{h.actions}</span>}
                   </div>
                 </th>
                 {visibleColumns.map((c) => {

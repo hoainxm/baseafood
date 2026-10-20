@@ -1,6 +1,6 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
 covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/ImportSteps.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/ImportSlipOcr.tsx, src/features/imports/importHelpers.ts, src/features/imports/ImportLinesTable.tsx, src/features/imports/DailyScrapSection.tsx, src/lib/ocr.ts, src/lib/ocrCloud.ts, src/types.ts
-last_verified: 2026-10-19
+last_verified: 2026-10-20
 <!-- updated: 2026-10-19 — link mở thẳng một ngày `/imports?date=yyyy-mm-dd&workshop=…` (từ Việc của tôi / Tổng quan): sang "Sổ chi tiết các chuyến" đúng ngày + xưởng sau khi nháp mở lại xong; nháp đang dở giữ nguyên, không có nháp thì "Ghi nhập" mở phiếu đúng ngày link; tham số gỡ khỏi URL. Xem 39-my-tasks.md. -->
 <!-- updated: 2026-10-16 (b) — Tự lưu NHÁP phiếu chuyến đang gõ (quy tắc 17): đầu chuyến + bảng loại hàng + chuyến đang sửa + phế liệu đang gõ; quay lại trang / đăng nhập lại ⇒ phiếu mở lại kèm dải "Đã mở lại phiếu đang gõ dở" (nút Bỏ bản nháp). Tự mở phiếu trống đợi `importDraft.isReady`. -->
 <!-- updated: 2026-10-16 — phân quyền: bảng duyệt OCR (OcrReviewTable) ẩn đơn giá đọc từ phiếu khi không có imports view-price (prop showPrice từ ImportSlipOcr). -->
@@ -164,7 +164,7 @@ Khóa theo **(ngày + phân xưởng)**, một bản ghi duy nhất mỗi cặp 
 ### 5. Phế liệu (nội tạng, dạt) — nhập MỘT chỗ
 
 Cân **gộp cuối ngày** theo (ngày + phân xưởng), ngay lúc nhận hàng ⇒ nhập ở màn này, `nguon = "Nhập hàng"`, `kyId` rỗng.
-Màn Cân đối chỉ **hút** vào kỳ (gán `kyId`), không nhập lại lần hai. Xem [31-can-doi-ky](31-can-doi-ky.md).
+Màn Cân đối chỉ **đọc** sổ nhập vào kỳ, không nhập lại lần hai: từ 2026-10-20 kỳ TỰ lấy chuyến cùng họ NL trong khoảng ngày, kỳ chồng ngày dùng chung (không gán kỳ lên sổ nhập nữa; `balancing_period_id` chỉ còn cho dòng khác loại người dùng tự chọn vào kỳ). Giá NL ở Cân đối = giá TỪNG chuyến của sổ này. Xem [31-can-doi-ky](31-can-doi-ky.md) (i)(j).
 **Khối "Cuối ngày"** (2026-10-14, thay hộp "Thêm phế liệu" có hai nút Lưu): `DailyScrapSection.tsx` là form nhập thẳng NGAY TRÊN nút Chốt ngày — ô kg + giá bán hiện sẵn cho **Nội tạng**, **Dạt** (`buildScrapDraft`: mọi dòng đã ghi + ô trống cho loại hay gặp chưa ghi) + nút "Loại khác"; MỘT nút **"Lưu phế liệu"** (`applyScrapDraft`: có kg ⇒ ghi/cập nhật, xóa kg dòng cũ ⇒ bỏ khỏi sổ, toast kèm Hoàn tác). Bản nháp giữ ở màn theo khóa `ngày|xưởng`; **Chốt ngày lưu luôn phần đang gõ**. Hộp chốt nhắc: có phế liệu ⇒ liệt kê; chưa cân ⇒ cảnh báo + "Quay lại cân phế liệu" / "Chốt — không có phế liệu". Mục tiêu: không bỏ quên cân phế liệu trước khi chốt. Ô Đại lý giao hàng + ô Loại NL ở bảng dòng hàng có **bút chì sửa nhanh danh mục** (2026-10-02, `useQuickCatalogEdit` — tên khoá vì sổ nhập nối theo tên; xem [32-danh-muc](32-danh-muc.md)).
 
 ### 6. Phiếu báo cáo tổng hợp — in A4 NGANG, theo KỲ (`DailyImportInvoice.tsx`)

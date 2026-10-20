@@ -1,6 +1,7 @@
 > Load khi: làm phân quyền theo vai trò / người dùng (xem · thêm · sửa · xóa · chốt · mở lại · duyệt · nạp · xuất), màn "Vai trò & quyền", ẩn/hiện nút theo quyền, siết RLS theo vai trò.
 > Trạng thái: **CHỐT 2026-10-15** — chủ dự án đồng ý cả 6 câu §10 theo khuyến nghị. **Đợt 1 → 5 ĐÃ BUILD 2026-10-15; Đợt 6: `0065` ĐÃ CHẠY trên DB thật ở chế độ `log` (2026-10-15 14:44 giờ VN) — chưa bật `enforce`** (xem §6 Kết quả).
 last_verified: 2026-10-19
+<!-- updated: 2026-10-20 — `documents`: Kế toán trưởng được view · create · update · delete · export (chủ dự án cấp; mig 0073 thay trọn `default_role_permissions`, 460 ô). Không cấp `approve`. -->
 <!-- updated: 2026-10-19 (b) — tài nguyên MỚI `documents` (Tài liệu công ty: view · create · update · delete · approve · export), nhóm mới `documents`. View tự cấp cho ai có quyền bất kỳ; ma trận mặc định không cấp ô ghi (chủ dự án: trước mắt admin làm) ⇒ KHÔNG đổi `default_role_permissions`. Lọc dòng KHI ĐỌC theo phòng ban — ngoại lệ đầu tiên của "đọc luôn all" (§6); phòng ban lấy `app_roles.department` (0072) hoặc mặc định vai trò. Spec: ../spec/quan-ly-tai-lieu.md. -->
 <!-- updated: 2026-10-19 — tài nguyên MỚI `my-tasks` (view · create · update · delete): view tự cấp cho ai có quyền bất kỳ; giao/sửa: quản đốc, phó QĐ, kế toán, kế toán trưởng; thu hồi: quản đốc, kế toán trưởng; giám đốc không. Ma trận máy chủ thay trọn ở 0070. Xem ../app-map/39-my-tasks.md. -->
 <!-- updated: 2026-10-16 — vá 3 chỗ hở Đợt 3 (canRemove picker lô, giá ở bảng OCR, tem /packaging). -->

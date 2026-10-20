@@ -343,6 +343,9 @@ const CHIEF_ACCOUNTANT: RoleSpec = {
   "nxt-warehouse": ["view", "import", "export"],
   "production-report": VIEW_EXPORT,
   "export-report": VIEW_EXPORT,
+  // Tài liệu công ty: thêm / sửa / ghi lần ban hành / đính file / xóa tài liệu chưa ban hành
+  // (chủ dự án cấp 2026-10-20, mig 0073). Duyệt (approve, đợt 2) để Ban giám đốc.
+  documents: ["view", "create", "update", "delete", "export"],
   ...catalogAll(["view", "create", "update", "delete"]),
 };
 

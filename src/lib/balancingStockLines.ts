@@ -40,6 +40,20 @@ export const DEFAULT_LEDGER_WAREHOUSE = "Kho 1500 tấn";
 
 export const monthOfDate = (iso: string) => iso.slice(0, 7);
 
+/**
+ * Bảng (nhóm) của Sổ kho tháng cho lô gửi đông: nhóm người dùng chọn; chưa chọn ⇒ nhóm lô đã
+ * ghi; còn lại ⇒ nhóm mặc định. KHÔNG BAO GIỜ là bảng cũ "Nguyên liệu gửi đông" (kế toán
+ * 2026-10-20: "chỉ xài bảng có sẵn, không thêm vô ô nào hết") — lô đang nằm ở đó dời sang
+ * bảng đã chọn / mặc định ngay lần ghi kế tiếp (hoặc nút "Ghi lại vào sổ kho").
+ */
+export function depositLotCategory(
+  r: Pick<BalancingInputItem, "stockCategory"> | undefined,
+  existing: Pick<MonthlyStockLine, "category"> | undefined
+): string {
+  const usable = (c: string | undefined) => (c && c !== LEGACY_FREEZE_DEPOSIT_CATEGORY ? c : "");
+  return usable(r?.stockCategory) || usable(existing?.category) || DEFAULT_DEPOSIT_CATEGORY;
+}
+
 /** "<sổ kho>|<vị trí>" ⇄ cặp (warehouse, storageLocation) của dòng sổ kho. */
 export function splitDepositLocation(v: string): { warehouse: string; storageLocation: string } {
   const i = v.indexOf("|");
@@ -368,6 +382,9 @@ export function syncMonthlyStockLedger(
         r && r.name.trim() && r.name !== BALANCING_STOCK_LINE_NAMES["freeze-deposit"] ? r.name.trim() : ctx.materialFamily;
       for (const date of [...new Set([...oldParts.keys(), ...newParts.keys()])].sort()) {
         const kg = newParts.get(date) ?? 0;
+        const did = freezeDepositRowId(id, date);
+        const existing = items.find((l) => l.id === did);
+        const category = depositLotCategory(b, existing);
         if (
           a &&
           b &&
@@ -375,11 +392,11 @@ export function syncMonthlyStockLedger(
           a.stockLocation === b.stockLocation &&
           (a.stockCategory ?? "") === (b.stockCategory ?? "") &&
           depositPriceOn(a, date) === depositPriceOn(b, date) &&
-          depositName(a) === depositName(b)
+          depositName(a) === depositName(b) &&
+          // Lô còn nằm ở bảng cũ / bảng khác bảng đã chọn ⇒ KHÔNG coi là "không đổi" — phải dời.
+          (!existing || existing.category === category)
         )
           continue; // ngày này không đổi gì
-        const did = freezeDepositRowId(id, date);
-        const existing = items.find((l) => l.id === did);
         if (kg === 0) {
           if (existing) {
             items = items.filter((l) => l.id !== did);
@@ -393,9 +410,7 @@ export function syncMonthlyStockLedger(
         const row: MonthlyStockLine = {
           id: did,
           period: month,
-          /* Nhóm người dùng chọn; chưa chọn ⇒ giữ nhóm lô đã ghi (lô cũ ở nhóm "Nguyên liệu
-             gửi đông" không tự dời), lô mới ⇒ nhóm mặc định. */
-          category: b?.stockCategory || existing?.category || DEFAULT_DEPOSIT_CATEGORY,
+          category,
           warehouse,
           itemName: depositName(b),
           size: "",
@@ -468,7 +483,7 @@ export function countMonthlyStockMismatches(
     } else if (lineKind === "freeze-deposit" && r.stockLocation) {
       for (const [date, kg] of freezeDepositByDay(r)) {
         const row = lines.find((l) => l.id === freezeDepositRowId(r.id, date));
-        if (!row || Math.abs(row.inKg - kg) > 1e-6) mismatchCount++;
+        if (!row || Math.abs(row.inKg - kg) > 1e-6 || row.category !== depositLotCategory(r, row)) mismatchCount++;
       }
     }
   }

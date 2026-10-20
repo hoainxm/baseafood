@@ -67,6 +67,7 @@ import {
   listDepositTargets,
   listThawLotOptions,
   syncMonthlyStockLedger,
+  LEGACY_FREEZE_DEPOSIT_CATEGORY,
   countMonthlyStockMismatches,
   splitDepositLocation,
   monthOfDate,
@@ -909,7 +910,9 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     [monthlyStock, ngucanh.materialFamily]
   );
   const depositLotCategory = useCallback(
-    (rowId: string) => monthlyStock.find((l) => l.id.startsWith(`cd|${rowId}|`))?.category ?? "",
+    // Bảng cũ "Nguyên liệu gửi đông" không còn dùng (2026-10-20) ⇒ không lấy làm bảng của dòng.
+    (rowId: string) =>
+      monthlyStock.find((l) => l.id.startsWith(`cd|${rowId}|`) && l.category !== LEGACY_FREEZE_DEPOSIT_CATEGORY)?.category ?? "",
     [monthlyStock]
   );
   const storageOptions = useMemo(

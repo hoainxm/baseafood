@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { BalancingInputItem, MonthlyStockLine } from "@/types";
 import {
   DEFAULT_DEPOSIT_CATEGORY,
+  depositLotCategory,
   LEGACY_FREEZE_DEPOSIT_CATEGORY,
   listDepositTargets,
   shortWarehouseLabel,
@@ -318,13 +319,33 @@ describe("Gửi đông vào BẢNG người dùng chọn (chốt 2026-10-16, b�
     expect(b.changed).toBe(true);
     expect(b.lines.find((x) => x.id === did)!.category).toBe("Nguyên liệu nhập khẩu");
   });
-  test("dòng cũ chưa chọn nhóm: lô đã ghi ở nhóm cũ GIỮ NGUYÊN, không tự dời", () => {
-    const did = freezeDepositRowId("g1", "2026-10-02");
-    const old = { ...lot(did, "2026-10", { category: LEGACY_FREEZE_DEPOSIT_CATEGORY, openKg: 0, inKg: 300 }), origin: "GĐ-20261002" };
+  /* Kế toán 2026-10-20: "chỉ xài bảng có sẵn, không thêm vô ô nào hết" ⇒ KHÔNG còn ghi vào bảng cũ
+     "Nguyên liệu gửi đông" (trước đây lô cũ chưa chọn nhóm giữ nguyên ở đó). */
+  const did = freezeDepositRowId("g1", "2026-10-02");
+  const legacyLot = () => ({ ...lot(did, "2026-10", { category: LEGACY_FREEZE_DEPOSIT_CATEGORY, openKg: 0, inKg: 300 }), origin: "GĐ-20261002" });
+  test("dòng cũ chưa chọn nhóm: lô ở bảng cũ DỜI sang bảng mặc định khi ghi lại", () => {
     const r = stockRow("g1", "gui", { "2026-10-02": -300 }, { stockLocation: warehouse });
     const r2 = { ...r, dailyQuantities: { "2026-10-02": -350 } };
-    const b = syncMonthlyStockLedger([old], [r], [r2], ctx);
-    expect(b.lines.find((x) => x.id === did)).toMatchObject({ category: LEGACY_FREEZE_DEPOSIT_CATEGORY, inKg: 350 });
+    const b = syncMonthlyStockLedger([legacyLot()], [r], [r2], ctx);
+    expect(b.lines.find((x) => x.id === did)).toMatchObject({ category: DEFAULT_DEPOSIT_CATEGORY, inKg: 350 });
+  });
+  test("đã chọn Hàng tạm mà lô còn ở bảng cũ ⇒ lưu lại cùng nhóm vẫn dời (không bị coi là 'không đổi')", () => {
+    const r = stockRow("g1", "gui", { "2026-10-02": -300 }, { stockLocation: warehouse, stockCategory: "Hàng tạm" });
+    const b = syncMonthlyStockLedger([legacyLot()], [r], [{ ...r }], ctx);
+    expect(b.changed).toBe(true);
+    expect(b.lines.find((x) => x.id === did)).toMatchObject({ category: "Hàng tạm", inKg: 300 });
+  });
+  test("lô ở bảng cũ tính là LỆCH ⇒ nút 'Ghi lại vào sổ kho' dời về bảng đã chọn", () => {
+    const r = stockRow("g1", "gui", { "2026-10-02": -300 }, { stockLocation: warehouse, stockCategory: "Hàng tạm" });
+    expect(countMonthlyStockMismatches([legacyLot()], [r])).toBe(1);
+    const fixed = syncMonthlyStockLedger([legacyLot()], [], [r], ctx);
+    expect(fixed.lines.find((x) => x.id === did)!.category).toBe("Hàng tạm");
+    expect(countMonthlyStockMismatches(fixed.lines, [r])).toBe(0);
+  });
+  test("depositLotCategory không bao giờ trả bảng cũ", () => {
+    expect(depositLotCategory({ stockCategory: LEGACY_FREEZE_DEPOSIT_CATEGORY }, { category: LEGACY_FREEZE_DEPOSIT_CATEGORY })).toBe(DEFAULT_DEPOSIT_CATEGORY);
+    expect(depositLotCategory(undefined, { category: "Nguyên liệu nhập khẩu" })).toBe("Nguyên liệu nhập khẩu");
+    expect(depositLotCategory({ stockCategory: "Hàng tạm" }, { category: "Nguyên liệu nhập khẩu" })).toBe("Hàng tạm");
   });
 });
 

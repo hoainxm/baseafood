@@ -4,9 +4,23 @@
 // Hàm THUẦN (không React) — test ở numberExpression.test.ts.
 // ============================================================
 
-/** "1.234,5" | "1234.5" | "1 234,5" → 1234.5 ; rỗng/không hợp lệ → null */
+/**
+ * "1.234,5" | "1234.5" | "1 234,5" → 1234.5 ; rỗng/không hợp lệ → null.
+ * Hiểu cả số chép từ chứng từ tiếng Anh (HĐ / invoice xuất khẩu):
+ *  - có CẢ "." lẫn "," ⇒ dấu đứng sau cùng là phần lẻ ("194,557.60" → 194557,6 · "1.234,5" → 1234,5);
+ *  - chỉ có "." ⇒ đúng nhóm nghìn kiểu Việt ("1.234", "1.234.567") thì là phân nghìn, còn lại
+ *    ("10.50", "4.05", "1234.5") là phần lẻ — trước đây "10.50" bị đọc thành 1.050;
+ *  - chỉ có "," ⇒ phần lẻ kiểu Việt như cũ ("2,5" → 2,5).
+ */
 export function parseVnNumber(raw: string): number | null {
-  const s = raw.replace(/[\s.]/g, "").replace(",", ".").trim();
+  const t = raw.replace(/\s/g, "");
+  if (!t) return null;
+  const hasDot = t.includes(".");
+  const hasComma = t.includes(",");
+  let s: string;
+  if (hasDot && hasComma) s = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  else if (hasDot) s = /^[-+]?\d{1,3}(\.\d{3})+$/.test(t) || t.split(".").length > 2 ? t.replace(/\./g, "") : t;
+  else s = t.replace(",", ".");
   if (!s) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;

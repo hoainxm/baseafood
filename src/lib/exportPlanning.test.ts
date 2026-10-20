@@ -22,7 +22,19 @@ import {
   isShipmentClosed,
   isShipmentLate,
   missingDocumentItems,
+  buildPeriodPlan,
+  deviationText,
+  isRequiredDocumentItem,
+  monthPeriod,
+  rangePeriod,
+  revisionApprovalLabelState,
+  searchContracts,
   searchShipments,
+  shiftPeriod,
+  shipmentInPeriod,
+  suggestProductId,
+  unmappedLines,
+  weekPeriod,
   shipmentActuals,
   shipmentMonth,
   shiftMonth,
@@ -312,8 +324,11 @@ describe("R4 + R5 · bằng chứng (AC-14, AC-15)", () => {
     const d = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], shipments: [s], items: [it2], files: [file("s1", "production-order", it2.id)] });
     expect(canMarkDone(it2, d)).toMatchObject({ ok: false, reason: "contract-not-approved" });
     expect(d.files.filter((f) => f.stepItemId === it2.id)).toHaveLength(1);
-    const ok = { ...d, approvals: [approval("r0", "c1", "approved")] };
-    expect(canMarkDone(it2, ok).ok).toBe(true);
+    // Duyệt rồi mà dòng hàng chưa nối danh mục mặt hàng ⇒ vẫn chặn (lệnh SX cần mặt hàng thật).
+    const approvedUnmapped = { ...d, approvals: [approval("r0", "c1", "approved")] };
+    expect(canMarkDone(it2, approvedUnmapped)).toMatchObject({ ok: false, reason: "lines-unmapped" });
+    const mapped = { ...approvedUnmapped, revisions: [revision("r0", "c1", 0, { lines: LINES_1826.map((l, i) => ({ ...l, productId: `p${i}` })) })] };
+    expect(canMarkDone(it2, mapped).ok).toBe(true);
   });
   it("tờ khai có file mà thiếu số ⇒ chặn, thiếu đúng declarationNo", () => {
     const tk = item("s1", "customs-declaration");
@@ -495,6 +510,115 @@ describe("NV11 · tháng, tra cứu, Excel (AC-24…AC-26)", () => {
     const ships = xl.rows.filter((r) => r.kind === "shipment");
     expect(ships).toHaveLength(4);
     expect(ships.some((r) => r.cells[0] === "40+20")).toBe(true);
-    expect(xl.rows[0]).toEqual({ kind: "week", cells: ["T1 (01-07/10)"] });
+    // Tuần LỊCH T2 → CN như sổ cũ ("T2 (06-12/01)"): 01/10/2026 là thứ Năm ⇒ T1 = 01–04, ngày 05 thuộc T2 = 05–11.
+    expect(xl.rows[0]).toEqual({ kind: "week", cells: ["T2 (05-11/10)"] });
+  });
+});
+
+// ---------- Bổ sung sau audit 2026-10-20 (ba-spec 41 v4 · AC-30…AC-38) ----------
+
+describe("Kỳ xem tháng · tuần · khoảng ngày (AC-30)", () => {
+  it("tuần lịch T2 → CN; khoảng ngày đảo đầu nếu chọn ngược; dịch kỳ", () => {
+    expect(weekPeriod("2026-10-15")).toMatchObject({ kind: "week", from: "2026-10-12", to: "2026-10-18" });
+    expect(weekPeriod("2026-10-12").from).toBe("2026-10-12");
+    expect(weekPeriod("2026-10-18").from).toBe("2026-10-12");
+    expect(rangePeriod("2026-10-20", "2026-10-01")).toMatchObject({ from: "2026-10-01", to: "2026-10-20" });
+    expect(shiftPeriod(weekPeriod("2026-10-15"), 1)).toMatchObject({ from: "2026-10-19", to: "2026-10-25" });
+    expect(shiftPeriod(monthPeriod("2026-12"), 1)).toMatchObject({ from: "2027-01-01", to: "2027-01-31" });
+    expect(shiftPeriod(rangePeriod("2026-10-01", "2026-10-10"), 1)).toMatchObject({ from: "2026-10-11", to: "2026-10-20" });
+  });
+  it("chuyến thuộc kỳ theo ngày đóng ?? ETD; chỉ có tháng KH thì thuộc kỳ chạm tháng đó", () => {
+    const p = rangePeriod("2026-10-05", "2026-10-11");
+    expect(shipmentInPeriod({ loadingDate: "2026-10-05", etd: "2026-10-20", planMonth: "2026-10" }, p)).toBe(true);
+    expect(shipmentInPeriod({ loadingDate: "", etd: "2026-10-12", planMonth: "2026-10" }, p)).toBe(false);
+    expect(shipmentInPeriod({ loadingDate: "", etd: "", planMonth: "2026-10" }, p)).toBe(true);
+    expect(shipmentInPeriod({ loadingDate: "", etd: "", planMonth: "2026-11" }, p)).toBe(false);
+  });
+  it("tháng qua buildPeriodPlan ra y như buildMonthPlan cũ; lọc khách thì 4 con số cũng theo khách", () => {
+    const d = (() => {
+      const c = closedShipmentData({ cartons: 1900, netKg: 19000, amount: 172445 }, { planMonth: "2026-10", loadingDate: "2026-10-05", etd: "2026-10-06" });
+      const c2 = contract("c2", { customerId: "kr", contractNo: "K-01" });
+      return {
+        ...c,
+        contracts: [...c.contracts, c2],
+        revisions: [...c.revisions, revision("r2", "c2", 0, { terms: terms({ latestShipmentDate: "2026-10-30" }) })],
+        approvals: [...c.approvals, approval("r2", "c2", "approved")],
+        shipments: [...c.shipments, shipment("s2", "c2", { planMonth: "2026-10", loadingDate: "2026-10-20" })],
+      };
+    })();
+    const cs = [
+      { id: "scm", name: "Seachemot" },
+      { id: "kr", name: "KR" },
+    ];
+    const all = buildPeriodPlan(monthPeriod("2026-10"), d, cs, "2026-10-15");
+    expect(all.stats.shipments).toBe(2);
+    expect(buildMonthPlan("2026-10", d, cs, "2026-10-15").stats).toEqual(all.stats);
+    const onlyKr = buildPeriodPlan(monthPeriod("2026-10"), d, cs, "2026-10-15", undefined, "kr");
+    expect(onlyKr.groups.map((g) => g.customerId)).toEqual(["kr"]);
+    expect(onlyKr.stats).toMatchObject({ shipments: 1, closed: 0, missingSteps: 1 });
+    const week = buildPeriodPlan(weekPeriod("2026-10-05"), d, cs, "2026-10-15");
+    expect(week.stats.shipments).toBe(1);
+  });
+});
+
+describe("Dòng hàng nối danh mục mặt hàng (AC-31, AC-32)", () => {
+  it("dòng có nội dung mà chưa có productId là chưa nối", () => {
+    const ls = [{ ...LINES_1826[0], productId: "p1" }, LINES_1826[1], { ...LINES_1826[2], description: "", quantity: null }];
+    expect(unmappedLines(ls).map((l) => l.id)).toEqual([LINES_1826[1].id]);
+  });
+  it("gợi ý mặt hàng theo tên tiếng Anh đã nối ở HĐ trước, ưu tiên cùng khách", () => {
+    const other = contract("c9", { customerId: "kr", contractNo: "K-9" });
+    const d = {
+      contracts: [contract("c1"), other],
+      revisions: [
+        revision("r1", "c1", 0, { lines: [{ ...LINES_1826[0], productId: "p-scm" }], createdAt: "2026-08-01T00:00:00Z" }),
+        revision("r9", "c9", 0, { lines: [{ ...LINES_1826[0], productId: "p-kr" }], createdAt: "2026-09-01T00:00:00Z" }),
+      ],
+    };
+    expect(suggestProductId(d, "  iwadako BLANCHED cut 2-3g ", "scm")).toBe("p-scm");
+    expect(suggestProductId(d, "Iwadako blanched cut 2-3g", "khac")).toBe("p-kr");
+    expect(suggestProductId(d, "Tên chưa từng nối", "scm")).toBe("");
+  });
+});
+
+describe("Chứng từ: tự cấp, bảo hiểm CIF, mục bắt buộc không xóa (AC-33…AC-35)", () => {
+  const s = shipment("s1", "c1");
+  it("H/C công ty tự cấp không bắt số chứng từ; chứng từ thường vẫn bắt", () => {
+    const hc = item("s1", "document", { docKind: "health-certificate", docIssuer: "công ty tự cấp", issuedOn: "2026-09-25" });
+    const co = item("s1", "document", { docKind: "certificate-of-origin", docForm: "VJ", issuedOn: "2026-09-25" });
+    const d = data({ shipments: [s], items: [hc, co], files: [file("s1", "document", hc.id), file("s1", "document", co.id)] });
+    expect(canMarkDone(hc, d).ok).toBe(true);
+    expect(canMarkDone(co, d).missing).toEqual(["number"]);
+  });
+  it("CIF / CIP tự thêm mục bảo hiểm; CFR thì không", () => {
+    const cif = missingDocumentItems("s1", { requiredDocuments: [], incoterm: "CIF" }, [], nid, T0);
+    expect(cif.map((i) => i.docKind)).toEqual(["commercial-invoice", "insurance"]);
+    expect(missingDocumentItems("s1", { requiredDocuments: [], incoterm: "CFR" }, [], nid, T0).map((i) => i.docKind)).toEqual(["commercial-invoice"]);
+  });
+  it("mục theo chứng từ khách yêu cầu là bắt buộc; mục thêm tay thì không", () => {
+    const t = terms();
+    expect(isRequiredDocumentItem(t, { docKind: "certificate-of-origin", docForm: "vj" })).toBe(true);
+    expect(isRequiredDocumentItem(t, { docKind: "commercial-invoice", docForm: "" })).toBe(true);
+    expect(isRequiredDocumentItem(t, { docKind: "sample-invoice", docForm: "" })).toBe(false);
+    expect(isRequiredDocumentItem({ ...t, incoterm: "CIP" }, { docKind: "insurance", docForm: "" })).toBe(true);
+  });
+});
+
+describe("Nhãn: duyệt sau khi sửa, chiều lệch dung sai, tra HĐ chưa chuyến (AC-36…AC-38)", () => {
+  it("bản bị 'yêu cầu sửa' rồi được sửa sau đó ⇒ hiện Chờ duyệt; chưa sửa thì vẫn yêu cầu sửa", () => {
+    const ap = { ...approval("r0", "c1", "needs-revision", "2026-08-05", "ghi rõ dung sai"), createdAt: "2026-08-05T00:00:00Z" };
+    const d = { approvals: [ap] };
+    expect(revisionApprovalLabelState(d, { id: "r0", createdAt: "2026-08-12T00:00:00Z" })).toBe("pending");
+    expect(revisionApprovalLabelState(d, { id: "r0", createdAt: "2026-08-01T00:00:00Z" })).toBe("needs-revision");
+  });
+  it("lệch dung sai nói chiều thừa / thiếu", () => {
+    expect(deviationText(16.916)).toBe("thừa 16,9%");
+    expect(deviationText(-10.53)).toBe("thiếu 10,5%");
+  });
+  it("tra số HĐ / số đơn / khách ra cả HĐ chưa lên chuyến", () => {
+    const d = data({ contracts: [contract("c1"), contract("c2", { contractNo: "TEST-G 11.26", customerId: "mtd", orderRef: "" })] });
+    expect(searchContracts(d, "test-g").map((c) => c.id)).toEqual(["c2"]);
+    expect(searchContracts(d, "b182").map((c) => c.id)).toEqual(["c1"]);
+    expect(searchContracts(d, "matsu", [{ id: "mtd", name: "Matsuda" }]).map((c) => c.id)).toEqual(["c2"]);
   });
 });

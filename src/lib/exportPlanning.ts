@@ -94,9 +94,20 @@ export type ContractState = "pending" | "approved" | "closed" | "cancelled";
 export const CONTRACT_STATE_LABELS: Record<ContractState, string> = {
   pending: "Chờ duyệt",
   approved: "Đã duyệt",
-  closed: "Đã khép",
+  closed: "Đã xuất đủ",
   cancelled: "Đã hủy",
 };
+/** Nhãn trạng thái HĐ cho người đọc: HĐ chốt bằng tay (lệch / có lý do) tách khỏi "Đã xuất đủ" tự tính. */
+export function contractStateLabel(state: ContractState, contract: Pick<ExportContract, "status">): string {
+  return state === "closed" && contract.status === "closed" ? "Đã chốt HĐ" : CONTRACT_STATE_LABELS[state];
+}
+
+/** "thừa 16,9%" / "thiếu 3,2%" — biết chiều để giao bù hay điều chỉnh invoice. */
+export function deviationText(pct: number): string {
+  const r = Math.round(Math.abs(pct) * 10) / 10;
+  return `${pct >= 0 ? "thừa" : "thiếu"} ${r.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
+}
+
 export const APPROVAL_LABELS: Record<"pending" | "approved" | "needs-revision" | "rejected", string> = {
   pending: "Chờ duyệt",
   approved: "BGĐ đồng ý",
@@ -270,6 +281,20 @@ export function approvalState(d: Pick<ExportData, "approvals">, revisionId: stri
   return xs.length ? xs[xs.length - 1].decision : "pending";
 }
 
+/**
+ * Trạng thái HIỂN THỊ của một bản: BGĐ "yêu cầu sửa" mà bản đã được sửa SAU lần ghi đó ⇒ "Chờ duyệt"
+ * (đã sửa, chờ ký lại). Luật bản hiệu lực vẫn dùng `approvalState`.
+ */
+export function revisionApprovalLabelState(
+  d: Pick<ExportData, "approvals">,
+  rev: Pick<ExportContractRevision, "id" | "createdAt">,
+): "pending" | "approved" | "needs-revision" | "rejected" {
+  const xs = approvalsOf(d, rev.id);
+  const last = xs[xs.length - 1];
+  if (!last) return "pending";
+  return last.decision === "needs-revision" && rev.createdAt > last.createdAt ? "pending" : last.decision;
+}
+
 /** Bản hiệu lực = bản `approved` có số bản lớn nhất. */
 export function effectiveRevision(d: Pick<ExportData, "revisions" | "approvals">, contractId: string): ExportContractRevision | null {
   const rs = revisionsOf(d, contractId).filter((r) => approvalState(d, r.id) === "approved");
@@ -333,9 +358,18 @@ const sameDoc = (a: { docKind: string; docForm: string }, b: { kind: string; for
  * Mục chứng từ còn THIẾU của chuyến theo chứng từ yêu cầu của `terms` (+ Commercial Invoice nếu HĐ
  * chưa liệt kê — thực xuất lấy từ đó). Trả mục MỚI để ghi thêm; không xóa mục đã có.
  */
+export const needsInsurance = (incoterm: string | undefined) => /^(CIF|CIP)$/i.test((incoterm ?? "").trim());
+
+/** Chứng từ khách yêu cầu theo điều khoản (kể cả Commercial Invoice + bảo hiểm CIF/CIP tự thêm) — mục này KHÔNG xóa được. */
+export function isRequiredDocumentItem(terms: Pick<ExportContractTerms, "requiredDocuments" | "incoterm">, item: Pick<ExportStepItem, "docKind" | "docForm">): boolean {
+  if (item.docKind === "commercial-invoice") return true;
+  if (item.docKind === "insurance" && needsInsurance(terms.incoterm)) return true;
+  return terms.requiredDocuments.some((w) => sameDoc(item, w));
+}
+
 export function missingDocumentItems(
   shipmentId: string,
-  terms: Pick<ExportContractTerms, "requiredDocuments">,
+  terms: Pick<ExportContractTerms, "requiredDocuments"> & { incoterm?: string },
   existing: readonly ExportStepItem[],
   makeId: () => string,
   now = new Date().toISOString(),
@@ -343,6 +377,8 @@ export function missingDocumentItems(
   const mine = existing.filter((i) => i.shipmentId === shipmentId && i.step === "document");
   const wanted = [...terms.requiredDocuments];
   if (!wanted.some((w) => w.kind === "commercial-invoice")) wanted.unshift({ kind: "commercial-invoice", form: "", issuer: "" });
+  // CIF / CIP: người bán buộc mua bảo hiểm ⇒ luôn có mục bảo hiểm (bỏ được bằng Không áp dụng + lý do).
+  if (needsInsurance(terms.incoterm) && !wanted.some((w) => w.kind === "insurance")) wanted.push({ kind: "insurance", form: "", issuer: "" });
   const out: ExportStepItem[] = [];
   for (const w of wanted) {
     if ([...mine, ...out].some((i) => sameDoc(i, w))) continue;
@@ -436,7 +472,7 @@ export function shareCandidates(d: Pick<ExportData, "items" | "shipments">, ship
 
 export interface MarkCheck {
   ok: boolean;
-  reason?: "contract-not-approved" | "derived-from-files" | "missing-evidence" | "shared-source-not-done";
+  reason?: "contract-not-approved" | "lines-unmapped" | "derived-from-files" | "missing-evidence" | "shared-source-not-done";
   /** Ô còn thiếu (khóa ổn định — màn đổi ra câu chữ). */
   missing: string[];
 }
@@ -462,6 +498,9 @@ export function canMarkDone(
   const shipment = shipmentById(d, item.shipmentId);
   if (item.step === "production-order" && shipment && !effectiveRevision(d, shipment.contractId))
     return { ok: false, reason: "contract-not-approved", missing: [] };
+  // Lệnh SX phải biết mặt hàng thật: mọi dòng hàng của bản hiệu lực đã nối danh mục.
+  if (item.step === "production-order" && shipment && unmappedLines(effectiveRevision(d, shipment.contractId)?.lines ?? []).length)
+    return { ok: false, reason: "lines-unmapped", missing: [] };
   if (item.sharedFromId) {
     return sharedSource(d, item)?.state === "done"
       ? { ok: true, missing: [] }
@@ -485,7 +524,8 @@ export function canMarkDone(
       if (!fileOk) missing.push("file");
       break;
     case "document":
-      if (!item.number.trim()) missing.push("number");
+      // Chứng từ công ty tự cấp (VD H/C) thường không in số — khỏi bắt bịa số.
+      if (!item.number.trim() && !isSelfIssued(item)) missing.push("number");
       if (!item.issuedOn) missing.push("issuedOn");
       if (!fileOk) missing.push("file");
       if (item.docKind === "commercial-invoice") {
@@ -497,6 +537,36 @@ export function canMarkDone(
       break;
   }
   return missing.length ? { ok: false, reason: "missing-evidence", missing } : { ok: true, missing };
+}
+
+export const isSelfIssued = (item: Pick<ExportStepItem, "docIssuer">) => /tự cấp/i.test(item.docIssuer);
+
+/** Dòng hàng chưa nối mặt hàng danh mục (có nội dung mà chưa có productId). */
+export function unmappedLines(lines: readonly ExportContractLine[]): ExportContractLine[] {
+  return lines.filter((l) => (l.description.trim() || l.quantity != null) && !l.productId);
+}
+
+/**
+ * Gợi ý mặt hàng cho tên tiếng Anh: lấy cặp (tên HĐ → mặt hàng) đã nối ở các HĐ trước, ưu tiên cùng
+ * khách, rồi bản mới nhất. Không dịch máy — chưa từng nối thì trả "".
+ */
+export function suggestProductId(
+  d: Pick<ExportData, "contracts" | "revisions">,
+  description: string,
+  customerId: string,
+): string {
+  const key = description.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!key) return "";
+  const customerOf = new Map(d.contracts.map((c) => [c.id, c.customerId]));
+  let best: { productId: string; score: number; at: string } | null = null;
+  for (const r of d.revisions) {
+    for (const l of r.lines) {
+      if (!l.productId || l.description.trim().toLowerCase().replace(/\s+/g, " ") !== key) continue;
+      const score = customerOf.get(r.contractId) === customerId ? 1 : 0;
+      if (!best || score > best.score || (score === best.score && r.createdAt > best.at)) best = { productId: l.productId, score, at: r.createdAt };
+    }
+  }
+  return best?.productId ?? "";
 }
 
 export function canMarkNotApplicable(_item: ExportStepItem, reason: string): { ok: boolean } {
@@ -791,6 +861,8 @@ export interface PendingContractRow {
 
 export interface MonthPlan {
   month: string;
+  /** Kỳ đang xem (tháng / tuần / khoảng ngày). `month` = tháng của ngày đầu kỳ. */
+  period: Period;
   groups: MonthGroup[];
   /** HĐ chưa lên đủ chuyến cần nhìn trong tháng (chưa chuyến nào, hoặc còn thiếu kg / cont). */
   pendingContracts: PendingContractRow[];
@@ -803,12 +875,95 @@ export interface MonthPlan {
   };
 }
 
+/** Tìm HĐ theo số HĐ / số đơn khách / tên khách / MSL của chuyến — để ra cả HĐ chưa lên chuyến. */
+export function searchContracts(d: ExportData, query: string, customers: readonly Pick<Customer, "id" | "name">[] = []): ExportContract[] {
+  const q = squash(query);
+  if (!q) return [];
+  const customerName = new Map(customers.map((c) => [c.id, c.name]));
+  return d.contracts.filter((c) => {
+    const lots = d.shipments.filter((s) => s.contractId === c.id).map((s) => s.lotCode);
+    return [c.contractNo, c.orderRef, customerName.get(c.customerId) ?? "", ...lots].some((h) => h && squash(h).includes(q));
+  });
+}
+
+/* ---------- Kỳ xem: tháng · tuần · khoảng ngày ---------- */
+
+export interface Period {
+  kind: "month" | "week" | "range";
+  /** ISO yyyy-mm-dd, tính cả hai đầu. */
+  from: string;
+  to: string;
+  label: string;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const isoOf = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`;
+const lastDayOfMonth = (month: string) => new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+const shortDate = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+
+export function monthPeriod(month: string): Period {
+  return { kind: "month", from: `${month}-01`, to: `${month}-${pad2(lastDayOfMonth(month))}`, label: monthLabel(month) };
+}
+
+/** Tuần lịch Thứ 2 → Chủ nhật chứa `date` (như sổ Kế hoạch xuất hàng). */
+export function weekPeriod(date: string): Period {
+  const d = new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
+  const back = (d.getDay() + 6) % 7; // T2 = 0 … CN = 6
+  const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - back);
+  const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+  const from = isoOf(mon.getFullYear(), mon.getMonth() + 1, mon.getDate());
+  const to = isoOf(sun.getFullYear(), sun.getMonth() + 1, sun.getDate());
+  return { kind: "week", from, to, label: `Tuần ${shortDate(from)} – ${shortDate(to)}/${to.slice(0, 4)}` };
+}
+
+export function rangePeriod(from: string, to: string): Period {
+  const [a, b] = from <= to ? [from, to] : [to, from];
+  return { kind: "range", from: a, to: b, label: a === b ? `Ngày ${formatDateVN(a)}` : `${formatDateVN(a)} – ${formatDateVN(b)}` };
+}
+
+/** Kỳ kế tiếp / trước cùng loại (tháng ± 1, tuần ± 7 ngày, khoảng ± độ dài khoảng). */
+export function shiftPeriod(p: Period, delta: number): Period {
+  if (p.kind === "month") return monthPeriod(shiftMonth(p.from.slice(0, 7), delta));
+  const days = p.kind === "week" ? 7 : Math.round((Date.parse(p.to) - Date.parse(p.from)) / 86400000) + 1;
+  const move = (iso: string) => {
+    const d = new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)) + delta * days);
+    return isoOf(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  };
+  return p.kind === "week" ? weekPeriod(move(p.from)) : rangePeriod(move(p.from), move(p.to));
+}
+
+/**
+ * Chuyến thuộc kỳ khi ngày đóng cont (chưa có thì ETD) nằm trong kỳ; chuyến chỉ có tháng kế
+ * hoạch thì thuộc mọi kỳ chạm tới tháng đó (R1 — xem theo tháng y như trước).
+ */
+export function shipmentInPeriod(s: Pick<ExportShipment, "loadingDate" | "etd" | "planMonth">, p: Pick<Period, "from" | "to">): boolean {
+  const d = s.loadingDate || s.etd;
+  if (d) return d >= p.from && d <= p.to;
+  if (!s.planMonth) return false;
+  return `${s.planMonth}-01` <= p.to && `${s.planMonth}-${pad2(lastDayOfMonth(s.planMonth))}` >= p.from;
+}
+
 export function buildMonthPlan(
   month: string,
   d: ExportData,
   customers: readonly Pick<Customer, "id" | "name">[],
   today: string,
   opts: EvidenceOptions = WITH_FILES,
+): MonthPlan {
+  return buildPeriodPlan(monthPeriod(month), d, customers, today, opts);
+}
+
+/**
+ * Dữ liệu một kỳ: chuyến gom theo khách + HĐ chưa lên đủ chuyến + 4 con số. Có `customerId`
+ * thì CẢ danh sách LẪN 4 con số chỉ tính khách đó (trước đây thẻ số vẫn đếm cả tháng).
+ */
+export function buildPeriodPlan(
+  period: Period,
+  d: ExportData,
+  customers: readonly Pick<Customer, "id" | "name">[],
+  today: string,
+  opts: EvidenceOptions = WITH_FILES,
+  customerId = "",
 ): MonthPlan {
   const contractById = new Map(d.contracts.map((c) => [c.id, c]));
   const nameOf = (id: string) => customers.find((c) => c.id === id)?.name || "(khách chưa rõ)";
@@ -817,9 +972,9 @@ export function buildMonthPlan(
   let late = 0;
   let count = 0;
   for (const s of d.shipments) {
-    if (s.status !== "open" || shipmentMonth(s) !== month) continue;
+    if (s.status !== "open" || !shipmentInPeriod(s, period)) continue;
     const c = contractById.get(s.contractId);
-    if (!c || c.status === "cancelled") continue;
+    if (!c || c.status === "cancelled" || (customerId && c.customerId !== customerId)) continue;
     const steps = Object.fromEntries(STEP_NOS.map((n) => [n, stepState(d, s, n, opts)])) as Record<StepNo, ExportItemState>;
     const row: MonthShipmentRow = {
       shipment: s,
@@ -844,23 +999,24 @@ export function buildMonthPlan(
     .map((g) => ({ ...g, rows: g.rows.sort((a, b) => byDate(a).localeCompare(byDate(b)) || a.shipment.createdAt.localeCompare(b.shipment.createdAt)) }))
     .sort((a, b) => a.customerName.localeCompare(b.customerName, "vi"));
 
-  const currentMonth = today.slice(0, 7);
+  const todayInPeriod = today >= period.from && today <= period.to;
   const pendingContracts: PendingContractRow[] = [];
   for (const c of d.contracts) {
-    if (c.status !== "open" || contractClosure(d, c.id, opts).closed) continue;
+    if (c.status !== "open" || (customerId && c.customerId !== customerId) || contractClosure(d, c.id, opts).closed) continue;
     const deadline = effectiveDeadline(d, c.id);
     const ships = openShipmentsOf(d, c.id);
     const coverage = contractCoverage(d, c.id);
     if (ships.length && coverage.covered) continue;
     const overdue = !!deadline && deadline < today;
-    const inMonth = deadline.slice(0, 7) === month || (overdue && month === currentMonth && !ships.length);
-    if (!inMonth) continue;
+    const inPeriod = (!!deadline && deadline >= period.from && deadline <= period.to) || (overdue && todayInPeriod && !ships.length);
+    if (!inPeriod) continue;
     pendingContracts.push({ contract: c, customerName: nameOf(c.customerId), deadline, overdue, coverage, hasShipments: ships.length > 0 });
   }
   pendingContracts.sort((a, b) => a.deadline.localeCompare(b.deadline));
 
   return {
-    month,
+    month: period.from.slice(0, 7),
+    period,
     groups: sortedGroups,
     pendingContracts,
     stats: {
@@ -910,16 +1066,16 @@ export interface MonthExcelRow {
   cells: ExcelCell[];
 }
 
-/** Tuần trong tháng theo ngày: T1 = 1–7, T2 = 8–14, … (nhãn kiểu sổ cũ "T1 (01-07/10)"). */
-function weekOf(date: string): { key: number; label: string } {
-  if (!date) return { key: 99, label: "Chưa có ngày đóng" };
+/** Tuần trong tháng theo TUẦN LỊCH (Thứ 2 → Chủ nhật), nhãn kiểu sổ cũ "T2 (06-12/01)". */
+function weekOf(date: string): { key: string; label: string } {
+  if (!date) return { key: "9999", label: "Chưa có ngày đóng" };
+  const month = date.slice(0, 7);
   const day = Number(date.slice(8, 10));
-  const w = Math.min(5, Math.floor((day - 1) / 7) + 1);
-  const from = (w - 1) * 7 + 1;
-  const lastDay = new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 0).getDate();
-  const to = w === 5 ? lastDay : Math.min(lastDay, w * 7);
-  const p2 = (n: number) => String(n).padStart(2, "0");
-  return { key: w, label: `T${w} (${p2(from)}-${p2(to)}/${date.slice(5, 7)})` };
+  const offset = (new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, 1).getDay() + 6) % 7; // ngày 1 là thứ mấy (T2 = 0)
+  const w = Math.floor((day - 1 + offset) / 7) + 1;
+  const from = Math.max(1, (w - 1) * 7 - offset + 1);
+  const to = Math.min(lastDayOfMonth(month), w * 7 - offset);
+  return { key: `${month}-${w}`, label: `T${w} (${pad2(from)}-${pad2(to)}/${date.slice(5, 7)})` };
 }
 
 const stateWord = (s: ExportItemState) => (s === "done" ? "Đã xong" : s === "not-applicable" ? "Không áp dụng" : s === "in-progress" ? "Đang làm" : "");
@@ -965,7 +1121,7 @@ export function buildMonthExcel(plan: MonthPlan, d: ExportData): { header: strin
   lines.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
 
   const rows: MonthExcelRow[] = [];
-  let lastWeek = -1;
+  let lastWeek = "";
   for (const l of lines) {
     const w = weekOf(l.date);
     if (w.key !== lastWeek) {
@@ -978,16 +1134,18 @@ export function buildMonthExcel(plan: MonthPlan, d: ExportData): { header: strin
     rows.push({ kind: "section", cells: ["Hợp đồng chưa lên đủ chuyến"] });
     for (const p of plan.pendingContracts) {
       const rev = workingRevision(d, p.contract.id);
+      // HĐ đã có chuyến ⇒ ghi phần CÒN THIẾU (không phải cả HĐ), không ghi "Chờ booking".
+      const missingCont = p.hasShipments ? p.coverage.missingContainers : numOr0(rev?.terms.containerCount);
       rows.push({
         kind: "pending",
         cells: [
-          rev?.terms.containerCount ? `${rev.terms.containerCount} cont` : "",
+          missingCont ? `${missingCont} cont` : "",
           p.customerName,
-          `HĐ ${p.contract.contractNo}`,
-          rev ? contractTotals(rev.lines).kg : null,
+          `HĐ ${p.contract.contractNo}${p.hasShipments ? " (phần còn thiếu)" : ""}`,
+          p.hasShipments ? p.coverage.missingKg || null : rev ? contractTotals(rev.lines).kg : null,
           "",
           rev?.terms.portOfDischarge ?? "",
-          "Chờ booking",
+          p.hasShipments ? "" : "Chờ booking",
           "",
           "",
           null,

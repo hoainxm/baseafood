@@ -73,7 +73,7 @@ export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string
 
 /** "Bước tiếp: Đóng cont — còn hình ảnh đóng cont, tờ khai" / "Khép kín". */
 export function progressText(p: ShipmentProgress): string {
-  if (p.next === null) return "Khép kín — đủ bước 1–5";
+  if (p.next === null) return "Đủ hồ sơ — xong bước 1–5";
   const head = `Bước tiếp: ${STEP_TITLES[p.next - 1]}`;
   if (!p.missing.length) return head;
   const shown = p.missing.slice(0, 2).join(", ");

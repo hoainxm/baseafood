@@ -652,7 +652,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
   const recentMonths = [...new Set(n.monthlyStock.map((m) => m.period))].sort().slice(-3);
   const monthlyStock = n.monthlyStock.filter((m) => recentMonths.includes(m.period)).map((m) => ({ ...m }));
   const nxtSnapshots = n.nxtSnapshots.map((x) => ({ ...x }));
-  const exportDemo = buildExportDemo(customers, tc.today);
+  const exportDemo = buildExportDemo(customers, tc.today, n.products);
 
   return {
     products: n.products.map((p) => ({ ...p })),

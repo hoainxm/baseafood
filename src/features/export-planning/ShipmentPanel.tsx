@@ -25,14 +25,15 @@ import {
   shipmentDeliveryDate,
   shipmentKindLabel,
   shipmentPaymentSummary,
+  sharedSource,
   stepItem,
   subStepState,
   type ExportData,
   type StepNo,
 } from "@/lib/exportPlanning";
-import { formatDateVN } from "@/lib/format";
+import { formatDateVN, formatMoney } from "@/lib/format";
 import type { ExportContract, ExportFile, ExportItemState, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
-import { Ban, Camera, ClipboardList, FilePlus2, Pencil, Plus, Send, Trash2, Wallet } from "lucide-react";
+import { Ban, Camera, ClipboardList, FilePlus2, Pencil, Plus, RotateCcw, Send, Trash2, Wallet } from "lucide-react";
 import { FileChips, StateTag, StepDot, StepStepper, type PreviewTarget } from "./parts";
 import { progressText, shipmentProgress, stepMissing } from "./progress";
 import type { LoadingUploadTarget, StepItemTarget } from "./ShipmentDialogs";
@@ -91,6 +92,7 @@ export function ShipmentPanel({
   canDeleteShipment,
   onEdit,
   onCancel,
+  onRestore,
   onDelete,
   onOpenItem,
   onUploadLoading,
@@ -108,6 +110,8 @@ export function ShipmentPanel({
   canDeleteShipment: boolean;
   onEdit: () => void;
   onCancel: () => void;
+  /** Khôi phục chuyến đã hủy (HĐ còn mở) — XK-10. */
+  onRestore: () => void;
   onDelete: () => void;
   onOpenItem: (t: StepItemTarget) => void;
   onUploadLoading: (t: LoadingUploadTarget) => void;
@@ -130,7 +134,7 @@ export function ShipmentPanel({
     const st = progress.steps[n];
     if (st === "done") return "Xong";
     if (st === "not-applicable") return "Không áp dụng";
-    if (n === 6) return pay.documentsSentOn ? `Đã gửi chứng từ ${formatDateVN(pay.documentsSentOn)}` : "Chưa ghi — không chặn khép kín";
+    if (n === 6) return pay.documentsSentOn ? `Đã gửi chứng từ ${formatDateVN(pay.documentsSentOn)}` : "Chưa ghi — không tính vào đủ hồ sơ";
     const miss = stepMissing(data, shipment, n);
     return miss.length ? `Còn thiếu: ${miss.join(", ")}` : ITEM_STATE_LABELS[st];
   };
@@ -146,8 +150,18 @@ export function ShipmentPanel({
         Cập nhật
       </Button>
     );
+  /** Mục dùng chung: nói rõ dùng của chuyến nào, số chứng từ nào (XK-12). */
+  const sharedText = (it: ExportStepItem | undefined) => {
+    if (!it?.sharedFromId) return "";
+    const src = sharedSource(data, it);
+    if (!src) return "Chuyến được dùng chung đã hủy hoặc mục gốc chưa xong";
+    const sh = data.shipments.find((x) => x.id === src.shipmentId);
+    const who = sh ? [sh.lotCode && `lô ${sh.lotCode}`, shipmentKindLabel(sh.kind), sh.containerNo].filter(Boolean).join(" · ") : "chuyến khác";
+    return `Dùng chung với ${who}${src.number ? ` · số ${src.number}` : ""}${src.issuedOn ? ` · ${formatDateVN(src.issuedOn)}` : ""}`;
+  };
   const itemDetail = (it: ExportStepItem | undefined, files: readonly ExportFile[], caption: string) => (
     <>
+      {it?.sharedFromId && <span>{sharedText(it)}</span>}
       {it?.number && (
         <span className="tnum">
           Số {it.number}
@@ -157,7 +171,7 @@ export function ShipmentPanel({
       {it?.note && <span className="text-muted-foreground">{it.note}</span>}
       {it?.naReason && <span className="text-muted-foreground">Không áp dụng: {it.naReason}</span>}
       <FileChips files={files} onPreview={onPreview} caption={caption} />
-      {!it?.number && !it?.note && !it?.naReason && !files.length && <span className="text-muted-foreground">Chưa có gì</span>}
+      {!it?.sharedFromId && !it?.number && !it?.note && !it?.naReason && !files.length && <span className="text-muted-foreground">Chưa có gì</span>}
     </>
   );
 
@@ -241,13 +255,19 @@ export function ShipmentPanel({
               {isCancelled ? (
                 <Tag variant="muted">Đã hủy: {shipment.cancelReason}</Tag>
               ) : progress.next === null ? (
-                <Tag variant="done">Chuyến đã khép kín</Tag>
+                <Tag variant="done">Đủ hồ sơ</Tag>
               ) : (
                 <Tag variant="pending">Đang làm · {progress.settledCount}/5 bước</Tag>
               )}
               {late && !isCancelled && <Tag variant="error">Trễ hạn giao{deliveredOn ? ` (${formatDateVN(deliveredOn)})` : ""}</Tag>}
             </div>
           </div>
+          {isCancelled && can.update && contract.status === "open" && (
+            <Button size="sm" variant="edit" onClick={onRestore} title="Khôi phục chuyến đã hủy về đang làm (mục dùng chung ở chuyến khác không tự quay lại).">
+              <RotateCcw className="mr-1 h-4 w-4" aria-hidden />
+              Khôi phục chuyến
+            </Button>
+          )}
           {!isCancelled && (can.update || can.delete) && (
             <div className="flex flex-wrap gap-2">
               {can.update && (
@@ -272,8 +292,8 @@ export function ShipmentPanel({
           )}
         </div>
         <dl className="grid gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
-          <Fact label="Booking" value={shipment.bookingNo || "Chờ booking"} />
-          <Fact label="Đóng cont" value={formatDateVN(shipment.loadingDate)} />
+          <Fact label="Booking" value={shipment.bookingNo || (shipment.containerNo ? "" : "Chờ booking")} />
+          <Fact label="Đóng cont" value={shipment.loadingDate ? formatDateVN(shipment.loadingDate) : ""} />
           <Fact label="ETD · ETA" value={[shipment.etd && formatDateVN(shipment.etd), shipment.eta && formatDateVN(shipment.eta)].filter(Boolean).join(" → ")} />
           <Fact label="Tàu / chuyến" value={shipment.vesselVoyage} />
           <Fact label={shipment.kind === "truck" ? "Biển số" : "Cont · seal"} value={[shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ")} />
@@ -306,9 +326,9 @@ export function ShipmentPanel({
       <StepBlock n={4} state={progress.steps[4]} summary={summaryOf(4)} isCurrent={progress.next === 4}>
         <ChecklistRow
           label={shipment.kind === "truck" ? "Biển số xe" : "Số cont + seal"}
-          state={containerIdentityOk(shipment) ? "done" : "not-started"}
+          state={shipment.kind === "consolidated" ? "not-applicable" : containerIdentityOk(shipment) ? "done" : "not-started"}
           actions={
-            canWrite && (
+            canWrite && shipment.kind !== "consolidated" && (
               <Button size="sm" variant="edit" onClick={onEdit} title="Điền số container và seal (nhìn ảnh seal / cửa cont).">
                 <Pencil className="mr-1 h-4 w-4" aria-hidden />
                 Sửa số cont
@@ -316,7 +336,11 @@ export function ShipmentPanel({
             )
           }
         >
-          <span className="tnum">{[shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ") || <span className="text-muted-foreground">Chưa điền</span>}</span>
+          <span className="tnum">
+            {shipment.kind === "consolidated"
+              ? <span className="text-muted-foreground">Không cần — hàng đóng ghép chung cont của chuyến khác</span>
+              : [shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ") || <span className="text-muted-foreground">Chưa điền</span>}
+          </span>
         </ChecklistRow>
         {LOADING_STEPS.map((st) => (st === "loading-plan" || st === "loading-photos" ? uploadRow(st) : singleRow(st)))}
       </StepBlock>
@@ -325,7 +349,7 @@ export function ShipmentPanel({
         {actuals.kg > 0 && (
           <p className="tnum border-b border-border py-3 text-sm">
             Thực xuất (theo Commercial Invoice): {formatNumber(actuals.cartons)} thùng · {formatNumber(actuals.kg)} kg
-            {can.viewPrice ? ` · ${formatNumber(actuals.amount)} ${currency}` : ""}
+            {can.viewPrice ? ` · ${formatMoney(actuals.amount)} ${currency}` : ""}
           </p>
         )}
         {!docs.length && <p className="py-3 text-sm text-muted-foreground">Chưa có mục chứng từ.</p>}
@@ -343,7 +367,7 @@ export function ShipmentPanel({
               {itemDetail(d, filesOfItem(data, d.id), title)}
               {d.docKind === "commercial-invoice" && d.netKg != null && (
                 <span className="tnum">
-                  {formatNumber(d.cartons)} thùng · {formatNumber(d.netKg)} kg{can.viewPrice && d.amount != null ? ` · ${formatNumber(d.amount)} ${currency}` : ""}
+                  {formatNumber(d.cartons)} thùng · {formatNumber(d.netKg)} kg{can.viewPrice && d.amount != null ? ` · ${formatMoney(d.amount)} ${currency}` : ""}
                 </span>
               )}
               {d.docKind === "bill-of-lading" && d.onBoardDate && <span className="tnum">On board {formatDateVN(d.onBoardDate)}</span>}
@@ -369,7 +393,7 @@ export function ShipmentPanel({
         <StepBlock n={6} state={progress.steps[6]} summary={summaryOf(6)} isCurrent={false}>
           {can.viewPrice && (
             <p className="tnum border-b border-border py-3 text-sm">
-              Tiền về {formatNumber(pay.received)} / {formatNumber(pay.expected)} {currency}
+              Tiền về {formatMoney(pay.received)} / {formatMoney(pay.expected)} {currency}
             </p>
           )}
           {payments.map((p) => (
@@ -393,7 +417,7 @@ export function ShipmentPanel({
                   {can.paymentsDelete && (
                     <InlineConfirmDelete
                       onConfirm={() => onDeletePayment(p)}
-                      recordDescription={`${p.kind === "documents-sent" ? "Gửi bộ chứng từ" : "Tiền về"} ${formatDateVN(p.date)}${p.kind === "payment" && can.viewPrice ? ` — ${formatNumber(p.amount)} ${p.currency}` : ""}`}
+                      recordDescription={`${p.kind === "documents-sent" ? "Gửi bộ chứng từ" : "Tiền về"} ${formatDateVN(p.date)}${p.kind === "payment" && can.viewPrice ? ` — ${formatMoney(p.amount)} ${p.currency}` : ""}`}
                     />
                   )}
                 </>
@@ -401,7 +425,7 @@ export function ShipmentPanel({
             >
               <span className="tnum">
                 {formatDateVN(p.date)}
-                {p.kind === "payment" && can.viewPrice ? ` · ${formatNumber(p.amount)} ${p.currency}` : ""}
+                {p.kind === "payment" && can.viewPrice ? ` · ${formatMoney(p.amount)} ${p.currency}` : ""}
                 {p.method ? ` · ${p.method}` : ""}
               </span>
               {p.note && <span className="text-muted-foreground">{p.note}</span>}

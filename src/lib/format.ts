@@ -35,3 +35,9 @@ export function formatDateVN(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
+
+/** Tiền ngoại tệ (USD…) đủ 2 số lẻ kiểu vi-VN: 194557.6 → "194.557,60"; null → "". */
+export function formatMoney(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "";
+  return chuan0(v).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}

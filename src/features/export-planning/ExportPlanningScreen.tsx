@@ -10,13 +10,17 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, notify, todayIso } from "@/design-system";
-import { useCustomers } from "@/lib/catalogRepo";
+import { useCustomers, useProducts, useUserProfiles } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { newId } from "@/lib/store";
 import {
   buildMonthExcel,
-  buildMonthPlan,
+  buildPeriodPlan,
+  monthPeriod,
+  rangePeriod,
+  weekPeriod,
+  type Period,
   canCancel,
   canDeleteContract,
   canDeleteShipment,
@@ -41,6 +45,7 @@ import { ContractFormDialog, type ContractFormTarget, type ContractSavePayload }
 import { ContractListView } from "./ContractListView";
 import { LoadingView } from "./LoadingView";
 import { MonthView } from "./MonthView";
+import { ProductMappingDialog, type ProductMappingTarget } from "./ProductMappingDialog";
 import { ExportFilePreview, type PreviewTarget } from "./parts";
 import {
   ApprovalDialog,
@@ -80,12 +85,35 @@ export default function ExportPlanningScreen() {
   const store = useExportData();
   const d = store.data;
   const [customers, setCustomers] = useCustomers();
+  const [products, setProducts] = useProducts();
+  const [profiles] = useUserProfiles();
+  /** Người ký duyệt = tài khoản có vai trò Giám đốc / Phó giám đốc (không gõ tự do — XK audit 2026-10-20). */
+  const approvers = profiles
+    .filter((p) => p.roles.includes("director") || p.roles.includes("vice-director"))
+    .map((p) => ({ name: p.fullName || p.username, role: p.roles.includes("director") ? ("director" as const) : ("vice-director" as const) }))
+    .filter((a) => a.name.trim());
   const [params, setParams] = useSearchParams();
   const filesAvailable = hasExportStorage;
   const opts = { filesAvailable };
 
   const view = params.get("view") === "contracts" ? "contracts" : "month";
-  const month = /^\d{4}-\d{2}$/.test(params.get("month") ?? "") ? (params.get("month") as string) : today.slice(0, 7);
+  // Kỳ xem: ?month=yyyy-mm (mặc định tháng này) · ?week=yyyy-mm-dd (tuần chứa ngày đó) · ?from=&to= (khoảng ngày).
+  const isoDay = /^\d{4}-\d{2}-\d{2}$/;
+  const period: Period =
+    isoDay.test(params.get("from") ?? "") && isoDay.test(params.get("to") ?? "")
+      ? rangePeriod(params.get("from") as string, params.get("to") as string)
+      : isoDay.test(params.get("week") ?? "")
+        ? weekPeriod(params.get("week") as string)
+        : monthPeriod(/^\d{4}-\d{2}$/.test(params.get("month") ?? "") ? (params.get("month") as string) : today.slice(0, 7));
+  const setPeriod = (p: Period) =>
+    setParam(
+      p.kind === "range"
+        ? { month: "", week: "", from: p.from, to: p.to }
+        : p.kind === "week"
+          ? { month: "", week: p.from, from: "", to: "" }
+          : { month: p.from.slice(0, 7) === today.slice(0, 7) ? "" : p.from.slice(0, 7), week: "", from: "", to: "" },
+      true,
+    );
   const contractId = params.get("contract") ?? "";
   const shipmentParam = params.get("shipment") ?? "";
   const setParam = (patch: Record<string, string>, replace = false) =>
@@ -109,6 +137,7 @@ export default function ExportPlanningScreen() {
   const [itemTarget, setItemTarget] = useState<StepItemTarget | null>(null);
   const [loadingTarget, setLoadingTarget] = useState<LoadingUploadTarget | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null);
+  const [mappingTarget, setMappingTarget] = useState<ProductMappingTarget | null>(null);
   const [reasonTarget, setReasonTarget] = useState<ReasonTarget | null>(null);
   const [deletingContract, setDeletingContract] = useState<ExportContract | null>(null);
   const [deletingShipment, setDeletingShipment] = useState<ExportShipment | null>(null);
@@ -307,6 +336,23 @@ export default function ExportPlanningScreen() {
     notify.saved("Đã hủy chuyến", () => store.saveShipments(prev));
   };
 
+  /** Nối dòng hàng ↔ mặt hàng: ghi thẳng vào bản đang dùng (thông tin nội bộ, không phải bản sửa HĐ). */
+  const saveProductMapping = (revisionId: string, map: Record<string, string>): boolean => {
+    const prev = d.revisions;
+    const next = prev.map((r) => (r.id === revisionId ? { ...r, lines: r.lines.map((l) => ({ ...l, productId: map[l.id] || undefined })) } : r));
+    if (!store.saveRevisions(next)) return false;
+    const n = Object.values(map).filter(Boolean).length;
+    notify.saved(`Đã nối mặt hàng cho ${n} dòng hàng`, () => store.saveRevisions(prev));
+    setMappingTarget(null);
+    return true;
+  };
+
+  const doRestoreShipment = (s: ExportShipment) => {
+    const prev = d.shipments;
+    if (!store.saveShipments(prev.map((x) => (x.id === s.id ? { ...x, status: "open" as const, cancelReason: "" } : x)))) return;
+    notify.saved(`Đã khôi phục chuyến${s.lotCode ? ` lô ${s.lotCode}` : ""}`, () => store.saveShipments(prev));
+  };
+
   const doDeleteShipment = (s: ExportShipment) => {
     const prevS = d.shipments;
     const prevI = d.items;
@@ -319,15 +365,17 @@ export default function ExportPlanningScreen() {
     });
   };
 
-  const exportExcel = async (m: string) => {
-    const plan = buildMonthPlan(m, d, customers, today, opts);
+  const exportExcel = async (p: Period, customerId: string) => {
+    const plan = buildPeriodPlan(p, d, customers, today, opts, customerId);
     const xl = buildMonthExcel(plan, d);
     const { exportAoaToXlsx } = await import("@/lib/reportXlsx"); // nạp động — xlsx không vào chunk chính
+    const slug = p.kind === "month" ? p.from.slice(0, 7) : `${p.from}_${p.to}`;
+    const who = customerId ? ` — ${customerName(customerId)}` : "";
     exportAoaToXlsx({
-      sheetName: `Kế hoạch XK ${m}`,
-      aoa: [[`KẾ HOẠCH XUẤT HÀNG THÁNG ${m.slice(5)}/${m.slice(0, 4)}`], [], xl.header, ...xl.rows.map((r) => r.cells)],
+      sheetName: `Kế hoạch XK ${slug}`.slice(0, 31),
+      aoa: [[`KẾ HOẠCH XUẤT HÀNG ${p.label.toUpperCase()}${who}`], [], xl.header, ...xl.rows.map((r) => r.cells)],
       colWidths: [10, 22, 30, 12, 10, 14, 16, 14, 12, 10, 12, 14, 14, 30],
-      fileName: `ke-hoach-xuat-khau-${m}.xlsx`,
+      fileName: `ke-hoach-xuat-khau-${slug}.xlsx`,
     });
   };
 
@@ -386,12 +434,12 @@ export default function ExportPlanningScreen() {
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
-              <p className="max-w-3xl text-muted-foreground">Mỗi chuyến container của từng khách đang ở bước nào và còn thiếu gì, tới khi bộ hợp đồng khép kín.</p>
+              <p className="max-w-3xl text-muted-foreground">Mỗi chuyến container của từng khách đang ở bước nào và còn thiếu gì, tới khi hợp đồng xuất đủ.</p>
               <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" ? "contracts" : "" }, true)}>
                 <TabsList className="h-auto max-w-full flex-wrap">
-                  <TabsTrigger value="month" title="Xem chuyến theo tháng đóng cont, gom theo khách.">
+                  <TabsTrigger value="month" title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
                     <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
-                    Theo tháng
+                    Lịch xuất hàng
                   </TabsTrigger>
                   <TabsTrigger value="contracts" title="Danh sách mọi hợp đồng, lọc theo trạng thái.">
                     <FileText className="mr-2 h-4 w-4" aria-hidden />
@@ -418,16 +466,16 @@ export default function ExportPlanningScreen() {
             <MonthView
               data={d}
               customers={customers}
-              month={month}
+              period={period}
               today={today}
               filesAvailable={filesAvailable}
               canExport={can.export}
-              onMonthChange={(m) => setParam({ month: m === today.slice(0, 7) ? "" : m }, true)}
+              onPeriodChange={setPeriod}
               onOpenContract={(cid, sid) => setParam({ contract: cid, shipment: sid ?? "" })}
-              onExportExcel={(m) => void exportExcel(m)}
+              onExportExcel={(p, cid) => void exportExcel(p, cid)}
             />
           ) : (
-            <ContractListView data={d} customers={customers} filesAvailable={filesAvailable} canSeePrice={can["view-price"]} onOpen={(cid) => setParam({ contract: cid, shipment: "" })} />
+            <ContractListView data={d} customers={customers} filesAvailable={filesAvailable} canSeePrice={can["view-price"]} today={today} onOpen={(cid) => setParam({ contract: cid, shipment: "" })} />
           )}
         </>
       )}
@@ -441,7 +489,15 @@ export default function ExportPlanningScreen() {
           data={d}
           contract={contract}
           customerName={customerName(contract.customerId)}
-          can={{ create: can.create, update: can.update, delete: can.delete, viewPrice: can["view-price"], paymentsWrite: paymentsCan.create || paymentsCan.update }}
+          can={{ create: can.create, update: can.update, delete: can.delete, viewPrice: can["view-price"], paymentsWrite: paymentsCan.create || paymentsCan.update, paymentsDelete: paymentsCan.delete }}
+          products={products}
+          today={today}
+          onEditPayment={(p) => setPaymentTarget({ contractId: contract.id, shipmentId: "", label: `HĐ ${contract.contractNo}`, kind: p.kind, currency, existing: p })}
+          onDeletePayment={deletePayment}
+          onMapProducts={() => {
+            const r = workingRevision(d, contract.id);
+            if (r) setMappingTarget({ contractNo: contract.contractNo, customerId: contract.customerId, revision: r });
+          }}
           filesAvailable={filesAvailable}
           selectedShipmentId={dossier.selected?.id ?? ""}
           canDelete={canDeleteContract(d, contract.id).ok}
@@ -473,13 +529,13 @@ export default function ExportPlanningScreen() {
           }
           onCloseManually={() =>
             setReasonTarget({
-              title: `Đóng tay HĐ ${contract.contractNo}?`,
-              description: "Dùng khi lượng / tiền lệch dung sai mà khách đã xác nhận (phụ kiện giảm lượng, gia hạn…). Ghi rõ lý do.",
-              confirmLabel: "Đóng hợp đồng",
-              onConfirm: (reason) => updateContract(contract, { status: "closed", closeReason: reason }, `Đã đóng tay HĐ ${contract.contractNo}`),
+              title: `Chốt HĐ ${contract.contractNo}?`,
+              description: "Dùng khi số xuất ngoài dung sai hoặc chuyến chưa đủ hồ sơ mà khách đã xác nhận (phụ kiện giảm lượng, gia hạn…). Ghi rõ lý do.",
+              confirmLabel: "Chốt hợp đồng",
+              onConfirm: (reason) => updateContract(contract, { status: "closed", closeReason: reason }, `Đã chốt HĐ ${contract.contractNo}`),
             })
           }
-          onReopen={() => updateContract(contract, { status: "open", closeReason: "" }, `Đã bỏ đóng tay HĐ ${contract.contractNo}`)}
+          onReopen={() => updateContract(contract, { status: "open", closeReason: "" }, `Đã mở lại HĐ ${contract.contractNo}`)}
           onDeleteContract={() => setDeletingContract(contract)}
           onDeposit={() => setPaymentTarget({ contractId: contract.id, shipmentId: "", label: `HĐ ${contract.contractNo}`, kind: "payment", currency })}
           onPreview={setPreview}
@@ -507,12 +563,13 @@ export default function ExportPlanningScreen() {
                 if (!s) return;
                 setReasonTarget({
                   title: "Hủy chuyến này?",
-                  description: "Chuyến chuyển Đã hủy, không tính vào tháng và khép kín. Dữ liệu, file giữ nguyên.",
+                  description: "Chuyến chuyển Đã hủy, không tính vào kỳ xem và không tính đủ hồ sơ của hợp đồng. Dữ liệu, file giữ nguyên; khôi phục lại được.",
                   confirmLabel: "Hủy chuyến",
                   destructive: true,
                   onConfirm: (reason) => doCancelShipment(s, reason),
                 });
               }}
+              onRestore={() => dossier.selected && doRestoreShipment(dossier.selected)}
               onDelete={() => dossier.selected && setDeletingShipment(dossier.selected)}
               onOpenItem={setItemTarget}
               onUploadLoading={setLoadingTarget}
@@ -530,12 +587,15 @@ export default function ExportPlanningScreen() {
         contracts={d.contracts}
         customers={customers}
         setCustomers={setCustomers}
+        products={products}
+        setProducts={setProducts}
+        data={d}
         recordedBy={recordedBy}
         canSeePrice={can["view-price"]}
         onClose={() => setContractForm(null)}
         onSave={saveContract}
       />
-      <ApprovalDialog target={approvalTarget} recordedBy={recordedBy} onClose={() => setApprovalTarget(null)} onSave={saveApproval} />
+      <ApprovalDialog target={approvalTarget} approvers={approvers} recordedBy={recordedBy} onClose={() => setApprovalTarget(null)} onSave={saveApproval} />
       <ExtensionDialog target={extensionTarget} recordedBy={recordedBy} onClose={() => setExtensionTarget(null)} onSave={saveExtension} />
       <ShipmentFormDialog target={shipmentTarget} onClose={() => setShipmentTarget(null)} onSave={saveShipment} />
       <StepItemDialog
@@ -553,6 +613,7 @@ export default function ExportPlanningScreen() {
       <LoadingUploadDialog target={loadingTarget} recordedBy={recordedBy} onClose={() => setLoadingTarget(null)} onSave={saveLoadingFiles} />
       <PaymentDialog target={paymentTarget} recordedBy={recordedBy} onClose={() => setPaymentTarget(null)} onSave={savePayment} />
       <ReasonDialog target={reasonTarget} onClose={() => setReasonTarget(null)} />
+      <ProductMappingDialog target={mappingTarget} data={d} products={products} setProducts={setProducts} onClose={() => setMappingTarget(null)} onSave={saveProductMapping} />
       <ExportFilePreview file={preview} onClose={() => setPreview(null)} />
 
       <ConfirmDelete

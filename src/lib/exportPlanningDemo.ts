@@ -19,6 +19,7 @@ import type {
   ExportPayment,
   ExportShipment,
   ExportStepItem,
+  Product,
 } from "@/types";
 
 const DOCS = [
@@ -36,7 +37,7 @@ function line(id: string, description: string, quantity: number, netKgPerCarton:
 export type ExportDemoSet = { [K in keyof ExportData]: ExportData[K] extends readonly (infer T)[] ? T[] : never };
 
 /** 3 HĐ: (A) đã khép kín, (B) đang đóng cont + còn thiếu 1 cont, (C) chờ duyệt chưa lên chuyến. */
-export function buildExportDemo(customers: readonly Customer[], today: string): ExportDemoSet {
+export function buildExportDemo(customers: readonly Customer[], today: string, products: readonly Pick<Product, "id">[] = []): ExportDemoSet {
   const out = {
     contracts: [] as ExportContract[],
     revisions: [] as ExportContractRevision[],
@@ -55,6 +56,7 @@ export function buildExportDemo(customers: readonly Customer[], today: string): 
   const kh = (i: number) => customers[i % customers.length].id;
   const placeholder = (name: string) => `${DEMO_PLACEHOLDER_PREFIX}${name}`;
 
+  let nextProduct = 0;
   const contract = (no: string, customerId: string, signedOn: string, deadline: string, containers: number, lines: ExportContractLine[], approved: boolean) => {
     const c: ExportContract = { id: id("hd"), customerId, contractNo: no, signedOn, orderRef: "", status: "open", cancelReason: "", closeReason: "", note: "Hợp đồng demo", createdAt: at(signedOn) };
     const r: ExportContractRevision = {
@@ -64,12 +66,14 @@ export function buildExportDemo(customers: readonly Customer[], today: string): 
       revisedOn: signedOn,
       changeSummary: "",
       terms: { ...emptyTerms(), incoterm: "CFR", portOfLoading: "Cái Mép", portOfDischarge: "Tokyo", tolerancePct: 10, latestShipmentDate: deadline, containerCount: containers, containerType: "40RF", requiredDocuments: DOCS.map((x) => ({ ...x })) },
-      lines,
+      // Dòng hàng nối danh mục mặt hàng của bộ demo (Lệnh SX cần mặt hàng thật — luật lines-unmapped).
+      lines: lines.map((l, i) => (products.length ? { ...l, productId: products[(nextProduct + i) % products.length].id } : l)),
       filePath: placeholder(`hd-${no}.pdf`),
       fileName: `HĐ ${no}.pdf`,
       recordedBy: "Demo",
       createdAt: at(signedOn),
     };
+    nextProduct += lines.length;
     out.contracts.push(c);
     out.revisions.push(r);
     if (approved)

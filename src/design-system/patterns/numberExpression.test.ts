@@ -5,6 +5,16 @@ describe("parseVnNumber — số thường vi-VN", () => {
   it("dấu chấm phân nghìn, phẩy thập phân", () => {
     expect(parseVnNumber("1.234,5")).toBe(1234.5);
     expect(parseVnNumber("1 250")).toBe(1250);
+    // Số chép từ chứng từ tiếng Anh (audit Xuất khẩu 2026-10-20: "10.50" từng bị đọc thành 1.050)
+    expect(parseVnNumber("10.50")).toBe(10.5);
+    expect(parseVnNumber("4.05")).toBe(4.05);
+    expect(parseVnNumber("194,557.60")).toBe(194557.6);
+    expect(parseVnNumber("22,214.00")).toBe(22214);
+    // Kiểu Việt giữ nguyên
+    expect(parseVnNumber("1.234")).toBe(1234);
+    expect(parseVnNumber("1.234.567")).toBe(1234567);
+    expect(parseVnNumber("2,5")).toBe(2.5);
+    expect(parseVnNumber("-1.234")).toBe(-1234);
     expect(parseVnNumber("")).toBeNull();
     expect(parseVnNumber("abc")).toBeNull();
   });

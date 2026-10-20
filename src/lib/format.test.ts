@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { num, kg, formatDateVN, todayISO, chuan0 } from "@/lib/format";
+import { num, kg, formatDateVN, todayISO, chuan0, formatMoney } from "@/lib/format";
 
 describe("num", () => {
   it("null/undefined/NaN ⇒ chuỗi rỗng (không phải '0')", () => {
@@ -40,5 +40,14 @@ describe("formatDateVN", () => {
 describe("todayISO", () => {
   it("trả yyyy-mm-dd hợp lệ", () => {
     expect(todayISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("formatMoney", () => {
+  it("đủ 2 số lẻ kiểu vi-VN", () => {
+    expect(formatMoney(194557.6)).toBe("194.557,60");
+    expect(formatMoney(10.5)).toBe("10,50");
+    expect(formatMoney(0)).toBe("0,00");
+    expect(formatMoney(null)).toBe("");
   });
 });

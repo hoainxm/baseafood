@@ -4,7 +4,9 @@
 covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql
 last_verified: 2026-10-20
 ttl_days: 90
-status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+status: ba-spec v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+<!-- re-verified: 2026-10-20 17:30 — v4: R16–R22 + AC-30…AC-38 = test `exportPlanning.test.ts` (48) + `numberExpression.test.ts` + `format.test.ts`; nhãn / người ký / kỳ xem / nối mặt hàng thử tay preview sandbox, 360 px + 130 %. -->
+<!-- re-verified: 2026-10-20 15:00 — audit hồ sơ SCM trên preview: NV3–NV13 chạy tay (AC-4…AC-28 trừ AC-1/2/18/29 cần DB thật), 50 TC ở docs/test-cases; luật trong doc khớp code. -->
 <!-- re-verified: 2026-10-20 12:40 — AC-4…AC-26 = test `src/lib/exportPlanning.test.ts` (37) + `exportPlanningDemo.test.ts`; AC-1/2/18/27 RLS thử trên PGlite; luồng lập HĐ → lên chuyến → chặn KH-R8 → duyệt → 6 bước → khép kín · bản sửa chờ / bị từ chối · nháp · 360 px + 130 % thử tay preview demo. -->
 
 > **Giao diện:** design-spec [42](42-export-planning-ui.design-spec.md) (oracle giao diện — chỉnh UI đọc file đó).
@@ -84,13 +86,13 @@ status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sq
 - **Start:** khách đã xác nhận đơn (giấy / email).
 - **Input bắt buộc:** khách · số HĐ · ngày ký · **hạn giao muộn nhất** · tiền tệ (cấp HĐ, mặc định USD) · ≥1 dòng hàng.
 - **Input khác:** Order ref của khách · incoterm (danh sách Incoterms 2020) · cảng xếp / cảng đích · **thanh toán** (TTR · L/C · khác) + % cọc · nếu L/C: số L/C, ngày hết hạn L/C, hạn giao theo L/C, file L/C · dung sai % (trống = 0) · số cont + loại cont · **chứng từ khách yêu cầu**, mỗi mục gồm loại + form / người cấp (VD C/O **form VJ**, H/C **công ty tự cấp**) · file HĐ.
-- **Dòng hàng:** mô tả, mã HS, size, quy cách, đơn vị tính (thùng / kiện), số thùng mỗi kiện, kg tịnh mỗi thùng, số lượng, kg (= số lượng × số thùng mỗi kiện × kg/thùng, sửa tay được), đơn giá, tiền (= kg × đơn giá), yêu cầu vi sinh.
+- **Dòng hàng:** mô tả (đúng chữ tiếng Anh trên HĐ), **mặt hàng danh mục** (không bắt buộc lúc lập — R16), mã HS, size, quy cách, đơn vị tính (thùng / kiện), số thùng mỗi kiện, kg tịnh mỗi thùng, số lượng, kg (= số lượng × số thùng mỗi kiện × kg/thùng, sửa tay được), đơn giá, tiền (= kg × đơn giá), yêu cầu vi sinh. Số chép từ chứng từ tiếng Anh ("10.50", "194,557.60") được hiểu đúng (R22).
 - **Output:** HĐ với bản 0 trạng thái **chờ duyệt**; tổng `units` / `cartons` / kg / tiền tính sẵn (R2); bước 1 "đang làm".
 - **End:** HĐ ở tháng của hạn giao, nhãn "chưa lên chuyến".
 
 ### Flow NV4 — Ghi kết quả duyệt giấy · owner U1
 - **Start:** BGĐ đã ký (hoặc trả về) bản giấy của **một bản HĐ** (bản 0 hoặc bản sửa).
-- **Input:** bản HĐ, kết quả (`approved` · `needs-revision` · `rejected`), người duyệt, ngày, file scan, lý do (bắt buộc khi không đồng ý).
+- **Input:** bản HĐ, kết quả (`approved` · `needs-revision` · `rejected`), **người ký chọn từ tài khoản có vai trò Giám đốc / Phó giám đốc** (R17 — không gõ tự do; mặc định Giám đốc khi hệ thống có đúng một tài khoản Giám đốc; PGĐ đồng ý ký HĐ phải xác nhận "ký theo ủy quyền"), ngày, file scan, lý do (bắt buộc khi không đồng ý). Chưa có tài khoản BGĐ ⇒ tạm gõ họ tên, có dòng nhắc admin gán vai trò.
 - **Output:**
 
 | Bản | `approved` | `needs-revision` | `rejected` |
@@ -129,10 +131,10 @@ status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sq
 
 | Bước | Mục con | Xong khi |
 |---|---|---|
-| 2 Lệnh sản xuất | — | có ≥1 file (hoặc dùng chung) **và** HĐ đã có bản hiệu lực (KH-R8) |
+| 2 Lệnh sản xuất | — | có ≥1 file (hoặc dùng chung) **và** HĐ đã có bản hiệu lực (KH-R8) **và mọi dòng hàng của bản hiệu lực đã nối mặt hàng danh mục** (R16) |
 | 3 Bao bì | — | có file hoặc ghi chú (VD "đã có sẵn") |
 | 4 Đóng cont | 4a Sơ đồ container · 4b Hình ảnh · 4c Tờ khai · 4d Lệnh xuất | 4a **tự xong** khi có file · 4b **tự xong** khi có ≥1 ảnh · 4c có số tờ khai **và** file · 4d có file lệnh xuất **đã có chữ ký BGĐ** (KH-R4); **và** số cont + seal đã điền (Xe tải: biển số; Đóng ghép: `not-applicable` + lý do) |
-| 5 Bộ chứng từ | một mục / chứng từ yêu cầu (+ mục thêm tay, VD kết quả kiểm vi sinh, hóa đơn hàng mẫu "M", bảo hiểm với CIF/CIP) | mỗi mục: số, ngày, file. **Commercial Invoice** thêm Σ thùng, Σ kg tịnh, Σ tiền. **B/L** thêm ngày on board. Bước 5 xong khi **mọi mục** `done` / `not-applicable` |
+| 5 Bộ chứng từ | một mục / chứng từ yêu cầu (+ **bảo hiểm tự thêm khi Incoterm CIF / CIP** — R19; + mục thêm tay, VD kết quả kiểm vi sinh, hóa đơn hàng mẫu "M") | mỗi mục: số, ngày, file — **chứng từ công ty tự cấp (VD H/C) không bắt số** (R20). **Commercial Invoice** thêm Σ thùng, Σ kg tịnh, Σ tiền. **B/L** thêm ngày on board. Bước 5 xong khi **mọi mục** `done` / `not-applicable`. **Mục theo chứng từ khách yêu cầu không xóa được**, chỉ "không áp dụng" + lý do; mục thêm tay xóa được, hỏi lại trước (R21) |
 
 - `not-applicable` bắt buộc có lý do.
 - **Thực xuất của chuyến** = Σ thùng / kg tịnh / tiền của các **invoice thương mại** của chuyến. **Không** cộng hóa đơn hàng mẫu "M", **không** lấy số trên B/L (B/L gồm cả hàng mẫu: 22.227,8 kg so với 22.214 kg).
@@ -149,20 +151,21 @@ status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sq
 - **Input:**
   - **Gửi bộ chứng từ cho khách:** ngày gửi, cách gửi (email / chuyển phát / ngân hàng), file email. Là mốc tính hạn trả TTR "sau khi nhận bộ chứng từ" và hạn xuất trình L/C.
   - **Tiền về:** ngày, số tiền, tiền tệ, ghi chú, file giấy báo có. Ghi được ở **cấp chuyến** hoặc **cấp HĐ** (tiền cọc trước sản xuất); nhiều lần.
-- **Output:** chuyến hiện "đã về X / Y" với Y = tiền thực xuất của chuyến; HĐ hiện tổng tiền về (cọc + các chuyến) so với tổng tiền thực xuất. **Không ảnh hưởng khép kín** (Q5).
+- **Output:** chuyến hiện "đã về X / Y" với Y = tiền thực xuất của chuyến; HĐ hiện tổng tiền về (cọc + các chuyến) so với tổng tiền thực xuất, và **liệt kê từng lần cọc / tiền về cấp HĐ (xem · sửa · xóa có Hoàn tác)**. **Không ảnh hưởng đủ hồ sơ / xuất đủ** (Q5).
 - **End:** U1 xem và ghi được cùng chỗ; ghi sai thì xóa (có Hoàn tác).
 
-### Flow NV11 — Theo dõi tháng · owner U1
-- **Input:** tháng, lọc khách (tùy chọn), ô tra theo **MSL / booking / số cont / số invoice / số B/L / số HĐ**.
+### Flow NV11 — Lịch xuất hàng (theo tháng / tuần / khoảng ngày) · owner U1
+- **Input:** **kỳ xem** = tháng · tuần lịch (Thứ 2 → Chủ nhật) · khoảng ngày (R18); lọc khách (tùy chọn — **4 con số cũng theo khách**); ô tra theo **MSL / booking / số cont / số invoice / số B/L / số HĐ / số đơn khách** — tra mọi kỳ, ra **cả HĐ chưa lên chuyến**.
 - **Output:**
   - Chuyến của tháng gom theo khách, mỗi chuyến có trạng thái 6 bước.
   - HĐ chưa lên chuyến: hiện ở tháng của hạn giao; **hạn đã qua mà vẫn chưa lên chuyến ⇒ hiện thêm ở tháng hiện tại, nhãn trễ**.
   - HĐ chưa phủ đủ (NV12) hiện nhãn "còn X kg / Y cont chưa lên chuyến".
   - 4 con số: số chuyến · chuyến đã khép · chuyến thiếu bước · **chuyến trễ hạn** (ngày on board B/L ?? ETD > hạn giao hiệu lực). HĐ quá hạn chưa lên chuyến đếm riêng.
-  - Xuất Excel theo bố cục sổ "Kế hoạch xuất hàng" (Q10): gom theo tuần của ngày đóng; các chuyến **cùng booking gộp một dòng**, CONT ghép (VD "40+20"); HĐ chưa lên chuyến ở phần cuối.
+  - Xuất Excel theo bố cục sổ "Kế hoạch xuất hàng" (Q10) cho **kỳ đang xem** (và khách đang lọc): gom theo **tuần lịch T2 → CN** của ngày đóng, nhãn "T2 (05-11/10)"; các chuyến **cùng booking gộp một dòng**, CONT ghép (VD "40+20"); HĐ chưa lên đủ chuyến ở phần cuối — HĐ đã có chuyến thì ghi **phần còn thiếu** (kg / cont), không ghi "Chờ booking".
 - **End:** người xem biết chuyến nào thiếu gì mà không mở giấy.
 
-### Flow NV12 — Khép kín · owner S1 (đóng tay: U1)
+### Flow NV12 — Đủ hồ sơ / Xuất đủ · owner S1 (chốt tay: U1)
+> Nhãn cho người dùng (§9b): chuyến khép = **"Đủ hồ sơ"**; HĐ khép tự tính = **"Đã xuất đủ"**; HĐ đóng tay = **"Đã chốt HĐ"** (nút **Chốt HĐ** / **Mở lại HĐ**); lệch = **"Ngoài dung sai: kg thừa / thiếu x%"**. Không dùng "thanh lý" (thủ tục pháp lý của kế toán). Tên khóa kỹ thuật (`closed`, `isShipmentClosed`, `contractClosure`) giữ nguyên.
 - **Chuyến khép** khi bước 2, 3, 4, 5 đều `done` / `not-applicable` (bước 6 không tính).
 - **Độ phủ HĐ** (chưa khép): Σ kg kế hoạch các chuyến chưa hủy < kg HĐ × (1 − dung sai), **hoặc** số chuyến cont < số cont trên HĐ ⇒ nhãn "còn X kg / Y cont chưa lên chuyến". Nhãn này **khác** "lệch dung sai".
 - **HĐ khép** (`closed`) khi:
@@ -177,7 +180,7 @@ status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sq
   - **Xóa** được khi chưa từng có bản duyệt `approved` và chưa có chuyến.
   - **Hủy** (`cancelled` + lý do) được khi **chưa chuyến nào đã đóng cont** (đã có số cont hoặc biển số). Hủy HĐ ⇒ mọi chuyến của HĐ tự hủy cùng lý do.
   - HĐ có chuyến đã đóng cont ⇒ không hủy, chỉ đóng tay (NV12).
-- **Chuyến:** xóa được khi chưa có file nào và chưa bước nào `done`; còn lại ⇒ hủy + lý do. Chuyến hủy không tính vào tháng, độ phủ, khép kín.
+- **Chuyến:** xóa được khi chưa có file nào và chưa bước nào `done`; còn lại ⇒ hủy + lý do. Chuyến hủy không tính vào kỳ xem, độ phủ, khép kín. **Chuyến đã hủy khôi phục được** khi HĐ còn mở (về đang làm; mục "dùng chung" ở chuyến khác đã rơi về chưa làm thì không tự quay lại).
 - **Tiền về:** xóa được (ghi sai), có Hoàn tác.
 - Mọi xóa có xác nhận + **Hoàn tác** (luật repo 6).
 
@@ -199,6 +202,10 @@ status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sq
 | NV9 trạng thái 4a/4b | A: U4 đánh dấu · B: tự suy từ file | **B** | RLS không chia được cột trạng thái chung; U4 chỉ cần quyền thêm file | Cross-User-Integrity | — |
 | NV10 tiền về | A: chặn khép · B: không chặn | **B** | Q5 | Optimizer | — |
 | NV12 dung sai | A: chỉ chuyến khép · B: + Σ kg · C: + Σ kg **và** Σ tiền | **C** | HĐ 18.26 ghi ±10% cả lượng lẫn tiền | Domain (XK) | v1 chỉ B — sửa ở v2 |
+| NV12 nhãn (v4) | A: Khép kín · B: Hoàn tất · C: Đủ hồ sơ (chuyến) + Đã xuất đủ (HĐ) · D: Thanh lý | **C** | "Hoàn tất" dễ hiểu là đã thu tiền; **D bị VETO** (thủ tục pháp lý có biên bản) | Domain (XK) | — |
+| NV4 người ký (v4) | A: gõ tự do · B: chọn tài khoản BGĐ, mặc định GĐ, PGĐ ký theo ủy quyền · C: chỉ GĐ | **B** | A đã gõ sai tên GĐ (VETO); C kẹt khi GĐ vắng có ủy quyền | Domain (XK) | — |
+| NV11 kỳ xem (v4) | A: khoảng ngày theo ngày xuất (= R1) + tuần lịch · B: chọn trường ngày · C: theo ngày ký | **A** | B hai người lọc ra hai kết quả; **C VETO** (ngày ký không phản ánh xuất hàng) | Domain (XK) + Optimizer | — |
+| NV3 / NV8 nối mặt hàng (v4) | A: bắt lúc lập HĐ · B: không bắt lúc lập, bắt trước Lệnh SX, nối không cần bản sửa · C: nối khi xuất invoice | **B** | A chậm khâu nhập; C quá muộn cho Lệnh SX; nối qua bản sửa bắt BGĐ duyệt lại vô ích (triage) | Domain (XK) + triage | — |
 
 ## 7. Scope & Priority
 
@@ -242,6 +249,13 @@ status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sq
 | R13 | Ghi / sửa / hủy / duyệt / gia hạn / tiền về đều vào nhật ký thao tác | — |
 | R14 | Chế độ demo: mọi bảng mới nằm trong bộ demo; **không** chép file thật — bản ghi demo dùng **file giữ chỗ đánh dấu demo**, chỉ tính là bằng chứng trong `site-demo`; số thật không đổi khi thao tác demo (luật repo 15) | — |
 | R15 | Trễ hạn của chuyến = (ngày on board trên B/L ?? ETD) > hạn giao hiệu lực (sau gia hạn) | gia hạn tới 30/09 ⇒ chuyến ETD 26/09 hết trễ |
+| R16 | Mỗi dòng hàng nối **một mặt hàng ở danh mục mở `products`** (`productId`, tên tiếng Anh giữ ở `description`). Không bắt lúc lập HĐ; **bắt trước khi Lệnh SX xong**. Nối là thông tin nội bộ ⇒ ghi thẳng vào bản đang dùng, **không tạo bản sửa, không cần BGĐ duyệt lại**. Gợi ý theo cặp (tên HĐ → mặt hàng) đã nối ở HĐ trước, ưu tiên cùng khách; không dịch máy. 141 mã kế toán chỉ ánh xạ qua `products` | dòng cũ không có `productId` ⇒ "chưa nối" |
+| R17 | Người ký duyệt = tài khoản có vai trò `director` / `vice-director`; không gõ tự do khi đã có tài khoản; không hard-code tên trong code. PGĐ đồng ý ký HĐ phải xác nhận ký theo ủy quyền (lưu vào tên người ký) | 0 tài khoản BGĐ ⇒ tạm gõ tên + dòng nhắc |
+| R18 | Kỳ xem: chuyến thuộc kỳ khi (ngày đóng ?? ETD) nằm trong [từ, đến]; chuyến chỉ có tháng KH thuộc mọi kỳ chạm tháng đó (xem theo tháng y như R1). HĐ chưa lên đủ chuyến thuộc kỳ khi hạn giao hiệu lực trong kỳ, hoặc quá hạn chưa chuyến và hôm nay trong kỳ. Lọc khách áp cho cả 4 con số | tuần 12–18/10 ra 2 chuyến đóng 13/10 |
+| R19 | Incoterm CIF / CIP ⇒ chuyến tự có mục **Bảo hiểm** ở bước 5 (người bán buộc mua bảo hiểm) | bỏ được bằng "không áp dụng" + lý do |
+| R20 | Chứng từ có người cấp "công ty tự cấp" không bắt số chứng từ (vẫn bắt ngày + file / ghi chú) | H/C lô 165 không in số |
+| R21 | Mục bước 5 theo chứng từ khách yêu cầu (gồm Commercial Invoice, bảo hiểm CIF/CIP) **không xóa được**; mục thêm tay xóa được, hỏi lại trước, có Hoàn tác | xóa C/O form VJ để chuyến đủ hồ sơ ⇒ không làm được |
+| R22 | Ô số hiểu số chép từ chứng từ tiếng Anh: có cả "." lẫn "," ⇒ dấu đứng sau là phần lẻ; chỉ "." mà không đúng nhóm nghìn kiểu Việt ⇒ "." là phần lẻ; có kiểu này ⇒ ô hiện lại số đã hiểu. Kiểu Việt giữ nguyên | "10.50" → 10,5 · "194,557.60" → 194.557,6 · "1.234" → 1234 |
 
 **R11 — ma trận quyền mặc định** (tài nguyên mới, mặc định cấm; Q11 đã đồng ý đổi ma trận):
 
@@ -434,6 +448,41 @@ status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sq
 - **Then** số dòng thật không đổi; trong demo có chuyến khép được
 - **Assert** đếm trước == đếm sau cho từng bảng mới (chênh == 0); trong demo `isShipmentClosed == true` cho ≥ 1 chuyến
 
+### AC-30 — Kỳ xem tháng · tuần · khoảng ngày · Maps to: NV11, R18 · Test: unit
+- **Given** chuyến TEST-006 đóng 13/10/2026 (2 cont), chuyến lô 181 đóng 06/10
+- **When** xem tuần chứa 15/10; xem khoảng 20/09–12/10; lọc khách KR trong tháng 10
+- **Then** tuần ra đúng chuyến đóng 12–18/10; khoảng ra đúng chuyến trong khoảng; lọc khách thì 4 con số chỉ đếm khách đó
+- **Assert** `weekPeriod("2026-10-15")` == {from "2026-10-12", to "2026-10-18"}; `buildPeriodPlan(monthPeriod, …, customerId="kr").stats.shipments == 1`; `buildMonthPlan(m).stats == buildPeriodPlan(monthPeriod(m)).stats`
+
+### AC-31 — Lệnh SX chặn khi dòng hàng chưa nối · Maps to: NV8, R16 · Test: unit
+- **Given** HĐ đã duyệt, 14 dòng chưa có `productId`, bước 2 có file
+- **When** đánh dấu bước 2 xong; rồi nối đủ 14 dòng
+- **Then** lần đầu bị chặn; sau khi nối thì xong
+- **Assert** `canMarkDone(step2).reason == "lines-unmapped"`; sau nối `canMarkDone(step2).ok == true`
+
+### AC-32 — Gợi ý mặt hàng theo tên HĐ đã nối · Maps to: NV3, R16 · Test: unit
+- **Given** HĐ cũ của Seachemot nối "Iwadako blanched cut 2-3g" → p-scm; HĐ khách khác nối cùng tên → p-kr
+- **When** gõ cùng tên (khác hoa thường / khoảng trắng) cho HĐ Seachemot; cho khách mới; gõ tên chưa từng nối
+- **Assert** `suggestProductId(...)` lần lượt == "p-scm", "p-kr", ""
+
+### AC-33 — H/C tự cấp không bắt số · Maps to: NV8, R20 · Test: unit
+- **Assert** H/C `docIssuer = "công ty tự cấp"` có ngày + file ⇒ `canMarkDone.ok == true`; C/O thiếu số ⇒ `missing == ["number"]`
+
+### AC-34 — CIF / CIP tự có mục bảo hiểm · Maps to: NV7, R19 · Test: unit
+- **Assert** `missingDocumentItems(…, incoterm "CIF")` kinds == ["commercial-invoice", "insurance"]; CFR == ["commercial-invoice"]
+
+### AC-35 — Chứng từ khách yêu cầu không xóa được · Maps to: NV8, R21 · Test: unit + manual
+- **Assert** `isRequiredDocumentItem(terms 18.26, C/O form "vj") == true`; hóa đơn hàng mẫu == false; hộp mục C/O không có nút xóa (thử tay)
+
+### AC-36 — Bản đã sửa sau "yêu cầu sửa" hiện Chờ duyệt · Maps to: NV4/NV5 · Test: unit
+- **Assert** lần ghi `needs-revision` 05/08, bản lưu lại 12/08 ⇒ `revisionApprovalLabelState == "pending"`; bản chưa sửa ⇒ "needs-revision"
+
+### AC-37 — Lệch dung sai nói chiều · Maps to: NV12 · Test: unit
+- **Assert** `deviationText(16.916) == "thừa 16,9%"`; `deviationText(-10.53) == "thiếu 10,5%"`
+
+### AC-38 — Tra ra HĐ chưa lên chuyến · Maps to: NV11 · Test: unit
+- **Assert** `searchContracts(d, "test-g")` == [HĐ TEST-G]; tra theo số đơn "b182" và tên khách "matsu" đều ra đúng 1 HĐ
+
 ## 11. Assumptions / Open
 
 **Assumptions (tự quyết, đổi được không tốn dữ liệu):**
@@ -461,6 +510,7 @@ status: ba-spec v3 — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sq
 
 ## History
 
+- v4 (2026-10-20, sau audit hồ sơ SCM — chủ dự án góp ý): nhãn "khép kín" đổi theo ngôn ngữ chứng từ XK (chuyến **Đủ hồ sơ**, HĐ **Đã xuất đủ** / **Đã chốt HĐ**, "Ngoài dung sai thừa / thiếu"); người ký duyệt chọn từ tài khoản BGĐ (R17 — trước gõ tự do, đã gõ sai tên GĐ); kỳ xem tháng / tuần / khoảng ngày + lọc khách áp cả 4 con số (R18); dòng hàng nối danh mục mặt hàng, bắt trước Lệnh SX, nối không cần bản sửa (R16); bảo hiểm CIF/CIP (R19); H/C tự cấp không bắt số (R20); chứng từ bắt buộc không xóa (R21); số kiểu Anh (R22); cọc cấp HĐ xem / sửa / xóa; khôi phục chuyến hủy; Excel phần còn thiếu + tuần lịch. Domain-Specialist XK veto: "thanh lý" (thuật ngữ pháp lý), gõ tự do người ký, lọc theo ngày ký, thay tên tiếng Anh bằng tên Việt, nối thẳng 141 mã kế toán.
 - v3 (2026-10-20): ĐÃ BUILD v1. Lệch nhỏ so với v2: route `/planning-export` (phẳng); kế toán không có Xóa tiền về (giữ luật vai trò — KTT / phòng KH xóa); thực xuất của chuyến "dùng chung" Commercial Invoice tính ở chuyến gốc (không cộng đôi); chạy không nối máy chủ thì ghi chú / số chứng từ thay file làm bằng chứng (như /documents).
 - v2 (2026-10-20): rà bởi Domain-Specialist XK + Cross-User-Integrity (25 điểm). Sửa: thực xuất lấy từ invoice thương mại (bỏ hàng mẫu, bỏ B/L); dung sai áp cả kg lẫn tiền, tính biên; `units` vs `cartons`; duyệt gắn **bản** (bản sửa bị từ chối không hủy HĐ); hủy HĐ kéo theo chuyến; hạn giao bắt buộc + HĐ quá hạn hiện ở tháng hiện tại; loại chuyến Xe tải / Đóng ghép; "dùng chung" chứng từ cho cont ghép; quyền đọc của U4; 4a/4b tự suy từ file; thứ tự ngày; gia hạn riêng; L/C + cọc; form/người cấp chứng từ; mốc gửi bộ chứng từ; độ phủ chuyến; tra theo số giấy tờ; cột Đơn giá; demo dùng file giữ chỗ; tiền về xóa được.
 - v1 (2026-10-20): khởi tạo đợt 1 từ kế hoạch đã chốt 11 câu.

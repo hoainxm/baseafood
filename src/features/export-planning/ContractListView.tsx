@@ -6,8 +6,9 @@
 import { useState } from "react";
 import { Button, ChoiceGroup, RecordTable, Tag, formatNumber, type RecordTableColumn } from "@/design-system";
 import {
-  CONTRACT_STATE_LABELS,
   contractClosure,
+  contractStateLabel,
+  deviationText,
   contractCoverage,
   contractState,
   contractTotals,
@@ -18,7 +19,7 @@ import {
   type ContractState,
   type ExportData,
 } from "@/lib/exportPlanning";
-import { formatDateVN } from "@/lib/format";
+import { formatDateVN, formatMoney } from "@/lib/format";
 import type { Customer, ExportContract } from "@/types";
 import { Eye } from "lucide-react";
 
@@ -27,7 +28,7 @@ type Filter = "open" | ContractState | "all";
 const FILTERS = [
   { value: "open", label: "Đang chạy" },
   { value: "pending", label: "Chờ duyệt" },
-  { value: "closed", label: "Đã khép" },
+  { value: "closed", label: "Đã xuất đủ · đã chốt" },
   { value: "cancelled", label: "Đã hủy" },
   { value: "all", label: "Tất cả" },
 ];
@@ -37,12 +38,14 @@ export function ContractListView({
   customers,
   filesAvailable,
   canSeePrice,
+  today,
   onOpen,
 }: {
   data: ExportData;
   customers: readonly Customer[];
   filesAvailable: boolean;
   canSeePrice: boolean;
+  today: string;
   onOpen: (id: string) => void;
 }) {
   const opts = { filesAvailable };
@@ -69,7 +72,7 @@ export function ContractListView({
         const r = workingRevision(data, c.id);
         if (!r) return "—";
         const t = contractTotals(r.lines);
-        return `${formatNumber(t.kg)}${canSeePrice ? ` · ${formatNumber(t.amount)} ${r.terms.currency}` : ""}`;
+        return `${formatNumber(t.kg)}${canSeePrice ? ` · ${formatMoney(t.amount)} ${r.terms.currency}` : ""}`;
       },
     },
     { key: "ships", header: "Chuyến", numeric: true, render: (c) => openShipmentsOf(data, c.id).length },
@@ -82,10 +85,11 @@ export function ContractListView({
         const cl = contractClosure(data, c.id, opts);
         return (
           <div className="flex flex-wrap gap-1">
-            <Tag variant={STATE_TAG[st]}>{CONTRACT_STATE_LABELS[st]}</Tag>
+            <Tag variant={STATE_TAG[st]}>{contractStateLabel(st, c)}</Tag>
             {pendingRevision(data, c.id) && st !== "pending" && <Tag variant="warning">Bản sửa chờ duyệt</Tag>}
             {(st === "pending" || st === "approved") && !cov.covered && <Tag variant="warning">Chưa lên đủ chuyến</Tag>}
-            {cl.reason === "out-of-tolerance" && <Tag variant="error">Lệch dung sai</Tag>}
+            {(st === "pending" || st === "approved") && effectiveDeadline(data, c.id) < today && (!openShipmentsOf(data, c.id).length || !cov.covered) && <Tag variant="error">Quá hạn giao</Tag>}
+            {cl.reason === "out-of-tolerance" && <Tag variant="error">Ngoài dung sai: kg {deviationText(cl.kgDeviationPct)}</Tag>}
           </div>
         );
       },

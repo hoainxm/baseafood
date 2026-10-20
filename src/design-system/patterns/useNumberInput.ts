@@ -30,7 +30,9 @@ export function useNumberInput({
 
   const displayNumber = (v: number | null) => (v == null || (rong0 && v === 0) ? "" : formatNumber(v));
   const laBT = isTyping && isExpression(raw);
-  const preview = laBT ? { result: parseNumberOrExpression(raw) } : null;
+  // Số có "." làm phần lẻ hoặc có cả "." lẫn "," (chép từ chứng từ tiếng Anh) ⇒ hiện lại số đã hiểu.
+  const isForeignStyle = isTyping && !laBT && /\d[.,]\d/.test(raw) && raw.includes(".") && !/^\s*[-+]?\d{1,3}(\.\d{3})+\s*$/.test(raw);
+  const preview = laBT || isForeignStyle ? { result: parseNumberOrExpression(raw) } : null;
 
   const props = {
     value: isTyping ? raw : displayNumber(value),

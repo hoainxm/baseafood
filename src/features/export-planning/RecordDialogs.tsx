@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import {
   Button,
   ChoiceGroup,
+  Combobox,
   DateField,
   ErrorSummary,
   Field,
@@ -45,8 +46,17 @@ export interface ApprovalTarget {
   revisionNo: number;
 }
 
+/** Người ký duyệt lấy từ tài khoản có vai trò Giám đốc / Phó giám đốc. */
+export interface Approver {
+  name: string;
+  role: "director" | "vice-director";
+}
+const APPROVER_ROLE_LABEL: Record<Approver["role"], string> = { director: "Giám đốc", "vice-director": "Phó giám đốc" };
+
 interface ApprovalForm {
   key: string;
+  /** PGĐ ký HĐ theo ủy quyền của Giám đốc ("" = chưa chọn). */
+  onBehalf: "" | "yes" | "no";
   contractId: string;
   revisionId: string;
   revisionNo: number;
@@ -57,15 +67,18 @@ interface ApprovalForm {
   reason: string;
   initial: string;
 }
-const approvalSnap = (f: ApprovalForm) => JSON.stringify([f.decision, f.approverName, f.decidedOn, f.reason]);
+const approvalSnap = (f: ApprovalForm) => JSON.stringify([f.decision, f.approverName, f.onBehalf, f.decidedOn, f.reason]);
 
 export function ApprovalDialog({
   target,
+  approvers,
   recordedBy,
   onClose,
   onSave,
 }: {
   target: ApprovalTarget | null;
+  /** Rỗng (chưa có tài khoản BGĐ / chạy không nối máy chủ) ⇒ tạm gõ tên, có dòng nhắc. */
+  approvers: readonly Approver[];
   recordedBy: string;
   onClose: () => void;
   onSave: (a: ExportContractApproval) => boolean;
@@ -79,7 +92,9 @@ export function ApprovalDialog({
 
   useEffect(() => {
     if (!target) return;
-    const f: ApprovalForm = { key: target.revisionId, ...target, decision: "approved", approverName: "", decidedOn: today, reason: "", initial: "" };
+    // Mặc định Giám đốc (người đại diện ký HĐ) khi hệ thống có đúng một tài khoản Giám đốc.
+    const directors = approvers.filter((a) => a.role === "director");
+    const f: ApprovalForm = { key: target.revisionId, ...target, decision: "approved", approverName: directors.length === 1 ? directors[0].name : "", onBehalf: "", decidedOn: today, reason: "", initial: "" };
     const fresh = { ...f, initial: approvalSnap(f) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
@@ -93,7 +108,11 @@ export function ApprovalDialog({
   const save = async () => {
     if (!form || busy) return;
     const errs: FieldError[] = [];
-    if (!form.approverName.trim()) errs.push({ field: "Người duyệt", message: "Ghi tên người ký duyệt (BGĐ)" });
+    const picked = approvers.find((a) => a.name === form.approverName);
+    if (!form.approverName.trim()) errs.push({ field: "Người ký duyệt", message: approvers.length ? "Chọn người ký trong Ban Giám đốc" : "Ghi họ tên người ký duyệt (BGĐ)" });
+    else if (approvers.length && !picked) errs.push({ field: "Người ký duyệt", message: "Chọn người ký trong danh sách Ban Giám đốc" });
+    if (picked?.role === "vice-director" && form.decision === "approved" && form.onBehalf !== "yes")
+      errs.push({ field: "Ủy quyền", message: "Phó giám đốc ký hợp đồng phải có ủy quyền của Giám đốc — chọn \"Có\" nếu đã có giấy ủy quyền" });
     if (!form.decidedOn) errs.push({ field: "Ngày duyệt", message: "Chọn ngày duyệt" });
     if (form.decision !== "approved" && !form.reason.trim()) errs.push({ field: "Lý do", message: "Không đồng ý thì phải ghi lý do" });
     const fe = file[0] ? checkExportFile(file[0]) : null;
@@ -112,7 +131,9 @@ export function ApprovalDialog({
         contractId: form.contractId,
         revisionId: form.revisionId,
         decision: form.decision,
-        approverName: form.approverName.trim(),
+        approverName: picked
+          ? `${picked.name} — ${APPROVER_ROLE_LABEL[picked.role]}${picked.role === "vice-director" && form.onBehalf === "yes" ? " (ký theo ủy quyền)" : ""}`
+          : form.approverName.trim(),
         decidedOn: form.decidedOn,
         reason: form.reason.trim(),
         filePath: up?.path ?? "",
@@ -177,12 +198,41 @@ export function ApprovalDialog({
             options={(["approved", "needs-revision", "rejected"] as const).map((v) => ({ value: v, label: APPROVAL_LABELS[v] }))}
             columns={3}
           />
+          {!approvers.length && (
+            <p role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
+              Chưa có tài khoản Giám đốc / Phó giám đốc trong hệ thống — admin gán vai trò ở màn Người dùng để chọn người ký từ danh sách. Tạm thời gõ đúng họ tên trên chữ ký.
+            </p>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Người duyệt" required>
-              <Input value={form.approverName} onChange={(e) => set("approverName", e.target.value)} aria-required />
-            </Field>
+            {approvers.length ? (
+              <Combobox
+                label="Người ký duyệt"
+                required
+                value={form.approverName}
+                onChange={(v) => set("approverName", v)}
+                options={approvers.map((a) => ({ value: a.name, label: a.name, subLabel: APPROVER_ROLE_LABEL[a.role] }))}
+                emptyText="Chưa có tài khoản Ban Giám đốc."
+              />
+            ) : (
+              <Field label="Người ký duyệt" required>
+                <Input value={form.approverName} onChange={(e) => set("approverName", e.target.value)} aria-required />
+              </Field>
+            )}
             <DateField label="Ngày duyệt" required value={form.decidedOn} onChange={(v) => set("decidedOn", v)} />
           </div>
+          {approvers.find((a) => a.name === form.approverName)?.role === "vice-director" && form.decision === "approved" && (
+            <ChoiceGroup
+              label="Ký theo ủy quyền của Giám đốc?"
+              required
+              value={form.onBehalf}
+              onChange={(v) => set("onBehalf", v as ApprovalForm["onBehalf"])}
+              options={[
+                { value: "yes", label: "Có — có giấy ủy quyền" },
+                { value: "no", label: "Không" },
+              ]}
+              columns={2}
+            />
+          )}
           {form.decision !== "approved" && (
             <Field label="Lý do" required>
               <Textarea rows={2} value={form.reason} onChange={(e) => set("reason", e.target.value)} aria-required />
@@ -475,7 +525,7 @@ export function PaymentDialog({
         onClose();
       }}
       title={form?.kind === "documents-sent" ? `Gửi bộ chứng từ · ${form?.label ?? ""}` : `Tiền về · ${form?.label ?? ""}`}
-      description="Không ảnh hưởng khép kín chuyến / hợp đồng — chỉ để theo dõi."
+      description="Không ảnh hưởng đủ hồ sơ của chuyến / hợp đồng — chỉ để theo dõi."
       icon={Wallet}
       size="md"
       hasRequiredFields

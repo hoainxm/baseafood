@@ -1134,6 +1134,9 @@ export interface ExportContractLine {
   kg: number | null;
   unitPrice: number | null;
   microSpec: string;
+  /** Mặt hàng ở danh mục `products` (không bắt buộc lúc lập HĐ; bắt buộc trước khi Lệnh SX xong).
+   *  Tên tiếng Anh của HĐ giữ ở `description`. Bản ghi cũ không có ⇒ coi như chưa nối. */
+  productId?: string;
 }
 
 /** Điều khoản của MỘT bản hợp đồng (bản 0 hoặc bản sửa). */

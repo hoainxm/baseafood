@@ -16,6 +16,7 @@ import {
   ErrorSummary,
   Field,
   FormDialog,
+  InlineConfirmDelete,
   Input,
   NumberField,
   Textarea,
@@ -32,7 +33,10 @@ import {
   SHIPMENT_KINDS,
   SUB_STEP_LABELS,
   canMarkDone,
+  filesOfStep,
   isContainerKind,
+  isRequiredDocumentItem,
+  termsOf,
   requiredDocumentLabel,
   shareCandidates,
   validateShipment,
@@ -40,7 +44,7 @@ import {
 } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import type { ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem } from "@/types";
-import { Camera, ClipboardList, Container, Save, Trash2 } from "lucide-react";
+import { Camera, ClipboardList, Container, Save } from "lucide-react";
 import { FileChips, FilePicker, type PreviewTarget } from "./parts";
 
 /** Tải nhiều file lên (theo thứ tự); lỗi giữa chừng ⇒ gỡ các file đã lên rồi báo. */
@@ -74,6 +78,8 @@ export interface ShipmentTarget {
 interface ShipmentForm extends Omit<ExportShipment, "createdAt" | "status" | "cancelReason"> {
   key: string;
   contractNo: string;
+  /** Chuyến có sẵn (sửa) ⇒ giữ trạng thái + ngày tạo; null = lên chuyến mới. Nằm TRONG form để nháp mở lại sau tải trang vẫn lưu đúng. */
+  existingMeta: Pick<ExportShipment, "status" | "cancelReason" | "createdAt"> | null;
   initial: string;
 }
 const shipSnap = (f: ShipmentForm) =>
@@ -100,6 +106,7 @@ export function ShipmentFormDialog({
       id: e?.id ?? newId(),
       contractId: target.contractId,
       contractNo: target.contractNo,
+      existingMeta: e ? { status: e.status, cancelReason: e.cancelReason, createdAt: e.createdAt } : null,
       planMonth: e?.planMonth ?? target.defaults.planMonth,
       kind: e?.kind ?? target.defaults.kind,
       goodsSummary: e?.goodsSummary ?? "",
@@ -126,12 +133,15 @@ export function ShipmentFormDialog({
   const set = <K extends keyof ShipmentForm>(k: K, v: ShipmentForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   const save = () => {
-    if (!form || !target) return;
+    // Không đòi `target`: hộp mở lại từ nháp sau tải trang thì target rỗng, mọi thứ cần đã nằm trong form.
+    if (!form) return;
     const errs = validateShipment(form).map((i) => ({ field: i.label, message: i.message }));
+    // Nháp cũ (trước khi form mang existingMeta) không biết là sửa hay lên mới ⇒ không đoán, bắt mở lại.
+    if (form.existingMeta === undefined) errs.push({ field: "Nháp cũ", message: "Bấm Bỏ bản nháp rồi mở lại chuyến để sửa" });
     setErrors(errs);
     if (errs.length) return;
-    const e = target.existing;
-    const { key: _key, contractNo: _no, initial: _initial, ...rest } = form;
+    const e = form.existingMeta;
+    const { key: _key, contractNo: _no, initial: _initial, existingMeta: _meta, ...rest } = form;
     const ok = onSave(
       {
         ...rest,
@@ -161,7 +171,7 @@ export function ShipmentFormDialog({
         draft.dismiss();
         onClose();
       }}
-      title={target?.existing ? `Sửa chuyến · HĐ ${form?.contractNo ?? ""}` : `Lên chuyến · HĐ ${form?.contractNo ?? ""}`}
+      title={(form ? form.existingMeta : target?.existing) ? `Sửa chuyến · HĐ ${form?.contractNo ?? ""}` : `Lên chuyến · HĐ ${form?.contractNo ?? ""}`}
       description="Một chuyến là một container. Chuyến hiện ở tháng của ngày đóng cont; chưa có thì theo ETD, rồi tới tháng kế hoạch."
       icon={Container}
       size="lg"
@@ -251,6 +261,8 @@ export interface StepItemTarget {
 interface StepItemForm {
   key: string;
   item: ExportStepItem;
+  /** Chuyến + HĐ của mục — giữ trong form để nháp mở lại sau tải trang vẫn lưu được. */
+  tg: StepItemTarget;
   initial: string;
 }
 const itemSnap = (i: ExportStepItem) => JSON.stringify(i);
@@ -286,7 +298,7 @@ export function StepItemDialog({
 
   useEffect(() => {
     if (!target) return;
-    const fresh: StepItemForm = { key: target.item.id, item: target.item, initial: itemSnap(target.item) };
+    const fresh: StepItemForm = { key: target.item.id, item: target.item, tg: target, initial: itemSnap(target.item) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
     setFiles([]);
@@ -295,9 +307,11 @@ export function StepItemDialog({
   }, [target]);
 
   const item = form?.item;
+  /** Đích của hộp: lúc mở bằng nút thì có `target`; mở lại từ nháp (tải trang) thì lấy trong form. */
+  const tgt = target ?? form?.tg ?? null;
   const set = <K extends keyof ExportStepItem>(k: K, v: ExportStepItem[K]) => setForm((f) => (f ? { ...f, item: { ...f.item, [k]: v } } : f));
   const savedFiles = item ? data.files.filter((f) => f.stepItemId === item.id) : [];
-  const candidates = useMemo(() => (target && item ? shareCandidates(data, target.shipment, item) : []), [data, target, item]);
+  const candidates = useMemo(() => (tgt && item ? shareCandidates(data, tgt.shipment, item) : []), [data, tgt, item]);
   const shipLabel = (id: string) => {
     const s = data.shipments.find((x) => x.id === id);
     return s ? [s.lotCode && `lô ${s.lotCode}`, s.containerNo, s.bookingNo && `booking ${s.bookingNo}`].filter(Boolean).join(" · ") || "chuyến khác" : "chuyến khác";
@@ -309,7 +323,7 @@ export function StepItemDialog({
   const title = item ? (isDoc ? requiredDocumentLabel({ kind: item.docKind, form: item.docForm, issuer: item.docIssuer }) : SUB_STEP_LABELS[item.step]) : "";
 
   const save = async () => {
-    if (!form || !target || busy) return;
+    if (!form || !tgt || busy) return;
     const it = form.item;
     const errs: FieldError[] = [];
     if (it.state === "not-applicable" && !it.naReason.trim()) errs.push({ field: "Lý do không áp dụng", message: "Ghi lý do không áp dụng" });
@@ -317,7 +331,7 @@ export function StepItemDialog({
       // Kiểm như khi file mới đã lên (tính cả file vừa chọn).
       const pending: ExportFile[] = files.map((f) => ({
         id: `pending-${f.name}`,
-        contractId: target.contractId,
+        contractId: tgt.contractId,
         shipmentId: it.shipmentId,
         stepItemId: it.id,
         step: it.step,
@@ -328,11 +342,21 @@ export function StepItemDialog({
         uploadedBy: "",
         createdAt: "",
       }));
-      const items = target.isNew ? [...data.items, it] : data.items.map((x) => (x.id === it.id ? it : x));
+      const items = tgt.isNew ? [...data.items, it] : data.items.map((x) => (x.id === it.id ? it : x));
       const check = canMarkDone(it, { ...data, items, files: [...data.files, ...pending] }, { filesAvailable });
       if (!check.ok) {
         if (check.reason === "contract-not-approved") errs.push({ field: "Trạng thái", message: "Hợp đồng chưa có bản BGĐ đồng ý — lệnh sản xuất chỉ xong sau khi duyệt (KH-R8)" });
+        else if (check.reason === "lines-unmapped")
+          errs.push({ field: "Dòng hàng", message: "Còn dòng hàng của hợp đồng chưa nối mặt hàng danh mục — bấm \"Nối mặt hàng\" ở khối Dòng hàng của hồ sơ HĐ" });
         else if (check.reason === "shared-source-not-done") errs.push({ field: "Dùng chung", message: "Mục được dùng chung chưa xong ở chuyến kia" });
+        // 4a / 4b tự xong khi có file — chọn "Xong" mà không đính gì thì trước đây lưu lặng lẽ, mục vẫn "Chưa làm".
+        else if (check.reason === "derived-from-files" && !files.length && !filesOfStep(data, it.shipmentId, it.step).length)
+          errs.push({
+            field: "Trạng thái",
+            message: filesAvailable
+              ? "Mục này tự xong khi đính file — chọn file ở dưới (hoặc dùng nút Đính ảnh / Đính file của chuyến)"
+              : "Mục này tự xong khi đính file — đang chạy không nối máy chủ nên chưa đính được; chọn Không áp dụng kèm lý do",
+          });
         else for (const m of check.missing) errs.push({ field: "Còn thiếu", message: `Chưa có ${MISSING_LABELS[m] ?? m}` });
       }
     }
@@ -345,10 +369,10 @@ export function StepItemDialog({
     setBusy(true);
     let uploaded: { path: string; fileName: string }[] = [];
     try {
-      if (files.length && hasExportStorage) uploaded = await uploadAll(files, target.contractId, "shipment", it.id);
+      if (files.length && hasExportStorage) uploaded = await uploadAll(files, tgt.contractId, "shipment", it.id);
       const rows: ExportFile[] = uploaded.map((u) => ({
         id: newId(),
-        contractId: target.contractId,
+        contractId: tgt.contractId,
         shipmentId: it.shipmentId,
         stepItemId: it.id,
         step: it.step,
@@ -360,7 +384,7 @@ export function StepItemDialog({
         createdAt: new Date().toISOString(),
       }));
       const clean: ExportStepItem = { ...it, naReason: it.state === "not-applicable" ? it.naReason.trim() : "", number: it.number.trim(), note: it.note.trim() };
-      if (!onSave(clean, rows, target.isNew)) {
+      if (!onSave(clean, rows, tgt.isNew)) {
         void removeExportFiles(uploaded.map((u) => u.path));
         return;
       }
@@ -389,19 +413,17 @@ export function StepItemDialog({
       hasRequiredFields
       footer={
         <>
-          {canDelete && target && !target.isNew && item?.step === "document" && (
-            <Button
-              variant="danger"
-              onClick={() => {
+          {/* Chứng từ khách yêu cầu (theo HĐ) không xóa được — chỉ đánh Không áp dụng kèm lý do (R5/R6, XK-07). */}
+          {canDelete && tgt && !tgt.isNew && item?.step === "document" && !isRequiredDocumentItem(termsOf(data, tgt.contractId), item) && (
+            <InlineConfirmDelete
+              recordDescription={title}
+              title="Bỏ chứng từ thêm tay này khỏi chuyến — hỏi lại trước, có Hoàn tác (file đã đính vẫn giữ trên máy chủ)."
+              onConfirm={() => {
                 if (!item) return;
                 draft.cancel();
                 onDeleteItem(item);
               }}
-              title="Bỏ chứng từ này khỏi chuyến (file đã đính vẫn giữ trên máy chủ)."
-            >
-              <Trash2 className="mr-2 h-4 w-4" aria-hidden />
-              Xóa mục
-            </Button>
+            />
           )}
           <Button
             variant="outline"
@@ -421,10 +443,10 @@ export function StepItemDialog({
       }
     >
       <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
-      {form && item && target && (
+      {form && item && tgt && (
         <div className="grid gap-4 py-2">
           <ErrorSummary errors={errors} />
-          {isDoc && target.isNew && (
+          {isDoc && tgt.isNew && (
             <div className="grid gap-4 sm:grid-cols-3">
               <Combobox
                 label="Loại chứng từ"
@@ -520,6 +542,8 @@ export interface LoadingUploadTarget {
 
 interface LoadingForm {
   key: string;
+  /** Chuyến + bước — giữ trong form để nháp mở lại sau tải trang vẫn lưu được. */
+  tg: LoadingUploadTarget;
   startLayer: number | null;
   caption: string;
   initial: string;
@@ -545,7 +569,7 @@ export function LoadingUploadDialog({
 
   useEffect(() => {
     if (!target) return;
-    const f: LoadingForm = { key: `${target.shipment.id}:${target.step}`, startLayer: null, caption: "", initial: "" };
+    const f: LoadingForm = { key: `${target.shipment.id}:${target.step}`, tg: target, startLayer: null, caption: "", initial: "" };
     const fresh = { ...f, initial: loadSnap(f) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
@@ -554,10 +578,12 @@ export function LoadingUploadDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
 
-  const isPhotos = target?.step === "loading-photos";
+  /** Đích của hộp: mở bằng nút thì có `target`; mở lại từ nháp (tải trang) thì lấy trong form. */
+  const tgt = target ?? form?.tg ?? null;
+  const isPhotos = tgt?.step === "loading-photos";
 
   const save = async () => {
-    if (!form || !target || busy) return;
+    if (!form || !tgt || busy) return;
     const errs: FieldError[] = [];
     if (!files.length) errs.push({ field: "File", message: isPhotos ? "Chọn hoặc chụp ít nhất một ảnh" : "Chọn file sơ đồ container" });
     if (!hasExportStorage) errs.push({ field: "Máy chủ", message: "Đang chạy không nối máy chủ — chưa tải ảnh lên được" });
@@ -565,13 +591,13 @@ export function LoadingUploadDialog({
     if (errs.length) return;
     setBusy(true);
     try {
-      const up = await uploadAll(files, target.contractId, "loading", target.step);
+      const up = await uploadAll(files, tgt.contractId, "loading", tgt.step);
       const rows: ExportFile[] = up.map((u, i) => ({
         id: newId(),
-        contractId: target.contractId,
-        shipmentId: target.shipment.id,
+        contractId: tgt.contractId,
+        shipmentId: tgt.shipment.id,
         stepItemId: "",
-        step: target.step,
+        step: tgt.step,
         path: u.path,
         fileName: u.fileName,
         layerNo: isPhotos && form.startLayer != null ? form.startLayer + i : null,
@@ -599,7 +625,7 @@ export function LoadingUploadDialog({
         draft.dismiss();
         onClose();
       }}
-      title={`${isPhotos ? "Ảnh đóng cont" : "Sơ đồ container"} · ${target?.label ?? ""}`}
+      title={`${isPhotos ? "Ảnh đóng cont" : "Sơ đồ container"} · ${tgt?.label ?? ""}`}
       description={isPhotos ? "Chụp từng lớp hàng (có tờ giấy ghi lớp / số thùng), ảnh seal và ảnh số cont. Chọn nhiều ảnh một lần được." : "Đính file sơ đồ xếp hàng (Excel / PDF / ảnh)."}
       icon={isPhotos ? Camera : ClipboardList}
       size="md"

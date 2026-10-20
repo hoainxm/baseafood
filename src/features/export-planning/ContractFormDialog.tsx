@@ -37,10 +37,14 @@ import {
   emptyTerms,
   lineAmount,
   lineKg,
+  suggestProductId,
+  unmappedLines,
   validateContract,
+  type ExportData,
 } from "@/lib/exportPlanning";
+import { formatMoney } from "@/lib/format";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
-import type { Customer, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind } from "@/types";
+import type { Customer, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, Product } from "@/types";
 import { FileSignature, Plus, Save, Trash2 } from "lucide-react";
 import { FilePicker } from "./parts";
 
@@ -156,6 +160,9 @@ export function ContractFormDialog({
   contracts,
   customers,
   setCustomers,
+  products,
+  setProducts,
+  data,
   recordedBy,
   canSeePrice,
   onClose,
@@ -165,6 +172,11 @@ export function ContractFormDialog({
   contracts: readonly ExportContract[];
   customers: Customer[];
   setCustomers: (rows: Customer[]) => boolean | void;
+  /** Danh mục mặt hàng (mở) — mỗi dòng hàng nối một mặt hàng; 141 mã kế toán chỉ ánh xạ qua đây. */
+  products: Product[];
+  setProducts: (rows: Product[]) => boolean | void;
+  /** Dữ liệu module — gợi ý mặt hàng theo tên tiếng Anh đã nối ở HĐ trước. */
+  data: Pick<ExportData, "contracts" | "revisions">;
   recordedBy: string;
   canSeePrice: boolean;
   onClose: () => void;
@@ -179,6 +191,30 @@ export function ContractFormDialog({
   const [openLines, setOpenLines] = useState<Set<string>>(new Set());
   const draft = useDialogDraft({ form: "export-contract", value: form, setValue: setForm, isEmpty: (f) => snapshot(f) === f.initial });
   const customerEditor = useQuickCatalogEdit("customer", customers, (rows) => void setCustomers(rows));
+  const productEditor = useQuickCatalogEdit("product", products, (rows) => void setProducts(rows));
+  /** Dòng vừa được tự gợi ý mặt hàng (chỉ để hiện dòng nhắc "kiểm lại", không lưu). */
+  const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
+  const productOptions: ComboboxOption[] = products.map((m) => ({ value: m.id, label: m.code ? `${m.code} · ${m.name}` : m.name, subLabel: m.code || undefined }));
+  const addProduct = (name: string) => {
+    const existing = products.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing.id;
+    const m: Product = { id: newId(), code: "", name, finishedGoodCode: "" };
+    setProducts([...products, m]);
+    notify.saved(`Đã thêm mặt hàng "${name}" vào danh mục`);
+    return m.id;
+  };
+  /** Rời ô tên tiếng Anh: dòng chưa nối mà tên đã từng nối ở HĐ trước ⇒ điền sẵn mặt hàng đó. */
+  const suggestFor = (lineId: string) => {
+    setForm((f) => {
+      if (!f) return f;
+      const l = f.lines.find((x) => x.id === lineId);
+      if (!l || l.productId || !l.description.trim()) return f;
+      const pid = suggestProductId(data, l.description, f.customerId);
+      if (!pid || !products.some((p) => p.id === pid)) return f;
+      setSuggestedLines((s) => new Set(s).add(lineId));
+      return { ...f, lines: f.lines.map((x) => (x.id === lineId ? { ...x, productId: pid } : x)) };
+    });
+  };
 
   useEffect(() => {
     if (!target) return;
@@ -225,7 +261,8 @@ export function ContractFormDialog({
   const identityLocked = form?.mode === "revise" || (form?.mode === "edit" && form.revisionNo > 0);
 
   const save = async () => {
-    if (!form || !target || isUploading) return;
+    // Không đòi `target`: tải lại trang thì hộp mở lại từ NHÁP (target rỗng) — Lưu vẫn phải chạy.
+    if (!form || isUploading) return;
     const issues = validateContract(
       { id: form.contractId, customerId: form.customerId, contractNo: form.contractNo, signedOn: form.signedOn, terms: form.terms, lines: form.lines },
       contracts,
@@ -269,7 +306,8 @@ export function ContractFormDialog({
           id: form.revisionId,
           contractId: form.contractId,
           revisionNo: form.revisionNo,
-          revisedOn: form.revisedOn || form.signedOn,
+          // Bản 0 không có ô "Ngày của bản này" ⇒ lấy ngày ký (trước đây rơi về ngày lập trên app).
+          revisedOn: form.mode === "create" ? form.signedOn : form.revisedOn || form.signedOn,
           changeSummary: form.changeSummary.trim(),
           terms: form.terms,
           lines,
@@ -327,14 +365,15 @@ export function ContractFormDialog({
         <>
           {totals && (
             <span className="tnum mr-auto min-w-0 text-sm text-muted-foreground">
-              {form?.lines.filter((l) => l.description.trim() || l.quantity != null).length ?? 0} dòng · {formatNumber(totals.cartons)} thùng ·{" "}
-              <b className="text-foreground">{formatNumber(totals.kg)} kg</b>
+              {form?.lines.filter((l) => l.description.trim() || l.quantity != null).length ?? 0} dòng · {formatNumber(totals.units)} thùng/kiện
+              {totals.cartons !== totals.units ? ` (${formatNumber(totals.cartons)} thùng)` : ""} · <b className="text-foreground">{formatNumber(totals.kg)} kg</b>
               {canSeePrice ? (
                 <>
                   {" "}
-                  · <b className="text-foreground">{formatNumber(totals.amount)} {currency}</b>
+                  · <b className="text-foreground">{formatMoney(totals.amount)} {currency}</b>
                 </>
               ) : null}
+              {form && unmappedLines(form.lines).length ? ` · ${unmappedLines(form.lines).length} dòng chưa nối danh mục` : ""}
             </span>
           )}
           <Button
@@ -491,7 +530,7 @@ export function ContractFormDialog({
           <FormSection
             no={4}
             title="Dòng hàng"
-            hint="Kg tự tính = số thùng × kg tịnh mỗi thùng (đếm theo kiện thì nhân thêm số thùng mỗi kiện); gõ đè nếu hợp đồng ghi khác."
+            hint="Tên hàng ghi đúng chữ trên HĐ (tiếng Anh); Mặt hàng (danh mục) nối dòng với danh mục của xưởng — lập HĐ chưa bắt buộc, nhưng Lệnh sản xuất chỉ xong khi mọi dòng đã nối. Kg tự tính = số thùng × kg tịnh mỗi thùng (theo kiện thì nhân thêm số thùng mỗi kiện); gõ đè nếu HĐ ghi khác."
           >
             <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
               {form.lines.map((l, i) => {
@@ -502,7 +541,7 @@ export function ContractFormDialog({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold">Dòng {i + 1}</span>
                       <span className="tnum min-w-0 flex-1 text-sm text-muted-foreground">
-                        {formatNumber(lineKg(l))} kg{canSeePrice ? ` · ${formatNumber(lineAmount(l))} ${currency}` : ""}
+                        {formatNumber(lineKg(l))} kg{canSeePrice ? ` · ${formatMoney(lineAmount(l))} ${currency}` : ""}
                       </span>
                       <Button
                         size="sm"
@@ -514,10 +553,31 @@ export function ContractFormDialog({
                         Bỏ dòng
                       </Button>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.3fr)]">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_minmax(0,0.9fr)_minmax(0,1.2fr)]">
                       <Field label="Tên hàng (như trên HĐ)" required>
-                        <Input value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} aria-required />
+                        <Input value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} onBlur={() => suggestFor(l.id)} aria-required />
                       </Field>
+                      <div className="grid min-w-0 gap-1">
+                        <Combobox
+                          label="Mặt hàng (danh mục)"
+                          value={l.productId ?? ""}
+                          onChange={(v) => {
+                            setLine(l.id, { productId: v || undefined });
+                            setSuggestedLines((s) => {
+                              const n = new Set(s);
+                              n.delete(l.id);
+                              return n;
+                            });
+                          }}
+                          options={productOptions}
+                          onCreate={productEditor.canCreate ? addProduct : undefined}
+                          emptyText="Chưa có mặt hàng nào trong danh mục."
+                          onEditItem={productEditor.openEdit}
+                          canEdit={productEditor.canEdit}
+                          editLabel={productEditor.editLabel}
+                        />
+                        {suggestedLines.has(l.id) && <span className="text-sm text-muted-foreground">Gợi ý theo HĐ trước cùng tên hàng — kiểm lại.</span>}
+                      </div>
                       <Field label="Size">
                         <Input value={l.size} onChange={(e) => setLine(l.id, { size: e.target.value })} />
                       </Field>
@@ -602,6 +662,7 @@ export function ContractFormDialog({
         </div>
       )}
       {customerEditor.dialog}
+      {productEditor.dialog}
     </FormDialog>
   );
 }

@@ -337,7 +337,7 @@ export function ContractDossier({
       </div>
 
       {terms && totals && (
-        <dl className="grid gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+        <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm">
           <Info label="Hạn giao" value={`${formatDateVN(deadline)}${extensions.length ? " (đã gia hạn)" : ""}`} />
           <Info label="Tổng hợp đồng" value={`${formatNumber(totals.kg)} kg${can.viewPrice ? ` · ${formatMoney(totals.amount)} ${currency}` : ""}`} />
           <Info label="Dung sai" value={`±${formatNumber(terms.tolerancePct ?? 0)}% lượng và tiền`} />
@@ -543,7 +543,7 @@ function shipmentCountText(open: readonly ExportShipment[], containerCount: numb
 
 function Info({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="grid min-w-0 gap-0.5">
+    <div className="grid min-w-0 content-start gap-0.5">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="tnum break-words font-medium">{value || "—"}</dd>
     </div>

@@ -68,6 +68,9 @@ import {
 } from "./ShipmentDialogs";
 import { useExportData } from "./useExportData";
 
+/** Hai tab luôn nằm cạnh nhau, chữ được xuống dòng: điện thoại 360 px / chữ 130 % không tràn, không đè nút Lập hợp đồng. */
+const TAB_TRIGGER = "h-auto min-h-9 whitespace-normal px-3 max-sm:[&>svg]:hidden sm:px-4";
+
 const KIND_FROM_TEXT = (t: string): ExportShipmentKind => {
   const x = t.toUpperCase();
   if (x.includes("HC")) return "40HC-RF";
@@ -436,12 +439,12 @@ export default function ExportPlanningScreen() {
             <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
               <p className="max-w-3xl text-muted-foreground">Mỗi chuyến container của từng khách đang ở bước nào và còn thiếu gì, tới khi hợp đồng xuất đủ.</p>
               <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" ? "contracts" : "" }, true)}>
-                <TabsList className="h-auto max-w-full flex-wrap">
-                  <TabsTrigger value="month" title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
+                <TabsList className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
+                  <TabsTrigger value="month" className={TAB_TRIGGER} title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
                     <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
                     Lịch xuất hàng
                   </TabsTrigger>
-                  <TabsTrigger value="contracts" title="Danh sách mọi hợp đồng, lọc theo trạng thái.">
+                  <TabsTrigger value="contracts" className={TAB_TRIGGER} title="Danh sách mọi hợp đồng, lọc theo trạng thái.">
                     <FileText className="mr-2 h-4 w-4" aria-hidden />
                     Hợp đồng
                   </TabsTrigger>

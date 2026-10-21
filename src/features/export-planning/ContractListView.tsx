@@ -60,10 +60,20 @@ export function ContractListView({
     .sort((a, b) => effectiveDeadline(data, b.id).localeCompare(effectiveDeadline(data, a.id)));
 
   const columns: RecordTableColumn<ExportContract>[] = [
-    { key: "no", header: "Số HĐ", primary: true, render: (c) => <span className="font-semibold">{c.contractNo}</span>, getSortValue: (c) => c.contractNo },
+    { key: "no", header: "Số HĐ", primary: true, render: (c) => <span className="font-semibold break-words @3xl:whitespace-nowrap">{c.contractNo}</span>, getSortValue: (c) => c.contractNo },
     { key: "customer", header: "Khách", render: (c) => nameOf(c.customerId), getSortValue: (c) => nameOf(c.customerId) },
-    { key: "signed", header: "Ngày ký", render: (c) => <span className="tnum">{formatDateVN(c.signedOn)}</span>, getSortValue: (c) => c.signedOn, hideOnMobile: true },
-    { key: "deadline", header: "Hạn giao", render: (c) => <span className="tnum">{formatDateVN(effectiveDeadline(data, c.id))}</span>, getSortValue: (c) => effectiveDeadline(data, c.id) },
+    {
+      key: "deadline",
+      header: "Hạn giao · ngày ký",
+      // Ngày ký là dòng phụ dưới hạn giao — cột riêng làm bảng tràn ngang ở 1366 px (che thẻ trạng thái).
+      render: (c) => (
+        <span className="tnum grid">
+          <span>{formatDateVN(effectiveDeadline(data, c.id))}</span>
+          {c.signedOn && <span className="text-sm text-muted-foreground">ký {formatDateVN(c.signedOn)}</span>}
+        </span>
+      ),
+      getSortValue: (c) => effectiveDeadline(data, c.id),
+    },
     {
       key: "size",
       header: canSeePrice ? "Kg · tiền" : "Kg",
@@ -72,7 +82,17 @@ export function ContractListView({
         const r = workingRevision(data, c.id);
         if (!r) return "—";
         const t = contractTotals(r.lines);
-        return `${formatNumber(t.kg)}${canSeePrice ? ` · ${formatMoney(t.amount)} ${r.terms.currency}` : ""}`;
+        // Kg trên, tiền dưới — một dòng "12.050 · 97.755,00 USD" làm bảng tràn ngang ở 1366 px.
+        return (
+          <span className="grid justify-items-end">
+            <span>{formatNumber(t.kg)}</span>
+            {canSeePrice && (
+              <span className="text-sm text-muted-foreground">
+                {formatMoney(t.amount)} {r.terms.currency}
+              </span>
+            )}
+          </span>
+        );
       },
     },
     { key: "ships", header: "Chuyến", numeric: true, render: (c) => openShipmentsOf(data, c.id).length },
@@ -84,7 +104,7 @@ export function ContractListView({
         const cov = contractCoverage(data, c.id);
         const cl = contractClosure(data, c.id, opts);
         return (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex min-w-36 flex-wrap gap-1 whitespace-normal">
             <Tag variant={STATE_TAG[st]}>{contractStateLabel(st, c)}</Tag>
             {pendingRevision(data, c.id) && st !== "pending" && <Tag variant="warning">Bản sửa chờ duyệt</Tag>}
             {(st === "pending" || st === "approved") && !cov.covered && <Tag variant="warning">Chưa lên đủ chuyến</Tag>}

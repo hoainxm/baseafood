@@ -96,10 +96,19 @@ export function MonthView({
     ...[...new Set(data.contracts.map((c) => c.customerId))].map((id) => ({ value: id, label: customers.find((c) => c.id === id)?.name || "(khách chưa rõ)" })),
   ];
 
+  const plannedKg = groups.reduce((sum, g) => sum + g.plannedKg, 0);
+  // Thẻ nào cũng có dòng phụ ⇒ 4 thẻ cùng một khuôn (nhãn · số · dòng phụ), không thẻ cao thẻ thấp.
   const cards: StatCardData[] = [
-    { label: `Chuyến trong ${periodNoun}`, value: plan.stats.shipments, numeric: true, icon: Container, color: "brand" },
-    { label: "Chuyến đủ hồ sơ", value: plan.stats.closed, numeric: true, icon: CircleCheck, color: "success" },
-    { label: "Chuyến còn thiếu", value: plan.stats.missingSteps, numeric: true, icon: ListChecks, color: plan.stats.missingSteps ? "warning" : "neutral" },
+    { label: `Chuyến trong ${periodNoun}`, value: plan.stats.shipments, numeric: true, icon: Container, color: "brand", subtext: `kế hoạch ${formatNumber(plannedKg)} kg` },
+    { label: "Chuyến đủ hồ sơ", value: plan.stats.closed, numeric: true, icon: CircleCheck, color: "success", subtext: "xong bước 1–5" },
+    {
+      label: "Chuyến còn thiếu",
+      value: plan.stats.missingSteps,
+      numeric: true,
+      icon: ListChecks,
+      color: plan.stats.missingSteps ? "warning" : "neutral",
+      subtext: "chưa xong bước 1–5",
+    },
     {
       label: "Trễ hạn giao",
       value: plan.stats.lateShipments,
@@ -146,6 +155,7 @@ export function MonthView({
       key: "shipment",
       header: "Chuyến",
       primary: !withCustomer,
+      width: withCustomer ? undefined : "30%",
       render: (r) => (
         <span className="grid gap-0.5">
           <span className="font-semibold">{[r.shipment.lotCode && `Lô ${r.shipment.lotCode}`, shipmentKindLabel(r.shipment.kind)].filter(Boolean).join(" · ")}</span>
@@ -160,6 +170,7 @@ export function MonthView({
     {
       key: "dates",
       header: "Đóng · ETD",
+      width: withCustomer ? undefined : "16%",
       render: (r) => (
         <span className="tnum">
           {[r.shipment.loadingDate && formatDateVN(r.shipment.loadingDate), r.shipment.etd && `ETD ${formatDateVN(r.shipment.etd)}`].filter(Boolean).join(" · ") ||
@@ -172,12 +183,15 @@ export function MonthView({
       key: "kg",
       header: "Kg KH · thực xuất",
       numeric: true,
+      width: withCustomer ? undefined : "17%",
       render: (r) => `${formatNumber(r.shipment.plannedKg)}${r.actuals.kg ? ` · ${formatNumber(r.actuals.kg)}` : ""}`,
       getSortValue: (r) => r.shipment.plannedKg ?? 0,
     },
     {
       key: "progress",
       header: "Tiến độ",
+      // Mỗi khách một bảng: cố định % bề rộng để cột các bảng thẳng hàng nhau.
+      width: withCustomer ? undefined : "29%",
       render: (r) => {
         const p = shipmentProgress(data, r.shipment, opts);
         return (

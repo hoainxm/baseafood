@@ -32,6 +32,11 @@ export interface RecordTableColumn<T> {
   secondary?: boolean;
   /** Giá trị dùng để sắp xếp. Không có → cột không sắp xếp được. */
   getSortValue?: (row: T) => string | number;
+  /**
+   * Bề rộng cột ở BẢNG desktop (VD "30%"). Dùng khi nhiều bảng cùng cột xếp chồng
+   * nhau (mỗi khách một bảng) để cột thẳng hàng giữa các bảng thay vì co theo chữ.
+   */
+  width?: string;
 }
 
 type SortDir = "asc" | "desc";
@@ -144,8 +149,13 @@ export function RecordTable<T>({
     }
   };
 
-  const toolbar = (getSearchText || sortableColumns.length > 0) && rows.length > 0 && (
-    <div className="flex min-w-0 flex-col gap-3 @3xl:flex-row @3xl:items-center">
+  // Sắp 1–2 dòng chẳng để làm gì — khỏi bày hàng nút "Sắp theo" trên thẻ điện thoại.
+  const showCardSort = cardSortableColumns.length > 0 && rows.length > 2;
+  const hasResetButton = Boolean(q || sapTheo);
+  const toolbar = (getSearchText || showCardSort || hasResetButton) && rows.length > 0 && (
+    // Desktop không có ô tìm / nút Bỏ lọc ⇒ ẩn hẳn (hàng rỗng vẫn ăn khoảng cách space-y
+    // làm tên bảng ở trên tách xa bảng hơn bảng tách khỏi khối kế).
+    <div className={cn("flex min-w-0 flex-col gap-3 @3xl:flex-row @3xl:items-center", !getSearchText && !hasResetButton && "@3xl:hidden")}>
       {getSearchText && (
         <div className="relative min-w-0 flex-1">
           <Search
@@ -162,7 +172,7 @@ export function RecordTable<T>({
         </div>
       )}
       {/* Sắp xếp trên điện thoại: header bảng không hiện nên cần nút riêng */}
-      {cardSortableColumns.length > 0 && (
+      {showCardSort && (
         <div className="flex min-w-0 flex-wrap items-center gap-2 @3xl:hidden">
           <span className="text-sm text-muted-foreground">Sắp theo</span>
           {cardSortableColumns.map((c) => (
@@ -186,7 +196,7 @@ export function RecordTable<T>({
           ))}
         </div>
       )}
-      {(q || sapTheo) && (
+      {hasResetButton && (
         <Button
           variant="outline"
           size="sm"
@@ -306,6 +316,7 @@ export function RecordTable<T>({
                     <TableHead
                       key={c.key}
                       className={cn(c.numeric && "text-right", "p-0 whitespace-normal")}
+                      style={c.width ? { width: c.width } : undefined}
                       aria-sort={
                         sapTheo === c.key
                           ? sortDir === "asc"

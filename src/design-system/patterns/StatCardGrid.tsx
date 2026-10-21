@@ -164,6 +164,9 @@ export function StatCardGrid({
         );
         const cls = cn(
           "flex items-center gap-2.5 rounded-xl border px-3 py-3",
+          // Điện thoại (2 thẻ một hàng): icon lên trên nhãn như thẻ hẹp 5 cột — để icon bên
+          // cạnh thì nhãn chỉ còn ~80 px, "Chuyến trong tháng" bẻ 3 dòng, thẻ cao thấp lệch nhau.
+          "max-md:flex-col max-md:items-start max-md:gap-2",
           sac ? cn("border-l-4", sac.card) : "bg-card",
           isNarrow && "lg:flex-col lg:items-start lg:gap-2",
           !sac && color.border

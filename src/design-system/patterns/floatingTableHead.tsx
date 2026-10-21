@@ -105,7 +105,8 @@ export function useFloatingTableHead(getFrame: () => HTMLElement | null, enabled
 
   if (!enabled) return null;
   return (
-    <div ref={holderRef} className="pointer-events-none sticky top-header z-20 h-0 print:hidden" aria-hidden>
+    // m-0: chỗ neo cao 0 — đừng ăn khoảng cách space-y của khối cha (đẩy bảng xuống 16 px).
+    <div ref={holderRef} className="pointer-events-none sticky top-header z-20 m-0 h-0 print:hidden" aria-hidden>
       <div
         ref={innerRef}
         // inert: bản sao không nhận phím / chuột (tránh tab vào ô tick trùng).

@@ -55,10 +55,13 @@ const settled = (s: ExportItemState) => s === "done" || s === "not-applicable";
 function ChecklistRow({ label, state, extraTag, children, actions }: { label: string; state: ExportItemState; extraTag?: ReactNode; children?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 border-t border-border py-3 first:border-t-0 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] sm:items-start sm:gap-4">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="font-semibold">{label}</span>
-        <StateTag state={state} />
-        {extraTag}
+      {/* Thẻ trạng thái LUÔN nằm dưới tên — tên ngắn hay dài thì hàng nào cũng cùng khuôn. */}
+      <div className="grid min-w-0 justify-items-start gap-1">
+        <span className="font-semibold break-words">{label}</span>
+        <span className="flex flex-wrap gap-1">
+          <StateTag state={state} />
+          {extraTag}
+        </span>
       </div>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-sm">{children}</div>
       {actions && <div className="flex min-w-0 flex-wrap gap-2 sm:justify-end">{actions}</div>}
@@ -72,9 +75,8 @@ function StepBlock({ n, state, summary, isCurrent, children }: { n: StepNo; stat
     <section id={`ship-step-${n}`} className={`grid min-w-0 scroll-mt-24 grid-cols-[minmax(0,1fr)] rounded-xl border bg-card ${isCurrent ? "border-primary" : "border-border"}`}>
       <div className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-3">
         <StepDot step={n} state={state} alert={isCurrent && state !== "done"} />
-        <h3 className="font-semibold">
-          {n}. {STEP_TITLES[n - 1]}
-        </h3>
+        {/* Số bước đã nằm trong chấm (hoặc ✓) — tên không lặp "n." (khớp stepper). */}
+        <h3 className="font-semibold">{STEP_TITLES[n - 1]}</h3>
         <span className={`min-w-0 basis-full text-sm break-words sm:flex-1 sm:basis-0 sm:text-right ${settled(state) ? "text-success" : isCurrent ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{summary}</span>
       </div>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] border-t border-border px-4">{children}</div>
@@ -291,13 +293,14 @@ export function ShipmentPanel({
             </div>
           )}
         </div>
-        <dl className="grid gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
+        {/* Lưới tự chia theo bề ngang: điện thoại 2 cột, desktop 6 cột một hàng; phóng chữ 130 % tự bớt cột. */}
+        <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 text-sm">
           <Fact label="Booking" value={shipment.bookingNo || (shipment.containerNo ? "" : "Chờ booking")} />
           <Fact label="Đóng cont" value={shipment.loadingDate ? formatDateVN(shipment.loadingDate) : ""} />
           <Fact label="ETD · ETA" value={[shipment.etd && formatDateVN(shipment.etd), shipment.eta && formatDateVN(shipment.eta)].filter(Boolean).join(" → ")} />
           <Fact label="Tàu / chuyến" value={shipment.vesselVoyage} />
           <Fact label={shipment.kind === "truck" ? "Biển số" : "Cont · seal"} value={[shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ")} />
-          <Fact label="Kg kế hoạch · thực xuất" value={`${formatNumber(shipment.plannedKg) || "—"}${actuals.kg ? ` · ${formatNumber(actuals.kg)}` : ""}`} />
+          <Fact label="Kg KH · thực xuất" value={`${formatNumber(shipment.plannedKg) || "—"}${actuals.kg ? ` · ${formatNumber(actuals.kg)}` : ""}`} />
         </dl>
         {!isCancelled && (
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 border-t border-border pt-3">
@@ -451,7 +454,7 @@ export function ShipmentPanel({
 
 function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="grid min-w-0 gap-0.5">
+    <div className="grid min-w-0 content-start gap-0.5">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="tnum break-words font-medium">{value || "—"}</dd>
     </div>

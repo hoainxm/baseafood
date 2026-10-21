@@ -232,12 +232,15 @@ function DemoActiveMenu() {
     <>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
+          {/* Điện thoại: chỉ icon (dải "ĐANG XEM DỮ LIỆU DEMO" trên trang đã báo) — chữ DEMO
+              chiếm ~110 px ở cỡ chữ 130 %, ép tiêu đề trang mất hẳn. */}
           <Button
             title="Đang ở chế độ demo — bấm để làm mới bộ demo hoặc thoát."
-            className="border-warning bg-warning font-bold text-warning-foreground hover:bg-warning/90"
+            aria-label="Đang ở chế độ demo — làm mới bộ demo hoặc thoát"
+            className="border-warning bg-warning font-bold text-warning-foreground hover:bg-warning/90 max-sm:w-10 max-sm:px-0"
           >
             <FlaskConical />
-            DEMO
+            <span className="max-sm:sr-only">DEMO</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="grid w-80 max-w-[calc(100vw-2rem)] gap-3">

@@ -715,8 +715,9 @@ export default function AppShell({
             </div>
           </div>
 
-          {/* Phải — điện thoại chỉ giữ trạng thái + hướng dẫn; phần còn lại ở drawer */}
-          <div className="flex shrink-0 items-center gap-2 md:gap-3">
+          {/* Phải — điện thoại chỉ giữ trạng thái + hướng dẫn; phần còn lại ở drawer.
+              Điện thoại khít khoảng cách (gap-1) để tiêu đề trang còn chỗ ở cỡ chữ 130 %. */}
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2 md:gap-3">
             {shift && (
               <button
                 title="Đổi ca làm việc đang chọn — số liệu trên màn lọc theo ca này."

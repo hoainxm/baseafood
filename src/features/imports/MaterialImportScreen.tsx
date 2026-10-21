@@ -1396,7 +1396,8 @@ export default function MaterialImportScreen() {
               type="button"
               variant="link"
               size="sm"
-              className="h-auto px-0"
+              // Chữ dài: cho xuống dòng (nút mặc định không xuống dòng ⇒ tràn ngang ở 360 px × 130 %).
+              className="h-auto max-w-full px-0 text-left whitespace-normal"
               onClick={() => setSplitDates(true)}
             >
               <CalendarRange />

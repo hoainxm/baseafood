@@ -170,6 +170,14 @@ dùng `min-h-10`.
   Đổi ca · thông báo · giao diện · tài khoản · đăng xuất nằm ở **chân drawer**.
 - Lý do: 6 nút icon ở cỡ chữ 130% = 407px > màn 390px → tiêu đề bị bóp còn 0px
   và cả trang cuộn ngang.
+- Cụm phải trên điện thoại khít `gap-1` (từ sm `gap-2`, md `gap-3`). Nút có chữ ở cụm phải
+  (VD **DEMO**) chỉ còn icon dưới `sm` (chữ vào `sr-only`, giữ `aria-label`) — nghĩa đã có ở
+  dải báo trên trang. 2026-10-21: chữ "DEMO" rộng ~110px ở 130% làm tiêu đề còn 1px; sau sửa
+  tiêu đề còn 74px (130%) / 128px (100%) ở 360px.
+- **Nút chữ dài trong khung hẹp phải được xuống dòng**: `Button` mặc định `whitespace-nowrap`,
+  ở 360px × 130% nhãn dài (VD "Ghi bù (hàng về ngày khác ngày ghi sổ)", "Gửi báo cáo lên
+  hệ thống") tràn ngang cả trang. Thêm `h-auto whitespace-normal` (+ `max-w-full` hoặc
+  `w-full sm:w-auto`) cho nút có nhãn > ~20 ký tự đặt trong khung co.
 
 ### 4. Điều hướng: DỌC, gom nhóm, một cây dùng chung
 

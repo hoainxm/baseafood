@@ -1930,9 +1930,11 @@ export default function WipProductionScreen() {
                 (khoá sửa).
               </p>
             </div>
-            <div className="flex flex-col items-end gap-1">
+            {/* Điện thoại: nút trải hết bề ngang, chữ được xuống dòng (360 px × 130 % không tràn). */}
+            <div className="flex w-full min-w-0 flex-col items-stretch gap-1 sm:w-auto sm:items-end">
               {allowed.export && (
               <Button
+                className="h-auto min-h-10 whitespace-normal"
                 title="Gửi báo cáo sản lượng ngày (gom theo xưởng × người ghi) lên hệ thống. Khác với chốt ngày: gửi báo cáo không khóa sổ." onClick={submitReport}>
                 <Send />
                 Gửi báo cáo lên hệ thống

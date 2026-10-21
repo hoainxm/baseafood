@@ -273,7 +273,7 @@ export function ContractDossier({
           <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
           Quay lại
         </Button>
-        <div className="grid min-w-0 flex-1 basis-64 gap-1">
+        <div data-tour="contract-status" className="grid min-w-0 flex-1 basis-64 gap-1">
           <h2 className="font-semibold">
             HĐ {contract.contractNo} · {customerName}
           </h2>
@@ -299,7 +299,7 @@ export function ContractDossier({
             {contract.status === "closed" && contract.closeReason && <Tag variant="muted">Lý do chốt: {contract.closeReason}</Tag>}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div data-tour="next-action" className="flex flex-wrap items-center gap-2">
           {primary === "approve" && (
             <Button onClick={onApprove} title="Việc tiếp: ghi kết quả BGĐ ký giấy cho bản đang chờ duyệt (đồng ý / yêu cầu sửa / từ chối).">
               <FileSignature className="mr-2 h-4 w-4" aria-hidden />
@@ -337,7 +337,7 @@ export function ContractDossier({
       </div>
 
       {terms && totals && (
-        <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm">
+        <dl data-tour="dossier-summary" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm">
           <Info label="Hạn giao" value={`${formatDateVN(deadline)}${extensions.length ? " (đã gia hạn)" : ""}`} />
           <Info label="Tổng hợp đồng" value={`${formatNumber(totals.kg)} kg${can.viewPrice ? ` · ${formatMoney(totals.amount)} ${currency}` : ""}`} />
           <Info label="Dung sai" value={`±${formatNumber(terms.tolerancePct ?? 0)}% lượng và tiền`} />
@@ -365,7 +365,7 @@ export function ContractDossier({
         </div>
       )}
       {shipments.length > 1 && (
-        <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
+        <section data-tour="shipment-list" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
           <h3 className="font-semibold">Chuyến của hợp đồng — chọn để xem các bước</h3>
           {shipments.map((s) => (
             <ShipmentRow key={s.id} data={data} shipment={s} selected={s.id === selectedShipmentId} onSelect={() => onSelectShipment(s.id)} filesAvailable={filesAvailable} />
@@ -408,6 +408,7 @@ export function ContractDossier({
 
       {terms && totals && (
         <CollapsibleSection
+          tourTarget="contract-details"
           title={`Điều khoản ${eff ? `· bản ${eff.revisionNo} đang hiệu lực` : "· chờ duyệt"}`}
           summary={[terms.incoterm, terms.portOfDischarge, PAYMENT_METHODS.find((p) => p.value === terms.paymentMethod)?.label].filter(Boolean).join(" · ")}
           defaultOpen={termsFirst}

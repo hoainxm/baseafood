@@ -643,4 +643,57 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       </>
     ),
   },
+  "planning-export": {
+    title: "Xuất khẩu",
+    description: "Theo dõi hợp đồng xuất khẩu và từng chuyến hàng qua 6 bước, tới khi hợp đồng xuất đủ.",
+    content: (
+      <>
+        <Section title="Trình tự công việc">
+          <Step>
+            <li>
+              Có hợp đồng giấy mới: chọn <b>Lập hợp đồng</b>, nhập đúng như bản giấy. Hợp đồng ở trạng thái <b>Chờ duyệt</b>.
+            </li>
+            <li>
+              Ban Giám đốc ký giấy xong: mở hồ sơ, chọn <b>Ghi kết quả duyệt</b>. Đồng ý thì hợp đồng chuyển <b>Đã duyệt</b>.
+            </li>
+            <li>
+              Chọn <b>Lên chuyến</b> cho từng container (hoặc xe tải, lô đóng ghép) tới khi đủ số lượng của hợp đồng.
+            </li>
+            <li>
+              Với mỗi chuyến, cập nhật lần lượt bước 2 đến 5: Lệnh sản xuất · Bao bì · Đóng cont · Bộ chứng từ. Bước 6 ghi ngày gửi chứng từ và tiền về.
+            </li>
+            <li>
+              Mọi chuyến đủ hồ sơ và số thực xuất trong dung sai thì hợp đồng tự chuyển <b>Đã xuất đủ</b>.
+            </li>
+          </Step>
+        </Section>
+        <Section title="Trạng thái hợp đồng">
+          <Y>
+            <li><b>Chờ duyệt</b>: đã lập, chưa ghi kết quả ký duyệt.</li>
+            <li><b>Đã duyệt</b>: đang thực hiện.</li>
+            <li><b>Đã xuất đủ</b>: mọi chuyến đủ hồ sơ, thực xuất trong dung sai cả kg lẫn tiền (tự tính).</li>
+            <li><b>Đã chốt HĐ</b>: đóng thủ công, có lý do chốt.</li>
+            <li><b>Đã hủy</b>: có lý do hủy.</li>
+          </Y>
+        </Section>
+        <Section title="Trạng thái mục trong bước">
+          <Y>
+            <li><b>Chưa làm</b> · <b>Đang làm</b> · <b>Xong</b> · <b>Không áp dụng</b> (phải ghi lý do).</li>
+            <li>
+              Mục chỉ được đánh dấu <b>Xong</b> khi đủ giấy tờ: file, số chứng từ, ngày theo từng loại. Sơ đồ container và hình ảnh đóng cont tự Xong khi có file.
+            </li>
+            <li>Đầu mỗi bước ghi <b>Còn thiếu</b> kèm tên các mục chưa xong.</li>
+          </Y>
+        </Section>
+        <Section title="Đọc thanh tiến độ">
+          <Y>
+            <li>6 khúc ứng với 6 bước: xanh lá là Xong, cam là Đang làm, xám là Chưa làm.</li>
+            <li>
+              Thẻ <b>Trễ hạn</b>: chuyến quá hạn giao. Thẻ <b>Chờ booking</b>: chuyến chưa có số booking và số container.
+            </li>
+          </Y>
+        </Section>
+      </>
+    ),
+  },
 };

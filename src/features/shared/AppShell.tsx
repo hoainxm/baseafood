@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { readDevicePrefJson, writeDevicePrefJson } from "@/lib/devicePrefs";
 import { UpdateBanner } from "./UpdateBanner";
+import { usePageTourControl } from "./PageTourProvider";
 import { AccountMenu, type AccountMenuProps } from "./AccountMenu";
 import {
   LayoutDashboard,
@@ -546,6 +547,8 @@ export default function AppShell({
   headerActions,
   children,
 }: AppShellProps) {
+  // Trang đang mở có khai "hướng dẫn từng bước" ⇒ nút "?" có lối bắt đầu (ba-spec 43).
+  const pageTour = usePageTourControl();
   // Thanh bên thu về dải icon: TỰ ĐỘNG ở màn hẹp (iPhone ngang, iPad dọc) để
   // nhường chỗ cho tiêu đề + bảng; người dùng bấm nút thu/mở thì theo ý họ —
   // nhưng chỉ trong cùng một cỡ màn: xoay máy sang cỡ khác là về lại mặc định.
@@ -744,9 +747,13 @@ export default function AppShell({
               </span>
             )}
 
-            {guide && (
-              <GuideButton title={guide.title} description={guide.description}>
-                {guide.content}
+            {(guide || pageTour.available) && (
+              <GuideButton
+                title={guide?.title ?? title}
+                description={guide?.description}
+                onStartTour={pageTour.available ? pageTour.start : undefined}
+              >
+                {guide?.content}
               </GuideButton>
             )}
             {headerActions}

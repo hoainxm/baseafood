@@ -847,7 +847,7 @@ thuộc về tiêu đề màn, xem § Quy chuẩn mobile.
 | `DisplaySettingsDialog` | Hộp "Tùy chỉnh giao diện" điều khiển từ ngoài (`open`/`onOpenChange`, `trigger` tùy chọn) — menu tài khoản mở nó. |
 | `DisplaySettingsButton` | Icon 🎨 → `FormDialog` chứa `DisplaySettingsPanel` (không còn gắn trên header — đã vào menu tài khoản). Nhận `account` để **lưu theo người dùng**. Có **draft**: xem trước live, **Lưu** mới giữ, **Hủy**/đóng khôi phục ảnh chụp (`readDisplaySettings`/`writeDisplaySettings`). |
 | `DataSyncStatusButton` | Icon theo màu store `ketNoi`. Popover chi tiết + nút **Thử kết nối lại** (`probeKetNoi`). |
-| `GuideButton` | Icon "?" → hộp hướng dẫn của trang. Nội dung lấy từ `features/shared/guideContent.tsx`, chỉ hiện ở trang có trong registry. |
+| `GuideButton` | Icon "?" → hộp hướng dẫn của trang. Nội dung lấy từ `features/shared/guideContent.tsx`; trang có **hướng dẫn thao tác** (tour) thì đầu hộp có nút "Bắt đầu hướng dẫn thao tác" (prop `onStartTour`). Hiện khi trang có nội dung hướng dẫn HOẶC có tour. |
 
 ## Trang duyệt + cấu hình
 
@@ -890,6 +890,17 @@ ngược lên thư mục cha và đụng junction tương thích cũ bị khóa 
 4. **Đè size cho khớp mật độ hệ**: mặc định ~`h-10` + `text-sm`, chiều cao nên
    bám token density qua `data-slot` (xem override trong `tokens.css`). Đừng để
    lẫn `h-8`/`h-9` lạc cỡ giữa các primitive.
+
+## Hướng dẫn thao tác — tour từng bước trên trang (`GuidedTour`, từ 2026-10-21)
+
+Dẫn người dùng đi lần lượt từng khu vực của trang theo thứ tự công việc, ngay trên trang thật. Hành vi (oracle): [`docs/app-map/43-guided-tour.ba-spec.md`](../../docs/app-map/43-guided-tour.ba-spec.md). Áp dụng đầu tiên: Xuất khẩu.
+
+- **Tour chỉ dẫn, không ghi** (R1): lớp phủ chặn mọi cú bấm lên trang; bước chỉ được đổi CHỖ XEM (đường dẫn, `replace`). Cấm bước tự bấm nút lưu / mở hộp form.
+- **Khai tour ở màn**: `usePageTour(tour)` (features/shared/PageTourProvider — tour `useMemo`, `null` khi đang tải). Lối vào tự có: nút "?" ở thanh tiêu đề (`GuideButton onStartTour`). Muốn thêm nút trên trang: `usePageTourControl()` → `Button variant="outline"` "Hướng dẫn thao tác" (icon `Route`, thuộc tính `data-tour-start`), đặt trước nút chính.
+- **Bước** (`TourStep`, `@/lib/guidedTour`): `target` = giá trị `data-tour="…"` gắn ở khu vực (trống ⇒ lời giữa trang) · `optional` ⇒ khu vực không có thì bỏ qua · `prepare` ⇒ đổi chỗ xem (bước cùng chỗ xem dùng CHUNG một hàm `prepare` — khung dò trước để đếm "Bước k/n" không nhảy cóc). Tên mốc tiếng Anh `kebab-case`, ổn định.
+- **Lời** theo [`noi-dung-va-label.md`](noi-dung-va-label.md): tiêu đề bước = danh từ, không chấm cuối; lời gọi ĐÚNG chữ đang hiện trên trang, dùng "chọn", kết thúc bằng dấu chấm; gạch đầu dòng `•`, xuống dòng `\n`. Giải thích trạng thái lấy từ ba-spec của module, không tự đặt.
+- **Khung tự lo**: đưa khu vực lên sát dưới thanh tiêu đề (cuộn đúng MỘT khung — không `scrollIntoView`, nó đẩy cả khung app); đặt khung lời dưới → trên → phải → trái, điện thoại nằm đáy màn và chừa đáy trang; phím → / Enter / ← / Esc; thoát ⇒ trả đường dẫn + vị trí cuộn. Không toast (luật 8 — thao tác trình bày).
+- Thêm tour cho trang mới: gắn mốc `data-tour`, viết hàm thuần dựng bước + test (số bước, thứ tự, bước bỏ theo quyền), thử 360 px × 130 %.
 
 ## 9. Hướng dẫn khi rê chuột (`title`) — BẮT BUỘC cho nút thao tác
 

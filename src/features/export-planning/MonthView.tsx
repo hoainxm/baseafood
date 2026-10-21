@@ -195,7 +195,7 @@ export function MonthView({
       render: (r) => {
         const p = shipmentProgress(data, r.shipment, opts);
         return (
-          <div className="grid min-w-0 gap-1.5 lg:min-w-56">
+          <div data-tour={r === groups[0]?.rows[0] ? "shipment-progress" : undefined} className="grid min-w-0 gap-1.5 lg:min-w-56">
             <StepBar steps={p.steps} />
             <span className={`text-sm ${p.next === null ? "font-semibold text-success" : "text-foreground"}`}>{progressText(p)}</span>
             {(r.late || (!r.shipment.bookingNo && !r.shipment.containerNo)) && (
@@ -252,8 +252,15 @@ export function MonthView({
     },
   ];
 
-  const openButton = (contractId: string, shipmentId?: string) => (
-    <Button size="sm" variant="outline" onClick={() => onOpenContract(contractId, shipmentId)} title="Mở hồ sơ hợp đồng và các bước của chuyến này.">
+  /** `tourMark`: nút Mở đầu tiên của lịch — chỗ "Mở hồ sơ" của hướng dẫn từng bước. */
+  const openButton = (contractId: string, shipmentId?: string, tourMark = false) => (
+    <Button
+      size="sm"
+      variant="outline"
+      data-tour={tourMark ? "open-dossier" : undefined}
+      onClick={() => onOpenContract(contractId, shipmentId)}
+      title="Mở hồ sơ hợp đồng và các bước của chuyến này."
+    >
       <Eye className="mr-1 h-4 w-4" aria-hidden />
       Mở
     </Button>
@@ -262,7 +269,7 @@ export function MonthView({
   return (
     <div className="grid min-w-0 gap-6">
       <div className="grid min-w-0 gap-3">
-        <div className="flex min-w-0 flex-wrap items-end gap-3">
+        <div data-tour="period-filter" className="flex min-w-0 flex-wrap items-end gap-3">
           <ChoiceGroup
             label="Xem theo"
             hideRequiredMark
@@ -307,7 +314,7 @@ export function MonthView({
             </div>
           )}
         </div>
-        <div className="flex min-w-0 flex-wrap items-end gap-3">
+        <div data-tour="customer-search" className="flex min-w-0 flex-wrap items-end gap-3">
           <div className="min-w-0 flex-1 basis-48">
             <Combobox label="Khách hàng" hideRequiredMark value={customerFilter} onChange={setCustomerFilter} options={customerOptions} clearable={false} />
           </div>
@@ -354,7 +361,9 @@ export function MonthView({
         </section>
       ) : (
         <>
-          <StatCardGrid cards={cards} />
+          <div data-tour="plan-stats">
+            <StatCardGrid cards={cards} />
+          </div>
           {!groups.length && !pending.length && (
             <EmptyState
               icon={Container}
@@ -362,8 +371,8 @@ export function MonthView({
               description="Lập hợp đồng rồi Lên chuyến — chuyến xếp theo ngày đóng cont (chưa có thì ETD, rồi tháng kế hoạch)."
             />
           )}
-          {groups.map((g) => (
-            <section key={g.customerId} className="grid gap-3">
+          {groups.map((g, gi) => (
+            <section key={g.customerId} data-tour={gi === 0 ? "shipment-table" : undefined} className="grid gap-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="font-semibold">{g.customerName}</h3>
                 <span className="tnum text-sm text-muted-foreground">
@@ -376,19 +385,19 @@ export function MonthView({
                 rows={g.rows}
                 getKey={(r) => r.shipment.id}
                 rowMarkKey={`export-plan:${period.kind === "month" ? period.from.slice(0, 7) : `${period.from}_${period.to}`}:${g.customerId}`}
-                actions={(r) => openButton(r.contract.id, r.shipment.id)}
+                actions={(r) => openButton(r.contract.id, r.shipment.id, gi === 0 && r === g.rows[0])}
               />
             </section>
           ))}
           {pending.length > 0 && (
-            <section className="grid gap-3">
+            <section data-tour="pending-contracts" className="grid gap-3">
               <h3 className="font-semibold">Hợp đồng chưa lên đủ chuyến</h3>
               <RecordTable
                 columns={pendingColumns}
                 rows={pending}
                 getKey={(p) => p.contract.id}
                 rowMarkKey={`export-plan-pending:${period.kind === "month" ? period.from.slice(0, 7) : `${period.from}_${period.to}`}`}
-                actions={(p) => openButton(p.contract.id)}
+                actions={(p) => openButton(p.contract.id, undefined, !groups.length && p === pending[0])}
               />
             </section>
           )}

@@ -1,6 +1,6 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/my-tasks/MyTasksScreen.tsx, src/features/shared/AccountMenu.tsx, src/features/admin/AdminHomeScreen.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts, src/lib/permissions.ts, src/features/shared/PermissionProvider.tsx
-last_verified: 2026-10-20
+last_verified: 2026-10-21
 <!-- updated: 2026-10-20 (x) — THÊM route `/planning-export` "Xuất khẩu" (features/export-planning): nhóm nav MỚI "Kế hoạch" (Xuất khẩu + Tra cứu khách), đặt trước "Tài liệu công ty"; trang chủ của vai trò `planner`; người đóng hàng (thủ kho, quản đốc, phó QĐ) thấy màn này dạng "đính ảnh đóng cont". Tham số `?view=contracts` · `?month=` · `?contract=` · `?shipment=`. -->
 <!-- updated: 2026-10-19 (b) — THÊM route `/documents` "Tài liệu công ty" (features/documents): nhóm nav "Tài liệu công ty" một màn, đặt trước "Hệ thống"; `homeFor` không chọn `documents` làm trang chủ (như `my-tasks`). -->
 <!-- updated: 2026-10-19 — THÊM route `/my-tasks` "Việc của tôi" (features/my-tasks, màn THẬT): mục nav ĐẦU TIÊN (nhóm 1 màn, hiện thẳng), số đỏ trên mục = việc đang được giao cho tôi (`ShellNavItem.badge`); chuông header bỏ số giả `3` ⇒ cùng số đó, bấm mở `/my-tasks`. Tài nguyên quyền `my-tasks` (ai có quyền ở đâu đó cũng xem). Link mở thẳng ngày `?date=&workshop=` ở `/imports` `/wip` `/packaging`. Chi tiết: 39-my-tasks.md. -->
@@ -85,7 +85,7 @@ Cụm trái (`☰` · logo · tiêu đề) được ưu tiên ngân sách ngang 
 
 | Nút | Component (design-system) | Hành vi |
 |---|---|---|
-| Hướng dẫn "?" | `GuideButton` | Chỉ hiện ở trang có trong `guideContent.tsx` (registry route→nội dung). Mở hộp hướng dẫn dùng trang đó. |
+| Hướng dẫn "?" | `GuideButton` | Hiện ở trang có trong `guideContent.tsx` (registry route→nội dung) **hoặc** trang đã khai hướng dẫn thao tác (`usePageTour`, ba-spec [43](43-guided-tour.ba-spec.md)). Mở hộp hướng dẫn dùng trang đó; trang có tour thì đầu hộp có "Bắt đầu hướng dẫn thao tác". |
 | Tùy chỉnh giao diện 🎨 | `DisplaySettingsButton` | Mở `DisplaySettingsPanel` (cỡ chữ · mật độ · bề rộng). Lưu **theo username** (`taiKhoan` prop). |
 | Trạng thái máy chủ | `DataSyncStatusButton` | Màu theo store `ketNoi`. Hover/bấm mở popover chi tiết + **Thử kết nối lại** (`probeKetNoi`). |
 | Tài khoản | `features/shared/AccountMenu.tsx` (trong `AppShell`) | **Avatar ở góc phải header, MỌI cỡ màn** (tên + vai trò hiện từ xl). Bấm ⇒ menu: tên · @username · vai trò · **Tùy chỉnh giao diện** (thay nút 🎨 cũ trên header) · **Đổi mật khẩu** (khi đăng nhập máy chủ) · **Quản trị hệ thống** (admin ⇒ `/admin`) · **Đăng xuất** (hỏi xác nhận). Hộp thoại mở sau khi đóng menu. Chân drawer điện thoại chỉ còn Ca + Thông báo. |

@@ -19,6 +19,7 @@ import LoginScreen from "@/features/auth";
 import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
 import { RowMarkProvider } from "@/features/shared/RowMarkProvider";
+import { PageTourProvider } from "@/features/shared/PageTourProvider";
 import { PermissionProvider } from "@/features/shared/PermissionProvider";
 import { PAGE_GUIDES } from "@/features/shared/guideContent";
 import { Toaster, applyDisplaySettings, ProcessingState, EmptyState, notify } from "@/design-system";
@@ -182,6 +183,8 @@ function ShellLayout() {
   const guide = PAGE_GUIDES[seg];
 
   return (
+    // Hướng dẫn từng bước của trang đang mở (trang tự khai bằng usePageTour) — ba-spec 43.
+    <PageTourProvider>
     <AppShell
       active={seg}
       activeTab={seg === "catalog" ? normalizeCatalogTab(searchParams.get("tab")) : undefined}
@@ -235,6 +238,7 @@ function ShellLayout() {
         </PermissionProvider>
       )}
     </AppShell>
+    </PageTourProvider>
   );
 }
 

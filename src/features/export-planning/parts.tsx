@@ -288,16 +288,19 @@ export function CollapsibleSection({
   title,
   summary,
   defaultOpen = true,
+  tourTarget,
   children,
 }: {
   title: string;
   summary?: ReactNode;
   defaultOpen?: boolean;
+  /** Mốc `data-tour` cho hướng dẫn từng bước. */
+  tourTarget?: string;
   children: ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   return (
-    <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] rounded-xl border border-border bg-card">
+    <section data-tour={tourTarget} className="grid min-w-0 grid-cols-[minmax(0,1fr)] rounded-xl border border-border bg-card">
       <button
         type="button"
         onClick={() => setIsOpen((o) => !o)}

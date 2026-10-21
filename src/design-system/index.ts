@@ -51,6 +51,8 @@ export {
 export { DataSyncStatus, DataSyncStatusButton } from "./patterns/DataStatusBadge";
 export { DisplaySettingsButton, DisplaySettingsDialog } from "./patterns/ThemeToggleButton";
 export { GuideButton } from "./patterns/GuideButton";
+export { GuidedTour } from "./patterns/GuidedTour";
+export type { PageTour, TourStep } from "@/lib/guidedTour";
 export { FormDialog, CloseButton } from "./patterns/FormDialog";
 export { SummaryTable, type SummaryTableColumn, type TableSelection } from "./patterns/SummaryTable";
 export { RowMarkActions, RowMarkToolbar } from "./patterns/RowMarkToolbar";

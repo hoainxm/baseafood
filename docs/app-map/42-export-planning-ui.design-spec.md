@@ -4,6 +4,7 @@
 covers: src/features/export-planning/**
 last_verified: 2026-10-21
 ttl_days: 90
+<!-- re-verified: 2026-10-21 — v4 hướng dẫn thao tác (tour 21 bước, ba-spec 43): nút phụ "Hướng dẫn thao tác" + lối từ hộp "?", khung lời, mốc data-tour — chạy thật 1366 px + 360 px × 100 / 130 %. -->
 <!-- re-verified: 2026-10-21 — v3 triage giao diện (ui-ux-triage + ui-design-logic): tab 2 cột ở điện thoại, cột bảng theo khách thẳng hàng, thẻ số cùng khuôn, hàng checklist cùng khuôn, tên bước không lặp số, bảng Hợp đồng vừa 1366 px — thử preview demo 1366 px + 360 px × 100 / 130 %. -->
 <!-- re-verified: 2026-10-20 17:40 — v2 sau ba-spec 41 v4: thanh kỳ xem, nhãn Đủ hồ sơ / Đã xuất đủ / Đã chốt HĐ, Nối mặt hàng, người ký BGĐ, cọc cấp HĐ, Khôi phục chuyến — thử tay preview 1366 px + 360 px × 100 / 130 %. -->
 
@@ -32,6 +33,7 @@ Trọng số thông tin (planner): **3** = tiến độ + mục còn thiếu, vi
 | Hộp Nối mặt hàng | nút "Nối mặt hàng" ở khối Dòng hàng của hồ sơ; lỗi chặn Lệnh SX chỉ tới đây | chọn mặt hàng danh mục cho từng dòng (không tạo bản sửa) | lưu ⇒ Lệnh SX đánh xong được | Lưu nối mặt hàng |
 | Hộp Ghi kết quả duyệt | nút chính "Ghi kết quả duyệt" | ghi BGĐ ký giấy: kết quả, **người ký chọn từ tài khoản BGĐ**, ngày, scan | lưu ⇒ nút chính đổi sang Lên chuyến | Lưu kết quả duyệt |
 | Màn đóng hàng | nav (chỉ quyền `.loading`) | chụp ảnh lớp / seal / số cont | Đính ảnh | Đính ảnh |
+| Hướng dẫn thao tác (lớp phủ) | nút phụ "Hướng dẫn thao tác" cạnh Lập hợp đồng · nút "Bắt đầu hướng dẫn thao tác" trong hộp "?" | đi một vòng các khu vực theo thứ tự công việc (ba-spec 43) | Hoàn tất ⇒ về đúng chỗ cũ | Tiếp theo |
 
 ## Flows
 
@@ -63,6 +65,8 @@ Trọng số thông tin (planner): **3** = tiến độ + mục còn thiếu, vi
 
 **Hộp duyệt.** "Người ký duyệt" = `Combobox` từ tài khoản Giám đốc / Phó giám đốc (dòng phụ = chức vụ), mặc định Giám đốc nếu có đúng 1; chọn PGĐ + đồng ý ⇒ hiện `ChoiceGroup` "Ký theo ủy quyền của Giám đốc?" (bắt "Có"). Chưa có tài khoản BGĐ ⇒ ô gõ tên + dải cảnh báo 1 đoạn TRÊN lưới ô (không `hint` trong hàng — làm lệch ô Ngày duyệt).
 
+**Hướng dẫn thao tác (tour, ba-spec 43).** Lối vào: nút `outline` "Hướng dẫn thao tác" (icon Route) đứng TRƯỚC nút chính Lập hợp đồng (không tranh nút chính) + khối nền nhấn đầu hộp "?" có nút "Bắt đầu hướng dẫn thao tác". Lớp phủ: nền tối 45 %, khung sáng viền `primary` quanh khu vực được chỉ (đệm 6 px), mọi cú bấm lên trang bị chặn. Khung lời: dòng đầu "Hướng dẫn thao tác · Bước k/n" + nút ✕ (Thoát, Esc) · thanh tiến độ mảnh · tiêu đề bước (danh từ) · lời (xuống dòng, gạch đầu dòng •; dài thì cuộn trong khung: điện thoại tối đa 26 % màn, desktop 45 %) · Quay lại (`outline`, ẩn ở bước 1) + Tiếp theo / Hoàn tất (`default`). Đặt khung: desktop dưới → trên → phải → trái khu vực, không đủ thì góc dưới phải; điện thoại (< 640 px) khung nằm đáy màn, trang chừa thêm đáy 70 % màn khi tour chạy. Khu vực được chỉ luôn đưa lên sát dưới thanh tiêu đề (cuộn đúng một khung; không bao giờ đẩy khung app). Mốc trên trang: `data-tour` = `export-tabs` · `create-contract` · `period-filter` · `customer-search` · `plan-stats` · `shipment-table` · `shipment-progress` · `pending-contracts` · `open-dossier` · `contract-status` · `next-action` · `dossier-summary` · `shipment-list` · `shipment-card` · `current-step` · `item-status` · `step-update` · `payments` · `contract-details`. Đổi bố cục làm mất mốc ⇒ bước tùy chọn tự bỏ, nhưng phải sửa mốc cùng commit.
+
 **Hộp mục chứng từ.** Chứng từ khách yêu cầu: không có nút xóa. Mục thêm tay: 🗑 `InlineConfirmDelete` (hỏi tại chỗ, có Hoàn tác). Mục dùng chung: dòng "Dùng chung với lô … · số … · ngày …" thay "Chưa có gì". Đóng ghép: hàng "Số cont + seal" trạng thái Không áp dụng, chữ "Không cần — hàng đóng ghép chung cont của chuyến khác", không nút. "Chờ booking" ẩn khi đã có số cont.
 
 ## Ma trận trạng thái
@@ -74,6 +78,7 @@ Trọng số thông tin (planner): **3** = tiến độ + mục còn thiếu, vi
 | Chuyến | — | chưa có mục chứng từ ⇒ câu hướng dẫn | — | không ghi: ẩn nút từng hàng | 27 ảnh lớp: chip ảnh gói gọn, xem trong hộp |
 | Form | — | — | `ErrorSummary` đầu form | — | 14 dòng hàng: tóm tắt từng dòng, tổng ở chân |
 | Không nối máy chủ | — | — | dải cảnh báo 1 dòng | — | ẩn nút tải file |
+| Hướng dẫn thao tác | chưa có lối vào khi trang đang tải (R7) | không có hợp đồng ⇒ phần hồ sơ gói thành 1 lời giữa trang | khu vực không hiện sau ~3 giây (đứng yên 300 ms thì thôi) ⇒ bước tùy chọn bỏ qua, bước bắt buộc thành lời giữa trang | chỉ xem ⇒ bỏ bước Lập hợp đồng / Cập nhật mục / Tiền về | khu vực cao hơn màn ⇒ thấy phần đầu; lời dài cuộn trong khung |
 
 ## Action → expectation
 
@@ -81,6 +86,7 @@ Trọng số thông tin (planner): **3** = tiến độ + mục còn thiếu, vi
 - Ghi duyệt đồng ý ⇒ chấm bước 1 xanh, nút chính đổi thành "Lên chuyến" (khi chưa đủ chuyến).
 - Cập nhật mục ⇒ hàng mục đổi thẻ trạng thái, "Còn thiếu" của bước rút ngắn; đủ ⇒ chấm bước xanh, thanh tiến độ tăng khúc.
 - Xóa ⇒ toast Hoàn tác (luật 6).
+- Bắt đầu hướng dẫn thao tác ⇒ bước 1 hiện ngay, trang khóa bấm; Hoàn tất / ✕ / Esc ⇒ lớp phủ tắt, trang về đúng tab, kỳ xem, hồ sơ, vị trí cuộn lúc bắt đầu. Không toast (luật 13 — thao tác trình bày).
 
 ## Platform
 
@@ -95,7 +101,10 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 
 - 2026-10-21 — **triage v3** (skill ui-ux-triage + ui-design-logic, preview demo `site-demo` bộ 7 HĐ): 1366 px + 360 px × 100 / 130 %. Sửa: tab "Hợp đồng" bị nút Lập hợp đồng đè ở 360 px (TabsList `h-10` thắng `h-auto` ⇒ tab tràn khung); bảng mỗi khách lệch cột nhau (cột co theo chữ) ⇒ `width` %; khoảng trống 32 px thừa trên mọi `RecordTable` (hàng công cụ rỗng + chỗ neo đầu bảng nổi ăn `space-y`) — tên khách cách bảng của mình xa hơn cách bảng trên; thẻ "Trễ hạn giao" lệch khuôn 3 thẻ kia; thẻ số điện thoại nhãn bẻ 3 dòng ⇒ icon lên trên (design-system); hàng checklist thẻ trạng thái lúc cạnh tên lúc xuống dòng; "④ 4. Đóng cont" lặp số; thẻ thông tin chuyến / HĐ 1 cột dài ở điện thoại + giá trị căn giữa dọc; bảng Hợp đồng tràn 24 px ở 1366 px, thẻ trạng thái bị cột Thao tác che; nút "Sắp theo" lặp ở mỗi bảng khách 1–2 dòng. Đo: `scrollWidth == 360`, 0 phần tử vượt khung ở lịch, hồ sơ, danh sách HĐ (130 %). Để nguyên: "Xem theo" 2+1 nút ở điện thoại (luật chung `ChoiceGroup`), nhãn cột "Kg KH · thực xuất" xuống 2 dòng (đều ở mọi bảng), booking dài ngắt ở dấu "-".
 
+- 2026-10-21 — **hướng dẫn thao tác** (preview demo 7 HĐ, script đo vì pane ẩn): 21 bước ở 1366 px và 360 px × 100 / 130 % — 0 bước khu vực khuất dưới thanh tiêu đề, 0 bước khung lời đè khu vực, 0 khung tràn, `scrollWidth` 1366 / 360, thanh tiêu đề không trôi, vị trí cuộn + đường dẫn trả đúng, khóa `bsf*` dưới máy không đổi. Sửa trong lúc đo: cuộn bằng `scrollIntoView` ở cuối trang đẩy cả khung app lên 600 px (đổi sang tự cuộn đúng một khung) · khung cuộn ngang của bảng bị nhận nhầm là khung dọc · điện thoại khung lời che khu vực (đổi sang đưa khu vực lên sát thanh tiêu đề + chừa đáy) · số bước nhảy cóc 6 → 9 (dò trước bước cùng chỗ xem). Lỗi có sẵn ngoài tour, để việc riêng: thanh tiêu đề tràn ngang khi bật DEMO + chữ 130 % (Nhập hàng 462 px).
+
 ## History
+- v4 (2026-10-21): hướng dẫn thao tác — tour 21 bước + mốc `data-tour` + hộp "?" cho Xuất khẩu (ba-spec 43).
 - v3 (2026-10-21): triage giao diện — tab điện thoại, cột thẳng hàng giữa bảng khách, thẻ số cùng khuôn, checklist cùng khuôn, bảng Hợp đồng gộp ngày ký vào hạn giao.
 - v2 (2026-10-20): theo góp ý chủ dự án sau audit — tab "Lịch xuất hàng" + kỳ xem tháng / tuần / ngày, nhãn Đủ hồ sơ / Đã xuất đủ / Đã chốt HĐ, cột + hộp Nối mặt hàng, người ký chọn từ tài khoản BGĐ, khối tiền cọc cấp HĐ, Khôi phục chuyến, tiền 2 số lẻ.
 - v1 (2026-10-20): khởi tạo khi chỉnh giao diện bản đầu cho trực quan — `progress.ts` (bước tiếp + còn thiếu, chỉ đọc lib), `StepBar` / `StepStepper` / `CollapsibleSection` ở `parts.tsx`, ShipmentPanel dạng checklist, hồ sơ 1 nút chính + menu, form 5 khối + tổng ở chân hộp.

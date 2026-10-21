@@ -52,19 +52,38 @@ export interface ShipmentPanelCan {
 const settled = (s: ExportItemState) => s === "done" || s === "not-applicable";
 
 /** Một hàng của checklist: trạng thái + tên · chi tiết (số, ngày, file) · nút. */
-function ChecklistRow({ label, state, extraTag, children, actions }: { label: string; state: ExportItemState; extraTag?: ReactNode; children?: ReactNode; actions?: ReactNode }) {
+function ChecklistRow({
+  label,
+  state,
+  extraTag,
+  children,
+  actions,
+  tourMark,
+}: {
+  label: string;
+  state: ExportItemState;
+  extraTag?: ReactNode;
+  children?: ReactNode;
+  actions?: ReactNode;
+  /** Hàng thuộc bước đang làm ⇒ thẻ trạng thái + nút là mốc "Trạng thái mục" / "Cập nhật mục" của hướng dẫn thao tác. */
+  tourMark?: boolean;
+}) {
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 border-t border-border py-3 first:border-t-0 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] sm:items-start sm:gap-4">
       {/* Thẻ trạng thái LUÔN nằm dưới tên — tên ngắn hay dài thì hàng nào cũng cùng khuôn. */}
       <div className="grid min-w-0 justify-items-start gap-1">
         <span className="font-semibold break-words">{label}</span>
-        <span className="flex flex-wrap gap-1">
+        <span data-tour={tourMark ? "item-status" : undefined} className="flex flex-wrap gap-1">
           <StateTag state={state} />
           {extraTag}
         </span>
       </div>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-sm">{children}</div>
-      {actions && <div className="flex min-w-0 flex-wrap gap-2 sm:justify-end">{actions}</div>}
+      {actions && (
+        <div data-tour={tourMark ? "step-update" : undefined} className="flex min-w-0 flex-wrap gap-2 sm:justify-end">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }
@@ -72,7 +91,11 @@ function ChecklistRow({ label, state, extraTag, children, actions }: { label: st
 /** Khối một bước: đầu (chấm · tên · tóm tắt) + thân là các hàng checklist. */
 function StepBlock({ n, state, summary, isCurrent, children }: { n: StepNo; state: ExportItemState; summary: string; isCurrent: boolean; children: ReactNode }) {
   return (
-    <section id={`ship-step-${n}`} className={`grid min-w-0 scroll-mt-24 grid-cols-[minmax(0,1fr)] rounded-xl border bg-card ${isCurrent ? "border-primary" : "border-border"}`}>
+    <section
+      id={`ship-step-${n}`}
+      data-tour={isCurrent ? "current-step" : n === 6 ? "payments" : undefined}
+      className={`grid min-w-0 scroll-mt-24 grid-cols-[minmax(0,1fr)] rounded-xl border bg-card ${isCurrent ? "border-primary" : "border-border"}`}
+    >
       <div className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-3">
         <StepDot step={n} state={state} alert={isCurrent && state !== "done"} />
         {/* Số bước đã nằm trong chấm (hoặc ✓) — tên không lặp "n." (khớp stepper). */}
@@ -178,7 +201,9 @@ export function ShipmentPanel({
   );
 
   /** Hàng của một mục đơn (bước 2, 3, 4c, 4d). */
-  const singleRow = (step: ExportStep) => {
+  /** Bước n là bước đang làm ⇒ nút của hàng là mốc "Cập nhật một mục" (hướng dẫn từng bước). */
+  const isTourStep = (n: StepNo) => progress.next === n;
+  const singleRow = (step: ExportStep, n: StepNo) => {
     const it = stepItem(data, shipment.id, step);
     const files = it ? filesOfItem(data, it.id) : [];
     return (
@@ -187,6 +212,7 @@ export function ShipmentPanel({
         label={SUB_STEP_LABELS[step]}
         state={subStepState(data, shipment.id, step)}
         extraTag={it?.sharedFromId ? <Tag variant="source">Dùng chung</Tag> : undefined}
+        tourMark={isTourStep(n)}
         actions={updateButton(() => openStep(step), `Cập nhật ${SUB_STEP_LABELS[step].toLowerCase()}: trạng thái, số, file.`)}
       >
         {itemDetail(it, files, `${label} · ${SUB_STEP_LABELS[step]}`)}
@@ -204,6 +230,7 @@ export function ShipmentPanel({
         key={step}
         label={SUB_STEP_LABELS[step]}
         state={subStepState(data, shipment.id, step)}
+        tourMark={isTourStep(4)}
         actions={
           !isCancelled && (
             <>
@@ -249,7 +276,7 @@ export function ShipmentPanel({
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
-      <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 rounded-xl border border-border bg-card p-4">
+      <section data-tour="shipment-card" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid min-w-0 gap-1">
             <p className="font-semibold">{label || "Chuyến chưa có mã lô"}</p>
@@ -319,17 +346,18 @@ export function ShipmentPanel({
       </StepBlock>
 
       <StepBlock n={2} state={progress.steps[2]} summary={summaryOf(2)} isCurrent={progress.next === 2}>
-        {singleRow("production-order")}
+        {singleRow("production-order", 2)}
       </StepBlock>
 
       <StepBlock n={3} state={progress.steps[3]} summary={summaryOf(3)} isCurrent={progress.next === 3}>
-        {singleRow("packaging")}
+        {singleRow("packaging", 3)}
       </StepBlock>
 
       <StepBlock n={4} state={progress.steps[4]} summary={summaryOf(4)} isCurrent={progress.next === 4}>
         <ChecklistRow
           label={shipment.kind === "truck" ? "Biển số xe" : "Số cont + seal"}
           state={shipment.kind === "consolidated" ? "not-applicable" : containerIdentityOk(shipment) ? "done" : "not-started"}
+          tourMark={isTourStep(4)}
           actions={
             canWrite && shipment.kind !== "consolidated" && (
               <Button size="sm" variant="edit" onClick={onEdit} title="Điền số container và seal (nhìn ảnh seal / cửa cont).">
@@ -345,7 +373,7 @@ export function ShipmentPanel({
               : [shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ") || <span className="text-muted-foreground">Chưa điền</span>}
           </span>
         </ChecklistRow>
-        {LOADING_STEPS.map((st) => (st === "loading-plan" || st === "loading-photos" ? uploadRow(st) : singleRow(st)))}
+        {LOADING_STEPS.map((st) => (st === "loading-plan" || st === "loading-photos" ? uploadRow(st) : singleRow(st, 4)))}
       </StepBlock>
 
       <StepBlock n={5} state={progress.steps[5]} summary={summaryOf(5)} isCurrent={progress.next === 5}>
@@ -365,6 +393,7 @@ export function ShipmentPanel({
               label={title}
               state={st}
               extraTag={d.sharedFromId ? <Tag variant="source">Dùng chung</Tag> : undefined}
+              tourMark={isTourStep(5)}
               actions={updateButton(() => onOpenItem({ shipment, contractId: contract.id, item: d, isNew: false }), `Cập nhật ${title}: số, ngày, file, trạng thái (${ITEM_STATE_LABELS[st]}).`)}
             >
               {itemDetail(d, filesOfItem(data, d.id), title)}

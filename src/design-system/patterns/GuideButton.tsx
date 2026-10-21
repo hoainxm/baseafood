@@ -5,7 +5,8 @@
 // ============================================================
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Route } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { FormDialog, CloseButton } from "./FormDialog";
 
 /**
@@ -22,14 +23,20 @@ export function GuideButton({
   description,
   children,
   className,
+  onStartTour,
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
   className?: string;
+  /** Trang có hướng dẫn thao tác (GuidedTour) ⇒ đầu hộp có lối bắt đầu. */
+  onStartTour?: () => void;
 }) {
+  const [open, setOpen] = React.useState(false);
   return (
     <FormDialog
+      open={open}
+      onOpenChange={setOpen}
       title={`Hướng dẫn: ${title}`}
       description={description}
       icon={HelpCircle}
@@ -50,6 +57,23 @@ export function GuideButton({
       }
     >
       <div className="space-y-5 text-base leading-relaxed text-foreground">
+        {onStartTour && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-accent px-4 py-3 text-accent-foreground">
+            <p className="min-w-0 flex-1 basis-56 text-sm">Hướng dẫn thao tác chỉ lần lượt từng khu vực trên trang này theo thứ tự công việc. Hướng dẫn không thay đổi dữ liệu.</p>
+            <Button
+              data-tour-start
+              onClick={() => {
+                setOpen(false);
+                // Đợi hộp đóng xong rồi mới phủ lớp tour (khỏi tranh tiêu điểm với hộp).
+                window.setTimeout(onStartTour, 200);
+              }}
+              title="Bắt đầu hướng dẫn thao tác trên trang này."
+            >
+              <Route aria-hidden />
+              Bắt đầu hướng dẫn thao tác
+            </Button>
+          </div>
+        )}
         {children}
       </div>
     </FormDialog>

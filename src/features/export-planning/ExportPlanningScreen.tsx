@@ -7,7 +7,7 @@
 // ============================================================
 // Spec: docs/spec/xuat-khau-phong-ke-hoach.md · ba-spec: docs/app-map/41-export-planning.ba-spec.md.
 // Máy chủ chặn bằng RLS riêng của mig 0075 (has_export_permission); màn ẩn nút theo useCan.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, notify, todayIso } from "@/design-system";
 import { useCustomers, useProducts, useUserProfiles } from "@/lib/catalogRepo";
@@ -39,7 +39,7 @@ import {
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
 import type { ExportContract, ExportFile, ExportPayment, ExportShipment, ExportShipmentKind, ExportStepItem } from "@/types";
-import { CalendarDays, FilePlus2, FileText, FolderLock } from "lucide-react";
+import { CalendarDays, FilePlus2, FileText, FolderLock, Route } from "lucide-react";
 import { ContractDossier } from "./ContractDossier";
 import { ContractFormDialog, type ContractFormTarget, type ContractSavePayload } from "./ContractFormDialog";
 import { ContractListView } from "./ContractListView";
@@ -67,6 +67,8 @@ import {
   type StepItemTarget,
 } from "./ShipmentDialogs";
 import { useExportData } from "./useExportData";
+import { buildExportTour, pickTourContract } from "./exportTour";
+import { usePageTour, usePageTourControl } from "@/features/shared/PageTourProvider";
 
 /** Hai tab luôn nằm cạnh nhau, chữ được xuống dòng: điện thoại 360 px / chữ 130 % không tràn, không đè nút Lập hợp đồng. */
 const TAB_TRIGGER = "h-auto min-h-9 whitespace-normal px-3 max-sm:[&>svg]:hidden sm:px-4";
@@ -404,6 +406,28 @@ export default function ExportPlanningScreen() {
     return { ships, selected };
   }, [contract, d.shipments, shipmentParam]);
 
+  // Hướng dẫn từng bước (ba-spec 43): hồ sơ minh họa chọn từ dữ liệu đang có (R4); bước chỉ đổi
+  // đường dẫn (replace) — không ghi gì (R1). Thoát thì PageTourProvider trả trang về chỗ cũ (R5).
+  // Tour chụp lúc bắt đầu ⇒ đổi đường dẫn qua ref luôn trỏ hàm MỚI NHẤT (hàm cũ giữ tham số
+  // cũ, làm rơi kỳ xem ?month= đang chọn).
+  const setParamRef = useRef(setParam);
+  useEffect(() => {
+    setParamRef.current = setParam;
+  });
+  const tourPick = useMemo(() => pickTourContract(d, opts), [d, filesAvailable]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tour = useMemo(
+    () =>
+      buildExportTour({
+        pick: tourPick,
+        can: { create: can.create, update: can.update, payments: paymentsCan.view },
+        openDossier: (cid, sid) => setParamRef.current({ view: "", contract: cid, shipment: sid }, true),
+        backToPlan: () => setParamRef.current({ view: "", contract: "", shipment: "" }, true),
+      }),
+    [tourPick, can.create, can.update, paymentsCan.view], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  usePageTour(can.view && !store.isLoading ? tour : null);
+  const pageTour = usePageTourControl();
+
   /* ---------- Vẽ ---------- */
 
   if (!can.view && loadingCan.view) {
@@ -439,7 +463,7 @@ export default function ExportPlanningScreen() {
             <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
               <p className="max-w-3xl text-muted-foreground">Mỗi chuyến container của từng khách đang ở bước nào và còn thiếu gì, tới khi hợp đồng xuất đủ.</p>
               <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" ? "contracts" : "" }, true)}>
-                <TabsList className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
+                <TabsList data-tour="export-tabs" className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
                   <TabsTrigger value="month" className={TAB_TRIGGER} title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
                     <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
                     Lịch xuất hàng
@@ -451,12 +475,25 @@ export default function ExportPlanningScreen() {
                 </TabsList>
               </Tabs>
             </div>
-            {can.create && (
-              <Button onClick={() => setContractForm({ mode: "create" })} title="Lập hồ sơ hợp đồng xuất khẩu mới: khách, số HĐ, điều khoản, dòng hàng, file ký.">
-                <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
-                Lập hợp đồng
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {pageTour.available && (
+                <Button
+                  variant="outline"
+                  data-tour-start
+                  onClick={pageTour.start}
+                  title="Mở hướng dẫn thao tác: lần lượt chỉ từng khu vực trên trang theo thứ tự công việc. Hướng dẫn không thay đổi dữ liệu."
+                >
+                  <Route className="mr-2 h-4 w-4" aria-hidden />
+                  Hướng dẫn thao tác
+                </Button>
+              )}
+              {can.create && (
+                <Button data-tour="create-contract" onClick={() => setContractForm({ mode: "create" })} title="Lập hồ sơ hợp đồng xuất khẩu mới: khách, số HĐ, điều khoản, dòng hàng, file ký.">
+                  <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
+                  Lập hợp đồng
+                </Button>
+              )}
+            </div>
           </div>
           {!filesAvailable && (
             <p role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">

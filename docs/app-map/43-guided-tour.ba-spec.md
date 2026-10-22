@@ -207,12 +207,13 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
 | Dòng hàng | Còn thiếu = Cần − Đã xuất; Khả dụng không tính lô chờ nhập | 34 H3 | detail-lines |
 | Lệnh xuất · kiểm lô | lô sản xuất sớm trước; tạo phiếu bán Xuất khẩu chưa có giá; quét lô, Thay lô | 34 F-N5, H5; spec QR §6c §6d | detail-actions, export-list |
 
-### `/sales` Bán hàng — 11 bước · `sales/salesTour.ts`
+### `/sales` Bán hàng — 14 bước, hai tab · `sales/salesTour.ts` (đăng ký ở `SalesTab`, đổi `?tab=`)
 | Khu vực | Lời phải nói | Nguồn | Bước |
 |---|---|---|---|
 | Hai ngày | ngày xuất bán cho mọi tổng; ghi sổ muộn bắt lý do | 33 §2 | create, invoice |
 | Kênh · giá · nguồn | Xuất khẩu (USD) / Nội địa (VND); Chưa có giá; Block thô / Đóng gói trừ tồn | 33 §4, Bán trừ tồn | add-item, items |
-| Lô · tổng | gắn lô BTP / TP; tổng tiền cộng thẳng (xem tab Báo cáo theo kênh) | spec QR §6d; 33 §5 | lot, totals |
+| Lô · tổng | gắn lô BTP / TP; Tiền bán Xuất khẩu (USD) và Tiền bán Nội địa (đ) cộng riêng theo kênh | spec QR §6d; 33 §4 §5 | lot, totals |
+| Tab Báo cáo | khách × kênh; kg cộng chung, giá trị riêng từng kênh, không cộng | 33 (Hai tab) | tabs, report-filters, report-stats, report-table |
 
 ### Báo cáo tồn / NXT — `reports/*Tour.ts`
 | Trang | Khu vực | Lời phải nói | Nguồn |
@@ -386,7 +387,7 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
   - 30 §1 còn tả hộp thoại ghi chuyến (nay ghi ngay trên trang).
   - 35 còn tả hộp "Ghi sản lượng" + "chốt ngày SX → chờ nhập" (nay lưu là Chờ nhập kho ngay).
   - 34 F-N6 / AC-13 (thủ kho xác nhận thực xuất) chưa có ở code — lập lệnh xuất là đóng ngay.
-  - 33: handoff Đơn đặt ghi "Lưu trữ", code ghi "Đơn đặt". Màn Bán hàng: thẻ "Tổng tiền bán" cộng thẳng USD với VND (trái 33 §4).
+  - 33: handoff Đơn đặt ghi "Lưu trữ", code ghi "Đơn đặt". (Đã sửa 2026-10-22: tiền bán tách USD / VND, tab Báo cáo nối lại — commit `69999c1`.)
   - 40 + spec DOC-R7: đính PDF "ở cột File" (thực tế trong hộp chi tiết); việc gia hạn giao "phòng sở hữu" (code: người xem được + có `documents.update`).
   - QC: "Mở lại ngày" không hỏi lý do (khác Nhập hàng / Sản xuất); phụ đề "Ảnh kèm sẽ bổ sung sau" đã cũ. Cân đối: nút "Nhận chuyển kỳ" không kiểm quyền.
   - Chữ trên vài màn còn "Bấm …" (Nhập hàng, Việc của tôi, Tài liệu, Đóng gói, Đối soát, QR) và empty state "Sản xuất BTP" (menu: "Sản xuất thành phẩm"). Hộp "?" (guideContent) đã sửa theo code ở v4.

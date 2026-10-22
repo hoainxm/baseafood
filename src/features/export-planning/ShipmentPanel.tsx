@@ -18,11 +18,10 @@ import {
   documentItems,
   filesOfItem,
   filesOfStep,
-  isShipmentLate,
+  shipmentLateInfo,
   itemState,
   requiredDocumentLabel,
   shipmentActuals,
-  shipmentDeliveryDate,
   shipmentKindLabel,
   shipmentPaymentSummary,
   sharedSource,
@@ -34,7 +33,7 @@ import {
 import { formatDateVN, formatMoney } from "@/lib/format";
 import type { ExportContract, ExportFile, ExportItemState, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
 import { Ban, Camera, ClipboardList, FilePlus2, Pencil, Plus, RotateCcw, Send, Trash2, Wallet } from "lucide-react";
-import { FileChips, StateTag, StepDot, StepStepper, type PreviewTarget } from "./parts";
+import { FileList, StateTag, StepDot, StepStepper, type PreviewTarget } from "./parts";
 import { progressText, shipmentProgress, stepMissing } from "./progress";
 import type { LoadingUploadTarget, StepItemTarget } from "./ShipmentDialogs";
 import type { PaymentTarget } from "./RecordDialogs";
@@ -72,7 +71,7 @@ function ChecklistRow({
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 border-t border-border py-3 first:border-t-0 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] sm:items-start sm:gap-4">
       {/* Thẻ trạng thái LUÔN nằm dưới tên — tên ngắn hay dài thì hàng nào cũng cùng khuôn. */}
       <div className="grid min-w-0 justify-items-start gap-1">
-        <span className="font-semibold break-words">{label}</span>
+        {label && <span className="font-semibold break-words">{label}</span>}
         <span data-tour={tourMark ? "item-status" : undefined} className="flex flex-wrap gap-1">
           <StateTag state={state} />
           {extraTag}
@@ -148,12 +147,11 @@ export function ShipmentPanel({
   const opts = { filesAvailable };
   const label = [shipment.lotCode && `Lô ${shipment.lotCode}`, shipmentKindLabel(shipment.kind), shipment.containerNo].filter(Boolean).join(" · ");
   const progress = shipmentProgress(data, shipment, opts);
-  const late = isShipmentLate(data, shipment);
+  const lateInfo = shipmentLateInfo(data, shipment);
   const actuals = shipmentActuals(data, shipment.id);
   const pay = shipmentPaymentSummary(data, shipment);
   const isCancelled = shipment.status === "cancelled";
   const canWrite = can.update && !isCancelled;
-  const deliveredOn = shipmentDeliveryDate(data, shipment);
 
   const summaryOf = (n: StepNo): string => {
     const st = progress.steps[n];
@@ -161,6 +159,8 @@ export function ShipmentPanel({
     if (st === "not-applicable") return "Không áp dụng";
     if (n === 6) return pay.documentsSentOn ? `Đã gửi chứng từ ${formatDateVN(pay.documentsSentOn)}` : "Chưa ghi — không tính vào đủ hồ sơ";
     const miss = stepMissing(data, shipment, n);
+    // Bước một mục (Lệnh SX, Bao bì): "Còn thiếu: lệnh sản xuất" chỉ lặp tên bước ⇒ nói trạng thái mục.
+    if (miss.length === 1 && miss[0] === STEP_TITLES[n - 1].toLowerCase()) return ITEM_STATE_LABELS[st];
     return miss.length ? `Còn thiếu: ${miss.join(", ")}` : ITEM_STATE_LABELS[st];
   };
 
@@ -195,7 +195,7 @@ export function ShipmentPanel({
       )}
       {it?.note && <span className="text-muted-foreground">{it.note}</span>}
       {it?.naReason && <span className="text-muted-foreground">Không áp dụng: {it.naReason}</span>}
-      <FileChips files={files} onPreview={onPreview} caption={caption} />
+      <FileList files={files} onPreview={onPreview} caption={caption} />
       {!it?.sharedFromId && !it?.number && !it?.note && !it?.naReason && !files.length && <span className="text-muted-foreground">Chưa có gì</span>}
     </>
   );
@@ -209,7 +209,8 @@ export function ShipmentPanel({
     return (
       <ChecklistRow
         key={step}
-        label={SUB_STEP_LABELS[step]}
+        // Mục trùng tên bước (Lệnh SX, Bao bì) ⇒ không lặp tên — đầu khối đã ghi.
+        label={SUB_STEP_LABELS[step] === STEP_TITLES[n - 1] ? "" : SUB_STEP_LABELS[step]}
         state={subStepState(data, shipment.id, step)}
         extraTag={it?.sharedFromId ? <Tag variant="source">Dùng chung</Tag> : undefined}
         tourMark={isTourStep(n)}
@@ -252,16 +253,7 @@ export function ShipmentPanel({
         {files.length ? (
           <>
             <span className="text-muted-foreground">{isPhotos ? `${files.length} ảnh` : `${files.length} file`}</span>
-            <FileChips files={files} onPreview={onPreview} caption={`${label} · ${SUB_STEP_LABELS[step]}`} />
-            {can.update && (
-              <span className="flex flex-wrap gap-1">
-                {files.map((f) => (
-                  <Button key={f.id} size="sm" variant="ghost" onClick={() => onRemoveFile(f)} title={`Gỡ file "${f.fileName}" (có Hoàn tác).`}>
-                    Gỡ {f.layerNo != null ? `lớp ${f.layerNo}` : f.fileName}
-                  </Button>
-                ))}
-              </span>
-            )}
+            <FileList files={files} onPreview={onPreview} caption={`${label} · ${SUB_STEP_LABELS[step]}`} onRemove={can.update ? onRemoveFile : undefined} />
           </>
         ) : (
           itemDetail(it, [], "")
@@ -286,9 +278,13 @@ export function ShipmentPanel({
               ) : progress.next === null ? (
                 <Tag variant="done">Đủ hồ sơ</Tag>
               ) : (
-                <Tag variant="pending">Đang làm · {progress.settledCount}/5 bước</Tag>
+                <Tag variant="pending">Đang làm · xong {progress.settledCount}/5 bước bắt buộc</Tag>
               )}
-              {late && !isCancelled && <Tag variant="error">Trễ hạn giao{deliveredOn ? ` (${formatDateVN(deliveredOn)})` : ""}</Tag>}
+              {lateInfo.late && !isCancelled && (
+                <Tag variant="error" title={`Hạn giao ${formatDateVN(lateInfo.deadline)} · ngày giao (on board / ETD) ${formatDateVN(lateInfo.deliveredOn)}`}>
+                  Trễ hạn giao {lateInfo.days} ngày
+                </Tag>
+              )}
             </div>
           </div>
           {isCancelled && can.update && contract.status === "open" && (
@@ -327,7 +323,7 @@ export function ShipmentPanel({
           <Fact label="ETD · ETA" value={[shipment.etd && formatDateVN(shipment.etd), shipment.eta && formatDateVN(shipment.eta)].filter(Boolean).join(" → ")} />
           <Fact label="Tàu / chuyến" value={shipment.vesselVoyage} />
           <Fact label={shipment.kind === "truck" ? "Biển số" : "Cont · seal"} value={[shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ")} />
-          <Fact label="Kg KH · thực xuất" value={`${formatNumber(shipment.plannedKg) || "—"}${actuals.kg ? ` · ${formatNumber(actuals.kg)}` : ""}`} />
+          <Fact label="Kg kế hoạch · thực xuất" value={`${formatNumber(shipment.plannedKg) || "—"}${actuals.kg ? ` · ${formatNumber(actuals.kg)}` : ""}`} />
         </dl>
         {!isCancelled && (
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 border-t border-border pt-3">

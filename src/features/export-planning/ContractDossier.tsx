@@ -346,7 +346,7 @@ export function ContractDossier({
             label="Thực xuất · tiền về"
             value={
               closure.actuals.kg > 0
-                ? `${formatNumber(closure.actuals.kg)} kg${can.viewPrice ? ` · ${formatMoney(closure.actuals.amount)} ${currency} · đã về ${formatMoney(pay.received)}` : ""}`
+                ? `${formatNumber(closure.actuals.kg)} kg${can.viewPrice ? ` · ${formatMoney(closure.actuals.amount)} ${currency} · đã về ${formatMoney(pay.received)} ${currency}` : ""}`
                 : can.viewPrice && pay.received > 0
                   ? `chưa có invoice · đã về ${formatMoney(pay.received)} ${currency}`
                   : "chưa có invoice"
@@ -415,7 +415,7 @@ export function ContractDossier({
         >
           <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <Info label="Ngày ký" value={formatDateVN(contract.signedOn)} />
-            <Info label="Order" value={contract.orderRef} />
+            <Info label="Số PO của khách" value={contract.orderRef} />
             <Info label="Incoterm · cảng" value={[terms.incoterm, terms.portOfLoading && `${terms.portOfLoading} → ${terms.portOfDischarge}`].filter(Boolean).join(" · ") || terms.portOfDischarge} />
             <Info
               label="Thanh toán"

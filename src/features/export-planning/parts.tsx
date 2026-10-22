@@ -2,15 +2,16 @@
 // Tên file: src/features/export-planning/parts.tsx
 // Tên tiếng Việt: Mảnh dùng chung của màn Xuất khẩu — chấm 6 bước, xem file, chọn file
 // Description: Shared UI bits for the export planning screens: step state dots, file preview,
-//              multi-file picker, file chips.
+//              multi-file picker, vertical file list.
 // ============================================================
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, FormDialog, ProcessingState, Tag, notify, type TagVariant } from "@/design-system";
 import { ITEM_STATE_LABELS, STEP_TITLES, type StepNo } from "@/lib/exportPlanning";
 import { DEMO_PLACEHOLDER_PREFIX, EXPORT_FILE_ACCEPT, getExportFileUrl } from "@/lib/exportFileStorage";
 import { filePreviewKind } from "@/lib/documents";
+import { formatDateVN } from "@/lib/format";
 import type { ExportFile, ExportItemState } from "@/types";
-import { Check, ChevronDown, CircleDashed, Download, ExternalLink, FileText, Minus, Paperclip, X } from "lucide-react";
+import { Check, ChevronDown, CircleDashed, Download, ExternalLink, Eye, FileText, Image as ImageIcon, Minus, Paperclip, Trash2, X } from "lucide-react";
 
 const STATE_TAG: Record<ExportItemState, TagVariant> = {
   done: "done",
@@ -214,23 +215,73 @@ export function FilePicker({
 }
 
 /** Danh sách file đã lưu — bấm để xem. */
-export function FileChips({ files, onPreview, caption }: { files: readonly ExportFile[]; onPreview: (f: PreviewTarget) => void; caption: string }) {
+/** Nhóm file dài quá ngần này thì gập, chừa nút "Hiện tất cả" (design-spec 42 v5). */
+const FILE_LIST_COLLAPSE_AFTER = 6;
+const isImageName = (name: string) => /\.(jpe?g|png|webp|heic|gif)$/i.test(name);
+
+/**
+ * Danh sách file DỌC (design-spec 42 v5 — thay chip ngang cắt tên): mỗi file một hàng, đủ tên,
+ * dòng phụ "Lớp n · người đính · ngày", nút Xem + Gỡ ngay trên hàng. Nhóm > 6 file gập lại.
+ */
+export function FileList({
+  files,
+  onPreview,
+  caption,
+  onRemove,
+}: {
+  files: readonly ExportFile[];
+  onPreview: (f: PreviewTarget) => void;
+  caption: string;
+  /** Có ⇒ mỗi hàng có nút Gỡ (có Hoàn tác ở nơi gọi). */
+  onRemove?: (f: ExportFile) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
   if (!files.length) return null;
+  const isLong = files.length > FILE_LIST_COLLAPSE_AFTER;
+  const shown = isLong && !showAll ? files.slice(0, FILE_LIST_COLLAPSE_AFTER) : files;
   return (
-    <div className="flex flex-wrap gap-2">
-      {files.map((f) => (
-        <Button
-          key={f.id}
-          size="sm"
-          variant="outline"
-          className="max-w-full min-w-0"
-          onClick={() => onPreview({ path: f.path, name: f.fileName || "file", caption: [caption, f.layerNo != null ? `lớp ${f.layerNo}` : "", f.caption].filter(Boolean).join(" · ") })}
-          title={`Xem file "${f.fileName}"${f.uploadedBy ? ` — ${f.uploadedBy} đính` : ""}.`}
-        >
-          <FileText className="mr-1 h-4 w-4" aria-hidden />
-          <span className="min-w-0 max-w-48 truncate">{f.layerNo != null ? `Lớp ${f.layerNo} · ` : ""}{f.fileName || "file"}</span>
-        </Button>
-      ))}
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)]">
+      <ul className="grid min-w-0 grid-cols-[minmax(0,1fr)] divide-y divide-border rounded-lg border border-border">
+        {shown.map((f) => {
+          const name = f.fileName || "file";
+          const meta = [f.layerNo != null ? `Lớp ${f.layerNo}` : "", f.caption, f.uploadedBy, f.createdAt ? formatDateVN(f.createdAt.slice(0, 10)) : ""].filter(Boolean).join(" · ");
+          const Icon = isImageName(name) ? ImageIcon : FileText;
+          return (
+            <li key={f.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2">
+              <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              <div className="grid min-w-0 gap-0.5">
+                <span className="font-medium break-all">{name}</span>
+                {meta && <span className="text-muted-foreground">{meta}</span>}
+              </div>
+              <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onPreview({ path: f.path, name, caption: [caption, f.layerNo != null ? `lớp ${f.layerNo}` : "", f.caption].filter(Boolean).join(" · ") })}
+                  title={`Xem file "${name}"${f.uploadedBy ? ` — ${f.uploadedBy} đính` : ""}.`}
+                >
+                  <Eye className="mr-1 h-4 w-4" aria-hidden />
+                  Xem
+                </Button>
+                {onRemove && (
+                  <Button size="sm" variant="danger" onClick={() => onRemove(f)} title={`Gỡ file "${name}" (có Hoàn tác).`}>
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                    <span className="sr-only">Gỡ {name}</span>
+                  </Button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      {isLong && (
+        <div>
+          <Button size="sm" variant="ghost" onClick={() => setShowAll((v) => !v)} title={showAll ? "Chỉ hiện 6 file đầu." : `Hiện đủ ${files.length} file của mục này.`}>
+            <ChevronDown className={`mr-1 h-4 w-4 transition-transform ${showAll ? "rotate-180" : ""}`} aria-hidden />
+            {showAll ? "Thu gọn" : `Hiện tất cả ${files.length} file`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -30,6 +30,7 @@ import {
   searchContracts,
   searchShipments,
   shipmentKindLabel,
+  shipmentLateInfo,
   shipmentMonth,
   shiftPeriod,
   weekPeriod,
@@ -181,7 +182,7 @@ export function MonthView({
     },
     {
       key: "kg",
-      header: "Kg KH · thực xuất",
+      header: "Kg kế hoạch · thực xuất",
       numeric: true,
       width: withCustomer ? undefined : "17%",
       render: (r) => `${formatNumber(r.shipment.plannedKg)}${r.actuals.kg ? ` · ${formatNumber(r.actuals.kg)}` : ""}`,
@@ -200,7 +201,14 @@ export function MonthView({
             <span className={`text-sm ${p.next === null ? "font-semibold text-success" : "text-foreground"}`}>{progressText(p)}</span>
             {(r.late || (!r.shipment.bookingNo && !r.shipment.containerNo)) && (
               <div className="flex flex-wrap gap-1">
-                {r.late && <Tag variant="error">Trễ hạn {formatDateVN(r.deadline)}</Tag>}
+                {r.late && (() => {
+                  const li = shipmentLateInfo(data, r.shipment);
+                  return (
+                    <Tag variant="error" title={`Hạn giao ${formatDateVN(li.deadline)} · ngày giao (on board / ETD) ${formatDateVN(li.deliveredOn)}`}>
+                      Trễ hạn giao {li.days} ngày
+                    </Tag>
+                  );
+                })()}
                 {!r.shipment.bookingNo && !r.shipment.containerNo && <Tag variant="muted">Chờ booking</Tag>}
               </div>
             )}
@@ -319,12 +327,12 @@ export function MonthView({
             <Combobox label="Khách hàng" hideRequiredMark value={customerFilter} onChange={setCustomerFilter} options={customerOptions} clearable={false} />
           </div>
           <div className="min-w-0 flex-1 basis-56">
-            <Field label="Tra lô · booking · cont · số giấy tờ · số HĐ">
+            <Field label="Tra lô · booking · cont · số chứng từ · số HĐ · số PO">
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 type="search"
-                title="Gõ mã lô (MSL), số booking, số container, số invoice, số B/L, số hợp đồng hoặc số đơn của khách — tra mọi kỳ."
+                title="Gõ mã lô (MSL), số booking, số container, số invoice, số B/L, số hợp đồng hoặc số PO của khách — tra mọi kỳ."
               />
             </Field>
           </div>

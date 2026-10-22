@@ -36,7 +36,9 @@ import {
   contractTotals,
   emptyTerms,
   lineAmount,
+  lineDescriptionAfterPick,
   lineKg,
+  rankProductsForLine,
   suggestProductId,
   unmappedLines,
   validateContract,
@@ -194,7 +196,13 @@ export function ContractFormDialog({
   const productEditor = useQuickCatalogEdit("product", products, (rows) => void setProducts(rows));
   /** Dòng vừa được tự gợi ý mặt hàng (chỉ để hiện dòng nhắc "kiểm lại", không lưu). */
   const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
-  const productOptions: ComboboxOption[] = products.map((m) => ({ value: m.id, label: m.code ? `${m.code} · ${m.name}` : m.name, subLabel: m.code || undefined }));
+  /** Ô chọn mặt hàng của một dòng: mục có tên thương mại khớp tên HĐ đứng đầu; dòng phụ = mã · tên thương mại (gõ tên tiếng Anh tìm được). */
+  const productOptionsFor = (description: string): ComboboxOption[] =>
+    rankProductsForLine(description, products).map((m) => ({
+      value: m.id,
+      label: m.code ? `${m.code} · ${m.name}` : m.name,
+      subLabel: [m.code, m.tradeName].filter(Boolean).join(" · ") || undefined,
+    }));
   const addProduct = (name: string) => {
     const existing = products.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase());
     if (existing) return existing.id;
@@ -209,7 +217,7 @@ export function ContractFormDialog({
       if (!f) return f;
       const l = f.lines.find((x) => x.id === lineId);
       if (!l || l.productId || !l.description.trim()) return f;
-      const pid = suggestProductId(data, l.description, f.customerId);
+      const pid = suggestProductId(data, l.description, f.customerId, products);
       if (!pid || !products.some((p) => p.id === pid)) return f;
       setSuggestedLines((s) => new Set(s).add(lineId));
       return { ...f, lines: f.lines.map((x) => (x.id === lineId ? { ...x, productId: pid } : x)) };
@@ -398,7 +406,7 @@ export function ContractFormDialog({
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 py-2">
           <ErrorSummary errors={errors} />
 
-          <FormSection no={1} title="Hợp đồng" hint="VD số HĐ: 18.26/BSF-SCM.2026 · số đơn của khách: #B182">
+          <FormSection no={1} title="Hợp đồng" hint="VD số HĐ: 18.26/BSF-SCM.2026 · số PO của khách (dòng Order trên HĐ): #B182">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {identityLocked ? (
                 <Field label="Khách hàng">
@@ -422,7 +430,7 @@ export function ContractFormDialog({
                 <Input value={form.contractNo} readOnly={identityLocked} onChange={(e) => set("contractNo", e.target.value)} aria-required />
               </Field>
               <DateField label="Ngày ký" required value={form.signedOn} onChange={(v) => set("signedOn", v)} />
-              <Field label="Số đơn của khách">
+              <Field label="Số PO của khách">
                 <Input value={form.orderRef} onChange={(e) => set("orderRef", e.target.value)} />
               </Field>
             </div>
@@ -562,21 +570,22 @@ export function ContractFormDialog({
                           label="Mặt hàng (danh mục)"
                           value={l.productId ?? ""}
                           onChange={(v) => {
-                            setLine(l.id, { productId: v || undefined });
+                            // R23: tên hàng còn trống ⇒ điền tên thương mại của mặt hàng vừa chọn.
+                            setLine(l.id, { productId: v || undefined, description: lineDescriptionAfterPick(l.description, products.find((p) => p.id === v)) });
                             setSuggestedLines((s) => {
                               const n = new Set(s);
                               n.delete(l.id);
                               return n;
                             });
                           }}
-                          options={productOptions}
+                          options={productOptionsFor(l.description)}
                           onCreate={productEditor.canCreate ? addProduct : undefined}
                           emptyText="Chưa có mặt hàng nào trong danh mục."
                           onEditItem={productEditor.openEdit}
                           canEdit={productEditor.canEdit}
                           editLabel={productEditor.editLabel}
                         />
-                        {suggestedLines.has(l.id) && <span className="text-sm text-muted-foreground">Gợi ý theo HĐ trước cùng tên hàng — kiểm lại.</span>}
+                        {suggestedLines.has(l.id) && <span className="text-sm text-muted-foreground">Gợi ý theo HĐ trước hoặc tên thương mại cùng tên hàng — kiểm lại.</span>}
                       </div>
                       <Field label="Size">
                         <Input value={l.size} onChange={(e) => setLine(l.id, { size: e.target.value })} />

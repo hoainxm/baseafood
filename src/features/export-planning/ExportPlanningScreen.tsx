@@ -16,6 +16,7 @@ import { useCan } from "@/features/shared/PermissionProvider";
 import { newId } from "@/lib/store";
 import {
   buildMonthExcel,
+  deviationText,
   buildPeriodPlan,
   monthPeriod,
   rangePeriod,
@@ -39,12 +40,14 @@ import {
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
 import type { ExportContract, ExportFile, ExportPayment, ExportShipment, ExportShipmentKind, ExportStepItem } from "@/types";
-import { CalendarDays, FilePlus2, FileText, FolderLock, Route } from "lucide-react";
+import { BarChart3, CalendarDays, FilePlus2, FileText, FolderLock, Route } from "lucide-react";
 import { ContractDossier } from "./ContractDossier";
 import { ContractFormDialog, type ContractFormTarget, type ContractSavePayload } from "./ContractFormDialog";
 import { ContractListView } from "./ContractListView";
 import { LoadingView } from "./LoadingView";
 import { MonthView } from "./MonthView";
+import { ReportView } from "./ReportView";
+import { buildExportReport, buildReportExcel, parseReportPeriod, type ReportPeriod } from "@/lib/exportReports";
 import { ProductMappingDialog, type ProductMappingTarget } from "./ProductMappingDialog";
 import { ExportFilePreview, type PreviewTarget } from "./parts";
 import {
@@ -71,7 +74,8 @@ import { buildExportTour, pickTourContract } from "./exportTour";
 import { usePageTour, usePageTourControl } from "@/features/shared/PageTourProvider";
 
 /** Hai tab luôn nằm cạnh nhau, chữ được xuống dòng: điện thoại 360 px / chữ 130 % không tràn, không đè nút Lập hợp đồng. */
-const TAB_TRIGGER = "h-auto min-h-9 whitespace-normal px-3 max-sm:[&>svg]:hidden sm:px-4";
+// Điện thoại: chữ được xuống dòng trong ô tab; từ sm trở lên KHÔNG gãy dòng (nhãn v5 m).
+const TAB_TRIGGER = "h-auto min-h-9 whitespace-normal px-3 max-sm:[&>svg]:hidden sm:whitespace-nowrap sm:px-4";
 
 const KIND_FROM_TEXT = (t: string): ExportShipmentKind => {
   const x = t.toUpperCase();
@@ -101,7 +105,11 @@ export default function ExportPlanningScreen() {
   const filesAvailable = hasExportStorage;
   const opts = { filesAvailable };
 
-  const view = params.get("view") === "contracts" ? "contracts" : "month";
+  const viewParam = params.get("view");
+  const view = viewParam === "contracts" || viewParam === "reports" ? viewParam : "month";
+  // Kỳ báo cáo: ?report=2026 · 2026-Q3 · 2026-09 (mặc định năm nay) — giữ khi mở HĐ rồi Quay lại.
+  const reportPeriod = parseReportPeriod(params.get("report"), today, "year");
+  const setReportPeriod = (p: ReportPeriod) => setParam({ report: p.key === today.slice(0, 4) ? "" : p.key }, true);
   // Kỳ xem: ?month=yyyy-mm (mặc định tháng này) · ?week=yyyy-mm-dd (tuần chứa ngày đó) · ?from=&to= (khoảng ngày).
   const isoDay = /^\d{4}-\d{2}-\d{2}$/;
   const period: Period =
@@ -384,6 +392,19 @@ export default function ExportPlanningScreen() {
     });
   };
 
+  const exportReportExcel = async (p: ReportPeriod, customerId: string) => {
+    const report = buildExportReport(d, p, { customers, customerId, today, evidence: opts });
+    const who = customerId ? customerName(customerId) : "";
+    const aoa = buildReportExcel(report, { viewPrice: can["view-price"], customerName: who, deviationText });
+    const { exportAoaToXlsx } = await import("@/lib/reportXlsx"); // nạp động — xlsx không vào chunk chính
+    exportAoaToXlsx({
+      sheetName: `Báo cáo XK ${p.key}`.slice(0, 31),
+      aoa,
+      colWidths: [28, 16, 16, 16, 18, 18, 18, 18, 12],
+      fileName: `bao-cao-xuat-khau-${p.key}${customerId ? `-${customerId}` : ""}.xlsx`,
+    });
+  };
+
   /* ---------- Hộp của hồ sơ đang mở ---------- */
 
   const shipmentDefaults = (c: ExportContract): ShipmentTarget["defaults"] => {
@@ -462,8 +483,8 @@ export default function ExportPlanningScreen() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
               <p className="max-w-3xl text-muted-foreground">Mỗi chuyến container của từng khách đang ở bước nào và còn thiếu gì, tới khi hợp đồng xuất đủ.</p>
-              <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" ? "contracts" : "" }, true)}>
-                <TabsList data-tour="export-tabs" className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
+              <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" ? v : "" }, true)}>
+                <TabsList data-tour="export-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
                   <TabsTrigger value="month" className={TAB_TRIGGER} title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
                     <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
                     Lịch xuất hàng
@@ -471,6 +492,10 @@ export default function ExportPlanningScreen() {
                   <TabsTrigger value="contracts" className={TAB_TRIGGER} title="Danh sách mọi hợp đồng, lọc theo trạng thái.">
                     <FileText className="mr-2 h-4 w-4" aria-hidden />
                     Hợp đồng
+                  </TabsTrigger>
+                  <TabsTrigger value="reports" className={TAB_TRIGGER} title="Báo cáo theo tháng · quý · năm: sản lượng, giá trị, tiền về, đúng hạn, hồ sơ còn kẹt, hợp đồng cần chú ý.">
+                    <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
+                    Báo cáo
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -513,6 +538,19 @@ export default function ExportPlanningScreen() {
               onPeriodChange={setPeriod}
               onOpenContract={(cid, sid) => setParam({ contract: cid, shipment: sid ?? "" })}
               onExportExcel={(p, cid) => void exportExcel(p, cid)}
+            />
+          ) : view === "reports" ? (
+            <ReportView
+              data={d}
+              customers={customers}
+              period={reportPeriod}
+              today={today}
+              filesAvailable={filesAvailable}
+              canSeePrice={can["view-price"]}
+              canExport={can.export}
+              onPeriodChange={setReportPeriod}
+              onOpenContract={(cid) => setParam({ contract: cid, shipment: "" })}
+              onExportExcel={(p, cid) => void exportReportExcel(p, cid)}
             />
           ) : (
             <ContractListView data={d} customers={customers} filesAvailable={filesAvailable} canSeePrice={can["view-price"]} today={today} onOpen={(cid) => setParam({ contract: cid, shipment: "" })} />

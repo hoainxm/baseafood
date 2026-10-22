@@ -13,7 +13,7 @@ import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
-import { suggestProductId, type ExportData } from "@/lib/exportPlanning";
+import { rankProductsForLine, suggestProductId, type ExportData } from "@/lib/exportPlanning";
 import type { ExportContractRevision, Product } from "@/types";
 import { Link2, Save } from "lucide-react";
 
@@ -56,11 +56,14 @@ export function ProductMappingDialog({
 
   useEffect(() => {
     if (!target) return;
-    // Dòng chưa nối ⇒ gợi ý theo tên tiếng Anh đã nối ở HĐ trước (không dịch máy).
+    // Dòng chưa nối ⇒ gợi ý theo tên tiếng Anh đã nối ở HĐ trước, rồi theo tên thương mại khớp đúng một
+    // mặt hàng (R16 + R23 — không dịch máy).
     const initialMap = Object.fromEntries(target.revision.lines.map((l) => [l.id, l.productId ?? ""]));
-    const map = Object.fromEntries(
-      target.revision.lines.map((l) => [l.id, l.productId || (products.some((p) => p.id === suggestProductId(data, l.description, target.customerId)) ? suggestProductId(data, l.description, target.customerId) : "")]),
-    );
+    const suggest = (description: string) => {
+      const pid = suggestProductId(data, description, target.customerId, products);
+      return products.some((p) => p.id === pid) ? pid : "";
+    };
+    const map = Object.fromEntries(target.revision.lines.map((l) => [l.id, l.productId || suggest(l.description)]));
     const fresh: MappingForm = { key: target.revision.id, tg: target, map, initial: mapSnap(initialMap) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
@@ -69,7 +72,13 @@ export function ProductMappingDialog({
   }, [target]);
 
   const tgt = target ?? form?.tg ?? null;
-  const options: ComboboxOption[] = products.map((m) => ({ value: m.id, label: m.code ? `${m.code} · ${m.name}` : m.name, subLabel: m.code || undefined }));
+  /** Mục có tên thương mại khớp tên HĐ đứng đầu; dòng phụ = mã · tên thương mại (gõ tên tiếng Anh tìm được). */
+  const optionsFor = (description: string): ComboboxOption[] =>
+    rankProductsForLine(description, products).map((m) => ({
+      value: m.id,
+      label: m.code ? `${m.code} · ${m.name}` : m.name,
+      subLabel: [m.code, m.tradeName].filter(Boolean).join(" · ") || undefined,
+    }));
   const addProduct = (name: string) => {
     const existing = products.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase());
     if (existing) return existing.id;
@@ -139,7 +148,7 @@ export function ProductMappingDialog({
                 label={`Mặt hàng (danh mục) · dòng ${i + 1}`}
                 value={form.map[l.id] ?? ""}
                 onChange={(v) => setForm((f) => (f ? { ...f, map: { ...f.map, [l.id]: v } } : f))}
-                options={options}
+                options={optionsFor(l.description)}
                 onCreate={productEditor.canCreate ? addProduct : undefined}
                 emptyText="Chưa có mặt hàng nào trong danh mục."
                 onEditItem={productEditor.openEdit}

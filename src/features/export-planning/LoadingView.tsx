@@ -12,7 +12,7 @@ import { filesOfStep, shipmentKindLabel } from "@/lib/exportPlanning";
 import { formatDateVN } from "@/lib/format";
 import type { Customer, ExportContract, ExportFile, ExportShipment } from "@/types";
 import { Camera, ClipboardList, Container } from "lucide-react";
-import { FileChips, type PreviewTarget } from "./parts";
+import { FileList, type PreviewTarget } from "./parts";
 import type { LoadingUploadTarget } from "./ShipmentDialogs";
 
 export function LoadingView({
@@ -87,7 +87,7 @@ export function LoadingView({
                     <Tag variant={plans.length ? "done" : "muted"}>{plans.length ? "Có sơ đồ" : "Chưa có sơ đồ"}</Tag>
                   </div>
                 </div>
-                <FileChips files={[...plans, ...photos]} onPreview={onPreview} caption={label} />
+                <FileList files={[...plans, ...photos]} onPreview={onPreview} caption={label} />
                 {canUpload && (
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button onClick={() => onUpload({ shipment: s, contractId: s.contractId, step: "loading-photos", label })} title="Chụp / chọn ảnh từng lớp hàng, seal, số cont của chuyến này.">

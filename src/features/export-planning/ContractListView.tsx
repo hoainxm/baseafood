@@ -4,7 +4,7 @@
 // Description: Contract list across months with state filter, coverage / tolerance hints.
 // ============================================================
 import { useState } from "react";
-import { Button, ChoiceGroup, RecordTable, Tag, formatNumber, type RecordTableColumn } from "@/design-system";
+import { Button, ChoiceGroup, Field, Input, RecordTable, Tag, formatNumber, type RecordTableColumn } from "@/design-system";
 import {
   contractClosure,
   contractStateLabel,
@@ -26,7 +26,7 @@ import { Eye } from "lucide-react";
 const STATE_TAG = { pending: "pending", approved: "source", closed: "done", cancelled: "muted" } as const;
 type Filter = "open" | ContractState | "all";
 const FILTERS = [
-  { value: "open", label: "Đang chạy" },
+  { value: "open", label: "Đang mở (chờ duyệt + đã duyệt)" },
   { value: "pending", label: "Chờ duyệt" },
   { value: "closed", label: "Đã xuất đủ · đã chốt" },
   { value: "cancelled", label: "Đã hủy" },
@@ -50,12 +50,17 @@ export function ContractListView({
 }) {
   const opts = { filesAvailable };
   const [filter, setFilter] = useState<Filter>("open");
+  const [query, setQuery] = useState("");
   const nameOf = (id: string) => customers.find((c) => c.id === id)?.name || "(khách chưa rõ)";
   const stateOf = (c: ExportContract) => contractState(data, c.id, opts);
   const rows = data.contracts
     .filter((c) => {
       const st = stateOf(c);
       return filter === "all" || (filter === "open" ? st === "pending" || st === "approved" : st === filter);
+    })
+    .filter((c) => {
+      const q = query.trim().toLowerCase();
+      return !q || `${c.contractNo} ${c.orderRef} ${nameOf(c.customerId)}`.toLowerCase().includes(q);
     })
     .sort((a, b) => effectiveDeadline(data, b.id).localeCompare(effectiveDeadline(data, a.id)));
 
@@ -85,7 +90,7 @@ export function ContractListView({
         // Kg trên, tiền dưới — một dòng "12.050 · 97.755,00 USD" làm bảng tràn ngang ở 1366 px.
         return (
           <span className="grid justify-items-end">
-            <span>{formatNumber(t.kg)}</span>
+            <span>{formatNumber(t.kg)} kg</span>
             {canSeePrice && (
               <span className="text-sm text-muted-foreground">
                 {formatMoney(t.amount)} {r.terms.currency}
@@ -119,13 +124,15 @@ export function ContractListView({
   return (
     <div className="grid min-w-0 gap-4">
       <ChoiceGroup label="Trạng thái" hideRequiredMark value={filter} onChange={(v) => setFilter(v as Filter)} options={FILTERS} columns={3} />
+      {/* Nhãn luôn hiện (luật 5) — ô tìm mặc định của bảng chỉ có chữ mờ. */}
+      <Field label="Tra hợp đồng (số HĐ · số PO · tên khách)">
+        <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} title="Gõ một phần số hợp đồng, số PO của khách hoặc tên khách — lọc ngay danh sách." />
+      </Field>
       <RecordTable
         columns={columns}
         rows={rows}
         getKey={(c) => c.id}
         rowMarkKey="export-contracts"
-        getSearchText={(c) => `${c.contractNo} ${c.orderRef} ${nameOf(c.customerId)}`}
-        searchLabel="Tìm số HĐ, số đơn, tên khách…"
         emptyText="Không có hợp đồng nào khớp."
         actions={(c) => (
           <Button size="sm" variant="outline" onClick={() => onOpen(c.id)} title="Mở hồ sơ hợp đồng.">

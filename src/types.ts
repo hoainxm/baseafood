@@ -278,6 +278,9 @@ export interface Product {
    *  nước tương = [24V, 18V, 220H]. Màn /wip tự hiện ô kg cho từng loại. Danh mục
    *  (CRUD lưu chuỗi) giữ dạng "id1,id2" — đọc bằng `getProductBatterIds()` (lib/batter). */
   batterIds?: string[] | string;
+  /** TÊN THƯƠNG MẠI tiếng Anh (migration 0076) — tên in trên HĐ / invoice quốc tế, VD
+   *  "Frozen iwadako boiled cut". `undefined` = máy chủ chưa có cột (đừng gửi). */
+  tradeName?: string;
 }
 
 /** Loại BỘT TẨM (migration 0051) — danh mục mở, VD "Bột 24V". Sổ nối theo TÊN. */

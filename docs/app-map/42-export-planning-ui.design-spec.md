@@ -2,8 +2,9 @@
 
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
-last_verified: 2026-10-21
+last_verified: 2026-10-22
 ttl_days: 90
+<!-- updated: 2026-10-22 — v5 (ba-spec 41 v5): tab Báo cáo, danh sách file dọc, nhãn v5 (a–n), ô Tên thương mại ở danh mục / form HĐ / hộp Nối mặt hàng. -->
 <!-- re-verified: 2026-10-21 — v4 hướng dẫn thao tác (tour 21 bước, ba-spec 43): nút phụ "Hướng dẫn thao tác" + lối từ hộp "?", khung lời, mốc data-tour — chạy thật 1366 px + 360 px × 100 / 130 %. -->
 <!-- re-verified: 2026-10-21 — v3 triage giao diện (ui-ux-triage + ui-design-logic): tab 2 cột ở điện thoại, cột bảng theo khách thẳng hàng, thẻ số cùng khuôn, hàng checklist cùng khuôn, tên bước không lặp số, bảng Hợp đồng vừa 1366 px — thử preview demo 1366 px + 360 px × 100 / 130 %. -->
 <!-- re-verified: 2026-10-20 17:40 — v2 sau ba-spec 41 v4: thanh kỳ xem, nhãn Đủ hồ sơ / Đã xuất đủ / Đã chốt HĐ, Nối mặt hàng, người ký BGĐ, cọc cấp HĐ, Khôi phục chuyến — thử tay preview 1366 px + 360 px × 100 / 130 %. -->
@@ -16,7 +17,7 @@ ttl_days: 90
 | Loại | Muốn thấy gì | Sản phẩm truyền tải | Thúc đẩy action tiếp |
 |---|---|---|---|
 | Nhân viên Kế hoạch (`planner`, quen, desktop) | Tháng này chuyến nào chưa xong, **thiếu cái gì** | Mỗi chuyến một thanh tiến độ + "Bước tiếp: … — còn thiếu …" | Mở chuyến → làm đúng mục còn thiếu |
-| BGĐ / Kế toán (xem, desktop / điện thoại) | Bao nhiêu chuyến đủ hồ sơ, trễ hạn, tiền về | 4 thẻ số + thẻ trạng thái; không nút ghi | Mở hồ sơ để xem |
+| BGĐ / Kế toán (xem, desktop / điện thoại) | Bao nhiêu chuyến đủ hồ sơ, trễ hạn, tiền về; **kỳ này xuất bao nhiêu, còn bao nhiêu tiền chưa về** (v5) | 4 thẻ số + thẻ trạng thái; **tab Báo cáo** (tổng kỳ, theo tháng, theo khách, HĐ cần chú ý); không nút ghi | Mở HĐ cần chú ý · Xuất Excel |
 | Người đóng hàng (`.loading`, điện thoại tại bãi) | Chuyến hôm nay cần chụp | Thẻ chuyến ±7 ngày, nút Đính ảnh to | Đính ảnh |
 
 Trọng số thông tin (planner): **3** = tiến độ + mục còn thiếu, việc làm tiếp của hồ sơ · **2** = ngày đóng / ETD, hạn giao, trễ · **1** = kg, booking, số cont · **0–1** = điều khoản chi tiết, dòng hàng, lịch sử (gập).
@@ -27,6 +28,7 @@ Trọng số thông tin (planner): **3** = tiến độ + mục còn thiếu, vi
 |---|---|---|---|---|
 | Xuất khẩu · Lịch xuất hàng | nav "Kế hoạch → Xuất khẩu", trang chủ planner, link `?month=` / `?week=` / `?from=&to=` | xem chuyến của kỳ (tháng / tuần / khoảng ngày) đang ở đâu, thiếu gì | mở chuyến thiếu bước | Lập hợp đồng |
 | Xuất khẩu · Hợp đồng | tab "Hợp đồng" | tìm một HĐ bất kỳ tháng | mở hồ sơ | Lập hợp đồng |
+| Xuất khẩu · Báo cáo (v5) | tab "Báo cáo", link `?view=reports&report=2026` / `2026-Q3` / `2026-09` | xem số kỳ (NV15 · R25) | mở HĐ cần chú ý | Lập hợp đồng (nút trang; trong tab không có nút chính — Xuất Excel là `outline`) |
 | Hồ sơ hợp đồng | nút Mở ở tháng / danh sách, link `?contract=` | làm việc tiếp của HĐ (duyệt, lên chuyến, bước) | bước còn thiếu của chuyến | **Việc tiếp** (suy theo trạng thái: Ghi kết quả duyệt → Lên chuyến → không có) |
 | Chuyến (trong hồ sơ) | chọn chuyến / HĐ 1 chuyến tự mở | điền bước còn thiếu | mục "đang" (bước đầu chưa xong) | nút Cập nhật / Đính ảnh của mục đầu còn thiếu |
 | Form Lập / sửa HĐ | Lập hợp đồng, Sửa bản chờ duyệt, Ghi bản sửa | ghi đúng HĐ giấy (+ nối mặt hàng nếu biết) | lưu ⇒ mở hồ sơ | Lưu hợp đồng |
@@ -69,6 +71,37 @@ Trọng số thông tin (planner): **3** = tiến độ + mục còn thiếu, vi
 
 **Hộp mục chứng từ.** Chứng từ khách yêu cầu: không có nút xóa. Mục thêm tay: 🗑 `InlineConfirmDelete` (hỏi tại chỗ, có Hoàn tác). Mục dùng chung: dòng "Dùng chung với lô … · số … · ngày …" thay "Chưa có gì". Đóng ghép: hàng "Số cont + seal" trạng thái Không áp dụng, chữ "Không cần — hàng đóng ghép chung cont của chuyến khác", không nút. "Chờ booking" ẩn khi đã có số cont.
 
+**Báo cáo (v5 — ba-spec 41 NV15, R25).** Tab thứ 3 "Báo cáo" (icon `ChartColumn`). Thanh lọc hai hàng, nhãn luôn hiện: hàng 1 = **Xem theo** (`ChoiceGroup` Tháng · Quý · Năm, cùng bề ngang 21rem với Lịch) + ‹ nhãn kỳ › (+ "Nay"); hàng 2 = Khách hàng (lọc mọi số) · Xuất Excel (`outline`). Thân, trên → dưới theo trọng số:
+1. **4 thẻ số** (khuôn `StatCard` như Lịch, dòng phụ bắt buộc): Chuyến của kỳ ("m cont") · Thực xuất kg ("kế hoạch x kg") · Giá trị thực xuất USD ("tiền về trong kỳ y USD") — **không quyền giá ⇒ thay bằng** "HĐ ký trong kỳ" ("x kg") · Đúng hạn % ("n trễ / m chuyến đã giao"; chưa chuyến nào giao ⇒ "—").
+2. **Theo tháng** (chỉ kỳ quý / năm): bảng tháng × (Chuyến · Cont · Kg kế hoạch · Kg thực xuất · Giá trị · Tiền về) + hàng tổng; tháng không có số vẫn hiện (0) để thấy mùa vụ.
+3. **Theo khách:** bảng Khách · HĐ ký · Chuyến · Cont · Kg thực xuất · Giá trị · Đã về · Còn chưa về, sắp theo kg thực xuất giảm dần, hàng tổng cuối. `rowMarkKey` ghép kỳ + khách (luật 12).
+4. **Hồ sơ còn kẹt:** 5 hàng bước 1–5, mỗi hàng "Bước n · tên" + số chuyến chưa xong + thanh tỉ lệ trên tổng chuyến của kỳ (`ProportionBar`); 0 ⇒ chữ "Không chuyến nào kẹt".
+5. **Hợp đồng cần chú ý:** bảng HĐ · Khách · Vấn đề (thẻ: đỏ "Quá hạn giao" · "Vượt dung sai" · vàng "Thiếu dung sai" · "Còn tiền chưa về") · Chi tiết (VD "thừa 16,9% kg · 12,8% tiền", "còn 194.557,60 USD") · Mở (`ghost`, mở hồ sơ). Không có ⇒ "Không hợp đồng nào cần chú ý trong kỳ".
+Cột tiền ẩn hẳn khi không quyền giá (không để ô "—"). Bảng dài dùng `SummaryTable` / `RecordTable` có sẵn (thanh cuộn ngang trên + dưới, luật 14).
+
+**Danh sách file (v5 — thay chip ngang).** Mọi chỗ có file (bước chuyến, hộp mục chứng từ, màn đóng hàng, hồ sơ HĐ) dùng **một** khuôn `FileList`: mỗi file **một hàng** — icon loại · **tên đủ** (xuống dòng khi dài, không cắt) · dòng phụ "Lớp n · người đính · ngày" · bên phải nút `ghost` **Xem** + 🗑 **Gỡ** (`danger`, chỉ khi được gỡ; có Hoàn tác). Nhóm > 6 file: hiện 6 hàng đầu + nút `ghost` "Hiện tất cả n file" / "Thu gọn". Bỏ cụm nút "Gỡ lớp 1 … Gỡ lớp 27" tách rời và nút chữ "Gỡ <tên file>".
+
+**Nhãn v5 (rà ngày 2026-10-22 trên HĐ 18.26 thật).**
+
+| # | Chỗ | Cũ | Mới |
+|---|---|---|---|
+| a | Form HĐ · đầu hồ sơ · ô tra | "Số đơn của khách" · "Order" · "số đơn" | **"Số PO của khách"** (ba-spec R24) · ô tra "số PO" |
+| b | Thẻ chuyến · bảng Lịch | "Kg KH · thực xuất" | "Kg kế hoạch · thực xuất" |
+| c | Thẻ trễ ở bảng Lịch + đầu chuyến | "Trễ hạn 05/09/2026" / "Trễ hạn giao (26/09/2026)" (hai ngày khác nghĩa) | **"Trễ hạn giao n ngày"** ở cả hai chỗ; `title` = "Hạn giao dd/mm/yyyy · ngày giao (on board / ETD) dd/mm/yyyy" |
+| d | Thẻ tiến độ chuyến | "Đang làm · 2/5 bước" | "Đang làm · xong 2/5 bước bắt buộc" |
+| e | "Bước tiếp" | "Bước tiếp: Lệnh sản xuất — còn lệnh sản xuất" | bỏ phần "— còn …" khi chỉ lặp tên bước |
+| f | Bước 1 mục (Lệnh SX, Bao bì) | tên bước + tên mục + "Còn thiếu: <tên>" | hàng mục không lặp tên; đầu bước tóm tắt = trạng thái mục ("Chưa làm" / "Đang làm") |
+| g | Bước 6 | "Khác" | **"Gửi chứng từ · tiền về"** |
+| h | Ô "Thực xuất · tiền về" | "đã về 0,00" | "đã về 0,00 USD" |
+| i | Tab Hợp đồng · bộ lọc | "Đang chạy" (≠ thẻ "Chờ duyệt"/"Đã duyệt") | **"Đang mở (chờ duyệt + đã duyệt)"** |
+| j | Tab Hợp đồng · cột | "Kg · tiền" ghi "19.000" | "19.000 kg" |
+| k | Ô tìm tab Hợp đồng | chữ mờ thay nhãn | nhãn "Tra hợp đồng" luôn hiện (luật 5) |
+| l | Ô tra Lịch | "số giấy tờ" | "số chứng từ" |
+| m | Thanh tab | "Lịch xuất hàng" gãy 2 dòng ở desktop | không xuống dòng từ sm trở lên |
+| n | File | chip ngang cắt tên + cụm "Gỡ lớp n" | `FileList` (mục trên) |
+
+**Danh mục Mặt hàng — Tên thương mại (v5, ba-spec R23).** Hộp Thêm/Sửa: ô chữ **"Tên thương mại (tiếng Anh)"** ngay dưới "Tên mặt hàng", ví dụ "VD: Frozen iwadako boiled cut"; cột bảng phụ (xem ở Chi tiết); ô tìm tìm cả tên này. Tiêu đề tab "Mặt hàng" (bỏ chữ "cân đối" — danh mục dùng chung). Máy chủ chưa có cột ⇒ ô tự ẩn. **Form HĐ:** chọn mặt hàng cho dòng tên trống ⇒ ô tên hàng tự điền tên thương mại. **Ô chọn mặt hàng** (form + hộp Nối): dòng phụ = tên thương mại (tìm được bằng tên này); hộp Nối mở ra điền sẵn khi khớp đúng 1 mặt hàng, các mục khớp đứng đầu danh sách.
+
 ## Ma trận trạng thái
 
 | Màn | Đang tải | Trống | Lỗi | Không quyền | Dữ liệu cực đoan |
@@ -78,9 +111,13 @@ Trọng số thông tin (planner): **3** = tiến độ + mục còn thiếu, vi
 | Chuyến | — | chưa có mục chứng từ ⇒ câu hướng dẫn | — | không ghi: ẩn nút từng hàng | 27 ảnh lớp: chip ảnh gói gọn, xem trong hộp |
 | Form | — | — | `ErrorSummary` đầu form | — | 14 dòng hàng: tóm tắt từng dòng, tổng ở chân |
 | Không nối máy chủ | — | — | dải cảnh báo 1 dòng | — | ẩn nút tải file |
+| Báo cáo (v5) | `TableSkeleton` | kỳ không có chuyến lẫn HĐ ⇒ `EmptyState` "<kỳ> chưa có số xuất khẩu [của khách này]" + gợi ý đổi kỳ | như Lịch | không quyền giá ⇒ ẩn mọi cột / thẻ tiền | năm 40 chuyến / 20 khách: bảng khách sắp kg, tháng 0 vẫn hiện; tiền tới hàng trăm nghìn USD 2 số lẻ |
 | Hướng dẫn thao tác | chưa có lối vào khi trang đang tải (R7) | không có hợp đồng ⇒ phần hồ sơ gói thành 1 lời giữa trang | khu vực không hiện sau ~3 giây (đứng yên 300 ms thì thôi) ⇒ bước tùy chọn bỏ qua, bước bắt buộc thành lời giữa trang | chỉ xem ⇒ bỏ bước Lập hợp đồng / Cập nhật mục / Tiền về | khu vực cao hơn màn ⇒ thấy phần đầu; lời dài cuộn trong khung |
 
 ## Action → expectation
+
+- Đổi kỳ / khách ở Báo cáo ⇒ mọi thẻ + bảng đổi ngay, URL giữ kỳ (`?report=`), không toast (luật 13). Mở HĐ cần chú ý ⇒ hồ sơ HĐ; Quay lại ⇒ đúng tab Báo cáo + kỳ cũ.
+- Gỡ file ở `FileList` ⇒ hàng biến mất, toast Hoàn tác; "Hiện tất cả" ⇒ mở hết ngay tại chỗ.
 
 - Lưu HĐ ⇒ hộp đóng, hồ sơ mở, nút chính đổi thành "Ghi kết quả duyệt".
 - Ghi duyệt đồng ý ⇒ chấm bước 1 xanh, nút chính đổi thành "Lên chuyến" (khi chưa đủ chuyến).
@@ -103,7 +140,10 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 
 - 2026-10-21 — **hướng dẫn thao tác** (preview demo 7 HĐ, script đo vì pane ẩn): 21 bước ở 1366 px và 360 px × 100 / 130 % — 0 bước khu vực khuất dưới thanh tiêu đề, 0 bước khung lời đè khu vực, 0 khung tràn, `scrollWidth` 1366 / 360, thanh tiêu đề không trôi, vị trí cuộn + đường dẫn trả đúng, khóa `bsf*` dưới máy không đổi. Sửa trong lúc đo: cuộn bằng `scrollIntoView` ở cuối trang đẩy cả khung app lên 600 px (đổi sang tự cuộn đúng một khung) · khung cuộn ngang của bảng bị nhận nhầm là khung dọc · điện thoại khung lời che khu vực (đổi sang đưa khu vực lên sát thanh tiêu đề + chừa đáy) · số bước nhảy cóc 6 → 9 (dò trước bước cùng chỗ xem). Lỗi có sẵn ngoài tour, để việc riêng: thanh tiêu đề tràn ngang khi bật DEMO + chữ 130 % (Nhập hàng 462 px).
 
+- 2026-10-22 — **v5** (preview `baseafood-demo`, bộ demo sinh từ sandbox): tab Báo cáo năm / quý ở 1366 px (4 khối cùng bề ngang 1003 px, không khối nào tràn — bản đầu biểu đồ 12 tháng đẩy khối "Theo tháng" ra 1224 px ⇒ bọc `HorizontalScroll` + lưới `minmax(0,1fr)`; dòng Tổng đặt trong `tfoot` của bảng làm gãy 5 dòng + lỗi `<p>` trong `<tfoot>` ⇒ dời ra dưới bảng; tên cột tiền rút gọn, đơn vị USD nói ở câu dưới tiêu đề), 360 px × 100 / 130 % `scrollWidth == 360`, 0 phần tử tràn ngoài khung cuộn riêng; `FileList` 25 ảnh gập còn 6 → "Hiện tất cả 25 file" mở đủ → "Thu gọn" về 6, cụm "Gỡ lớp n" đã hết; khai tên thương mại ở danh mục rồi chọn mặt hàng ở form HĐ ⇒ tên hàng tự điền "Frozen iwadako boiled cut", ô chọn tìm được bằng tên tiếng Anh; console 0 lỗi sau tải lại.
+
 ## History
+- v5 (2026-10-22): tab Báo cáo · `FileList` dọc thay chip · nhãn v5 (a–n) · Tên thương mại ở danh mục, form HĐ, hộp Nối mặt hàng (ba-spec 41 v5).
 - v4 (2026-10-21): hướng dẫn thao tác — tour 21 bước + mốc `data-tour` + hộp "?" cho Xuất khẩu (ba-spec 43).
 - v3 (2026-10-21): triage giao diện — tab điện thoại, cột thẳng hàng giữa bảng khách, thẻ số cùng khuôn, checklist cùng khuôn, bảng Hợp đồng gộp ngày ký vào hạn giao.
 - v2 (2026-10-20): theo góp ý chủ dự án sau audit — tab "Lịch xuất hàng" + kỳ xem tháng / tuần / ngày, nhãn Đủ hồ sơ / Đã xuất đủ / Đã chốt HĐ, cột + hộp Nối mặt hàng, người ký chọn từ tài khoản BGĐ, khối tiền cọc cấp HĐ, Khôi phục chuyến, tiền 2 số lẻ.

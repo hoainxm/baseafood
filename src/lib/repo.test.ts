@@ -5,6 +5,7 @@ vi.mock("@/lib/supabase", () => ({ supabase: null, hasSupabase: false, SITE_ID: 
 
 import {
   CUSTOMER_TABLE,
+  PRODUCT_TABLE,
   RECONCILIATION_RUN_TABLE,
   WIP_PRODUCTION_TABLE,
   dropSentKeys,
@@ -252,5 +253,20 @@ describe("khách hàng — cột xuất khẩu (mig 0075)", () => {
     const c = CUSTOMER_TABLE.fromRow({ id: "k1", code: "", name: "SCM", market: "", country: "Nhật Bản", address: "", default_port: "Tokyo", payment_terms: "", contact_name: "", contact_email: "" });
     expect(c).toMatchObject({ country: "Nhật Bản", defaultPort: "Tokyo", address: "" });
     expect(CUSTOMER_TABLE.toRow(c)).toMatchObject({ country: "Nhật Bản", default_port: "Tokyo", payment_terms: "", contact_email: "" });
+  });
+});
+
+describe("mặt hàng — tên thương mại (mig 0076, ba-spec 41 AC-41)", () => {
+  const base = { id: "p1", code: "", name: "Bạch tuộc 2 da cắt luộc 5,5gr", finishedGoodCode: "" };
+  it("máy chủ chưa có cột ⇒ đọc ra undefined, ghi KHÔNG gửi trade_name", () => {
+    const p = PRODUCT_TABLE.fromRow({ id: "p1", name: "a" });
+    expect(p.tradeName).toBeUndefined();
+    expect("trade_name" in PRODUCT_TABLE.toRow({ ...base, tradeName: undefined })).toBe(false);
+  });
+  it("máy chủ có cột ⇒ đọc (null về chuỗi rỗng) và gửi", () => {
+    expect(PRODUCT_TABLE.fromRow({ id: "p1", name: "a", trade_name: null }).tradeName).toBe("");
+    expect(PRODUCT_TABLE.fromRow({ id: "p1", name: "a", trade_name: "Frozen iwadako boiled cut" }).tradeName).toBe("Frozen iwadako boiled cut");
+    expect(PRODUCT_TABLE.toRow({ ...base, tradeName: "X" }).trade_name).toBe("X");
+    expect(PRODUCT_TABLE.toRow({ ...base, tradeName: "" }).trade_name).toBe("");
   });
 });

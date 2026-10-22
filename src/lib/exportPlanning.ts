@@ -24,6 +24,7 @@ import type {
   ExportShipmentKind,
   ExportStep,
   ExportStepItem,
+  Product,
 } from "@/types";
 
 /* ---------- Danh sách cố định + nhãn ---------- */
@@ -65,7 +66,7 @@ export const PAYMENT_METHODS: { value: "ttr" | "lc" | "other"; label: string }[]
   { value: "other", label: "Khác" },
 ];
 
-export const STEP_TITLES = ["Hợp đồng", "Lệnh sản xuất", "Bao bì", "Đóng cont", "Bộ chứng từ", "Khác"] as const;
+export const STEP_TITLES = ["Hợp đồng", "Lệnh sản xuất", "Bao bì", "Đóng cont", "Bộ chứng từ", "Gửi chứng từ · tiền về"] as const;
 export type StepNo = 1 | 2 | 3 | 4 | 5 | 6;
 export const STEP_NOS: StepNo[] = [1, 2, 3, 4, 5, 6];
 
@@ -546,27 +547,51 @@ export function unmappedLines(lines: readonly ExportContractLine[]): ExportContr
   return lines.filter((l) => (l.description.trim() || l.quantity != null) && !l.productId);
 }
 
+/** Khóa so tên tiếng Anh: không phân hoa thường, gộp khoảng trắng. */
+const nameKey = (v: string | undefined) => (v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+/** Mặt hàng có tên thương mại khớp tên hàng trên HĐ (R23). */
+export function productsByTradeName<P extends Pick<Product, "id" | "tradeName">>(description: string, products: readonly P[]): P[] {
+  const key = nameKey(description);
+  return key ? products.filter((p) => nameKey(p.tradeName) === key) : [];
+}
+
 /**
- * Gợi ý mặt hàng cho tên tiếng Anh: lấy cặp (tên HĐ → mặt hàng) đã nối ở các HĐ trước, ưu tiên cùng
- * khách, rồi bản mới nhất. Không dịch máy — chưa từng nối thì trả "".
+ * Gợi ý mặt hàng cho tên tiếng Anh (R16 + R23): (1) cặp (tên HĐ → mặt hàng) đã nối ở các HĐ trước,
+ * ưu tiên cùng khách, rồi bản mới nhất; (2) chưa từng nối ⇒ mặt hàng có tên thương mại khớp — chỉ khi
+ * khớp ĐÚNG MỘT (hai size cùng tên thương mại thì để người dùng chọn). Không dịch máy.
  */
 export function suggestProductId(
   d: Pick<ExportData, "contracts" | "revisions">,
   description: string,
   customerId: string,
+  products: readonly Pick<Product, "id" | "tradeName">[] = [],
 ): string {
-  const key = description.trim().toLowerCase().replace(/\s+/g, " ");
+  const key = nameKey(description);
   if (!key) return "";
   const customerOf = new Map(d.contracts.map((c) => [c.id, c.customerId]));
   let best: { productId: string; score: number; at: string } | null = null;
   for (const r of d.revisions) {
     for (const l of r.lines) {
-      if (!l.productId || l.description.trim().toLowerCase().replace(/\s+/g, " ") !== key) continue;
+      if (!l.productId || nameKey(l.description) !== key) continue;
       const score = customerOf.get(r.contractId) === customerId ? 1 : 0;
       if (!best || score > best.score || (score === best.score && r.createdAt > best.at)) best = { productId: l.productId, score, at: r.createdAt };
     }
   }
-  return best?.productId ?? "";
+  if (best) return best.productId;
+  const byTrade = productsByTradeName(description, products);
+  return byTrade.length === 1 ? byTrade[0].id : "";
+}
+
+/** Danh sách chọn mặt hàng cho một dòng hàng: mục có tên thương mại khớp tên HĐ đứng đầu (R23). */
+export function rankProductsForLine<P extends Pick<Product, "id" | "tradeName">>(description: string, products: readonly P[]): P[] {
+  const hit = new Set(productsByTradeName(description, products).map((p) => p.id));
+  return [...products.filter((p) => hit.has(p.id)), ...products.filter((p) => !hit.has(p.id))];
+}
+
+/** Tên hàng sau khi chọn mặt hàng (R23): ô đang trống ⇒ tên thương mại; đã có chữ ⇒ giữ nguyên. */
+export function lineDescriptionAfterPick(current: string, product: Pick<Product, "tradeName"> | undefined): string {
+  return current.trim() ? current : (product?.tradeName ?? "").trim() || current;
 }
 
 export function canMarkNotApplicable(_item: ExportStepItem, reason: string): { ok: boolean } {
@@ -711,6 +736,15 @@ export function isShipmentLate(d: ExportData, shipment: ExportShipment): boolean
   const ref = shipmentDeliveryDate(d, shipment);
   const deadline = effectiveDeadline(d, shipment.contractId);
   return !!ref && !!deadline && ref > deadline;
+}
+
+/** Trễ bao nhiêu ngày (R15) + hai ngày so — để thẻ "Trễ hạn giao n ngày" nói một nghĩa ở mọi chỗ. */
+export function shipmentLateInfo(d: ExportData, shipment: ExportShipment): { late: boolean; days: number; deadline: string; deliveredOn: string } {
+  const deliveredOn = shipmentDeliveryDate(d, shipment);
+  const deadline = effectiveDeadline(d, shipment.contractId);
+  const late = !!deliveredOn && !!deadline && deliveredOn > deadline;
+  const days = late ? Math.round((Date.parse(deliveredOn) - Date.parse(deadline)) / 86400000) : 0;
+  return { late, days, deadline, deliveredOn };
 }
 
 /* ---------- Độ phủ + khép HĐ (NV12, R7) ---------- */

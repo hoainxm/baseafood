@@ -2,8 +2,9 @@
 
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), hoặc trang Xuất khẩu đổi bố cục / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/export-planning/exportTour.ts
-last_verified: 2026-10-21
+last_verified: 2026-10-22
 ttl_days: 90
+<!-- updated: 2026-10-22 — lời tour Xuất khẩu theo nhãn v5 (ba-spec 41 v5): bước "Lịch xuất hàng, Hợp đồng và Báo cáo" nói thêm tab Báo cáo · "số PO của khách" thay "số đơn của khách" · thẻ "Trễ hạn giao n ngày" · "Đang làm · xong k/5 bước bắt buộc" · bước 6 "Gửi chứng từ · tiền về". Không đổi mốc `data-tour`, số bước giữ nguyên; test `exportTour.test.ts` xanh. -->
 <!-- re-verified: 2026-10-21 — v3: áp nhánh nội dung của skill ba-flow-logic (references/06): §9b kiểm kê 9 nhóm mục có nguồn, R10–R12, AC-10/11 test đọc hằng số nhãn của lib/exportPlanning. -->
 <!-- re-verified: 2026-10-21 — v2: nhãn "Hướng dẫn thao tác", 21 bước (thêm trạng thái HĐ · việc tiếp · cột Tiến độ · trạng thái mục và file), chạy thật trên preview demo 1366 px + 360 px × 100 / 130 %. -->
 

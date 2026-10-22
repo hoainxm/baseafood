@@ -147,6 +147,12 @@ export function buildCatalogFields(
       example: "VD: 2 da cắt luộc 1000-1300",
     },
     {
+      key: "tradeName",
+      label: "Tên thương mại (tiếng Anh)",
+      hideInTable: true,
+      example: "VD: Frozen iwadako boiled cut — tên in trên hợp đồng, hóa đơn quốc tế",
+    },
+    {
       key: "materialTypeId",
       hideInTable: true,
       label: "Loại nguyên liệu",
@@ -493,6 +499,8 @@ export function buildCatalogFields(
 
 const EXPORT_CUSTOMER_KEYS = new Set<string>(["country", "address", "defaultPort", "paymentTerms", "contactName", "contactEmail"]);
 const hasExportCustomerColumns = (rows: readonly Customer[]) => !hasExportStorage || rows.some((r) => r.country !== undefined);
+/** Mig 0076: máy chủ chưa có cột `products.trade_name` ⇒ ẩn ô Tên thương mại, khỏi gửi cột chưa có (kẹt hàng chờ). */
+const hasTradeNameColumn = (rows: readonly Product[]) => !hasExportStorage || rows.some((r) => r.tradeName !== undefined);
 
 /** Nguồn dữ liệu của một danh mục — PHẢI là đúng instance `useTable` của màn đang mở. */
 export interface CatalogSource<T> {
@@ -515,12 +523,12 @@ export function buildCatalogConfigs(
 ): CatalogConfigSet {
   return {
     product: {
-      title: "Mặt hàng cân đối",
-      description: "Mặt hàng dùng khi ghi bán thành phẩm sản xuất trong bảng cân đối.",
+      title: "Mặt hàng",
+      description: "Mặt hàng của xưởng — dùng khi ghi sản xuất, đóng gói, bán hàng, cân đối và nối dòng hàng hợp đồng xuất khẩu.",
       entityName: "mặt hàng",
       rows: n.product.rows,
       onChange: n.product.onChange,
-      fields: fields.product,
+      fields: hasTradeNameColumn(n.product.rows) ? fields.product : fields.product.filter((f) => f.key !== "tradeName"),
       loading: n.product.loading,
       validate: (editing, rows) => [
         ...checkDuplicateCode(editing, rows, "mặt hàng"),
@@ -537,8 +545,9 @@ export function buildCatalogConfigs(
         splitComponents: false,
         blockSpecKg: null,
         batterIds: [],
+        ...(hasTradeNameColumn(n.product.rows) ? { tradeName: "" } : {}),
       }),
-      getSearchText: (r) => `${r.code} ${r.name} ${r.finishedGoodCode}`,
+      getSearchText: (r) => `${r.code} ${r.name} ${r.finishedGoodCode} ${r.tradeName ?? ""}`,
       getRecordDescription: (r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`,
       nameField: "name",
       linkedByName: false,

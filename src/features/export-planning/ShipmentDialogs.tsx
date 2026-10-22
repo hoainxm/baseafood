@@ -45,7 +45,7 @@ import {
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import type { ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem } from "@/types";
 import { Camera, ClipboardList, Container, Save } from "lucide-react";
-import { FileChips, FilePicker, type PreviewTarget } from "./parts";
+import { FileList, FilePicker, type PreviewTarget } from "./parts";
 
 /** Tải nhiều file lên (theo thứ tự); lỗi giữa chừng ⇒ gỡ các file đã lên rồi báo. */
 async function uploadAll(files: File[], contractId: string, area: "shipment" | "loading", prefix: string): Promise<{ path: string; fileName: string }[]> {
@@ -505,16 +505,7 @@ export function StepItemDialog({
               <Field label="File">
                 <div className="grid gap-3">
                   {savedFiles.length > 0 && (
-                    <div className="grid gap-2">
-                      <FileChips files={savedFiles} onPreview={onPreview} caption={title} />
-                      <div className="flex flex-wrap gap-2">
-                        {savedFiles.map((f) => (
-                          <Button key={f.id} size="sm" variant="ghost" onClick={() => onRemoveFile(f)} title={`Gỡ file "${f.fileName}" khỏi mục này (có Hoàn tác).`}>
-                            Gỡ {f.fileName}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
+                    <FileList files={savedFiles} onPreview={onPreview} caption={title} onRemove={onRemoveFile} />
                   )}
                   {hasExportStorage ? (
                     <FilePicker files={files} onChange={setFiles} />

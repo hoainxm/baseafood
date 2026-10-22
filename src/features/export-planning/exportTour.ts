@@ -72,16 +72,17 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       title: "Giới thiệu trang Xuất khẩu",
       body:
         "Trang Xuất khẩu theo dõi từng hợp đồng xuất khẩu và từng chuyến hàng (một container, một xe tải hoặc một lô đóng ghép) cho tới khi hợp đồng xuất đủ.\n" +
-        "Mỗi chuyến đi qua 6 bước: 1 Hợp đồng · 2 Lệnh sản xuất · 3 Bao bì · 4 Đóng cont · 5 Bộ chứng từ · 6 Khác (gửi chứng từ, tiền về).\n" +
+        "Mỗi chuyến đi qua 6 bước: 1 Hợp đồng · 2 Lệnh sản xuất · 3 Bao bì · 4 Đóng cont · 5 Bộ chứng từ · 6 Gửi chứng từ · tiền về.\n" +
         "Trong lúc xem hướng dẫn, các nút trên trang tạm khóa và dữ liệu không thay đổi. Chọn Tiếp theo (phím →) để sang bước sau, Quay lại (phím ←) để xem lại, Esc để thoát.",
     }),
     plan({
       id: "tabs",
       target: "export-tabs",
-      title: "Lịch xuất hàng và Hợp đồng",
+      title: "Lịch xuất hàng, Hợp đồng và Báo cáo",
       body:
         "Lịch xuất hàng: các chuyến trong kỳ đang xem, nhóm theo khách hàng. Dùng hằng ngày để biết chuyến nào còn thiếu việc.\n" +
-        "Hợp đồng: toàn bộ hợp đồng ở mọi tháng, lọc theo trạng thái. Dùng khi cần tìm một hợp đồng cụ thể.",
+        "Hợp đồng: toàn bộ hợp đồng ở mọi tháng, lọc theo trạng thái. Dùng khi cần tìm một hợp đồng cụ thể.\n" +
+        "Báo cáo: số theo tháng, quý hoặc năm — chuyến, kg thực xuất, giá trị, tiền về, tỉ lệ đúng hạn, hồ sơ còn kẹt ở bước nào và hợp đồng cần chú ý (quá hạn, lệch dung sai, còn tiền chưa về). Chỉ xem, không sửa số.",
     }),
   ];
   if (can.create) {
@@ -112,7 +113,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       title: "Khách hàng và tra cứu",
       body:
         "Khách hàng: chỉ hiện chuyến của một khách; bốn chỉ số bên dưới cũng tính theo khách đã chọn.\n" +
-        "Tra cứu: nhập mã lô, số booking, số container, số invoice, số B/L, số hợp đồng hoặc số đơn của khách. Kết quả tìm trong mọi kỳ, không chỉ kỳ đang xem.\n" +
+        "Tra cứu: nhập mã lô, số booking, số container, số invoice, số B/L, số hợp đồng hoặc số PO của khách. Kết quả tìm trong mọi kỳ, không chỉ kỳ đang xem.\n" +
         "Xuất Excel (khi được cấp quyền): tải danh sách chuyến của kỳ theo mẫu sổ Kế hoạch xuất hàng.",
     }),
     plan({
@@ -142,7 +143,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       body:
         "Thanh 6 khúc ứng với 6 bước của chuyến: xanh lá là Xong, cam là Đang làm, xám là Chưa làm, xám nhạt là Không áp dụng.\n" +
         "Dòng \"Bước tiếp\" ghi bước cần làm và các mục còn thiếu của bước đó. Khi xong bước 1 đến 5, dòng này đổi thành \"Đủ hồ sơ\".\n" +
-        "Thẻ Trễ hạn: chuyến đã quá hạn giao. Thẻ Chờ booking: chuyến chưa có số booking và số container.",
+        "Thẻ Trễ hạn giao n ngày: ngày on board (chưa có thì ETD) sau hạn giao n ngày. Thẻ Chờ booking: chuyến chưa có số booking và số container.",
     }),
     plan({
       id: "pending-contracts",
@@ -218,7 +219,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Thông tin và trạng thái chuyến",
         body:
           "Thẻ chuyến ghi booking, ngày đóng cont, ETD và ETA, tàu, số container và seal, kg kế hoạch và kg thực xuất.\n" +
-          "Thẻ trạng thái chuyến: Đang làm · k/5 bước (số bước đã xong trong bước 1 đến 5) · Đủ hồ sơ · Trễ hạn giao · Đã hủy.\n" +
+          "Thẻ trạng thái chuyến: Đang làm · xong k/5 bước bắt buộc (bước 1 đến 5; bước 6 không bắt buộc) · Đủ hồ sơ · Trễ hạn giao n ngày · Đã hủy.\n" +
           "Hàng 6 bước bên dưới: chọn một bước để chuyển nhanh tới phần đó.",
       }),
       dossier({

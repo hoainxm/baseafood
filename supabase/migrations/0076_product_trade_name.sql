@@ -1,0 +1,22 @@
+-- ============================================================
+-- Baseafood MES — 0076: TÊN THƯƠNG MẠI của mặt hàng (tiếng Anh)
+--
+-- Vì sao (chủ dự án 2026-10-22, ba-spec 41 v5 R23): hợp đồng và hóa đơn quốc tế ghi tên
+-- hàng bằng tiếng Anh ("Frozen iwadako boiled cut"), danh mục mặt hàng chỉ có tên Việt
+-- ("Bạch tuộc 2 da cắt luộc 5,5gr") ⇒ nối dòng hàng HĐ với mặt hàng phải nhớ bằng đầu.
+-- Cột này giữ MỘT tên thương mại cho mỗi mặt hàng: lập HĐ chọn mặt hàng thì tự điền tên
+-- hàng; hộp Nối mặt hàng gợi ý theo tên này.
+--
+-- Không bắt buộc, không duy nhất (hai size có thể cùng tên thương mại). Không đụng
+-- 141 mã kế toán (bảng `finished_goods`).
+--
+-- App chỉ gửi cột khi đọc được cột từ máy chủ hoặc người dùng vừa gõ (lib/repo.ts) ⇒
+-- DB chưa chạy file này thì mặt hàng cũ vẫn lưu được; ô "Tên thương mại" tự ẩn.
+--
+-- Chỉ THÊM cột. Không đổi dữ liệu, policy, trigger. Mức độ 🟡.
+-- Idempotent (add column if not exists) — chạy lại hai lần không lỗi.
+-- ROLLBACK:
+--   alter table public.products drop column if exists trade_name;
+-- ============================================================
+
+alter table public.products add column if not exists trade_name text not null default '';

@@ -4,6 +4,8 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_EXPORT_DATA,
+  lineDescriptionAfterPick,
+  rankProductsForLine,
   blankItem,
   buildMonthExcel,
   buildMonthPlan,
@@ -21,6 +23,7 @@ import {
   findDuplicateContract,
   isShipmentClosed,
   isShipmentLate,
+  shipmentLateInfo,
   missingDocumentItems,
   buildPeriodPlan,
   deviationText,
@@ -578,6 +581,49 @@ describe("Dòng hàng nối danh mục mặt hàng (AC-31, AC-32)", () => {
     expect(suggestProductId(d, "  iwadako BLANCHED cut 2-3g ", "scm")).toBe("p-scm");
     expect(suggestProductId(d, "Iwadako blanched cut 2-3g", "khac")).toBe("p-kr");
     expect(suggestProductId(d, "Tên chưa từng nối", "scm")).toBe("");
+  });
+});
+
+describe("Trễ hạn giao n ngày (R15, nhãn v5 c)", () => {
+  it("lô 165: hạn 05/09, on board 26/09 ⇒ trễ 21 ngày; chưa ngày giao ⇒ không trễ", () => {
+    const d = closedShipmentData({ cartons: 2251, netKg: 22214, amount: 194557.6 });
+    expect(shipmentLateInfo(d, d.shipments[0])).toEqual({ late: true, days: 21, deadline: "2026-09-05", deliveredOn: "2026-09-26" });
+    const d2 = data({ ...d, items: [], shipments: [{ ...d.shipments[0], etd: "" }] });
+    expect(shipmentLateInfo(d2, d2.shipments[0]).late).toBe(false);
+  });
+});
+
+describe("Tên thương mại mặt hàng (AC-39, AC-40 — R23)", () => {
+  const products = [
+    { id: "p-a", tradeName: "Frozen Tako tip raw" },
+    { id: "p-b", tradeName: "Frozen iwadako boiled cut" },
+    { id: "p-c", tradeName: "Frozen iwadako boiled cut" },
+    { id: "p-x", tradeName: "" },
+    { id: "p-hist" },
+  ];
+  it("chọn mặt hàng điền tên thương mại vào tên hàng TRỐNG, không ghi đè chữ đã gõ", () => {
+    expect(lineDescriptionAfterPick("", { tradeName: "Frozen iwadako blanched cut" })).toBe("Frozen iwadako blanched cut");
+    expect(lineDescriptionAfterPick("  ", { tradeName: "Frozen iwadako blanched cut" })).toBe("Frozen iwadako blanched cut");
+    expect(lineDescriptionAfterPick("Iwadako cut 2-3g", { tradeName: "Frozen iwadako blanched cut" })).toBe("Iwadako cut 2-3g");
+    expect(lineDescriptionAfterPick("", { tradeName: "" })).toBe("");
+    expect(lineDescriptionAfterPick("", undefined)).toBe("");
+  });
+  it("gợi ý theo tên thương mại chỉ khi khớp đúng một; lịch sử nối thắng", () => {
+    const empty = { contracts: [contract("c1")], revisions: [] };
+    expect(suggestProductId(empty, "frozen  tako TIP raw", "scm", products)).toBe("p-a");
+    expect(suggestProductId(empty, "Frozen iwadako boiled cut", "scm", products)).toBe("");
+    expect(suggestProductId(empty, "", "scm", products)).toBe("");
+    const withHistory = {
+      contracts: [contract("c1")],
+      revisions: [revision("r1", "c1", 0, { lines: [{ ...LINES_1826[0], description: "Frozen Tako tip raw", productId: "p-hist" }] })],
+    };
+    expect(suggestProductId(withHistory, "Frozen Tako tip raw", "scm", products)).toBe("p-hist");
+  });
+  it("danh sách chọn đưa mặt hàng khớp tên thương mại lên đầu, giữ thứ tự phần còn lại", () => {
+    const ranked = rankProductsForLine("Frozen iwadako boiled cut", products).map((p) => p.id);
+    expect(ranked.slice(0, 2).sort()).toEqual(["p-b", "p-c"]);
+    expect(ranked.slice(2)).toEqual(["p-a", "p-x", "p-hist"]);
+    expect(rankProductsForLine("", products).map((p) => p.id)).toEqual(["p-a", "p-b", "p-c", "p-x", "p-hist"]);
   });
 });
 

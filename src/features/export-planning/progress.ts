@@ -75,7 +75,8 @@ export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string
 export function progressText(p: ShipmentProgress): string {
   if (p.next === null) return "Đủ hồ sơ — xong bước 1–5";
   const head = `Bước tiếp: ${STEP_TITLES[p.next - 1]}`;
-  if (!p.missing.length) return head;
+  // "Bước tiếp: Lệnh sản xuất — còn lệnh sản xuất" chỉ lặp tên bước (nhãn v5 e) ⇒ bỏ phần sau.
+  if (!p.missing.length || (p.missing.length === 1 && p.missing[0] === STEP_TITLES[p.next - 1].toLowerCase())) return head;
   const shown = p.missing.slice(0, 2).join(", ");
   return `${head} — còn ${shown}${p.missing.length > 2 ? ` và ${p.missing.length - 2} mục khác` : ""}`;
 }

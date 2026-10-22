@@ -268,6 +268,8 @@ export const PRODUCT_TABLE: TableMapping<Product> = {
     id: x.id,
     code: x.code,
     name: x.name,
+    // Mig 0076: chỉ gửi khi đã đọc được cột / vừa gõ — DB chưa chạy 0076 vẫn lưu được.
+    ...(x.tradeName !== undefined ? { trade_name: x.tradeName ?? "" } : {}),
     finished_good_code: x.finishedGoodCode ?? "",
     // Trường tùy chọn ⇒ gửi chuỗi rỗng (cột NOT NULL default ''), không để undefined.
     category: x.category ?? "",
@@ -294,6 +296,7 @@ export const PRODUCT_TABLE: TableMapping<Product> = {
     splitComponents: Boolean(r.split_components),
     blockSpecKg: r.block_spec_kg == null ? null : Number(r.block_spec_kg),
     batterIds: Array.isArray(r.batter_ids) ? (r.batter_ids as string[]) : [],
+    ...("trade_name" in r ? { tradeName: r.trade_name == null ? "" : s(r.trade_name) } : {}),
   }),
   // Dòng ghi trước 0031/0051 chưa có cờ tách / quy cách block / bột đi kèm → mặc định trống.
   patchLegacy: (x) => ({

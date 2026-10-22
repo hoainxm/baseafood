@@ -6,7 +6,8 @@
 //              customer catalog and from the export contract dossier. Draft-saved (rule 17).
 // ============================================================
 // Mỗi (khách, mặt hàng) một dòng; tên + size không trùng giữa hai mặt hàng của cùng khách
-// (lib/customerProductNames). App còn tự thêm dòng khi lưu hợp đồng đã nối mặt hàng (NV16).
+// (lib/customerProductNames). Trích xuất từ chứng từ (NV16): app thêm dòng còn thiếu khi lưu hợp đồng đã
+// nối mặt hàng, và nút "Trích xuất từ chứng từ" quét lại mọi hợp đồng của khách.
 import { useEffect, useState } from "react";
 import {
   Button,
@@ -27,8 +28,9 @@ import { useQuickCatalogEdit } from "./QuickCatalogEdit";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import { nameKey, namesOfCustomer, validateCustomerProductName } from "@/lib/customerProductNames";
+import { extractCustomerNamesFromContracts, type ExportData } from "@/lib/exportPlanning";
 import type { Customer, CustomerProductName, Product } from "@/types";
-import { Languages, Pencil, Plus, Save } from "lucide-react";
+import { FileSearch, Languages, Pencil, Plus, Save } from "lucide-react";
 
 const emptyRow = (customerId: string): CustomerProductName => ({
   id: newId(),
@@ -57,6 +59,7 @@ export function CustomerProductNamesDialog({
   isAvailable,
   canWrite,
   canDelete,
+  extractSource,
   onClose,
 }: {
   /** Khách đang xem — null ⇒ hộp đóng. */
@@ -70,6 +73,8 @@ export function CustomerProductNamesDialog({
   isAvailable: boolean;
   canWrite: boolean;
   canDelete: boolean;
+  /** Hợp đồng xuất khẩu để "Trích xuất từ chứng từ" (ba-spec 41 NV16). Không có ⇒ ẩn nút. */
+  extractSource?: Pick<ExportData, "contracts" | "revisions" | "approvals">;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<NameForm | null>(null);
@@ -88,6 +93,8 @@ export function CustomerProductNamesDialog({
   }, [customer?.id]);
 
   const [query, setQuery] = useState("");
+  /** Kết quả lần "Trích xuất từ chứng từ" gần nhất (không thêm gì thì chỉ báo tại chỗ, không toast — luật 13). */
+  const [extractNote, setExtractNote] = useState("");
   const productName = (id: string) => products.find((p) => p.id === id)?.name || "(mặt hàng đã xóa)";
   const productCode = (id: string) => products.find((p) => p.id === id)?.finishedGoodCode || "";
   // Sắp theo tên rồi size ⇒ hai size cùng tên đứng cạnh nhau (dễ đối chiếu với HĐ).
@@ -122,6 +129,29 @@ export function CustomerProductNamesDialog({
     notify.saved(form.isNew ? `Đã thêm tên "${row.tradeName}" cho ${customer.name}` : "Đã lưu tên hàng", () => void setNames(prev));
     draft.done();
   };
+  const extract = () => {
+    if (!customer || !extractSource) return;
+    const prev = names;
+    const { created, contractCount } = extractCustomerNamesFromContracts(extractSource, names, customer.id, newId);
+    if (!created.length) {
+      setExtractNote(contractCount ? `Đã quét ${contractCount} hợp đồng của ${customer.name} — không có tên hàng mới.` : `${customer.name} chưa có hợp đồng xuất khẩu nào để trích xuất.`);
+      return;
+    }
+    if (setNames([...names, ...created]) === false) return;
+    setExtractNote("");
+    notify.saved(`Đã trích xuất ${created.length} tên hàng từ ${contractCount} hợp đồng của ${customer.name}`, () => void setNames(prev));
+  };
+  const extractButton = writable && extractSource && customer && (
+    <Button
+      variant="outline"
+      onClick={extract}
+      title={`Quét mọi hợp đồng xuất khẩu của ${customer.name}: dòng hàng đã nối mặt hàng mà chưa có trong bảng thì thêm vào (không ghi đè tên đang có).`}
+    >
+      <FileSearch className="mr-2 h-4 w-4" aria-hidden />
+      Trích xuất từ chứng từ
+    </Button>
+  );
+
   const remove = (n: CustomerProductName) => {
     const prev = names;
     if (setNames(names.filter((x) => x.id !== n.id)) === false) return;
@@ -178,7 +208,7 @@ export function CustomerProductNamesDialog({
         onClose();
       }}
       title={`Tên hàng trên chứng từ · ${customer?.name ?? ""}`}
-      description="Tên khách dùng trên hợp đồng / invoice cho từng mặt hàng của xưởng. App tự thêm khi nối mặt hàng ở hợp đồng; sửa ở đây không đổi hợp đồng đã lưu."
+      description="Đối chiếu mặt hàng của xưởng với tên, size, quy cách và mã HS mà khách dùng trên hợp đồng, invoice. Tên được trích xuất từ các dòng hàng hợp đồng đã nối mặt hàng; chỉnh sửa tại đây không làm thay đổi hợp đồng đã lưu."
       icon={Languages}
       size="xl"
       hasRequiredFields={!!form}
@@ -264,7 +294,13 @@ export function CustomerProductNamesDialog({
               <span className="tnum pb-2 text-sm text-muted-foreground">
                 {q ? `${shown.length} / ${all.length} tên hàng` : `${all.length} tên hàng`}
               </span>
+              <div className="ml-auto">{extractButton}</div>
             </div>
+            {extractNote && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {extractNote}
+              </p>
+            )}
             <RecordTable
               columns={columns}
               rows={shown}
@@ -287,9 +323,19 @@ export function CustomerProductNamesDialog({
           </div>
         ) : (
           !form && (
-            <p className="text-sm text-muted-foreground">
-              Chưa có tên nào — lưu một hợp đồng đã nối mặt hàng của khách này là app tự thêm{writable ? ", hoặc Thêm tên hàng" : ""}.
-            </p>
+            <div className="grid min-w-0 justify-items-start gap-3">
+              <p className="text-sm text-muted-foreground">
+                Chưa có tên hàng nào cho khách này. Tên được trích xuất khi lưu hợp đồng đã nối mặt hàng
+                {extractButton ? '; chọn "Trích xuất từ chứng từ" để lấy ngay từ các hợp đồng đã có' : ""}
+                {writable ? ', hoặc "Thêm tên hàng" để khai tay' : ""}.
+              </p>
+              {extractButton}
+              {extractNote && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  {extractNote}
+                </p>
+              )}
+            </div>
           )
         )}
       </div>

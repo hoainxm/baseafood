@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_EXPORT_DATA,
+  extractCustomerNamesFromContracts,
   rankProductsForLine,
   blankItem,
   buildMonthExcel,
@@ -626,6 +627,40 @@ describe("Gợi ý nối theo 4 bậc — tên theo khách, lịch sử, tên m�
     expect(ranked.slice(0, 2).sort()).toEqual(["p-55", "p-67"]);
     expect(rankProductsForLine("Frozen Tako tip boiled", products, "scm", { names })[0].id).toBe("p-a");
     expect(rankProductsForLine("", products).map((p) => p.id)).toEqual(["p-55", "p-67", "p-a", "p-x", "p-hist"]);
+  });
+});
+
+describe("Trích xuất từ chứng từ — quét mọi HĐ của khách (AC-50 — NV16 · R26)", () => {
+  let k = 0;
+  const id = () => `n-${++k}`;
+  const mapped = (desc: string, size: string, productId: string) => ({ ...LINES_1826[0], id: `l-${desc}-${size}`, description: desc, size, productId });
+  const d = {
+    contracts: [
+      contract("c1", { signedOn: "2026-07-30", contractNo: "18.26/BSF-SCM.2026" }),
+      contract("c2", { signedOn: "2026-09-01", contractNo: "21.26/BSF-SCM.2026" }),
+      contract("c3", { signedOn: "2026-09-10", contractNo: "HUY", status: "cancelled" }),
+      contract("c9", { customerId: "khac", contractNo: "K-9" }),
+    ],
+    revisions: [
+      revision("r1", "c1", 0, { lines: [mapped("Frozen iwadako boiled cut", "5-5.5 gr/pc", "p-55"), mapped("Frozen Tako tip raw", "", "p-tip")] }),
+      revision("r2", "c2", 0, { lines: [mapped("Frozen iwadako boiled cut", "6-7 gr/pc", "p-67"), mapped("Tên khác", "", "p-55"), { ...LINES_1826[1], productId: undefined }] }),
+      revision("r3", "c3", 0, { lines: [mapped("Từ HĐ hủy", "", "p-huy")] }),
+      revision("r9", "c9", 0, { lines: [mapped("Của khách khác", "", "p-k")] }),
+    ],
+    approvals: [],
+  };
+  it("thêm tên còn thiếu từ mọi HĐ chưa hủy của khách, HĐ ký trước thắng, không ghi đè", () => {
+    const existing = [{ id: "e1", customerId: "scm", productId: "p-tip", tradeName: "Tako tip (cũ)", sizeText: "", packing: "", hsCode: "", note: "" }];
+    const r = extractCustomerNamesFromContracts(d, existing, "scm", id);
+    expect(r.contractCount).toBe(2);
+    expect(r.created.map((c) => [c.productId, c.tradeName, c.note])).toEqual([
+      ["p-55", "Frozen iwadako boiled cut", "Trích xuất từ HĐ 18.26/BSF-SCM.2026"],
+      ["p-67", "Frozen iwadako boiled cut", "Trích xuất từ HĐ 21.26/BSF-SCM.2026"],
+    ]);
+  });
+  it("chạy lại sau khi đã thêm ⇒ 0 dòng mới", () => {
+    const first = extractCustomerNamesFromContracts(d, [], "scm", id).created;
+    expect(extractCustomerNamesFromContracts(d, first, "scm", id).created).toEqual([]);
   });
 });
 

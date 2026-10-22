@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, notify, todayIso } from "@/design-system";
 import { useCustomerProductNameStore, useCustomers, useProducts, useUserProfiles } from "@/lib/catalogRepo";
-import { learnCustomerNames } from "@/lib/customerProductNames";
+import { extractCustomerNames } from "@/lib/customerProductNames";
 import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNamesDialog";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
@@ -97,7 +97,7 @@ export default function ExportPlanningScreen() {
   const d = store.data;
   const [customers, setCustomers] = useCustomers();
   const [products, setProducts] = useProducts();
-  // Tên hàng theo khách (mig 0077, ba-spec 41 v6): điền dòng hàng, gợi ý nối, tự học khi lưu.
+  // Tên hàng theo khách (mig 0077, ba-spec 41 v6): điền dòng hàng, gợi ý nối, trích xuất khi lưu.
   const nameStore = useCustomerProductNameStore();
   const customerCan = useCan("catalog.customers");
   const [namesFor, setNamesFor] = useState<{ id: string; name: string } | null>(null);
@@ -177,17 +177,17 @@ export default function ExportPlanningScreen() {
   };
 
   /**
-   * Tự học (NV16 · R26): thêm tên còn thiếu của khách từ các dòng đã nối. Máy chủ chưa có bảng
+   * Trích xuất từ chứng từ (NV16 · R26): thêm tên còn thiếu của khách từ các dòng đã nối. Máy chủ chưa có bảng
    * hoặc không có quyền ghi ⇒ bỏ qua (HĐ vẫn lưu). Trả về số tên thêm + hàm Hoàn tác.
    */
-  const learnNames = (customerId: string, lines: Parameters<typeof learnCustomerNames>[2], contractNo: string) => {
+  const learnNames = (customerId: string, lines: Parameters<typeof extractCustomerNames>[2], contractNo: string) => {
     const allowed = nameStore.isAvailable && (can.create || can.update || customerCan.create || customerCan.update);
     const prev = nameStore.names;
-    const created = allowed ? learnCustomerNames(prev, customerId, lines, contractNo, newId) : [];
+    const created = allowed ? extractCustomerNames(prev, customerId, lines, contractNo, newId) : [];
     if (created.length && nameStore.setNames([...prev, ...created]) === false) return { count: 0, undo: () => {} };
     return { count: created.length, undo: () => (created.length ? void nameStore.setNames(prev) : undefined) };
   };
-  const learnedText = (n: number) => (n ? ` · thêm ${n} tên hàng của khách` : "");
+  const learnedText = (n: number) => (n ? ` · trích xuất ${n} tên hàng của khách` : "");
 
   const saveContract = (p: ContractSavePayload): boolean => {
     const prevC = d.contracts;
@@ -731,6 +731,7 @@ export default function ExportPlanningScreen() {
         isAvailable={nameStore.isAvailable}
         canWrite={customerCan.create || customerCan.update}
         canDelete={customerCan.delete}
+        extractSource={d}
         onClose={() => setNamesFor(null)}
       />
       <ExportFilePreview file={preview} onClose={() => setPreview(null)} />

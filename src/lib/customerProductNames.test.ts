@@ -1,7 +1,7 @@
 // Oracle: docs/app-map/41-export-planning.ba-spec.md v6 — R23 · R26, AC-39 · AC-46 · AC-47.
 // Tên thật của HĐ 18.26 (Seachemot) — dòng 3 và 4 cùng tên, khác size.
 import { describe, expect, it } from "vitest";
-import { learnCustomerNames, lineTextAfterPick, productsByCustomerName, validateCustomerProductName } from "./customerProductNames";
+import { extractCustomerNames, lineTextAfterPick, productsByCustomerName, validateCustomerProductName } from "./customerProductNames";
 import type { CustomerProductName, ExportContractLine } from "@/types";
 
 let seq = 0;
@@ -57,21 +57,21 @@ describe("AC-47 — chặn trùng trong danh sách của một khách", () => {
   });
 });
 
-describe("AC-46 — tự học từ HĐ, chỉ tạo, không ghi đè", () => {
+describe("AC-46 — trích xuất từ HĐ, chỉ tạo, không ghi đè", () => {
   const lines = Array.from({ length: 14 }, (_, k) => line({ productId: `p-${k + 1}`, description: `Frozen item ${k + 1}`, size: `${k + 1} gr/pc`, packing: "IQF 1kg x 10", hsCode: "16055500" }));
   it("HĐ 18.26 nối 14 mặt hàng ⇒ tạo 14 dòng có ghi chú nguồn", () => {
-    const created = learnCustomerNames([], "scm", lines, "18.26/BSF-SCM.2026", nid);
+    const created = extractCustomerNames([], "scm", lines, "18.26/BSF-SCM.2026", nid);
     expect(created).toHaveLength(14);
-    expect(created[0]).toMatchObject({ customerId: "scm", productId: "p-1", tradeName: "Frozen item 1", sizeText: "1 gr/pc", packing: "IQF 1kg x 10", hsCode: "16055500", note: "Tự học từ HĐ 18.26/BSF-SCM.2026" });
+    expect(created[0]).toMatchObject({ customerId: "scm", productId: "p-1", tradeName: "Frozen item 1", sizeText: "1 gr/pc", packing: "IQF 1kg x 10", hsCode: "16055500", note: "Trích xuất từ HĐ 18.26/BSF-SCM.2026" });
   });
   it("lưu lại với tên khác ⇒ 0 dòng mới, tên cũ giữ nguyên", () => {
-    const first = learnCustomerNames([], "scm", lines, "18.26/BSF-SCM.2026", nid);
-    const again = learnCustomerNames(first, "scm", [{ ...lines[0], description: "X" }, ...lines.slice(1)], "18.26/BSF-SCM.2026", nid);
+    const first = extractCustomerNames([], "scm", lines, "18.26/BSF-SCM.2026", nid);
+    const again = extractCustomerNames(first, "scm", [{ ...lines[0], description: "X" }, ...lines.slice(1)], "18.26/BSF-SCM.2026", nid);
     expect(again).toEqual([]);
     expect(first[0].tradeName).toBe("Frozen item 1");
   });
   it("bỏ dòng chưa nối / tên rỗng / mặt hàng lặp / trùng tên + size với mặt hàng khác", () => {
-    const created = learnCustomerNames(
+    const created = extractCustomerNames(
       [row({ productId: "p-55" })],
       "scm",
       [
@@ -85,6 +85,6 @@ describe("AC-46 — tự học từ HĐ, chỉ tạo, không ghi đè", () => {
       nid,
     );
     expect(created.map((c) => [c.productId, c.tradeName])).toEqual([["p-3", "A"]]);
-    expect(learnCustomerNames([], "", lines, "x", nid)).toEqual([]);
+    expect(extractCustomerNames([], "", lines, "x", nid)).toEqual([]);
   });
 });

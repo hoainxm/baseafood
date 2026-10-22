@@ -2,7 +2,7 @@
 // Tên file: src/lib/customerProductNames.ts
 // Tên tiếng Việt: Tên hàng theo khách — tên in trên chứng từ xuất khẩu của từng khách
 // Description: Pure rules for per-customer product names (ba-spec 41 v6 R23 · R26): lookup, fill
-//              a contract line after picking a product, duplicate checks, learning names from
+//              a contract line after picking a product, duplicate checks, extracting names from
 //              mapped contract lines (create only, never overwrite).
 // ============================================================
 // Vì sao (họp 2026-10-22): cùng một mặt hàng mỗi khách gọi một tên (Matsuda "Frozen boiled
@@ -96,11 +96,11 @@ export function validateCustomerProductName(
 }
 
 /**
- * Tự học (NV16 · R26): từ các dòng hàng đã nối mặt hàng, TẠO dòng tên cho cặp (khách, mặt hàng)
+ * Trích xuất từ chứng từ (NV16 · R26): từ các dòng hàng đã nối mặt hàng, TẠO dòng tên cho cặp (khách, mặt hàng)
  * chưa có. Không sửa dòng đã có; dòng không có mặt hàng / tên rỗng bỏ qua; cùng mặt hàng lấy dòng
  * đầu; trùng tên + size với mặt hàng khác của khách thì bỏ qua (giữ R23).
  */
-export function learnCustomerNames(
+export function extractCustomerNames(
   existing: readonly CustomerProductName[],
   customerId: string,
   lines: readonly Pick<ExportContractLine, "productId" | "description" | "size" | "packing" | "hsCode">[],
@@ -121,7 +121,7 @@ export function learnCustomerNames(
       sizeText: l.size.trim(),
       packing: l.packing.trim(),
       hsCode: l.hsCode.trim(),
-      note: contractNo ? `Tự học từ HĐ ${contractNo}` : "Tự học từ hợp đồng",
+      note: contractNo ? `Trích xuất từ HĐ ${contractNo}` : "Trích xuất từ hợp đồng",
     };
     if (validateCustomerProductName(row, pool).length) continue;
     created.push(row);

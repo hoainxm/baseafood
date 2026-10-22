@@ -67,7 +67,7 @@ import { calculateBalancing } from "@/lib/balancingCalc";
 import { RETAIL_WAREHOUSE, FG_WAREHOUSE } from "@/lib/inventory";
 import { listDatesInRange, subtractDays } from "@/lib/dataFlow";
 import { buildExportDemo, type ExportDemoPack } from "@/lib/exportPlanningDemo";
-import { learnCustomerNames } from "@/lib/customerProductNames";
+import { extractCustomerNames } from "@/lib/customerProductNames";
 
 /** Sổ thật đưa vào để quét tham số (chỉ ĐỌC). */
 export interface DemoSource {
@@ -127,7 +127,7 @@ export interface DemoBundle {
   exportStepItems: ExportStepItem[];
   exportFiles: ExportFile[];
   exportPayments: ExportPayment[];
-  /** Tên hàng theo khách (mig 0077) — TỰ HỌC từ dòng hàng đã nối của bộ HĐ demo (như app làm khi lưu HĐ). */
+  /** Tên hàng theo khách (mig 0077) — TRÍCH XUẤT từ dòng hàng đã nối của bộ HĐ demo (như app làm khi lưu HĐ). */
   customerProductNames: CustomerProductName[];
   labelPrints: LabelPrint[];
   qcChecklists: QcChecklistItem[];
@@ -721,7 +721,7 @@ export function countBundle(g: DemoBundle): { table: keyof DemoBundle; count: nu
   return (Object.keys(g) as (keyof DemoBundle)[]).map((table) => ({ table, count: g[table].length }));
 }
 
-/** Tên hàng theo khách của bộ demo: chạy đúng luật tự học (R26) trên các bản HĐ demo, id tất định. */
+/** Tên hàng theo khách của bộ demo: chạy đúng luật trích xuất từ chứng từ (R26) trên các bản HĐ demo, id tất định. */
 function demoCustomerNames(pack: Pick<ReturnType<typeof buildExportDemo>, "contracts" | "revisions">): CustomerProductName[] {
   let k = 0;
   const out: CustomerProductName[] = [];
@@ -729,7 +729,7 @@ function demoCustomerNames(pack: Pick<ReturnType<typeof buildExportDemo>, "contr
   for (const r of [...pack.revisions].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     const c = byId.get(r.contractId);
     if (!c) continue;
-    out.push(...learnCustomerNames(out, c.customerId, r.lines, c.contractNo, () => `dm-xk-ten-${++k}`));
+    out.push(...extractCustomerNames(out, c.customerId, r.lines, c.contractNo, () => `dm-xk-ten-${++k}`));
   }
   return out;
 }

@@ -18,7 +18,7 @@ import FinishedGoodScreen from "./FinishedGoodScreen";
 import { normalizeCatalogTab } from "@/lib/legacyUrls";
 import { useCan, usePermissions } from "@/features/shared/PermissionProvider";
 import { can } from "@/lib/permissions";
-import { useCustomerProductNameStore } from "@/lib/catalogRepo";
+import { useCustomerProductNameStore, useExportContractApprovals, useExportContractRevisions, useExportContracts } from "@/lib/catalogRepo";
 import { namesOfCustomer } from "@/lib/customerProductNames";
 import type { Customer } from "@/types";
 import { Languages } from "lucide-react";
@@ -73,6 +73,10 @@ export default function CatalogScreen() {
   const nameStore = useCustomerProductNameStore();
   const customerCan = useCan("catalog.customers");
   const [namesFor, setNamesFor] = useState<Customer | null>(null);
+  // Hợp đồng xuất khẩu — nguồn của "Trích xuất từ chứng từ" (người không xem được Xuất khẩu ⇒ mảng rỗng).
+  const [exportContracts] = useExportContracts();
+  const [exportRevisions] = useExportContractRevisions();
+  const [exportApprovals] = useExportContractApprovals();
 
   return (
     <div className="space-y-6">
@@ -117,6 +121,7 @@ export default function CatalogScreen() {
             isAvailable={nameStore.isAvailable}
             canWrite={customerCan.create || customerCan.update}
             canDelete={customerCan.delete}
+            extractSource={{ contracts: exportContracts, revisions: exportRevisions, approvals: exportApprovals }}
             onClose={() => setNamesFor(null)}
           />
         </TabsContent>

@@ -27,7 +27,7 @@ import type {
   Product,
   CustomerProductName,
 } from "@/types";
-import { nameKey, productsByCustomerName } from "./customerProductNames";
+import { extractCustomerNames, nameKey, productsByCustomerName } from "./customerProductNames";
 
 /* ---------- Danh sách cố định + nhãn ---------- */
 
@@ -547,6 +547,29 @@ export const isSelfIssued = (item: Pick<ExportStepItem, "docIssuer">) => /tự c
 /** Dòng hàng chưa nối mặt hàng danh mục (có nội dung mà chưa có productId). */
 export function unmappedLines(lines: readonly ExportContractLine[]): ExportContractLine[] {
   return lines.filter((l) => (l.description.trim() || l.quantity != null) && !l.productId);
+}
+
+/**
+ * "Trích xuất từ chứng từ" (NV16 · R26, chủ dự án 2026-10-22): quét MỌI hợp đồng xuất khẩu chưa hủy
+ * của khách (bản đang dùng: hiệu lực, chưa có thì bản mới nhất), HĐ ký trước xét trước; dòng đã nối
+ * mặt hàng mà (khách, mặt hàng) chưa có tên ⇒ tạo dòng tên. Không ghi đè; chặn trùng tên + size (R23).
+ */
+export function extractCustomerNamesFromContracts(
+  d: Pick<ExportData, "contracts" | "revisions" | "approvals">,
+  existing: readonly CustomerProductName[],
+  customerId: string,
+  newId: () => string,
+): { created: CustomerProductName[]; contractCount: number } {
+  const contracts = d.contracts
+    .filter((c) => c.customerId === customerId && c.status !== "cancelled")
+    .sort((a, b) => (a.signedOn || a.createdAt).localeCompare(b.signedOn || b.createdAt) || a.contractNo.localeCompare(b.contractNo));
+  const created: CustomerProductName[] = [];
+  for (const c of contracts) {
+    const rev = workingRevision(d, c.id);
+    if (!rev) continue;
+    created.push(...extractCustomerNames([...existing, ...created], customerId, rev.lines, c.contractNo, newId));
+  }
+  return { created, contractCount: contracts.length };
 }
 
 /** Mặt hàng có tên tiếng Anh MẶC ĐỊNH (`products.trade_name`) khớp tên hàng trên HĐ (R23 bậc 4). */

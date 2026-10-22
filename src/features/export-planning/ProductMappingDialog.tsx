@@ -114,7 +114,7 @@ export function ProductMappingDialog({
         onClose();
       }}
       title={`Nối mặt hàng · HĐ ${tgt?.contractNo ?? ""}`}
-      description="Chọn mặt hàng trong danh mục của xưởng cho từng dòng hàng (tên tiếng Anh giữ đúng như HĐ). Đây là thông tin nội bộ — không tạo bản sửa, không cần BGĐ duyệt lại. Lưu xong, app tự thêm tên còn thiếu vào danh sách Tên hàng của khách."
+      description="Chọn mặt hàng trong danh mục của xưởng cho từng dòng hàng (tên tiếng Anh giữ đúng như HĐ). Đây là thông tin nội bộ — không tạo bản sửa, không cần BGĐ duyệt lại. Lưu xong, hệ thống trích xuất tên còn thiếu vào bảng tên hàng của khách."
       icon={Link2}
       size="lg"
       footer={

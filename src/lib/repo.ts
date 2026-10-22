@@ -2126,6 +2126,8 @@ function parseLines(v: unknown): ExportContractLine[] {
     kg: numOrNull(l.kg),
     unitPrice: numOrNull(l.unitPrice),
     microSpec: s(l.microSpec),
+    // Mặt hàng đã nối (R16) — thiếu dòng này thì tải lại trang mọi dòng thành "chưa nối" dù máy chủ đã lưu.
+    ...(l.productId ? { productId: s(l.productId) } : {}),
   }));
 }
 

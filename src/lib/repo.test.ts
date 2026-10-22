@@ -6,6 +6,7 @@ vi.mock("@/lib/supabase", () => ({ supabase: null, hasSupabase: false, SITE_ID: 
 import {
   CUSTOMER_TABLE,
   PRODUCT_TABLE,
+  EXPORT_CONTRACT_REVISION_TABLE,
   RECONCILIATION_RUN_TABLE,
   WIP_PRODUCTION_TABLE,
   dropSentKeys,
@@ -268,5 +269,16 @@ describe("mặt hàng — tên thương mại (mig 0076, ba-spec 41 AC-41)", () 
     expect(PRODUCT_TABLE.fromRow({ id: "p1", name: "a", trade_name: "Frozen iwadako boiled cut" }).tradeName).toBe("Frozen iwadako boiled cut");
     expect(PRODUCT_TABLE.toRow({ ...base, tradeName: "X" }).trade_name).toBe("X");
     expect(PRODUCT_TABLE.toRow({ ...base, tradeName: "" }).trade_name).toBe("");
+  });
+});
+
+describe("bản hợp đồng xuất khẩu — dòng hàng đọc lại từ máy chủ giữ mặt hàng đã nối (R16)", () => {
+  it("productId còn sau vòng toRow → fromRow; dòng chưa nối không có productId", () => {
+    const line = { id: "l1", description: "Frozen iwadako boiled cut", hsCode: "", size: "6-7 gr/pc", packing: "", unitKind: "carton" as const, cartonsPerUnit: 1, netKgPerCarton: 10, quantity: 100, kg: null, unitPrice: 11.2, microSpec: "" };
+    const rev = { id: "r0", contractId: "c1", revisionNo: 0, revisedOn: "2026-07-30", changeSummary: "", terms: {} as never, lines: [{ ...line, productId: "p-67" }, { ...line, id: "l2" }], filePath: "", fileName: "", recordedBy: "", createdAt: "" };
+    const row = EXPORT_CONTRACT_REVISION_TABLE.toRow(rev);
+    const back = EXPORT_CONTRACT_REVISION_TABLE.fromRow({ ...row, created_at: "", lines: JSON.parse(JSON.stringify(row.lines)) });
+    expect(back.lines[0].productId).toBe("p-67");
+    expect("productId" in back.lines[1]).toBe(false);
   });
 });

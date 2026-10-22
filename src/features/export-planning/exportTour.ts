@@ -13,7 +13,7 @@ import {
   openShipmentsOf,
   type ExportData,
 } from "@/lib/exportPlanning";
-import type { PageTour, TourStep } from "@/lib/guidedTour";
+import type { PageTour, PageTourSpec, TourStep } from "@/lib/guidedTour";
 
 export interface TourContractPick {
   contractId: string;
@@ -299,3 +299,15 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
   });
   return { title: "Xuất khẩu", steps };
 }
+
+/** Bản khai cho test quét chung (ba-spec 43 v4 R13): đủ quyền, có hồ sơ minh họa. */
+export const tourSpec: PageTourSpec = {
+  pageId: "planning-export",
+  build: () =>
+    buildExportTour({
+      pick: { contractId: "c", shipmentId: "s" },
+      can: { create: true, update: true, payments: true },
+      openDossier: () => {},
+      backToPlan: () => {},
+    }),
+};

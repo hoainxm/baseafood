@@ -59,6 +59,8 @@ import { useAuth } from "@/lib/auth";
 import { DailyTaskReminder, LotLabelPrint, BlankDailyImportSlip } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildImportsTour } from "./importsTour";
 import { ImportSlipOcr } from "./ImportSlipOcr";
 import { hasOcr, type OcrCatalog, type OcrResult } from "@/lib/ocr";
 import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
@@ -1099,6 +1101,7 @@ export default function MaterialImportScreen() {
   const lockSection = isSingleDayWorkshop && (
         <section className="space-y-4 rounded-xl border-2 border-border bg-card p-4">
           <h2 className="text-lg font-semibold text-foreground">Cuối ngày</h2>
+          <div data-tour="imports-scrap">
           <DailyScrapSection
             date={scrapDate}
             workshop={scrapWorkshop}
@@ -1110,7 +1113,8 @@ export default function MaterialImportScreen() {
             isLocked={isDayLocked || isReadOnly}
             showPrice={canViewPrice}
           />
-          <div className="space-y-3 border-t-2 border-border pt-4">
+          </div>
+          <div data-tour="imports-day-lock" className="space-y-3 border-t-2 border-border pt-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {isDayLocked ? (
               <Lock className="size-6 shrink-0 text-primary" aria-hidden />
@@ -1148,6 +1152,7 @@ export default function MaterialImportScreen() {
           {isDayLocked ? (
             allowed.unlock && (
             <Button
+              data-tour="imports-lock-action"
               title="Mở khóa lại ngày đã chốt để sửa hoặc ghi bù. Phải ghi lý do, và việc mở khóa được lưu vết."
               variant="edit"
               size="lg"
@@ -1165,6 +1170,7 @@ export default function MaterialImportScreen() {
           ) : (
             allowed.lock && (
             <Button variant="lock"
+              data-tour="imports-lock-action"
               title="Khóa sổ ngày này lại: chốt tổng nhập trong ngày. Sau khi chốt muốn sửa phải Mở lại ngày và ghi lý do."
               size="lg"
               className="w-full"
@@ -1234,12 +1240,13 @@ export default function MaterialImportScreen() {
         )}
 
         {/* ĐẦU CHUYẾN — mọi ô hiện sẵn trên một khối */}
-        <section className="space-y-4 rounded-xl border-2 border-border bg-card p-4">
+        <section data-tour="imports-shipment-header" className="space-y-4 rounded-xl border-2 border-border bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold">Đầu chuyến</h2>
             <div className="flex flex-wrap items-center gap-2">
               {hasOcr && (
                 <Button
+                  data-tour="imports-ocr"
                   title="Chụp hoặc chọn ảnh phiếu nhập viết tay, máy tự đọc ra ngày · đại lý · các dòng loại NL và kg. Kết quả là NHÁP — soát lại rồi mới lưu."
                   type="button"
                   variant="outline"
@@ -1380,6 +1387,7 @@ export default function MaterialImportScreen() {
             </div>
           )}
 
+          <div data-tour="imports-backdate" className="space-y-4">
           {(isBackdatedImport(session) || isSessionLocked) && (
             <Field label="Lý do ghi bù" required>
               <Input
@@ -1417,10 +1425,11 @@ export default function MaterialImportScreen() {
               </Button>
             )
           )}
+          </div>
         </section>
 
         {/* LOẠI HÀNG & KG — bảng điền sẵn theo đại lý, chỉ còn gõ số */}
-        <section className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
+        <section data-tour="imports-lines" className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className="font-semibold">Loại hàng và số kg</h2>
             {tableRows.some((d) => d.isSuggested) && (
@@ -1443,7 +1452,7 @@ export default function MaterialImportScreen() {
           />
 
           {/* Mã lô tự sinh + SSCC (ít dùng) — thu sẵn */}
-          <div className="border-t-2 border-border pt-2">
+          <div data-tour="imports-lot" className="border-t-2 border-border pt-2">
             <button
               title="Mở / thu phần ít dùng của chuyến: mã SSCC (nhà nước) và mã lô nội bộ tự sinh."
               type="button"
@@ -1483,6 +1492,7 @@ export default function MaterialImportScreen() {
 
         {/* THANH LƯU — dính đáy màn khi có số: luôn thấy tổng chuyến + nút lưu */}
         <div
+          data-tour="imports-save-bar"
           className={cn(
             "flex flex-col gap-2 rounded-xl border-2 bg-card p-3 sm:flex-row sm:items-center sm:justify-between",
             // Chỉ DÍNH ĐÁY khi đã có số để lưu — phiếu trống thì nằm yên.
@@ -1567,7 +1577,7 @@ export default function MaterialImportScreen() {
 
       {/* CỘT NGÀY — đã ghi gì trong ngày này + phế liệu (chốt ngày ở strip cuối màn) */}
       <div className="min-w-0 space-y-4">
-        <div className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
+        <div data-tour="imports-day-list" className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <p className="font-semibold">
               Đã ghi ngày {formatDateVN(session.deliveryDate)} · xưởng {session.workshop}
@@ -1608,6 +1618,20 @@ export default function MaterialImportScreen() {
     </div>
   );
 
+  // Hướng dẫn thao tác (ba-spec 43): bước chỉ đổi chế độ xem, không ghi. Tour dựng lại khi đổi
+  // chế độ ⇒ bản chụp lúc bắt đầu nhớ đúng chế độ để bước cuối trả trang về (R5).
+  const tour = useMemo(
+    () =>
+      buildImportsTour({
+        can: { create: allowed.create, update: allowed.update, lock: allowed.lock, unlock: allowed.unlock },
+        hasOcr,
+        startView: mode,
+        showView: setMode,
+      }),
+    [allowed.create, allowed.update, allowed.lock, allowed.unlock, mode]
+  );
+  usePageTour(isLoading ? null : tour);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1618,7 +1642,7 @@ export default function MaterialImportScreen() {
           </h1>
         </div>
         {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
-        <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
+        <div data-tour="imports-mode-tabs" className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
           <button
             title="Sang chế độ Ghi nhập để gõ chuyến nguyên liệu mới."
             type="button"
@@ -1699,7 +1723,9 @@ export default function MaterialImportScreen() {
       )}
 
       {mode === "entry" && (
-        <DailyTaskReminder isLocked={isImportLockedToday} task={`chuyến nhập nguyên liệu hôm nay — xưởng ${recordWorkshop}`} />
+        <div data-tour="imports-daily-reminder">
+          <DailyTaskReminder isLocked={isImportLockedToday} task={`chuyến nhập nguyên liệu hôm nay — xưởng ${recordWorkshop}`} />
+        </div>
       )}
 
       {mode === "entry" && <DraftRestoredNotice savedAt={importDraft.restoredAt} onDiscard={discardImportDraft} />}
@@ -1708,7 +1734,7 @@ export default function MaterialImportScreen() {
 
       {mode === "ledger" && (
         <>
-      <div className="flex flex-wrap gap-2">
+      <div data-tour="imports-ledger-tools" className="flex flex-wrap gap-2">
         {allowed.export && (
         <Button
           title="Xem trước bản in A4 báo cáo nhập hàng của ngày đang chọn." variant="outline" size="lg" onClick={() => setShowInvoice(true)}>
@@ -1723,6 +1749,7 @@ export default function MaterialImportScreen() {
         </Button>
         {allowed.update && (
         <Button
+          data-tour="imports-bulk-type-change"
           title="Đổi loại nguyên liệu cho nhiều chuyến cùng lúc — dùng khi gõ nhầm loại cho cả loạt dòng." variant="edit" size="lg" onClick={() => setIsTypeChangeOpen(true)}>
           <Replace />
           Đổi loại hàng loạt
@@ -1743,7 +1770,7 @@ export default function MaterialImportScreen() {
 
       {/* Bộ lọc — toolbar một hàng; lọc ít dùng gom vào "Bộ lọc thêm" để sổ
           hiện ngay, không phải cuộn qua cả khối lọc */}
-      <div className="space-y-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="imports-ledger-filters" className="space-y-4 rounded-xl border-2 border-border p-4">
         <div className="flex flex-wrap items-end gap-4">
           <Combobox
             label="Kỳ xem sổ"
@@ -1916,6 +1943,7 @@ export default function MaterialImportScreen() {
               return (
                 <section
                   key={n.groupKey}
+                  data-tour={i === 0 ? "imports-ledger-shipments" : undefined}
                   className="space-y-4 rounded-xl border-2 border-border p-5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">

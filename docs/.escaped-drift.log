@@ -24,3 +24,9 @@
 2026-10-13 | docs/app-map/01-app-structure.md | cây thư mục ghi features/ gồm nhap-hang, san-xuat, ban-hang… (tên Việt cũ) trong khi thư mục thật là imports, production, sales… | hook: so danh sách thư mục trong khối cây của 01-app-structure với `ls src/features` khi covers đổi
 2026-10-15 | docs/app-map/32-danh-muc.md | ghi 'repo.ts chỉ gửi cột mới khi có giá trị ⇒ ghi được kể cả khi chưa chạy 0009' nhưng SUPPLIER_TABLE.toRow gửi đủ cột vô điều kiện | test quét repo.ts: mọi key toRow phải có trong một migration (add column / create table) — chặn deploy cột chưa có migration
 2026-10-19 | docs/trien-khai/flow-end-to-end-2-bo-phan.md | §4 ghi 'giám đốc/kế toán/admin/chưa-gán vẫn xem đầy đủ' nhưng từ Đợt 1 phân quyền (2026-10-15) chưa gán ⇒ không quyền, tập màn theo permissions.ts | doc này không có covers: ⇒ hook không bắt; thêm covers: src/lib/nav-access.ts, src/lib/permissions.ts, src/features/shared/DailyTaskReminder.tsx
+2026-10-22 | CLAUDE.md (G1) | công thức tồn cuối NL ghi "đầu + đông gửi − xả đông", màn + 31/38 dùng "đầu + nhập − xuất SX − bán NĐ" | hook: đổi lib/inventoryMaterial.ts ⇒ nhắc soát mục G1 CLAUDE.md
+2026-10-22 | 31-can-doi-ky.md | thân doc khối NL tả UI cũ (n chuyến, tách đại lý, ô ngày ghi ngược); khung còn dở SX vẫn hiện | hook: đổi features/balancing/MaterialGrid.tsx ⇒ bắt bump last_verified 31
+2026-10-22 | 30-nhap-hang.md §1 | còn tả hộp thoại ghi chuyến, nay ghi inline | hook: covers 30 gồm MaterialImportScreen.tsx (đã có) — cảnh báo bị bỏ qua
+2026-10-22 | 35-btp-ui.design-spec.md | còn tả dialog Ghi sản lượng + chốt ngày → chờ nhập | hook: covers 35 thêm WipProductionScreen.tsx
+2026-10-22 | 40-documents.md | đính PDF "ở cột File" — thực tế trong hộp chi tiết | hook: test phủ nhãn hộp "?" đọc nhãn nút ở màn
+2026-10-22 | 33-ban-hang.md | handoff Đơn đặt ghi "Lưu trữ", code "Đơn đặt" | hook: covers 33 thêm lib/inventory.ts

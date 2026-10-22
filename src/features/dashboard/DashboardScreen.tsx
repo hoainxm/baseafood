@@ -40,6 +40,10 @@ import {
   useScraps,
 } from "@/lib/catalogRepo";
 import { useTraceData } from "@/features/shared/useTraceData";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { useAuth } from "@/lib/auth";
+import { IS_DEMO } from "@/lib/demoMode";
+import { buildDashboardTour } from "./dashboardTour";
 import {
   buildFlowStages,
   buildChainWarnings,
@@ -174,15 +178,18 @@ function Section({
   actions,
   children,
   className,
+  tourTarget,
 }: {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Mốc `data-tour` cho hướng dẫn thao tác. */
+  tourTarget?: string;
 }) {
   return (
-    <section className={`grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-xl border-2 border-border bg-card p-5 ${className ?? ""}`}>
+    <section data-tour={tourTarget} className={`grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-xl border-2 border-border bg-card p-5 ${className ?? ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
@@ -207,7 +214,7 @@ export default function DashboardScreen() {
   const warningsRef = useRef<HTMLDivElement>(null);
 
   // ---- Nạp sổ ----
-  const { traceData } = useTraceData();
+  const { traceData, isReady } = useTraceData();
   const [scraps] = useScraps();
   const [dailyLocks] = useDailyLocks();
   const [productionLocks] = useProductionLocks();
@@ -222,6 +229,12 @@ export default function DashboardScreen() {
     () => ({ ...traceData, scraps, dailyLocks, productionLocks, periods, balancingInputs, balancingOutputs, materialOpening, finishedOpening }),
     [traceData, scraps, dailyLocks, productionLocks, periods, balancingInputs, balancingOutputs, materialOpening, finishedOpening],
   );
+
+  // ---- Hướng dẫn thao tác (ba-spec 43) — chỉ dẫn, không ghi. Nút Demo: cùng điều kiện hiện ở App.tsx. ----
+  const auth = useAuth();
+  const canDemo = auth.isAdmin || !auth.requiresLogin || IS_DEMO;
+  const tour = useMemo(() => buildDashboardTour({ can: { demo: canDemo } }), [canDemo]);
+  usePageTour(isReady ? tour : null);
 
   // ---- Gom số (lib/dataFlow) ----
   const dataFlow = useMemo(() => buildDataFlow(d, range), [d, range]);
@@ -512,7 +525,7 @@ export default function DashboardScreen() {
       </div>
 
       {/* Thanh lọc GỌN một hàng: kỳ (bấm nhanh) · lùi/tiến · xưởng. Tự chọn mới hiện ô ngày. */}
-      <div className="grid gap-3 rounded-xl border bg-muted/30 p-3">
+      <div data-tour="dashboard-filters" className="grid gap-3 rounded-xl border bg-muted/30 p-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Tabs value={period} onValueChange={(v) => setPeriod(v as ViewPeriod)}>
             <TabsList aria-label="Kỳ xem" className="flex-wrap group-data-horizontal/tabs:h-auto">
@@ -561,9 +574,12 @@ export default function DashboardScreen() {
         )}
       </div>
 
-      <StatCardGrid cards={cards} />
+      <div data-tour="dashboard-kpis">
+        <StatCardGrid cards={cards} />
+      </div>
 
       <Section
+        tourTarget="dashboard-stages"
         title="Năm khâu của chuỗi"
         description="kg đã qua từng khâu trong kỳ và số lô / dòng còn thiếu việc (tem, gắn lô, duyệt, quét kiểm). Phần trăm trên mũi tên so với khâu nguồn: SX so với NL nhập, nhập kho so với SX, đóng gói và xuất/bán so với nhập kho. Bấm một khâu để mở màn của khâu đó."
       >
@@ -571,6 +587,7 @@ export default function DashboardScreen() {
       </Section>
 
       <Section
+        tourTarget="dashboard-outflow"
         title="Nguyên liệu đi đâu"
         description="Mỗi thanh là 100% một khối hàng, chia theo nơi nó đi tới. Bấm một phần để mở màn liên quan."
       >
@@ -614,7 +631,7 @@ export default function DashboardScreen() {
         )}
       </Section>
 
-      <div ref={warningsRef} className="scroll-mt-header">
+      <div ref={warningsRef} data-tour="dashboard-warnings" className="scroll-mt-header">
         <Section
           title={`Việc cần đốc (${warnings.length})`}
           description="Sổ sai đứng trước, rồi việc chưa làm, cuối cùng là các ghi bù để biết. Bấm Mở để tới đúng chỗ sửa."
@@ -627,7 +644,7 @@ export default function DashboardScreen() {
         </Section>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 2xl:grid-cols-2">
+      <div data-tour="dashboard-daily" className="grid grid-cols-[minmax(0,1fr)] gap-6 2xl:grid-cols-2">
         <Section title="Nhập và sản xuất theo ngày" description="Cột: kg nguyên liệu nhập và kg bán thành phẩm sản xuất mỗi ngày.">
           {hasDailyFigures ? (
             <TimeSeriesChart
@@ -661,7 +678,7 @@ export default function DashboardScreen() {
         </Section>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 2xl:grid-cols-2">
+      <div data-tour="dashboard-periods" className="grid grid-cols-[minmax(0,1fr)] gap-6 2xl:grid-cols-2">
         <Section
           title="Kết quả các kỳ cân đối"
           description="Định mức = NL vào ÷ TP ra; lãi/lỗ = giá trị xuất − giá thành. Kỳ chưa có thành phẩm thì chưa tính."
@@ -697,6 +714,7 @@ export default function DashboardScreen() {
       </div>
 
       <Section
+        tourTarget="dashboard-nxt"
         title="Tồn kho theo kho (báo cáo Xuất–Nhập–Tồn)"
         description="Tồn cuối của kỳ mới nhất mỗi kho. Nguồn: báo cáo NXT nhập từ hệ thống xí nghiệp."
         actions={

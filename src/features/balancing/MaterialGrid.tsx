@@ -833,7 +833,7 @@ export function MaterialGrid({
       return mt ? <span className="mt-0.5 block">{mt}</span> : undefined;
     }
     return (
-      <span className="mt-1 block space-y-1">
+      <span data-tour="balancing-stock-lines" className="mt-1 block space-y-1">
         {h.stockLineKind === "thaw-out" ? (
           <>
             <Combobox
@@ -1172,10 +1172,10 @@ export function MaterialGrid({
   ].filter(Boolean);
 
   return (
-    <section className="p-5 xl:p-2">
+    <section data-tour="balancing-material" className="p-5 xl:p-2">
       {/* Màn rộng: khối co theo BẢNG (đứng cạnh Xuất khẩu) — tiêu đề, cảnh báo, nút không
           được kéo khối rộng hơn bảng (w-0 + min-w-full: rộng đúng bằng khối, tự xuống dòng). */}
-      <div className="xl:w-0 xl:min-w-full">
+      <div data-tour="balancing-material-checks" className="xl:w-0 xl:min-w-full">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Nguyên liệu vào</h2>
         <div className="flex flex-wrap gap-2">
@@ -1345,7 +1345,7 @@ export function MaterialGrid({
         )}
 
       {!grid.isLocked && (
-        <div className="mt-3 flex flex-wrap gap-2 xl:w-0 xl:min-w-full">
+        <div data-tour="balancing-material-add" className="mt-3 flex flex-wrap gap-2 xl:w-0 xl:min-w-full">
           <Button
             title="Thêm dòng xả đông hàng mua về (cấp đông ở kho khác). Xả đông hàng kho mình gõ thẳng vào dòng Lấy xả đông." variant="outline" onClick={() => setAddingGroup("Xả đông")}>
             <Plus />

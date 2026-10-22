@@ -65,6 +65,8 @@ import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, ScanLine, Truck } from "lucide-react";
 import { ExportLotCheck } from "./ExportLotCheck";
 import { readParam } from "@/lib/legacyUrls";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildOrdersTour, pickTourOrder } from "./ordersTour";
 
 interface NewWeighRow {
   productId: string;
@@ -368,6 +370,22 @@ export default function SalesOrderScreen() {
     });
   };
 
+  // Hướng dẫn thao tác (ba-spec 43): đơn minh họa chọn từ dữ liệu đang có; bước chỉ đổi đơn đang
+  // mở (không ghi gì). Tour chụp lúc bắt đầu ⇒ `selectedId` trong lời gọi trả về chính là đơn đang
+  // mở lúc bắt đầu — bước danh sách và lời kết trả chi tiết về đúng đơn đó.
+  const tourPick = useMemo(() => pickTourOrder(don, orderItems, exportOrders), [don, orderItems, exportOrders]);
+  const tour = useMemo(
+    () =>
+      buildOrdersTour({
+        pick: tourPick,
+        can: { create: allowed.create, update: allowed.update, delete: allowed.delete },
+        openOrder: (id) => setSelectedId(id),
+        restoreView: () => setSelectedId(selectedId),
+      }),
+    [tourPick, allowed.create, allowed.update, allowed.delete, selectedId],
+  );
+  usePageTour(isLoading ? null : tour);
+
   const colsDon: RecordTableColumn<SalesOrder>[] = [
     { key: "kh", header: "Khách", primary: true, render: (r) => tenKH(r.customerId), getSortValue: (r) => tenKH(r.customerId) },
     { key: "ngay", header: "Ngày đặt", render: (r) => formatDateVN(r.orderDate), getSortValue: (r) => r.orderDate },
@@ -401,6 +419,7 @@ export default function SalesOrderScreen() {
         {allowed.create && (
         <div className="flex flex-wrap gap-2">
           <Button
+            data-tour="orders-create"
             title="Tạo một đơn đặt hàng xuất khẩu: khách, hạn giao, và các mặt hàng cần bao nhiêu kg." size="lg" onClick={openCreate}>
             <Plus />
             Tạo đơn
@@ -409,6 +428,7 @@ export default function SalesOrderScreen() {
         )}
       </div>
 
+      <div data-tour="orders-stats">
       <StatCardGrid
         className="grid-cols-1 sm:grid-cols-3"
         cards={[
@@ -417,7 +437,9 @@ export default function SalesOrderScreen() {
           { label: "Đã xuất xong", value: don.filter((d) => d.status === "closed").length, numeric: true, icon: CheckCircle, color: "success" },
         ]}
       />
+      </div>
 
+      <div data-tour="orders-table">
       {isLoading ? (
         <TableSkeleton />
       ) : don.length === 0 ? (
@@ -448,6 +470,7 @@ export default function SalesOrderScreen() {
           actions={(r) => (
             <div className="flex flex-wrap gap-2">
               <Button
+                data-tour="orders-view"
                 title="Mở đơn này để xem chi tiết các mặt hàng cần và đối chiếu với tồn kho hiện có." variant="outline" size="sm" onClick={() => setSelectedId(r.id)}>
                 Xem
               </Button>
@@ -461,6 +484,7 @@ export default function SalesOrderScreen() {
           )}
         />
       )}
+      </div>
 
       {/* Chi tiết đơn được chọn */}
       {selectedOrder && (
@@ -476,7 +500,7 @@ export default function SalesOrderScreen() {
             </div>
             <div className="flex min-w-0 flex-wrap gap-2">
               {selectedOrder.status !== "closed" && (
-                <>
+                <div data-tour="orders-detail-actions" className="flex min-w-0 flex-wrap gap-2">
                   {allowed.update && (
                   <Button
                     title="Đánh dấu đơn này đã gom đủ hàng — chuyển trạng thái, chưa xuất kho." variant="outline" onClick={() => confirmFulfilled(selectedOrder)}>
@@ -504,7 +528,7 @@ export default function SalesOrderScreen() {
                     }
                   />
                   )}
-                </>
+                </div>
               )}
               <Button variant="outline" onClick={() => setSelectedId(null)}>
                 Đóng
@@ -512,7 +536,7 @@ export default function SalesOrderScreen() {
             </div>
           </div>
 
-          <ul className="divide-y divide-border">
+          <ul data-tour="orders-detail-lines" className="divide-y divide-border">
             {selectedOrderItems.map((dc) => {
               const exportedQty = exportedKg(selectedOrder.id, dc.productId, dc.spec);
               const kd = stock
@@ -559,7 +583,7 @@ export default function SalesOrderScreen() {
               .sort((a, b) => b.exportDate.localeCompare(a.exportDate));
             if (!exportOrderList.length) return null;
             return (
-              <div className="space-y-2 border-t-2 border-border pt-4">
+              <div data-tour="orders-export-list" className="space-y-2 border-t-2 border-border pt-4">
                 <p className="font-semibold text-foreground">Lệnh xuất đã lập</p>
                 <ul className="divide-y divide-border">
                   {exportOrderList.map((l) => {

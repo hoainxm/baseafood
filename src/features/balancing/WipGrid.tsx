@@ -433,7 +433,7 @@ export function WipGrid({
   const amounts = sumFinishedGoodAmounts(finishedGoodRows);
 
   return (
-    <section className="p-5 xl:p-2">
+    <section data-tour="balancing-finished-goods" className="p-5 xl:p-2">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 xl:w-0 xl:min-w-full">
         <h2 className="text-xl font-semibold">Bán thành phẩm sản xuất</h2>
         <div className="flex flex-wrap gap-2">

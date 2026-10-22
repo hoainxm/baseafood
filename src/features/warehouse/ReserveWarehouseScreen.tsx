@@ -47,6 +47,8 @@ import { parseQrCode, formatWipLotLabel, findLots } from "@/lib/lotTraceability"
 import { BSF1_WAREHOUSES } from "@/types";
 import { computeWarehouseOccupancy } from "@/lib/inventory";
 import { readParam } from "@/lib/legacyUrls";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildWarehouseTour } from "./warehouseTour";
 
 const BSF1_WAREHOUSE_NAMES = BSF1_WAREHOUSES.map((w) => w.name);
 
@@ -237,6 +239,10 @@ export default function ReserveWarehouseScreen() {
     ? wips.find((s) => s.id === approval.wipId)
     : undefined;
 
+  // Hướng dẫn thao tác (ba-spec 43): chỉ dẫn, không ghi; bước duyệt chỉ có khi có quyền Duyệt.
+  const tour = useMemo(() => buildWarehouseTour({ can: { approve: allowed.approve } }), [allowed.approve]);
+  usePageTour(isLoading ? null : tour);
+
   return (
     <div className="space-y-6">
       <div>
@@ -246,6 +252,7 @@ export default function ReserveWarehouseScreen() {
         </h1>
       </div>
 
+      <div data-tour="warehouse-stats">
       <StatCardGrid
         className="grid-cols-2 lg:grid-cols-4"
         cards={[
@@ -255,9 +262,10 @@ export default function ReserveWarehouseScreen() {
           { label: "Tổng tồn", value: kg(totalStock), numeric: true, icon: Scale, color: "success" },
         ]}
       />
+      </div>
 
       {totalOversold > 0 && (
-        <div role="status" className="flex items-start gap-3 rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">
+        <div data-tour="warehouse-oversold" role="status" className="flex items-start gap-3 rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
           <span>
             Bán vượt <span className="tnum font-semibold">{kg(totalOversold)}</span> so với tồn —{" "}
@@ -271,7 +279,7 @@ export default function ReserveWarehouseScreen() {
 
       {/* Hàng nằm kho bao lâu — đẩy lô cũ trước (FIFO). */}
       {totalStock > 0 && (
-        <section className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
+        <section data-tour="warehouse-age" className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
           <h2 className="text-lg font-semibold text-foreground">Hàng nằm kho bao lâu</h2>
           <p className="text-sm text-muted-foreground">
             Tồn {warehouseFilter ? `kho ${warehouseFilter}` : "mọi kho"} chia theo số ngày từ ngày sản xuất tới hôm nay. Phần nằm lâu nên xuất trước.
@@ -290,7 +298,7 @@ export default function ReserveWarehouseScreen() {
       )}
 
       {/* Dung tích & Tải trọng 5 Kho BSF1 */}
-      <div className="rounded-xl border-2 border-border p-4 bg-card space-y-3">
+      <div data-tour="warehouse-capacity" className="rounded-xl border-2 border-border p-4 bg-card space-y-3">
         <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground">
           <Warehouse className="w-5 h-5 text-primary" />
           Dung tích & Tải trọng Kho BSF1
@@ -352,13 +360,13 @@ export default function ReserveWarehouseScreen() {
 
       {/* Khối chờ nhập — lời mời duyệt (không coi rỗng khi còn lô chờ) */}
       {pendingIntake.length > 0 && (
-        <div className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
+        <div data-tour="warehouse-pending" className="space-y-4 rounded-xl border-2 border-primary/40 bg-accent/40 p-4">
           <p className="text-base font-semibold text-foreground">
             Có {pendingIntake.length} lô sản xuất chờ nhập kho — duyệt để tính vào tồn
           </p>
           {/* Quét tem lô BTP trên block ⇒ mở đúng hộp duyệt. Gõ mã khi tem bong / không có camera. */}
           {allowed.approve && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div data-tour="warehouse-scan" className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <Button
               title={isScanning ? "Tắt camera." : "Bật camera quét tem QR trên block để mở đúng lô cần duyệt nhập kho."}
               variant="outline"
@@ -400,6 +408,7 @@ export default function ReserveWarehouseScreen() {
                 </span>
                 {canRow("approve", s) && (
                 <Button
+                  data-tour="warehouse-approve"
                   title="Duyệt lô bán thành phẩm này từ trạng thái chờ sang đã nhập kho, để tính vào tồn dự trữ." size="sm" onClick={() => openApprove(s)}>
                   <PackageCheck />
                   Duyệt nhập kho
@@ -411,7 +420,7 @@ export default function ReserveWarehouseScreen() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="warehouse-filter" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <Combobox
           label="Lọc theo kho"
           hideRequiredMark
@@ -423,6 +432,7 @@ export default function ReserveWarehouseScreen() {
         />
       </div>
 
+      <div data-tour="warehouse-stock" className="space-y-6">
       {isLoading ? (
         <TableSkeleton />
       ) : filteredStock.length === 0 ? (
@@ -453,6 +463,7 @@ export default function ReserveWarehouseScreen() {
           </div>
         </>
       )}
+      </div>
 
       {/* Dialog duyệt nhập kho */}
       <Dialog open={approval !== null} onOpenChange={(o) => !o && setApproval(null)}>

@@ -23,6 +23,24 @@ export interface TourStep {
 export interface PageTour {
   title: string;
   steps: TourStep[];
+  /**
+   * Trả trang về chỗ cũ khi tour đóng (ở BẤT KỲ bước nào, kể cả Esc) — cho chỗ xem nằm trong state
+   * của màn (chế độ, đơn đang mở…) mà đường dẫn không giữ (R5). Chỉ đổi chỗ xem, không ghi.
+   */
+  onExit?: () => void;
+}
+
+/**
+ * Bản khai tour của MỘT trang (ba-spec 43 v4 R13–R16) — mỗi file `features/<khu>/<trang>Tour.ts`
+ * export `tourSpec`. Test quét chung (`features/shared/pageTourCoverage.test.ts`) đọc mọi bản khai:
+ * trang có route mà thiếu tour / thiếu hộp "?" ⇒ đỏ; lời sai văn phong, mốc `data-tour` không có
+ * trên trang ⇒ đỏ.
+ */
+export interface PageTourSpec {
+  /** Đoạn đầu đường dẫn của trang (`/imports` ⇒ "imports") — trùng id nav. */
+  pageId: string;
+  /** Dựng tour với ĐỦ quyền, đủ dữ liệu (bản dài nhất) — dùng cho test quét chung. */
+  build: () => PageTour;
 }
 
 /** Thời gian đợi chỗ được chỉ hiện ra (trang đang tải / vừa đổi chỗ xem) — R3. */

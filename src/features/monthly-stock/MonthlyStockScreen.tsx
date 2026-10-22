@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MonthlyStockLine, MaterialType, Product } from "@/types";
 import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES, STORAGE_KIND_LABELS } from "@/types";
 import { useMonthlyStock, useMaterialTypes, useProducts, useStorageLocations } from "@/lib/catalogRepo";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildMonthlyStockTour } from "./monthlyStockTour";
 import { uid } from "@/lib/db";
 import { chuan0, num, formatDateVN } from "@/lib/format";
 import {
@@ -185,7 +187,7 @@ const numberOrDash = (v: number) => (chuan0(v) ? num(v) : "—");
 export default function MonthlyStockScreen() {
   /* Phân quyền lớp 2 (spec role-permissions §5): ẩn nút không có quyền, không làm mờ. */
   const allowed = useCan("monthly-stock");
-  const [lines, writeLinesRaw] = useMonthlyStock();
+  const [lines, writeLinesRaw, { status: ledgerStatus }] = useMonthlyStock();
   const [mtypes, setMtypes] = useMaterialTypes();
   const [products, setProducts] = useProducts();
   const [storageLocationCatalog, setStorageLocationCatalog] = useStorageLocations();
@@ -197,6 +199,12 @@ export default function MonthlyStockScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set()); // dòng đang tick (cộng tổng / thao tác lô)
   const [viewedCard, setViewedCard] = useState<MonthlyStockRow | null>(null); // thẻ kho của 1 mặt hàng
   const [hideEmptyRows, setHideEmptyRows] = useState(false); // ẩn dòng tồn đầu = nhập = xuất = 0
+  /* Hướng dẫn thao tác (ba-spec 43): chỉ dẫn, không đổi chỗ xem, không ghi. */
+  const tour = useMemo(
+    () => buildMonthlyStockTour({ can: { create: allowed.create, update: allowed.update, import: allowed.import } }),
+    [allowed.create, allowed.update, allowed.import],
+  );
+  usePageTour(ledgerStatus === "loading" && lines.length === 0 ? null : tour);
 
   // ---------- Nhập Excel bảng kê (seed số cũ) ----------
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1327,7 +1335,7 @@ export default function MonthlyStockScreen() {
     },
     {
       key: "thaotac", header: "", render: (r) => (
-        <div className="flex items-center justify-end gap-0.5">
+        <div data-tour="monthly-stock-row-actions" className="flex items-center justify-end gap-0.5">
           <Button
             size="icon-sm"
             variant="ghost"
@@ -1399,6 +1407,7 @@ export default function MonthlyStockScreen() {
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
           {allowed.import && (
             <Button
+              data-tour="monthly-stock-import"
               variant="outline"
               onClick={pickFile}
               title="Đọc file Excel 'bảng kê kho' của kế toán — mỗi sheet một tháng. Nạp lại cùng file + cùng kho chỉ cập nhật, không nhân đôi dòng."
@@ -1409,6 +1418,7 @@ export default function MonthlyStockScreen() {
           )}
           {allowed.update && (
             <Button
+              data-tour="monthly-stock-sync"
               variant="outline"
               onClick={openSyncDialog}
               title="Đối chiếu tên hàng trong sổ với danh mục Loại nguyên liệu và Mặt hàng, rồi ánh xạ từng tên về tên chuẩn. Không đụng 141 mã thành phẩm kế toán."
@@ -1419,6 +1429,7 @@ export default function MonthlyStockScreen() {
           )}
           {allowed.export && (
             <Button
+              data-tour="monthly-stock-print"
               onClick={() => setMoIn(true)}
               disabled={!hasData}
               title="Xem trước bản in A4. Có tick dòng thì chỉ in đúng mấy dòng đó kèm tổng của chúng."
@@ -1431,7 +1442,7 @@ export default function MonthlyStockScreen() {
       </div>
 
       {/* Bộ lọc: tháng + kho */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div data-tour="monthly-stock-filters" className="flex flex-wrap items-end gap-3">
         <div className="flex w-full items-end gap-1 sm:w-auto">
           <Button
             title="Lùi về tháng liền trước."
@@ -1510,6 +1521,7 @@ export default function MonthlyStockScreen() {
           )}
           {hasData && !isPreview && (
             <Button
+              data-tour="monthly-stock-select"
               variant="outline"
               onClick={selectedRows.length ? clearSelection : selectAll}
               title={selectedRows.length ? "Bỏ tick toàn bộ dòng đang chọn." : "Tick hết các dòng đang hiện để xem tổng của cả tháng, hoặc in / xóa theo lô."}
@@ -1538,6 +1550,7 @@ export default function MonthlyStockScreen() {
           )}
           {allowed.create && hasCarryForward && (
             <Button
+              data-tour="monthly-stock-carry-next"
               variant="outline"
               className="h-auto min-h-10 max-w-full whitespace-normal text-left"
               onClick={carryToNextMonth}
@@ -1551,6 +1564,7 @@ export default function MonthlyStockScreen() {
       </div>
 
       {!hasData ? (
+        <div data-tour="monthly-stock-month-open">
         <EmptyState
           icon={FileSpreadsheet}
           title={`${formatMonthLabel(month)} chưa có số liệu`}
@@ -1576,10 +1590,11 @@ export default function MonthlyStockScreen() {
             )
           }
         />
+        </div>
       ) : (
         <>
           {isPreview && (
-            <div className="space-y-2 rounded-xl border border-primary/50 bg-primary/5 p-3">
+            <div data-tour="monthly-stock-month-open" className="space-y-2 rounded-xl border border-primary/50 bg-primary/5 p-3">
               <div className="flex items-start gap-2">
                 <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
                 <div className="min-w-0 space-y-1">
@@ -1609,9 +1624,11 @@ export default function MonthlyStockScreen() {
             </div>
           )}
 
-          <StatCardGrid cards={cards} />
+          <div data-tour="monthly-stock-stats">
+            <StatCardGrid cards={cards} />
+          </div>
 
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
+          <div data-tour="monthly-stock-invariant" className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
             {invariantHolds ? (
               <span className="flex items-center gap-2 text-base font-semibold text-success">
                 <CheckCircle2 className="h-5 w-5" aria-hidden />
@@ -1628,7 +1645,7 @@ export default function MonthlyStockScreen() {
           </div>
 
           {hasData && canEdit && (
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            <p data-tour="monthly-stock-edit-hint" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">Cách thao tác:</span>
               <span>gõ thẳng vào ô trên bảng (Enter / ↑ / ↓ đi dọc cột, dán được khối từ Excel, Ctrl+Z hoàn tác); thêm dòng ở ô "Dòng mới" cuối mỗi bảng;</span>
               <span>
@@ -1652,7 +1669,7 @@ export default function MonthlyStockScreen() {
           )}
 
           {showDiffWarning && (
-            <div className="space-y-2 rounded-xl border border-warning/50 bg-warning/10 p-3">
+            <div data-tour="monthly-stock-carry-gap" className="space-y-2 rounded-xl border border-warning/50 bg-warning/10 p-3">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
                 <div className="min-w-0 space-y-1">
@@ -1693,7 +1710,7 @@ export default function MonthlyStockScreen() {
           )}
 
           {/* Một khung phím cho mọi nhóm: ↓ ở dòng cuối nhóm trên nhảy sang dòng đầu nhóm dưới. */}
-          <div className="space-y-8" data-grid-nav>
+          <div className="space-y-8" data-grid-nav data-tour="monthly-stock-table">
             {groups.map((g) => (
               <section key={g.category} className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1736,7 +1753,7 @@ export default function MonthlyStockScreen() {
                   rowMarkKey="ton-kho-thang"
                   addRow={
                     allowed.create ? (
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div data-tour="monthly-stock-add-row" className="flex flex-wrap items-center gap-2">
                       <span className="flex items-center gap-1 text-sm font-medium text-foreground">
                         <Plus className="size-4" aria-hidden />
                         Dòng mới

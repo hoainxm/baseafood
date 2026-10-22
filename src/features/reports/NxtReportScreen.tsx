@@ -66,6 +66,8 @@ import {
 } from "lucide-react";
 import { useDraftAccount, useFormDraft } from "@/lib/formDraft";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildFinishedGoodStockTour } from "./finishedGoodStockTour";
 
 interface OpeningForm {
   productId: string;
@@ -87,7 +89,7 @@ export default function NxtReportScreen() {
   // Phân quyền lớp 2: thêm/xóa tồn đầu khai tay + xuất Excel theo quyền `nxt`.
   const allowed = useCan("nxt");
   const isReadOnly = !allowed.create && !allowed.update;
-  const [wips] = useWipProductions();
+  const [wips, , { status: wipStatus }] = useWipProductions();
   const [exportItems] = useExportItems();
   const [exportOrders] = useExportOrders();
   const [salesItems] = useSalesItems();
@@ -121,6 +123,13 @@ export default function NxtReportScreen() {
       setIsOpeningOpen(true);
     },
   });
+
+  /* Hướng dẫn thao tác (ba-spec 43) — chỉ dẫn, không ghi; bước ghi theo quyền. */
+  const tour = useMemo(
+    () => buildFinishedGoodStockTour({ canExport: allowed.export, canCreateOpening: allowed.create }),
+    [allowed.export, allowed.create],
+  );
+  usePageTour(wipStatus === "loading" && wips.length === 0 ? null : tour);
 
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
@@ -330,12 +339,14 @@ export default function NxtReportScreen() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button
+            data-tour="nxt-opening"
             title="Khai tồn đầu kho thành phẩm cho các mã chưa có lịch sử giao dịch — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setIsOpeningOpen(true)}>
             <PackagePlus className="mr-2 h-4 w-4" />
             Tồn đầu ({opening.length})
           </Button>
           {allowed.export && (
             <Button
+              data-tour="nxt-export"
               title="Tải báo cáo đang xem ra file Excel." onClick={exportExcel} disabled={!rows.length}>
               <Download className="mr-2 h-4 w-4" />
               Xuất Excel
@@ -344,7 +355,7 @@ export default function NxtReportScreen() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4">
+      <div data-tour="nxt-period" className="flex flex-wrap items-end gap-4">
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -380,10 +391,12 @@ export default function NxtReportScreen() {
         </div>
       </div>
 
-      <StatCardGrid cards={cards} />
+      <div data-tour="nxt-stats">
+        <StatCardGrid cards={cards} />
+      </div>
 
       {total.warningCount > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
+        <div data-tour="nxt-negative-warning" className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" aria-hidden />
           <span className="text-base font-semibold text-destructive">
             {total.warningCount} mặt hàng có tồn cuối ÂM — xuất nhiều hơn số đang trữ. Kiểm lại sản xuất /
@@ -399,7 +412,9 @@ export default function NxtReportScreen() {
           description="Ghi sản lượng ở Sản xuất BTP, duyệt vào Kho dự trữ, rồi xuất theo Đơn đặt / Bán hàng — số sẽ tổng hợp về đây. Có số dư đông trước khi số hoá thì khai ở nút Tồn đầu."
         />
       ) : (
-        <SummaryTable rows={rows} columns={columns} getKey={(r) => `${r.productId}|||${r.spec}`} rowMarkKey={`nxt-tp|${fromDate}|${toDate}`} />
+        <div data-tour="nxt-table">
+          <SummaryTable rows={rows} columns={columns} getKey={(r) => `${r.productId}|||${r.spec}`} rowMarkKey={`nxt-tp|${fromDate}|${toDate}`} />
+        </div>
       )}
 
       <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

@@ -901,14 +901,22 @@ ngược lên thư mục cha và đụng junction tương thích cũ bị khóa 
 
 ## Hướng dẫn thao tác — tour từng bước trên trang (`GuidedTour`, từ 2026-10-21)
 
-Dẫn người dùng đi lần lượt từng khu vực của trang theo thứ tự công việc, ngay trên trang thật. Hành vi (oracle): [`docs/app-map/43-guided-tour.ba-spec.md`](../../docs/app-map/43-guided-tour.ba-spec.md). Áp dụng đầu tiên: Xuất khẩu.
+Dẫn người dùng đi lần lượt từng khu vực của trang theo thứ tự công việc, ngay trên trang thật. Hành vi (oracle): [`docs/app-map/43-guided-tour.ba-spec.md`](../../docs/app-map/43-guided-tour.ba-spec.md). Áp dụng đầu tiên: Xuất khẩu; **từ 2026-10-22 BẮT BUỘC cho mọi trang nghiệp vụ có route, kể cả trang mới về sau (CLAUDE.md quy tắc 18)** — mỗi trang có tour + hộp "?" (`PAGE_GUIDES`).
 
 - **Tour chỉ dẫn, không ghi** (R1): lớp phủ chặn mọi cú bấm lên trang; bước chỉ được đổi CHỖ XEM (đường dẫn, `replace`). Cấm bước tự bấm nút lưu / mở hộp form.
 - **Khai tour ở màn**: `usePageTour(tour)` (features/shared/PageTourProvider — tour `useMemo`, `null` khi đang tải). Lối vào tự có: nút "?" ở thanh tiêu đề (`GuideButton onStartTour`). Muốn thêm nút trên trang: `usePageTourControl()` → `Button variant="outline"` "Hướng dẫn thao tác" (icon `Route`, thuộc tính `data-tour-start`), đặt trước nút chính.
 - **Bước** (`TourStep`, `@/lib/guidedTour`): `target` = giá trị `data-tour="…"` gắn ở khu vực (trống ⇒ lời giữa trang) · `optional` ⇒ khu vực không có thì bỏ qua · `prepare` ⇒ đổi chỗ xem (bước cùng chỗ xem dùng CHUNG một hàm `prepare` — khung dò trước để đếm "Bước k/n" không nhảy cóc). Tên mốc tiếng Anh `kebab-case`, ổn định.
 - **Lời** theo [`noi-dung-va-label.md`](noi-dung-va-label.md): tiêu đề bước = danh từ, không chấm cuối; lời gọi ĐÚNG chữ đang hiện trên trang, dùng "chọn", kết thúc bằng dấu chấm; gạch đầu dòng `•`, xuống dòng `\n`. Giải thích trạng thái lấy từ ba-spec của module, không tự đặt.
 - **Khung tự lo**: đưa khu vực lên sát dưới thanh tiêu đề (cuộn đúng MỘT khung — không `scrollIntoView`, nó đẩy cả khung app); đặt khung lời dưới → trên → phải → trái, điện thoại nằm đáy màn và chừa đáy trang; phím → / Enter / ← / Esc; thoát ⇒ trả đường dẫn + vị trí cuộn. Không toast (luật 8 — thao tác trình bày).
-- Thêm tour cho trang mới: gắn mốc `data-tour`, viết hàm thuần dựng bước + test (số bước, thứ tự, bước bỏ theo quyền), thử 360 px × 130 %.
+- **Trang mới — checklist (quy tắc 18):**
+  1. Kiểm kê nội dung trước khi viết lời: mọi khu vực, mọi nhãn trạng thái đang hiện (lấy từ hằng số trong code), điều kiện "xong" / chốt / khóa, cảnh báo, cách tính số, việc tiếp — nguồn là ba-spec / app-map của trang (ghi vào §9c của ba-spec 43).
+  2. `features/<khu>/<trang>Tour.ts`: hàm thuần `build<Trang>Tour(ctx)` (ctx = cờ quyền + hàm đổi chỗ xem) + `export const tourSpec: PageTourSpec = { pageId: "<đoạn đường dẫn>", build: () => build<Trang>Tour({ /* đủ quyền */ }) }`.
+  3. Bước 1 `id: "intro"`, KHÔNG `target`: trang làm gì, ai dùng, khâu nào của chuỗi nhập → sản xuất → kho → bán / xuất, cách đi tour (Tiếp theo → · Quay lại ← · Esc). Các bước sau theo thứ tự công việc; khu vực có trạng thái ⇒ bước giải thích trạng thái; bước chỉ nút ghi ⇒ `optional` + chỉ thêm khi có quyền; 3–22 bước.
+  4. Màn: mốc `data-tour="<pageId>-<khu-vực>"` (component không nhận thuộc tính ⇒ bọc `<div data-tour>`), `usePageTour(isLoading ? null : tour)` với tour `useMemo`.
+  5. Hộp "?": mục `PAGE_GUIDES["<pageId>"]` — viết ở `features/shared/guides/<trang>Guide.tsx` bằng `GuideSteps` / `GuideList` / `GuideSection` (`guides/parts.tsx`) rồi nối vào `guideContent.tsx`. Hộp tự có nút "Bắt đầu hướng dẫn thao tác".
+  6. Test: `features/shared/pageTourCoverage.test.ts` (route ⇄ tour ⇄ hộp "?" ⇄ mốc ⇄ văn phong) phải xanh; trang có hằng số nhãn trạng thái ⇒ `<trang>Tour.test.ts` kiểm mọi nhãn có nguyên văn trong lời + bước ghi biến mất khi không có quyền.
+  7. Thử tay: đi hết tour ở 1366 px và 360 px × 130 % — không bước nào khuất / tràn, dữ liệu dưới máy không đổi, thoát về đúng chỗ.
+  - Trang không cần tour (quản trị chỉ admin, trang mẫu) ⇒ thêm vào `PAGE_TOUR_EXEMPT` của test, KÈM lý do.
 
 ## 9. Hướng dẫn khi rê chuột (`title`) — BẮT BUỘC cho nút thao tác
 

@@ -42,6 +42,8 @@ import type { LotKind } from "@/types";
 import { cn } from "@/lib/utils";
 import { normalizeQrTab, readParam } from "@/lib/legacyUrls";
 import { useCan } from "@/features/shared/PermissionProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildQrTour, pickTourLot } from "./qrTour";
 
 const laLo = (k: TraceNodeKind): k is LotKind => !isOutboundKind(k);
 
@@ -94,7 +96,7 @@ function Tree({ branches, onOpen }: { branches: TraceBranch[]; onOpen: (n: LotNo
 }
 
 export default function QrLookupScreen() {
-  const { traceData } = useTraceData();
+  const { traceData, isReady } = useTraceData();
   const [params, setParams] = useSearchParams();
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
@@ -108,7 +110,8 @@ export default function QrLookupScreen() {
   // Link quét tem (?lot=…) luôn mở tab Tra, kể cả khi lỡ kèm tab=…
   const tabUrl = params.get("tab");
   // Phân quyền lớp 2: in tem (đơn lẻ + hàng loạt) = quyền xuất của /qr.
-  const canExport = useCan("qr").export;
+  const qrAllowed = useCan("qr");
+  const canExport = qrAllowed.export;
   const requestedTab = lotParam ? "lookup" : normalizeQrTab(tabUrl);
   const tab = requestedTab === "print" && !canExport ? "lookup" : requestedTab;
   const result = useMemo(() => {
@@ -135,6 +138,19 @@ export default function QrLookupScreen() {
   /** Lô NL: các loại NL khác của CÙNG CHUYẾN (mỗi loại một lô, chốt 2026-10-08). */
   const sameShipmentLots = useMemo(() => (viewing?.kind === "S" ? findSameShipmentLots(viewing.id, traceData) : []), [viewing, traceData]);
 
+  // Hướng dẫn thao tác (ba-spec 43): mở hộ chiếu minh họa + đổi tab qua đường link, không ghi gì.
+  const sampleLot = viewing ? `${viewing.kind}:${viewing.id}` : pickTourLot(traceData);
+  const tour = useMemo(
+    () =>
+      buildQrTour({
+        sampleLot,
+        can: { print: canExport, linkLots: qrAllowed.create || qrAllowed.update },
+        showTab: (t, lot) => setParams(t === "lookup" ? (lot ? { lot } : {}) : { tab: t }, { replace: true }),
+      }),
+    [sampleLot, canExport, qrAllowed.create, qrAllowed.update, setParams]
+  );
+  usePageTour(isReady ? tour : null);
+
   const backwardErrors: Partial<Record<TraceNodeKind, string>> = {
     S: "Lô nguyên liệu là đầu chuỗi — nguồn gốc là đại lý / chuyến nhập ghi ở trên.",
     W: "Mẻ này CHƯA gắn lô nguyên liệu nào. Vào Sản xuất BTP, bấm \"Gắn lô NL\" ở dòng của mẻ.",
@@ -160,7 +176,7 @@ export default function QrLookupScreen() {
       </div>
 
       {/* Hai việc của màn: TRA một lô ⇄ IN TEM nhiều lô. Tab nằm trên link (?tab=print) để gửi được. */}
-      <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-fit">
+      <div data-tour="qr-tabs" className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-fit">
         {(
           [
             ["lookup", "Tra lô", "Tra lô", "Quét hoặc gõ mã lô để xem hộ chiếu: nguồn gốc, đã đi đâu, cân bằng kg.", Search],
@@ -196,7 +212,7 @@ export default function QrLookupScreen() {
         <>
 
       {/* Quét + gõ */}
-      <div className="space-y-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="qr-scan" className="space-y-4 rounded-xl border-2 border-border p-4">
         <div className="flex flex-wrap items-center gap-3">
           <Button
             title={isScanning ? "Tắt camera, quay về gõ mã lô bằng tay." : "Bật camera quét mã QR trên tem lô."}
@@ -261,7 +277,7 @@ export default function QrLookupScreen() {
         viewing && (
           <div className="space-y-4">
             {/* 1. Lô này là gì */}
-            <section className="space-y-3 rounded-xl border-2 border-border p-4">
+            <section data-tour="qr-lot-summary" className="space-y-3 rounded-xl border-2 border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Tag variant="category" tone={toneByName(TRACE_KIND_LABELS[viewing.kind])}>{TRACE_KIND_LABELS[viewing.kind]}</Tag>
@@ -344,7 +360,7 @@ export default function QrLookupScreen() {
 
             {/* 2. Cân bằng khối lượng */}
             {massBalance && (
-              <section className="space-y-2 rounded-xl border-2 border-border p-4">
+              <section data-tour="qr-mass-balance" className="space-y-2 rounded-xl border-2 border-border p-4">
                 <h2 className="flex items-center gap-2 font-semibold">
                   <Scale aria-hidden /> Cân bằng khối lượng
                   <InfoTip label="cân bằng khối lượng">
@@ -405,7 +421,7 @@ export default function QrLookupScreen() {
             )}
 
             {/* 3. Truy ngược */}
-            <section className="space-y-2 rounded-xl border-2 border-border p-4">
+            <section data-tour="qr-trace-backward" className="space-y-2 rounded-xl border-2 border-border p-4">
               <h2 className="flex items-center gap-2 font-semibold">
                 <ArrowUpLeft aria-hidden /> Truy ngược — lô này làm từ đâu
               </h2>
@@ -413,7 +429,7 @@ export default function QrLookupScreen() {
             </section>
 
             {/* 4. Truy xuôi */}
-            <section className="space-y-2 rounded-xl border-2 border-border p-4">
+            <section data-tour="qr-trace-forward" className="space-y-2 rounded-xl border-2 border-border p-4">
               <h2 className="flex items-center gap-2 font-semibold">
                 <ArrowDownRight aria-hidden /> Truy xuôi — lô này đã đi đâu
                 <InfoTip label="truy xuôi">Đây là danh sách cần khi phải thu hồi: mọi mẻ, thành phẩm và lệnh xuất có dùng lô này.</InfoTip>

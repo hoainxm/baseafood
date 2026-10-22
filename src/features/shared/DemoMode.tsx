@@ -212,6 +212,7 @@ const DemoTriggerButton = forwardRef<HTMLButtonElement, ComponentProps<typeof Bu
   return (
     <Button
       ref={ref}
+      data-tour="dashboard-demo-mode"
       title="Chế độ demo: trình bày bằng bộ số sinh từ số thật, số thật không bị đụng."
       variant="outline"
       className="text-muted-foreground"
@@ -237,6 +238,7 @@ function DemoActiveMenu() {
           {/* Điện thoại: chỉ icon (dải "ĐANG XEM DỮ LIỆU DEMO" trên trang đã báo) — chữ DEMO
               chiếm ~110 px ở cỡ chữ 130 %, ép tiêu đề trang mất hẳn. */}
           <Button
+            data-tour="dashboard-demo-mode"
             title="Đang ở chế độ demo — bấm để làm mới bộ demo hoặc thoát."
             aria-label="Đang ở chế độ demo — làm mới bộ demo hoặc thoát"
             className="border-warning bg-warning font-bold text-warning-foreground hover:bg-warning/90 max-sm:w-10 max-sm:px-0"

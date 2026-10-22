@@ -68,6 +68,8 @@ import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildSalesTour } from "./salesTour";
 import {
   CalendarRange,
   CircleCheck,
@@ -192,6 +194,7 @@ export default function SalesScreen() {
   const lotInputButton = (r: SalesItem) =>
     saleLotKind(r) && (allowed.create || allowed.update) ? (
       <Button
+        data-tour="sales-lot"
         title={`Ghi dòng bán này lấy từ ${saleLotKind(r) === "P" ? "lô thành phẩm" : "lô bán thành phẩm"} nào (quét tem thùng, gõ mã, hoặc chọn lô còn tồn). Có lô thì thu hồi mới tới được khách.`}
         variant={countSalesLots(r.id) ? "outline" : "default"}
         size="sm"
@@ -584,6 +587,13 @@ export default function SalesScreen() {
     },
   ] : [];
 
+  // Hướng dẫn thao tác (ba-spec 43): chỉ dẫn, không ghi; bước ghi theo quyền, lời về giá theo quyền xem giá.
+  const tour = useMemo(
+    () => buildSalesTour({ can: { create: allowed.create, update: allowed.update, viewPrice: canViewPrice } }),
+    [allowed.create, allowed.update, canViewPrice],
+  );
+  usePageTour(isLoading ? null : tour);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -596,6 +606,7 @@ export default function SalesScreen() {
         {allowed.create && (
         <div className="flex flex-wrap gap-2">
           <Button
+            data-tour="sales-create"
             title="Mở form ghi một phiếu bán mới: chọn khách, kênh bán, rồi thêm từng dòng mặt hàng." size="lg" onClick={openAdd}>
             <Plus />
             Ghi phiếu bán
@@ -604,6 +615,7 @@ export default function SalesScreen() {
         )}
       </div>
 
+      <div data-tour="sales-stats">
       <StatCardGrid
         className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
         cards={[
@@ -614,9 +626,10 @@ export default function SalesScreen() {
           { label: "Tổng bán", value: kg(total), numeric: true, icon: Scale, color: "success" },
         ]}
       />
+      </div>
 
       {/* Bộ lọc — toolbar một hàng */}
-      <div className="rounded-xl border-2 border-border p-4">
+      <div data-tour="sales-filter" className="rounded-xl border-2 border-border p-4">
         <div className="flex flex-wrap items-end gap-4">
           <Combobox
             label="Kỳ xem sổ"
@@ -709,6 +722,7 @@ export default function SalesScreen() {
             {groupedView.map((n, i) => (
               <section
                 key={n.invoice.id}
+                data-tour="sales-invoice"
                 className="space-y-4 rounded-xl border-2 border-border p-5"
               >
                 <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
@@ -763,6 +777,7 @@ export default function SalesScreen() {
                   </div>
                 </div>
 
+                <div data-tour="sales-items">
                 <RecordTable
                   columns={itemColumns(n.invoice.channel)}
                   rows={n.items}
@@ -770,11 +785,12 @@ export default function SalesScreen() {
                   rowMarkKey="ban-hang"
                   actions={(r) => lotInputButton(r)}
                 />
+                </div>
               </section>
             ))}
           </div>
 
-          <div className="flex flex-wrap justify-end gap-x-10 gap-y-3 rounded-xl bg-muted px-5 py-4">
+          <div data-tour="sales-totals" className="flex flex-wrap justify-end gap-x-10 gap-y-3 rounded-xl bg-muted px-5 py-4">
             <div className="flex items-baseline gap-3">
               <span className="text-base text-muted-foreground">
                 Tổng khối lượng

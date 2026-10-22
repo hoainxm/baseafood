@@ -86,7 +86,7 @@ export function SessionLotsSection({
   };
 
   return (
-    <div className="space-y-3 rounded-xl border-2 border-border p-4">
+    <div data-tour="wip-session-lots" className="space-y-3 rounded-xl border-2 border-border p-4">
       {/* Đầu khối MỘT hàng: tên + ⓘ (giải thích dài) + trạng thái khai lô. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-base font-semibold">

@@ -91,6 +91,8 @@ import {
   removeFrozenLot,
 } from "@/lib/frozenStockLines";
 import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildWipTour } from "./wipTour";
 import { assignSessionLots, findBatchesWithoutLot, formatWipLotLabel, buildLotNode, type TraceData } from "@/lib/lotTraceability";
 import {
   CalendarRange,
@@ -212,6 +214,18 @@ export default function WipProductionScreen() {
   /** Không có quyền thêm ⇒ không có form Ghi nhập, chỉ còn sổ ngày. */
   const canEnter = allowed.create && writableWorkshops.length > 0;
   const activeMode = canEnter ? mode : "ledger";
+  /** Hướng dẫn thao tác (ba-spec 43): chỉ đổi chế độ xem, không ghi; bước ghi theo quyền. */
+  const canLockDay = allowed.lock || allowed.unlock;
+  const tour = useMemo(
+    () =>
+      buildWipTour({
+        can: { enter: canEnter, lock: canLockDay, report: allowed.export },
+        startMode: activeMode,
+        setMode,
+      }),
+    [canEnter, canLockDay, allowed.export, activeMode]
+  );
+  usePageTour(isLoading ? null : tour);
   const [isPrintingBlank, setIsPrintingBlank] = useState(false);
   // Truy xuất lô (docs/spec/qr-truy-xuat-lo.md): gắn lô NL cho mẻ + in tem lô BTP.
   const [lotInputs, saveLotInputs] = useLotInputs();
@@ -1338,7 +1352,7 @@ export default function WipProductionScreen() {
       )}
 
       {/* Ba ô đầu phiên MỘT hàng (sm trở lên): ngày ghi sổ · ngày SX · phân xưởng. */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div data-tour="wip-session-header" className="grid gap-4 sm:grid-cols-3">
         <DateField
           label="Ngày ghi sổ"
           required
@@ -1392,7 +1406,7 @@ export default function WipProductionScreen() {
 
       {/* Bảng thành phẩm — nhập cả phiên một lượt, lưu một lần. KHÔNG bọc thêm khung
           (đã nằm trong khung form) — nhường bề ngang cho cột tên ở tablet. */}
-      <div className="space-y-3">
+      <div data-tour="wip-production-lines" className="space-y-3">
         {/* Câu hướng dẫn ngay dưới tiêu đề (không dạt sang mép phải ở màn rộng). */}
         <div>
           <p className="text-base font-semibold">Thành phẩm làm ra trong ngày</p>
@@ -1458,7 +1472,7 @@ export default function WipProductionScreen() {
         warehouseOptions={warehouseOptions}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div data-tour="wip-save-session" className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-base text-muted-foreground">
           Tổng ngày {formatDateVN(session.productionDate)} · xưởng {session.workshop}:{" "}
           <span className="tnum text-xl font-semibold text-foreground">
@@ -1495,7 +1509,7 @@ export default function WipProductionScreen() {
         </div>
         {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
         {canEnter && (
-        <div className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
+        <div data-tour="wip-mode-switch" className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
           <button
             title="Sang chế độ Ghi nhập để gõ sản lượng thành phẩm."
             type="button"
@@ -1526,17 +1540,19 @@ export default function WipProductionScreen() {
         )}
       </div>
 
-      <DailyTaskReminder
-        isLocked={isProductionLockedToday}
-        task={`thành phẩm làm ra hôm nay — xưởng ${recordWorkshop}`}
-      />
+      <div data-tour="wip-daily-reminder">
+        <DailyTaskReminder
+          isLocked={isProductionLockedToday}
+          task={`thành phẩm làm ra hôm nay — xưởng ${recordWorkshop}`}
+        />
+      </div>
 
       {activeMode === "entry" && <DraftRestoredNotice savedAt={wipDraft.restoredAt} onDiscard={discardWipDraft} />}
 
       {activeMode === "entry" && entryForm}
 
       {activeMode === "entry" && session && sessionDayRows.length > 0 && (
-        <section className="space-y-3 rounded-xl border-2 border-border p-4 md:p-6" aria-label="Thành phẩm đã ghi trong ngày">
+        <section data-tour="wip-day-rows" className="space-y-3 rounded-xl border-2 border-border p-4 md:p-6" aria-label="Thành phẩm đã ghi trong ngày">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
               Đã ghi ngày {formatDateVN(session.productionDate)} · xưởng {session.workshop}
@@ -1569,18 +1585,20 @@ export default function WipProductionScreen() {
         </Button>
       </div>
       )}
-      <StatCardGrid
-        className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-        cards={[
-          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
-          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "neutral" },
-          { label: "Số dòng", value: view.length, numeric: true, icon: ClipboardList, color: "brand" },
-          { label: "Chờ nhập kho", value: pendingInCount, numeric: true, icon: Hourglass, color: "warning" },
-          { label: "Tổng sản lượng", value: kg(total), numeric: true, icon: Scale, color: "success" },
-        ]}
-      />
+      <div data-tour="wip-ledger-stats">
+        <StatCardGrid
+          className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+          cards={[
+            { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
+            { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "neutral" },
+            { label: "Số dòng", value: view.length, numeric: true, icon: ClipboardList, color: "brand" },
+            { label: "Chờ nhập kho", value: pendingInCount, numeric: true, icon: Hourglass, color: "warning" },
+            { label: "Tổng sản lượng", value: kg(total), numeric: true, icon: Scale, color: "success" },
+          ]}
+        />
+      </div>
 
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="wip-ledger-filter" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <Combobox
           label="Kỳ xem sổ"
           hideRequiredMark
@@ -1650,15 +1668,17 @@ export default function WipProductionScreen() {
         />
       ) : (
         <>
-          <RecordTable
-            columns={cols}
-            rows={view}
-            getKey={(r) => r.id}
-            rowMarkKey="san-xuat-tp"
-            getSearchText={(r) => `${productNameOf(r.productId)} ${r.customerName ?? ""}`}
-            searchLabel="Tìm theo thành phẩm / khách…"
-            actions={wipRowActions}
-          />
+          <div data-tour="wip-ledger-table">
+            <RecordTable
+              columns={cols}
+              rows={view}
+              getKey={(r) => r.id}
+              rowMarkKey="san-xuat-tp"
+              getSearchText={(r) => `${productNameOf(r.productId)} ${r.customerName ?? ""}`}
+              searchLabel="Tìm theo thành phẩm / khách…"
+              actions={wipRowActions}
+            />
+          </div>
           <div className="flex flex-wrap justify-end gap-x-10 gap-y-2 rounded-xl bg-muted px-5 py-4">
             <div className="flex items-baseline gap-3">
               <span className="text-base text-muted-foreground">Tổng block</span>
@@ -1675,7 +1695,7 @@ export default function WipProductionScreen() {
           {/* Bột tẩm đã dùng (mig 0051) — cộng theo loại cho phạm vi đang xem; là số
               kế toán điền nhóm "Bột phụ gia" (Khối 1) ở Cân đối. */}
           {batterByType.length > 0 && (
-            <div className="space-y-3 rounded-xl border-2 border-border p-4">
+            <div data-tour="wip-batter-summary" className="space-y-3 rounded-xl border-2 border-border p-4">
               <div>
                 <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                   <Wheat className="size-icon shrink-0" aria-hidden />
@@ -1722,7 +1742,7 @@ export default function WipProductionScreen() {
 
       {/* Hàng đông lạnh → Hàng tạm (Sổ kho tháng) — hiện cả khi ngày không có thành phẩm. */}
       {frozenView.length > 0 && (
-        <div className="space-y-3 rounded-xl border-2 border-border p-4">
+        <div data-tour="wip-ledger-frozen" className="space-y-3 rounded-xl border-2 border-border p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -1777,7 +1797,7 @@ export default function WipProductionScreen() {
 
       {/* Bán nội địa (mig 0054) — sổ riêng; hiện cả khi ngày không có thành phẩm. */}
       {bndView.length > 0 && (
-        <div className="space-y-3 rounded-xl border-2 border-border p-4">
+        <div data-tour="wip-ledger-domestic" className="space-y-3 rounded-xl border-2 border-border p-4">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <Store className="size-icon shrink-0" aria-hidden />
@@ -1847,7 +1867,7 @@ export default function WipProductionScreen() {
       )}
 
       {isSingleDayWorkshop && (
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-xl border-2 border-border px-4 py-3">
+        <div data-tour="wip-day-lock" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-xl border-2 border-border px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {isLocked ? (
               <Lock className="size-6 shrink-0 text-primary" aria-hidden />
@@ -1874,6 +1894,7 @@ export default function WipProductionScreen() {
           {isLocked ? (
             canRow("unlock", { workshop: activeWorkshop }) && (
             <Button
+              data-tour="wip-lock-action"
               title="Mở khóa lại ngày sản xuất đã chốt để sửa hoặc ghi bù. Phải ghi lý do, và việc mở khóa được lưu vết."
               variant="edit"
               size="lg"
@@ -1890,6 +1911,7 @@ export default function WipProductionScreen() {
           ) : (
             canRow("lock", { workshop: activeWorkshop }) && (
             <Button variant="lock"
+              data-tour="wip-lock-action"
               title="Khóa sổ sản xuất ngày này và khai phần nguyên liệu CÒN DỞ tách theo từng loại. Số còn dở đó thành đông gửi ở sổ tồn kho nguyên liệu."
               size="lg"
               onClick={() => {
@@ -1917,7 +1939,7 @@ export default function WipProductionScreen() {
       {/* A4 — Báo cáo công việc ngày: gom theo (xưởng × người thao tác) + Gửi lên
           hệ thống (lưu vết audit), TÁCH khỏi "Chốt ngày" (khoá sửa). */}
       {view.length > 0 && (
-        <div className="space-y-3 rounded-xl border-2 border-border p-4">
+        <div data-tour="wip-daily-report" className="space-y-3 rounded-xl border-2 border-border p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -1934,6 +1956,7 @@ export default function WipProductionScreen() {
             <div className="flex w-full min-w-0 flex-col items-stretch gap-1 sm:w-auto sm:items-end">
               {allowed.export && (
               <Button
+                data-tour="wip-send-report"
                 className="h-auto min-h-10 whitespace-normal"
                 title="Gửi báo cáo sản lượng ngày (gom theo xưởng × người ghi) lên hệ thống. Khác với chốt ngày: gửi báo cáo không khóa sổ." onClick={submitReport}>
                 <Send />

@@ -42,7 +42,7 @@ export function DomesticSaleSection({
   const totalAmount = validItems.reduce((s, d) => s + d.quantityKg * (d.unitPrice ?? 0), 0);
 
   return (
-    <div className="space-y-3 rounded-xl border-2 border-border p-4">
+    <div data-tour="wip-domestic-sale" className="space-y-3 rounded-xl border-2 border-border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 text-base font-semibold">

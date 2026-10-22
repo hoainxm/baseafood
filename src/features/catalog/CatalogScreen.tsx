@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Màn hình Quản lý Danh mục chung
 // Description: Master Catalog Management Screen
 // ============================================================
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Button,
@@ -23,6 +23,8 @@ import { namesOfCustomer } from "@/lib/customerProductNames";
 import type { Customer } from "@/types";
 import { Languages } from "lucide-react";
 import { CustomerProductNamesDialog } from "./CustomerProductNamesDialog";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildCatalogTour } from "./catalogTour";
 
 /** Tab ⇄ tài nguyên phân quyền (lib/permissions.ts) — mỗi tab quyền riêng. */
 const TAB_RESOURCE: Record<string, string> = {
@@ -68,6 +70,16 @@ export default function CatalogScreen() {
       { replace: true }
     );
 
+  // Hướng dẫn thao tác (ba-spec 43): bước của từng tab chỉ đổi ?tab= (replace), không ghi.
+  // Tour chụp lúc bắt đầu ⇒ đổi tab qua ref luôn trỏ hàm MỚI NHẤT (giữ đúng tham số khác).
+  const setTabRef = useRef(setTab);
+  useEffect(() => {
+    setTabRef.current = setTab;
+  });
+  const canWriteAny = Object.values(TAB_RESOURCE).some((r) => can(perms, r, "create") || can(perms, r, "update") || can(perms, r, "delete"));
+  const tour = useMemo(() => buildCatalogTour({ canWrite: canWriteAny, setTab: (t) => setTabRef.current(t) }), [canWriteAny]);
+  usePageTour(tour);
+
   const c = useCatalogConfigs();
   // Tên hàng trên chứng từ theo khách (mig 0077, ba-spec 41 v6) — nút riêng ở mỗi dòng khách.
   const nameStore = useCustomerProductNameStore();
@@ -89,7 +101,7 @@ export default function CatalogScreen() {
 
       <Tabs value={tab} onValueChange={setTab}>
         {/* 6 tab: hẹp thì XUỐNG HÀNG thay vì cuộn ngang khuất tab cuối. */}
-        <TabsList className="w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto">
+        <TabsList data-tour="catalog-tabs" className="w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto">
           {canViewTab("products") && <TabsTrigger value="products" title="Danh mục mặt hàng thực tế của xưởng — dùng khi ghi sản lượng, đóng gói và bán hàng.">Mặt hàng</TabsTrigger>}
           {canViewTab("customers") && <TabsTrigger value="customers" title="Khách mua thành phẩm, kèm thị trường (Nhật, EU, nội địa…).">Khách hàng</TabsTrigger>}
           {canViewTab("suppliers") && <TabsTrigger value="suppliers" title="Đại lý cung cấp nguyên liệu — dùng khi ghi chuyến nhập hàng.">Đại lý</TabsTrigger>}
@@ -99,11 +111,11 @@ export default function CatalogScreen() {
           {canViewTab("finished-goods") && <TabsTrigger value="finished-goods" title="141 mã thành phẩm kế toán (TK 1551) — chỉ đọc, không sửa ở đây.">Thành phẩm (141 mã)</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="products" className="pt-6">
+        <TabsContent value="products" data-tour="catalog-products" className="pt-6">
           <CatalogCrudFor cfg={c.product} rowMarkKey="danh-muc-mat-hang" resource={TAB_RESOURCE["products"]} />
         </TabsContent>
 
-        <TabsContent value="customers" className="pt-6">
+        <TabsContent value="customers" data-tour="catalog-customers" className="pt-6">
           <CatalogCrudFor
             cfg={c.customer}
             rowMarkKey="danh-muc-khach-hang"
@@ -129,23 +141,23 @@ export default function CatalogScreen() {
           />
         </TabsContent>
 
-        <TabsContent value="suppliers" className="pt-6">
+        <TabsContent value="suppliers" data-tour="catalog-suppliers" className="pt-6">
           <CatalogCrudFor cfg={c.supplier} rowMarkKey="danh-muc-dai-ly" resource={TAB_RESOURCE["suppliers"]} />
         </TabsContent>
 
-        <TabsContent value="material-types" className="pt-6">
+        <TabsContent value="material-types" data-tour="catalog-material-types" className="pt-6">
           <CatalogCrudFor cfg={c.materialType} rowMarkKey="danh-muc-loai-nl" resource={TAB_RESOURCE["material-types"]} />
         </TabsContent>
 
-        <TabsContent value="batters" className="pt-6">
+        <TabsContent value="batters" data-tour="catalog-batters" className="pt-6">
           <CatalogCrudFor cfg={c.batter} rowMarkKey="danh-muc-bot-tam" resource={TAB_RESOURCE["batters"]} />
         </TabsContent>
 
-        <TabsContent value="storage-locations" className="pt-6">
+        <TabsContent value="storage-locations" data-tour="catalog-storage-locations" className="pt-6">
           <CatalogCrudFor cfg={c.storageLocation} rowMarkKey="danh-muc-kho-luu" resource={TAB_RESOURCE["storage-locations"]} />
         </TabsContent>
 
-        <TabsContent value="finished-goods" className="pt-6">
+        <TabsContent value="finished-goods" data-tour="catalog-finished-goods" className="pt-6">
           <FinishedGoodScreen />
         </TabsContent>
       </Tabs>

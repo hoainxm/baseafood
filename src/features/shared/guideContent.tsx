@@ -4,6 +4,13 @@
 // Description: Screen Guide & Help Documentation Content
 // ============================================================
 import type { ReactNode } from "react";
+import { dashboardGuide } from "./guides/dashboardGuide";
+import { materialStockGuide } from "./guides/materialStockGuide";
+import { packagingGuide } from "./guides/packagingGuide";
+import { qcGuide } from "./guides/qcGuide";
+import { reconciliationGuide } from "./guides/reconciliationGuide";
+import { warehouseNxtGuide } from "./guides/warehouseNxtGuide";
+import { wipGuide } from "./guides/wipGuide";
 
 /**
  * Nội dung "Hướng dẫn sử dụng" cho từng trang, mở từ nút "?" trên header.
@@ -40,6 +47,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export const PAGE_GUIDES: Record<string, PageGuide> = {
+  // Trang viết hộp riêng ở ./guides (quy tắc 18 — ba-spec 43 v4 R14).
+  wip: wipGuide,
+  packaging: packagingGuide,
+  qc: qcGuide,
+  "nxt-material": materialStockGuide,
+  "nxt-warehouse": warehouseNxtGuide,
+  reconciliation: reconciliationGuide,
+  dashboard: dashboardGuide,
   "my-tasks": {
     title: "Việc của tôi",
     description: "Việc bạn cần làm, hạn của từng việc, và việc bạn đã giao.",
@@ -48,7 +63,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Ba mục trên màn">
           <Y>
             <li>
-              <b>Được giao cho tôi</b>: việc người khác giao riêng cho bạn, có hạn. Việc giao tay thì làm xong bấm <b>Xong</b>.
+              <b>Được giao cho tôi</b>: việc người khác giao riêng cho bạn, có hạn. Việc giao tay thì làm xong chọn <b>Xong</b>.
             </li>
             <li>
               <b>Việc theo quyền của tôi</b>: việc máy tự phát hiện thuộc phần việc của bạn: ngày nhập / sản xuất chưa chốt, BTP chờ
@@ -62,9 +77,9 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Làm một việc">
           <Step>
             <li>
-              Bấm <b>Mở việc</b>: app mở đúng màn, đúng ngày và xưởng cần sửa.
+              Chọn <b>Mở việc</b>: app mở đúng màn, đúng ngày và xưởng cần sửa.
             </li>
-            <li>Làm xong ở màn đó (chốt ngày, duyệt kho, gắn lô…). Quay lại đây là việc đã tự hết, không cần bấm gì.</li>
+            <li>Làm xong ở màn đó (chốt ngày, duyệt kho, gắn lô…). Quay lại đây là việc đã tự hết, không cần làm gì.</li>
           </Step>
         </Section>
         <Section title="Hạn">
@@ -77,7 +92,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Giao việc (quản đốc, kế toán)">
           <Y>
             <li>
-              Bấm <b>Giao</b> ở một việc để giao cho đúng một người. Người khác không thấy việc đó nữa, khỏi làm trùng.
+              Chọn <b>Giao</b> ở một việc để giao cho đúng một người. Người khác không thấy việc đó nữa, khỏi làm trùng.
             </li>
             <li>
               <b>Giao việc mới</b>: giao việc tay (tiêu đề, hạn, màn cần mở). <b>Thu hồi</b> thì việc quay về danh sách chung.
@@ -102,22 +117,22 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
           <Step>
             <li>Tìm theo mã hoặc tên, lọc theo loại / phòng / trạng thái.</li>
             <li>
-              Bấm <b>Xem</b> ở một dòng: thấy lần đang hiệu lực, các lần cũ (vẫn mở được, có nhãn Hết hiệu lực) và biểu mẫu con.
+              Chọn <b>Xem</b> ở một dòng: thấy lần đang hiệu lực, các lần cũ (vẫn mở được, có nhãn Hết hiệu lực) và biểu mẫu con.
             </li>
             <li>
-              Bấm <b>Mở PDF</b> / <b>Tải file gốc</b>. Link mở file chỉ dùng được ít phút, không gửi ra ngoài được.
+              Chọn <b>Xem PDF</b> (trong hộp chi tiết còn <b>Tải PDF</b> / <b>Tải file gốc</b>). Link mở file chỉ dùng được ít phút, không gửi ra ngoài được.
             </li>
           </Step>
         </Section>
         <Section title="Ban hành lần mới (người có quyền)">
           <Step>
             <li>
-              Trong chi tiết tài liệu bấm <b>Ghi lần ban hành</b>: điền ngày hiệu lực, nội dung sửa, người soạn / xem xét / phê duyệt,
+              Trong chi tiết tài liệu chọn <b>Ghi lần ban hành</b>: điền ngày hiệu lực, nội dung sửa, người soạn / xem xét / phê duyệt,
               đính <b>PDF đã ký</b> (bắt buộc) và file Word gốc nếu có.
             </li>
             <li>Lưu xong lần mới có hiệu lực ngay, lần cũ tự chuyển Hết hiệu lực. Không sửa lần đã ban hành, muốn sửa thì ghi lần mới.</li>
             <li>
-              Lần ban hành <b>chưa có file</b> (vd QTI-KH-01 nạp từ bản giấy): bấm <b>Đính PDF</b> / <b>Đính file gốc</b> ở cột File để đính
+              Lần ban hành <b>chưa có file</b> (vd QTI-KH-01 nạp từ bản giấy): mở hộp chi tiết rồi chọn <b>Đính PDF đã ký</b> / <b>Đính file gốc</b> để đính
               bản đã có. Chỉ đính được vào ô còn trống, không thay file đã có.
             </li>
           </Step>
@@ -141,8 +156,8 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Ghi một chuyến hàng">
           <Step>
             <li>
-              Bấm <b>Ghi chuyến</b>. Một chuyến là <b>một đại lý giao một lượt</b>
-              . Đại lý giao 2 lần trong ngày thì ghi 2 chuyến riêng.
+              Ở chế độ <b>Ghi nhập</b>, phiếu chuyến mở sẵn. Một chuyến là <b>một đại lý giao một lượt</b>.
+              Đại lý giao 2 lần trong ngày thì ghi 2 chuyến riêng.
             </li>
             <li>
               Điền đầu chuyến: ngày, phân xưởng, đại lý, tài xế, biển số. Đại lý
@@ -157,8 +172,9 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
               có giá", điền sau.
             </li>
             <li>
-              Bấm <b>Lưu chuyến</b>. Phiếu trống hiện ra cho chuyến kế, giữ
-              ngày và phân xưởng, đại lý để trống để chọn lại.
+              Chọn <b>Lưu chuyến vào sổ</b>. Phiếu trống hiện ra cho chuyến kế, giữ
+              ngày và phân xưởng, đại lý để trống để chọn lại. Đang gõ dở thì phiếu tự lưu nháp, nhưng chỉ vào
+              sổ khi chọn Lưu.
             </li>
           </Step>
         </Section>
@@ -177,36 +193,36 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Phế liệu (nội tạng, hàng dạt)">
           <p>
             Cân gộp cuối ngày, gõ số kg vào ô <b>Nội tạng</b> và <b>Dạt</b> ở khối{" "}
-            <b>Cuối ngày</b>, ngay trên nút Chốt ngày, rồi bấm <b>Lưu phế liệu</b>.
-            Bấm <b>Chốt ngày</b> cũng tự lưu số đang gõ. Loại khác thì bấm{" "}
+            <b>Cuối ngày</b>, ngay trên nút Chốt ngày, rồi chọn <b>Lưu phế liệu</b>.
+            Chọn <b>Chốt ngày</b> cũng tự lưu số đang gõ. Loại khác thì chọn{" "}
             <b>Loại khác</b>. Chỉ nhập một lần ở đây — màn Cân đối sẽ hút sang.
           </p>
         </Section>
         <Section title="Chốt ngày">
           <p>
-            Xem hết số trong ngày rồi kéo xuống cuối màn bấm <b>Chốt ngày</b>
+            Xem hết số trong ngày rồi kéo xuống cuối màn chọn <b>Chốt ngày</b>
             (theo ngày + phân xưởng). Chốt xong khóa sửa. Cần sửa thêm thì{" "}
             <b>ghi bù</b> hoặc <b>mở lại ngày</b> — cả hai đều bắt ghi lý do.
           </p>
         </Section>
         <Section title="Xem báo cáo">
           <p>
-            Bấm <b>Xem báo cáo</b> để in tờ tổng hợp nguyên liệu (A4 ngang), hoặc
-            mở tab <b>Báo cáo</b> để xem tổng nhập theo đại lý và loại nguyên liệu.
+            Chế độ <b>Báo cáo</b> có <b>Tổng hợp theo kỳ</b> (tổng nhập theo đại lý và loại nguyên liệu, kg chờ giá) và{" "}
+            <b>Sổ chi tiết các chuyến</b> (lọc, in báo cáo A4 ngang, in phiếu trống).
           </p>
         </Section>
         <Section title="Mã lô & in tem QR">
           <Y>
             <li>
               Khi chọn <b>ngày về</b> và <b>phân xưởng</b>, ô <b>Mã lô nội bộ</b>{" "}
-              tự hiện mã (vd <b>Đ-260912-01</b>) — không phải gõ, mỗi chuyến một mã.
+              tự hiện mã (vd <b>Đ-260912-01</b>) — không phải gõ. Mỗi loại nguyên liệu của chuyến là một lô, in một tem.
             </li>
             <li>
-              Lưu chuyến xong, sang tab <b>📖 Sổ ngày</b>, tìm chuyến (có nhãn{" "}
-              <b>Lô …</b>) rồi bấm <b>In tem QR</b>.
+              Lưu chuyến xong, chọn <b>In tem</b> ở thông báo vừa lưu, hoặc <b>In tem QR</b> ở chuyến trong{" "}
+              <b>Sổ chi tiết các chuyến</b> (chuyến có nhãn <b>Lô …</b>).
             </li>
             <li>
-              Chọn <b>khổ tem</b> đúng máy in tem → bấm <b>In tem</b> →{" "}
+              Chọn <b>khổ tem</b> đúng máy in tem → chọn <b>In tem</b> →{" "}
               <b>dán tem lên lô hàng</b>. Sau này quét tem ở màn <b>Quét lô (QR)</b>{" "}
               là ra đúng lô.
             </li>
@@ -227,7 +243,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Ghi một phiếu bán">
           <Step>
             <li>
-              Bấm <b>Ghi phiếu</b>. Một phiếu là <b>một khách nhận hàng một lượt
+              Chọn <b>Ghi phiếu</b>. Một phiếu là <b>một khách nhận hàng một lượt
               </b>, có thể nhiều mặt hàng.
             </li>
             <li>
@@ -246,10 +262,10 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
             <b>ngày ghi sổ</b> muộn hơn là ghi bù, phải ghi lý do.
           </p>
         </Section>
-        <Section title="Xem báo cáo">
+        <Section title="Tổng của kỳ">
           <p>
-            Mở tab <b>Báo cáo</b> để xem tổng bán theo khách và theo kênh (Xuất
-            khẩu / Nội địa) trong kỳ đang xem.
+            Cuối sổ có tổng khối lượng và tổng tiền của các phiếu đang xem. Tổng tiền cộng thẳng thành tiền các dòng,
+            không quy đổi tỉ giá — kỳ có cả Xuất khẩu (USD) và Nội địa (VND) thì đọc giá trị theo từng phiếu.
           </p>
         </Section>
       </>
@@ -298,7 +314,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Tạo một kỳ cân đối">
           <Step>
             <li>
-              Bấm tạo kỳ. Một kỳ = <b>một loại nguyên liệu</b> + các ngày nhận của
+              Chọn tạo kỳ. Một kỳ = <b>một loại nguyên liệu</b> + các ngày nhận của
               lô đó (ngày có thể rời rạc).
             </li>
             <li>
@@ -307,25 +323,26 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
             </li>
           </Step>
         </Section>
-        <Section title="Ba khối số liệu">
+        <Section title="Hai khối số liệu">
           <Y>
             <li>
-              <b>Nguyên liệu vào</b>: hàng đưa vào chế biến. Dòng điều chỉnh giảm
-              (VD bán thẳng nội địa) ghi số âm.
-            </li>
-            <li>
-              <b>Phế liệu</b>: bấm hút từ sổ Nhập hàng vào kỳ — không nhập lại.
+              <b>Nguyên liệu vào</b>: tự lấy từ sổ Nhập hàng theo loại nguyên liệu và ngày hàng về (tiền = kg × giá từng chuyến).
+              Dòng giảm (VD bán nội địa — chọn <b>Lấy bán nội địa từ SX</b>) gõ số dương, lưu thành số âm. <b>Lấy xả đông</b> /{" "}
+              <b>Gửi đông</b> ghi thẳng vào Sổ kho tháng.
             </li>
             <li>
               <b>Bán thành phẩm sản xuất</b>: thành phẩm làm ra trong kỳ, theo mặt
-              hàng × quy cách × khách × kênh.
+              hàng × quy cách × khách × kênh — chọn <b>Lấy … dòng từ sổ</b> để lấy từ sổ sản xuất / sổ bán.
+            </li>
+            <li>
+              Kỳ xong thì chọn <b>Chốt kỳ</b>: mọi ô khóa; muốn sửa phải <b>Mở lại kỳ</b> (ghi lý do).
             </li>
           </Y>
         </Section>
         <Section title="Kết quả & in">
           <p>
             Có đủ nguyên liệu và thành phẩm, hệ thống tự tính <b>định mức</b>{" "}
-            (nguyên liệu ÷ thành phẩm), <b>tỉ lệ thu hồi</b> và <b>lãi/lỗ</b>. Bấm
+            (nguyên liệu ÷ thành phẩm), <b>tỉ lệ thu hồi</b> và <b>lãi/lỗ</b>. Chọn
             xem/in <b>bảng cân đối A4</b> để lưu hồ sơ.
           </p>
         </Section>
@@ -335,30 +352,36 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
 
   catalog: {
     title: "Danh mục",
-    description: "Quản lý mặt hàng, khách, đại lý, loại nguyên liệu.",
+    description: "Mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ và 141 mã thành phẩm — chọn từ danh mục thay gõ tay để tổng cuối kỳ đúng.",
     content: (
       <>
         <p>
-          Năm tab: <b>Mặt hàng · Khách hàng · Đại lý · Loại nguyên liệu · Thành
-          phẩm</b>.
+          Bảy tab: <b>Mặt hàng · Khách hàng · Đại lý · Loại nguyên liệu · Bột tẩm · Kho lưu trữ · Thành phẩm</b>. Tab nào
+          tài khoản không được xem thì ẩn; tab chỉ xem có nhãn <b>Chỉ xem</b>.
         </p>
         <Y>
-          <li>Bốn tab đầu: thêm / sửa / xóa / tìm bình thường.</li>
+          <li>Sáu tab đầu: tìm, xem chi tiết, thêm / sửa / xóa (xóa hỏi lại trước, có <b>Hoàn tác</b>). Trùng mã số hoặc trùng tên thì app báo.</li>
+          <li>Đổi tên ở danh mục không sửa các dòng sổ đã ghi trước đó.</li>
           <li>
-            <b>Đại lý</b> (nơi mua nguyên liệu) tách riêng với <b>khách hàng</b>{" "}
-            (nơi bán thành phẩm) — đừng gộp.
+            <b>Đại lý</b> (nơi mua nguyên liệu) tách riêng với <b>khách hàng</b> (nơi bán thành phẩm) — đừng gộp. Đại lý có{" "}
+            <b>tên gọi tắt</b> (ghi trên sổ) và <b>tên đầy đủ</b> (ghi hóa đơn).
           </li>
           <li>
-            Đại lý có <b>tên gọi tắt</b> (ghi trên sổ) và <b>tên đầy đủ</b> (ghi
-            hóa đơn). Đổi tên đại lý không sửa các dòng sổ đã ghi trước đó.
+            <b>Mặt hàng</b> có <b>tên tiếng Anh mặc định</b> (dùng trên hợp đồng / invoice khi khách chưa có tên riêng) và{" "}
+            <b>bột đi kèm</b> cho hàng tẩm bột.
           </li>
           <li>
-            Tab <b>Thành phẩm</b> (141 mã kế toán) chỉ để xem, không sửa trong app.
+            Tab <b>Khách hàng</b>: nút <b>Tên hàng</b> ở mỗi khách mở bảng <b>Tên hàng trên chứng từ</b> — tên, size, quy cách,
+            mã HS khách dùng; <b>Trích xuất từ chứng từ</b> lấy thêm tên còn thiếu từ hợp đồng và invoice (không ghi đè).
+          </li>
+          <li><b>Bột tẩm</b> là phụ gia, không cộng vào kg thành phẩm. <b>Kho lưu trữ</b> gồm kho nhà và kho thuê ngoài.</li>
+          <li>
+            Tab <b>Thành phẩm</b> (141 mã kế toán) chỉ để tra, không sửa trong app.
           </li>
         </Y>
         <p className="text-muted-foreground">
-          Ở mọi màn nhập liệu, gõ tên mới trong ô chọn là tạo ngay vào danh mục —
-          không để tên lẻ ngoài danh mục.
+          Ở mọi màn nhập liệu, gõ tên mới trong ô chọn là tạo ngay vào danh mục (trùng tên thì dùng lại mục cũ); bút chì cạnh ô
+          mở sửa nhanh mục đang chọn.
         </p>
       </>
     ),
@@ -380,7 +403,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         </Section>
         <Section title="Xuất Excel">
           <p>
-            Bấm <b>Xuất Excel</b> để tải file cho kế toán đối chiếu — giữ đúng lưới
+            Chọn <b>Xuất Excel</b> để tải file cho kế toán đối chiếu — giữ đúng lưới
             ngày, cộng xưởng và tổng.
           </p>
         </Section>
@@ -408,7 +431,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
           </Step>
         </Section>
         <p className="text-muted-foreground">
-          Số lấy từ <b>lệnh xuất</b> ở màn Đơn đặt. Bấm <b>Xuất Excel</b> để lưu hồ sơ.
+          Số lấy từ <b>lệnh xuất</b> ở màn Đơn đặt. Chọn <b>Xuất Excel</b> để lưu hồ sơ.
         </p>
       </>
     ),
@@ -429,7 +452,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         </Section>
         <Section title="Tồn đầu">
           <p>
-            Có bán thành phẩm cấp đông <b>trước khi dùng app</b> thì bấm <b>Tồn đầu</b>,
+            Có bán thành phẩm cấp đông <b>trước khi dùng app</b> thì chọn <b>Tồn đầu</b>,
             khai một lần theo mặt hàng × quy cách. Các kỳ sau tự kế thừa.
           </p>
         </Section>
@@ -450,37 +473,37 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       <>
         <Section title="Đầu tháng: mở sổ">
           <Step>
-            <li>Chọn <b>Kỳ (tháng)</b> ở ô trên cùng (hoặc bấm ◀ ▶).</li>
+            <li>Chọn <b>Kỳ (tháng)</b> ở ô trên cùng (hoặc chọn ◀ ▶).</li>
             <li>
               Tháng mới chưa có dòng nào thì màn hiện <b>bản xem trước</b> tồn đầu lấy
-              từ tồn cuối tháng trước. Soát lại rồi bấm <b>Kế thừa &amp; lưu vào sổ</b>.
-              Chưa bấm thì chưa ghi được gì.
+              từ tồn cuối tháng trước. Soát lại rồi chọn <b>Kế thừa &amp; lưu vào sổ</b>.
+              Chưa chọn thì chưa ghi được gì.
             </li>
           </Step>
         </Section>
         <Section title="Lấy hàng ra sử dụng (xuất)">
           <Step>
             <li>Tìm dòng hàng (gõ tên / invoice / vị trí vào ô <b>Tìm mặt hàng</b>).</li>
-            <li>Bấm nút <b>hộp có dấu trừ</b> ở cuối dòng.</li>
+            <li>Chọn nút <b>hộp có dấu trừ</b> ở cuối dòng.</li>
             <li>Chọn <b>Lấy ra sử dụng</b>, gõ <b>số kg</b>, chọn ngày, ghi chú nếu cần.</li>
-            <li>Bấm <b>Lưu thao tác</b>. Số kg cộng vào cột <b>Xuất trong kỳ</b>, tồn cuối tự giảm.</li>
+            <li>Chọn <b>Lưu thao tác</b>. Số kg cộng vào cột <b>Xuất trong kỳ</b>, tồn cuối tự giảm.</li>
           </Step>
           <p>Lấy nhiều lần trong tháng thì làm lại từng lần — số tự cộng dồn, không phải cộng tay.</p>
         </Section>
-        <Section title="Chuyển kho (đổi chỗ để hàng)">
+        <Section title="Gửi kho ngoài (đổi chỗ để hàng)">
           <Y>
             <li>
-              <b>Một dòng:</b> bấm nút hộp cuối dòng → chọn <b>Chuyển kho</b> → gõ số kg →
+              <b>Một dòng:</b> chọn nút hộp cuối dòng → chọn <b>Gửi kho ngoài</b> → gõ số kg →
               chọn <b>Chuyển tới</b> (VD Kho Ánh Dương) → Lưu.
             </li>
             <li>
-              Chuyển <b>hết</b> tồn ⇒ dòng chỉ đổi cột <b>Vị trí</b>. Chuyển <b>một phần</b> ⇒ hệ
-              thống tách thành dòng mới ở kho đích. Tổng tồn của tháng <b>không đổi</b> vì chuyển
-              kho không phải nhập hay xuất.
+              Gửi <b>hết</b> tồn ⇒ dòng chỉ đổi cột <b>Vị trí</b>. Gửi <b>một phần</b> ⇒ hệ
+              thống tách thành dòng mới ở kho đích. Tổng tồn của tháng <b>không đổi</b> vì gửi
+              kho ngoài không phải nhập hay xuất.
             </li>
             <li>
-              <b>Nhiều dòng cùng lúc</b> (chuyển cả lô): tick ô đầu các dòng → bấm{" "}
-              <b>Gán vị trí</b> → chọn kho → Lưu.
+              <b>Nhiều dòng cùng lúc</b> (gửi cả lô): tick ô đầu các dòng → chọn{" "}
+              <b>Gửi kho ngoài</b> trên thanh "Đã chọn" → chọn kho → Lưu.
             </li>
             <li>Kho chưa có trong danh sách thì gõ tên mới, hệ thống tự lưu vào danh mục.</li>
           </Y>
@@ -488,7 +511,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Hàng mới về">
           <Y>
             <li>
-              <b>Lô mới</b> (ngày nhập / invoice khác): bấm <b>Thêm dòng</b>, điền ngày nhập, tên,
+              <b>Lô mới</b> (ngày nhập / invoice khác): chọn <b>Thêm dòng</b>, điền ngày nhập, tên,
               invoice, đơn giá, số kg ô <b>Nhập trong kỳ</b>, vị trí.
             </li>
             <li>
@@ -507,18 +530,18 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
             </li>
             <li>
               <b>Dòng mới</b> (cuối mỗi bảng nhóm): gõ hoặc chọn tên hàng là dòng hiện luôn trong
-              bảng, con trỏ nhảy sang ô Nhập để gõ số tiếp. Cần điền nhiều ô một lần thì bấm{" "}
+              bảng, con trỏ nhảy sang ô Nhập để gõ số tiếp. Cần điền nhiều ô một lần thì chọn{" "}
               <b>Thêm đủ thông tin…</b>.
             </li>
             <li>Nút <b>bút chì</b>: đổi tên hàng, nhóm (và mọi ô khác trong một hộp).</li>
-            <li>Nút <b>thùng rác</b>: xóa dòng (có hỏi lại, xóa nhầm bấm <b>Hoàn tác</b>).</li>
+            <li>Nút <b>thùng rác</b>: xóa dòng (có hỏi lại, xóa nhầm chọn <b>Hoàn tác</b>).</li>
             <li>Nút <b>đồng hồ</b>: thẻ kho — lịch sử mặt hàng qua các tháng + nhật ký thao tác.</li>
           </Y>
         </Section>
         <Section title="Xem cho gọn">
           <Y>
             <li>
-              <b>Ẩn dòng trống</b>: giấu các dòng không có số (tồn đầu, nhập, xuất đều 0). Bấm lại
+              <b>Ẩn dòng trống</b>: giấu các dòng không có số (tồn đầu, nhập, xuất đều 0). Chọn lại
               để hiện.
             </li>
             <li>Tick vài dòng ⇒ thấy ngay tổng của đúng mấy dòng đó, in riêng được.</li>
@@ -526,8 +549,8 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         </Section>
         <Section title="Cuối tháng">
           <p>
-            Soát xong bấm <b>Dồn sang tháng sau</b>: tồn cuối tháng này thành tồn đầu tháng sau
-            (mọi kho). Bấm lại chỉ cập nhật, không nhân đôi.
+            Soát xong chọn <b>Dồn sang tháng sau</b>: tồn cuối tháng này thành tồn đầu tháng sau
+            (mọi kho). Chọn lại chỉ cập nhật, không nhân đôi.
           </p>
         </Section>
       </>
@@ -561,7 +584,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="In tem nhiều lô một lượt (tab In tem hàng loạt)">
           <Step>
             <li>
-              Ở màn này bấm tab <b>In tem hàng loạt</b>.
+              Ở màn này chọn tab <b>In tem hàng loạt</b>.
             </li>
             <li>
               Chọn <b>khoảng ngày</b>, <b>phân xưởng</b> và <b>loại lô</b> (nguyên
@@ -569,7 +592,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
               định chọn hết — bỏ tick lô không cần in.
             </li>
             <li>
-              Bấm <b>In … tem</b> → chọn <b>khổ tem</b> (vd 50×30 mm) → <b>In</b> →
+              Chọn <b>In … tem</b> → chọn <b>khổ tem</b> (vd 50×30 mm) → <b>In</b> →
               chọn <b>máy in tem</b> trong hộp thoại in. Mặc định mỗi <b>block</b> (bán
               thành phẩm) / mỗi <b>thùng</b> (thành phẩm) một tem — sửa ô <b>Số tem</b> dưới
               từng tem nếu cần.
@@ -580,7 +603,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
           <Y>
             <li>
               Lưu xong chuyến nhập, mẻ sản xuất hay phiếu đóng gói, thông báo thả
-              xuống ở đầu màn có nút <b>In tem</b> — bấm là in luôn.
+              xuống ở đầu màn có nút <b>In tem</b> — chọn là in luôn.
             </li>
             <li>
               In lại sau: <b>Nhập hàng</b> → nút <b>Tem</b> ở cột "Đã ghi ngày", hoặc{" "}
@@ -592,24 +615,24 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Quét / tra lô (tab Tra lô)">
           <Step>
             <li>
-              Bấm <b>Quét bằng camera</b> rồi đưa tem QR vào khung; hoặc <b>gõ tay
+              Chọn <b>Quét bằng camera</b> rồi đưa tem QR vào khung; hoặc <b>gõ tay
               mã lô</b> vào ô bên dưới.
             </li>
             <li>
               Màn hiện lô là gì, <b>cân bằng kg</b>, <b>truy ngược</b> (làm từ lô
               nào, đại lý nào) và <b>truy xuôi</b> (đã vào mẻ nào, xuất / bán cho ai). Tem
-              mờ / bong thì bấm <b>In tem</b> ngay đây.
+              mờ / bong thì chọn <b>In tem</b> ngay đây.
             </li>
             <li>
               Lô nghi có vấn đề: xuống mục <b>Thu hồi</b> — danh sách khách đã nhận hàng
-              từ lô này + lô còn trong xưởng. Bấm <b>In danh sách</b> hoặc <b>Tải Excel</b>.
+              từ lô này + lô còn trong xưởng. Chọn <b>In danh sách</b> hoặc <b>Tải Excel</b>.
             </li>
           </Step>
         </Section>
         <Section title="Kiểm QR từng khâu (tab Theo giai đoạn)">
           <Step>
             <li>
-              Bấm tab <b>Theo giai đoạn</b>, chọn khoảng ngày + xưởng. Màn xếp 5 khâu theo
+              Chọn tab <b>Theo giai đoạn</b>, chọn khoảng ngày + xưởng. Màn xếp 5 khâu theo
               thứ tự: <b>Nhập nguyên liệu → Sản xuất → Nhập kho → Đóng gói → Xuất & bán</b>.
             </li>
             <li>
@@ -617,7 +640,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
               đã quét kiểm chưa. Khâu nào còn thiếu thì hiện <b>Còn thiếu N</b>.
             </li>
             <li>
-              Bấm nút ngay ở dòng: <b>In tem</b>, <b>Gắn lô NL / BTP</b>, <b>Gắn lô</b> (dòng
+              Chọn nút ngay ở dòng: <b>In tem</b>, <b>Gắn lô NL / BTP</b>, <b>Gắn lô</b> (dòng
               bán), <b>Duyệt nhập kho</b> (mở thẳng hộp duyệt ở Kho dự trữ), <b>Kiểm lô</b>{" "}
               (mở thẳng hộp kiểm ở Đơn đặt). Tick <b>Chỉ hiện mục còn thiếu</b> để lọc.
             </li>
@@ -628,7 +651,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
             <li>
               Muốn truy được trọn chuỗi: lúc ghi sản xuất quét tem các chuyến NL vào khối{" "}
               <b>Lô nguyên liệu dùng cho phiên này</b> (lưu là tự gắn cho mọi mẻ cùng loài);
-              đóng gói bấm <b>Gắn lô BTP</b>; bán hàng bấm <b>Gắn lô</b> ở từng dòng bán.
+              đóng gói chọn <b>Gắn lô BTP</b>; bán hàng chọn <b>Gắn lô</b> ở từng dòng bán.
               Chốt ngày sản xuất phải gắn lô cho mọi mẻ, hoặc ghi lý do chưa gắn.
             </li>
             <li>

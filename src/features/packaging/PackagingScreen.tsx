@@ -62,6 +62,8 @@ import {
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildPackagingTour } from "./packagingTour";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
@@ -101,6 +103,9 @@ export default function PackagingScreen() {
   const canCreateIn = (w: Workshop) => canRow("create", { workshop: w }, "create");
   const writableWorkshops = WORKSHOPS.filter(canCreateIn);
   const canAdd = allowed.create && writableWorkshops.length > 0;
+  /** Hướng dẫn thao tác (ba-spec 43): chỉ chỉ chỗ, không ghi; bước ghi theo quyền. */
+  const tour = useMemo(() => buildPackagingTour({ can: { create: canAdd, lot: canWrite } }), [canAdd, canWrite]);
+  usePageTour(isLoading ? null : tour);
 
   const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO());
@@ -331,7 +336,7 @@ export default function PackagingScreen() {
       key: "xoa",
       header: "",
       render: (r) => (
-        <div className="flex flex-wrap gap-2">
+        <div data-tour="packaging-row-actions" className="flex flex-wrap gap-2">
           {(canRow("create", r) || canRow("update", r)) && (
           <Button
             title="Ghi phiếu này đã đóng từ lô bán thành phẩm nào (quét tem, gõ mã, hoặc chọn). Có lô thì mới truy được nguồn của thành phẩm."
@@ -381,6 +386,7 @@ export default function PackagingScreen() {
         </div>
         {canAdd && (
         <Button
+          data-tour="packaging-add"
           title="Ghi một phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, phần chênh là hao hụt." size="lg" onClick={openAdd}>
           <Plus />
           Ghi phiếu đóng gói
@@ -388,18 +394,20 @@ export default function PackagingScreen() {
         )}
       </div>
 
-      <StatCardGrid
-        className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-        cards={[
-          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
-          { label: "Số phiếu", value: view.length, numeric: true, icon: Package, color: "brand" },
-          { label: "BTP vào", value: kg(totalIn), numeric: true, icon: Scale, color: "neutral" },
-          { label: "TP ra", value: kg(totalOut), numeric: true, icon: PackageCheck, color: "success" },
-          { label: "Hao hụt", value: kg(totalLoss), numeric: true, icon: Scale, color: totalLoss < 0 ? "warning" : "neutral" },
-        ]}
-      />
+      <div data-tour="packaging-stats">
+        <StatCardGrid
+          className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+          cards={[
+            { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
+            { label: "Số phiếu", value: view.length, numeric: true, icon: Package, color: "brand" },
+            { label: "BTP vào", value: kg(totalIn), numeric: true, icon: Scale, color: "neutral" },
+            { label: "TP ra", value: kg(totalOut), numeric: true, icon: PackageCheck, color: "success" },
+            { label: "Hao hụt", value: kg(totalLoss), numeric: true, icon: Scale, color: totalLoss < 0 ? "warning" : "neutral" },
+          ]}
+        />
+      </div>
 
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="packaging-filter" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <Combobox
           label="Kỳ xem"
           hideRequiredMark
@@ -438,7 +446,7 @@ export default function PackagingScreen() {
 
       {/* Tồn thành phẩm đóng gói còn kho */}
       {finishedGoodStock.some((t) => t.remainingKg > 0) && (
-        <section className="grid gap-3 rounded-xl border-2 border-border bg-card p-5">
+        <section data-tour="packaging-fg-stock" className="grid gap-3 rounded-xl border-2 border-border bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-foreground">Tồn thành phẩm đóng gói</h2>
             <Tag variant="muted" icon={Boxes}>
@@ -475,7 +483,9 @@ export default function PackagingScreen() {
           }
         />
       ) : (
-        <RecordTable columns={columns} rows={view} getKey={(r) => r.id} rowMarkKey="dong-goi" />
+        <div data-tour="packaging-table">
+          <RecordTable columns={columns} rows={view} getKey={(r) => r.id} rowMarkKey="dong-goi" />
+        </div>
       )}
 
       {/* Dialog ghi phiếu */}

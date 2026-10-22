@@ -53,6 +53,8 @@ import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { num, formatDateVN } from "@/lib/format";
 import { newId } from "@/lib/store";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildWarehouseNxtTour } from "./warehouseNxtTour";
 import {
   ArrowDownToLine,
   CalendarPlus,
@@ -113,7 +115,13 @@ export default function WarehouseNxtScreen() {
   // thao tác ghi sổ NXT (nạp file, lưới ghi, thêm mã, gán kho lưu, tạo kỳ) theo `import`.
   const allowed = useCan("nxt-warehouse");
   const canWrite = allowed.import;
-  const [snapshots, setSnapshots] = useNxtSnapshots();
+  const [snapshots, setSnapshots, { status: snapshotStatus }] = useNxtSnapshots();
+  /* Hướng dẫn thao tác (ba-spec 43) — chỉ dẫn, không ghi; bước ghi theo quyền `import`. */
+  const tour = useMemo(
+    () => buildWarehouseNxtTour({ canWrite, canExport: allowed.export }),
+    [canWrite, allowed.export],
+  );
+  usePageTour(snapshotStatus === "loading" && snapshots.length === 0 ? null : tour);
   const [storageLocationCatalog, setStorageLocationCatalog] = useStorageLocations();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
   const storageLocationEditor = useQuickCatalogEdit("storageLocation", storageLocationCatalog, setStorageLocationCatalog, { matchBy: "name" });
@@ -598,14 +606,14 @@ export default function WarehouseNxtScreen() {
         <div className="flex flex-wrap items-center gap-3">
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
           {canWrite && (
-            <Button variant="outline" onClick={pickFile} title="Đọc file Excel báo cáo Xuất–Nhập–Tồn xuất từ hệ thống xí nghiệp (mẫu 10 cột). Nạp lại cùng kho + cùng kỳ chỉ cập nhật, không nhân đôi dòng.">
+            <Button data-tour="nxt-warehouse-import" variant="outline" onClick={pickFile} title="Đọc file Excel báo cáo Xuất–Nhập–Tồn xuất từ hệ thống xí nghiệp (mẫu 10 cột). Nạp lại cùng kho + cùng kỳ chỉ cập nhật, không nhân đôi dòng.">
               <Upload className="mr-2 h-4 w-4" />
               Nhập Excel báo cáo
             </Button>
           )}
           {allowed.export && (
             <>
-              <Button variant="outline" onClick={exportExcel} disabled={!rows.length} title="Tải kỳ đang xem ra file Excel đúng mẫu báo cáo của xí nghiệp, để gửi kế toán hoặc lưu hồ sơ.">
+              <Button data-tour="nxt-warehouse-export" variant="outline" onClick={exportExcel} disabled={!rows.length} title="Tải kỳ đang xem ra file Excel đúng mẫu báo cáo của xí nghiệp, để gửi kế toán hoặc lưu hồ sơ.">
                 <Download className="mr-2 h-4 w-4" />
                 Xuất Excel
               </Button>
@@ -619,7 +627,7 @@ export default function WarehouseNxtScreen() {
       </div>
 
       {hasData && (
-        <div className="flex flex-wrap items-end gap-4">
+        <div data-tour="nxt-warehouse-filters" className="flex flex-wrap items-end gap-4">
           <div className="min-w-0 sm:min-w-[16rem]">
             <Combobox
               label="Kho / chi nhánh"
@@ -664,6 +672,7 @@ export default function WarehouseNxtScreen() {
           {rows.length > 0 && canWrite && (
             <div className="flex flex-wrap items-center gap-3">
               <Button
+                data-tour="nxt-warehouse-edit"
                 variant={isEditMode ? "default" : "edit"}
                 onClick={() => setIsEditMode((v) => !v)}
                 title={
@@ -676,6 +685,7 @@ export default function WarehouseNxtScreen() {
                 {isEditMode ? "Xong · xem lại" : "Ghi nhập/xuất"}
               </Button>
               <Button
+                data-tour="nxt-warehouse-next-period"
                 variant="outline"
                 title="Mở một kỳ báo cáo mới và lấy tồn cuối kỳ này làm tồn đầu kỳ đó (kèm cả kho lưu) — khỏi gõ lại từ đầu."
                 onClick={() => {
@@ -699,9 +709,11 @@ export default function WarehouseNxtScreen() {
         />
       ) : (
         <>
-          <StatCardGrid cards={cards} />
+          <div data-tour="nxt-warehouse-stats">
+            <StatCardGrid cards={cards} />
+          </div>
 
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
+          <div data-tour="nxt-warehouse-invariant" className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
             {invariantHolds ? (
               <span className="flex items-center gap-2 text-base font-semibold text-success">
                 <CheckCircle2 className="h-5 w-5" aria-hidden />
@@ -719,7 +731,7 @@ export default function WarehouseNxtScreen() {
 
           {/* Tồn cuối theo từng KHO LƯU — trả lời "hàng đang nằm ở kho nào" */}
           {byStorageLocation.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-3">
+            <div data-tour="nxt-warehouse-by-location" className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-3">
               <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <PackageOpen className="h-4 w-4 text-primary" aria-hidden />
                 Tồn cuối theo kho lưu:
@@ -750,6 +762,7 @@ export default function WarehouseNxtScreen() {
             </div>
           )}
 
+          <div data-tour="nxt-warehouse-table">
           {isEditMode && canWrite ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -791,6 +804,7 @@ export default function WarehouseNxtScreen() {
           ) : (
             <SummaryTable rows={rows} columns={columns} getKey={(r) => r.id} selection={tableSelection} stickyHeader rowMarkKey="nxt-kho" />
           )}
+          </div>
 
           {/* Thanh dòng đã tick: cộng tổng + tô màu + gán kho lưu theo lô. Đặt SAU bảng và
               DÍNH ĐÁY màn hình từ md: tick dòng cuối bảng vẫn thấy nút, khỏi lăn ngược lên

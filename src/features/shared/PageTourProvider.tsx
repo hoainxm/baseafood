@@ -38,10 +38,12 @@ export function PageTourProvider({ children }: { children: ReactNode }) {
   }, [registered]);
 
   const close = useCallback(() => {
+    // Chỗ xem nằm trong state của màn (chế độ, đơn đang mở…) ⇒ tour tự trả về (R5).
+    running?.onExit?.();
     setRunning(null);
     // Thoát ở bước nào cũng về đúng chỗ lúc bắt đầu (tab, kỳ xem, hồ sơ đang mở).
     if (startedAtRef.current && hereRef.current !== startedAtRef.current) navigate(startedAtRef.current, { replace: true });
-  }, [navigate]);
+  }, [navigate, running]);
 
   const value = useMemo(() => ({ tour: registered, register: setRegistered, start }), [registered, start]);
 

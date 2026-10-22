@@ -31,6 +31,8 @@ import {
   TimeSeriesChart,
 } from "@/design-system";
 import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildQcTour, type QcTourContext } from "./qcTour";
 import { Camera, Lock, Plus, X } from "lucide-react";
 
 const WORKSHOP_OPTIONS: ChoiceOption[] = [
@@ -255,6 +257,12 @@ export default function QcChecklistScreen() {
     notify.warning(`Đã mở lại QC ${formatDateVN(date)} · xưởng ${workshop}`);
   };
 
+  // Hướng dẫn thao tác (ba-spec 43): chỉ dẫn, không ghi; bước ghi chỉ có khi được ghi.
+  useQcPageTour(
+    { write: canWriteDay, lock: canRow("lock", scopeRow), unlock: canRow("unlock", scopeRow) },
+    !(qcStatus === "loading" && rows.length === 0)
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -279,7 +287,7 @@ export default function QcChecklistScreen() {
       />
 
       {/* Bộ lọc: ngày + xưởng */}
-      <div className="grid gap-5 rounded-xl border-2 border-border p-4 sm:grid-cols-2">
+      <div data-tour="qc-filter" className="grid gap-5 rounded-xl border-2 border-border p-4 sm:grid-cols-2">
         <DateField label="Ngày kiểm" value={date} onChange={setDate} hideRequiredMark />
         <ChoiceGroup
           label="Phân xưởng"
@@ -292,7 +300,7 @@ export default function QcChecklistScreen() {
       </div>
 
       {/* Trạng thái + chốt ngày */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-border p-4">
+      <div data-tour="qc-status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-border p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-base font-semibold">
             {formatDateVN(date)} · xưởng {workshop}
@@ -314,6 +322,7 @@ export default function QcChecklistScreen() {
         {isLocked ? (
           canRow("unlock", scopeRow) && (
           <Button
+            data-tour="qc-lock-action"
             title="Mở khóa lại ngày QC đã chốt để sửa hoặc chấm bù." variant="edit" size="lg" onClick={reopen}>
             Mở lại ngày
           </Button>
@@ -321,6 +330,7 @@ export default function QcChecklistScreen() {
         ) : (
           canRow("lock", scopeRow) && (
           <Button
+            data-tour="qc-lock-action"
             title="Khóa sổ QC ngày này. Sau khi chốt muốn sửa phải mở lại ngày." variant="lock" size="lg" onClick={lockDay}>
             <Lock aria-hidden />
             Chốt ngày
@@ -331,7 +341,7 @@ export default function QcChecklistScreen() {
 
       {/* Xu hướng 30 ngày — số chỉ tiêu đạt / tạm / không đạt mỗi ngày */}
       {hasQc30 && (
-        <section className="space-y-3 rounded-xl border-2 border-border p-4">
+        <section data-tour="qc-trend" className="space-y-3 rounded-xl border-2 border-border p-4">
           <h2 className="text-lg font-semibold text-foreground">30 ngày gần đây · xưởng {workshop}</h2>
           <TimeSeriesChart
             labels={qc30.map((x) => `${x.date.slice(8, 10)}/${x.date.slice(5, 7)}`)}
@@ -355,6 +365,7 @@ export default function QcChecklistScreen() {
       )}
 
       {canWriteDay && isBackdate && (
+        <div data-tour="qc-backdate">
         <Field
           label="Lý do ghi bù"
           required
@@ -370,9 +381,11 @@ export default function QcChecklistScreen() {
             placeholder="VD: bổ sung chỉ tiêu sót, sửa kết quả sau khi kiểm lại…"
           />
         </Field>
+        </div>
       )}
 
       {/* Chỉ xem: liệt kê kết quả đã chấm, không có ô nhập */}
+      <div data-tour="qc-criteria">
       {!canWriteDay ? (
         scoredRows.length === 0 ? (
           <EmptyState title="Chưa chấm QC ngày này" description={`${formatDateVN(date)} · xưởng ${workshop}`} />
@@ -437,10 +450,11 @@ export default function QcChecklistScreen() {
           ))}
         </div>
       )}
+      </div>
 
       {/* Thêm chỉ tiêu tại chỗ */}
       {canWriteDay && (
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-dashed border-border p-4">
+      <div data-tour="qc-add-criterion" className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-dashed border-border p-4">
         <Field label="Thêm chỉ tiêu khác" className="min-w-[min(15rem,100%)] flex-1">
           <Input
             value={newName}
@@ -464,7 +478,7 @@ export default function QcChecklistScreen() {
 
       {/* Lưu — không bao giờ disabled (thiếu thì báo qua toast); không quyền thì không có nút */}
       {canWriteDay && (
-      <div className="flex justify-end">
+      <div data-tour="qc-save" className="flex justify-end">
         <Button variant="save"
           title="Ghi điểm của toàn bộ chỉ tiêu vào sổ QC ngày đang chọn." size="lg" onClick={save}>
           Lưu chấm điểm
@@ -473,6 +487,12 @@ export default function QcChecklistScreen() {
       )}
     </div>
   );
+}
+
+/** Khai tour của trang khi dữ liệu đã tải (R7) — quyền là cờ đơn giản nên tour chỉ dựng lại khi quyền đổi. */
+function useQcPageTour({ write, lock, unlock }: QcTourContext["can"], isReady: boolean) {
+  const tour = useMemo(() => buildQcTour({ can: { write, lock, unlock } }), [write, lock, unlock]);
+  usePageTour(isReady ? tour : null);
 }
 
 /* ---------- Ảnh của một chỉ tiêu QC (chụp/chọn → tải Storage → xem signed URL) ---------- */

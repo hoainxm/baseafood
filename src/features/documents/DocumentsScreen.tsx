@@ -63,6 +63,8 @@ import { DocumentDetailDialog } from "./DocumentDetailDialog";
 import { DocumentFormDialog, type DocumentFormTarget } from "./DocumentFormDialog";
 import { FilePreviewDialog, type PreviewFile } from "./FilePreviewDialog";
 import { VersionFormDialog } from "./VersionFormDialog";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildDocumentsTour } from "./documentsTour";
 
 const STATE_TAGS: Record<DocumentState, TagVariant> = {
   active: "done",
@@ -302,6 +304,13 @@ export default function DocumentsScreen() {
 
   const isLoading = status === "loading" && documents.length === 0;
 
+  // Hướng dẫn thao tác (ba-spec 43): chỉ dẫn, không mở hộp, không ghi.
+  const tour = useMemo(
+    () => buildDocumentsTour({ can: { create: can.create, write: canWrite, delete: can.delete } }),
+    [can.create, canWrite, can.delete],
+  );
+  usePageTour(isLoading ? null : tour);
+
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -310,7 +319,7 @@ export default function DocumentsScreen() {
           liệu của phòng mình và tài liệu được mở cho phòng mình.
         </p>
         {can.create && (
-          <Button title="Thêm một tài liệu mới: mã, tên, loại, phòng sở hữu và ai được xem." onClick={() => setFormTarget({ kind: "create" })}>
+          <Button data-tour="documents-add" title="Thêm một tài liệu mới: mã, tên, loại, phòng sở hữu và ai được xem." onClick={() => setFormTarget({ kind: "create" })}>
             <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
             Thêm tài liệu
           </Button>
@@ -323,9 +332,11 @@ export default function DocumentsScreen() {
         </p>
       )}
 
-      <StatCardGrid cards={cards} />
+      <div data-tour="documents-stats">
+        <StatCardGrid cards={cards} />
+      </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div data-tour="documents-filters" className="grid gap-4 sm:grid-cols-2">
         <Combobox label="Loại" hideRequiredMark value={kindFilter} onChange={setKindFilter} options={KIND_FILTERS} clearable={false} />
         <Combobox label="Phòng" hideRequiredMark value={departmentFilter} onChange={setDepartmentFilter} options={DEPARTMENT_FILTERS} clearable={false} />
         <ChoiceGroup
@@ -361,21 +372,23 @@ export default function DocumentsScreen() {
           }
         />
       ) : (
-        <RecordTable
-          columns={columns}
-          rows={rows}
-          getKey={(d) => d.id}
-          rowMarkKey="documents"
-          getSearchText={(d) => `${d.code} ${d.title} ${d.note}`}
-          searchLabel="Tìm theo mã hoặc tên tài liệu…"
-          emptyText="Không có tài liệu nào khớp bộ lọc."
-          actions={(d) => (
-            <Button size="sm" variant="outline" onClick={() => openDetail(d.id)} title="Xem chi tiết, các lần ban hành và mở file của tài liệu này.">
-              <Eye className="mr-1 h-4 w-4" aria-hidden />
-              Xem
-            </Button>
-          )}
-        />
+        <div data-tour="documents-table" className="min-w-0">
+          <RecordTable
+            columns={columns}
+            rows={rows}
+            getKey={(d) => d.id}
+            rowMarkKey="documents"
+            getSearchText={(d) => `${d.code} ${d.title} ${d.note}`}
+            searchLabel="Tìm theo mã hoặc tên tài liệu…"
+            emptyText="Không có tài liệu nào khớp bộ lọc."
+            actions={(d) => (
+              <Button size="sm" variant="outline" onClick={() => openDetail(d.id)} title="Xem chi tiết, các lần ban hành và mở file của tài liệu này.">
+                <Eye className="mr-1 h-4 w-4" aria-hidden />
+                Xem
+              </Button>
+            )}
+          />
+        </div>
       )}
 
       <DocumentDetailDialog

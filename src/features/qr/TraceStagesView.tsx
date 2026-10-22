@@ -236,7 +236,7 @@ export function TraceStagesView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="qr-stage-filters" className="grid gap-4 rounded-xl border-2 border-border p-4">
         <DateRangeField
           label="Khoảng ngày"
           hint="Ngày hàng về · ngày sản xuất · ngày đóng gói · ngày xuất / bán."
@@ -264,7 +264,7 @@ export function TraceStagesView() {
         </label>
       </div>
 
-      <ol className="space-y-4">
+      <ol data-tour="qr-stage-list" className="space-y-4">
         {items.map((g, i) => {
           const missingCount = g.items.filter((m) => m.missing.length > 0).length;
           const isVisible = onlyMissing ? g.items.filter((m) => m.missing.length > 0) : g.items;

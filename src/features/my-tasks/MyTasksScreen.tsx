@@ -48,6 +48,8 @@ import { formatDateVN } from "@/lib/format";
 import type { TaskAssignment } from "@/types";
 import { AlarmClock, ArrowRight, CalendarCheck, CheckCircle2, ClipboardList, Pencil, Send, UserPlus, Users, XCircle } from "lucide-react";
 import { AssignTaskDialog, type AssignTarget } from "./AssignTaskDialog";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildMyTasksTour } from "./myTasksTour";
 
 const URGENCY_TAGS: Record<TaskUrgency, (x: MyTaskItem) => { text: string; variant: TagVariant }> = {
   overdue: (x) => ({ text: `Quá hạn ${x.overdueDays} ngày`, variant: "error" }),
@@ -68,9 +70,9 @@ const matchesFilter = (x: MyTaskItem, f: UrgencyFilter) =>
   f === "all" ||
   (f === "todo" ? x.urgency !== "info" || (x.bucket === "delegated" && x.assignment?.status === "open" && !x.isResolved) : x.urgency === f);
 
-function Section({ id, title, description, children }: { id: string; title: string; description?: ReactNode; children: ReactNode }) {
+function Section({ id, title, description, tour, children }: { id: string; title: string; description?: ReactNode; tour?: string; children: ReactNode }) {
   return (
-    <section id={id} className="grid min-w-0 scroll-mt-header grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-xl border-2 border-border bg-card p-5">
+    <section id={id} data-tour={tour} className="grid min-w-0 scroll-mt-header grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-xl border-2 border-border bg-card p-5">
       <div className="min-w-0">
         <h2 className="text-lg font-semibold text-foreground">{title}</h2>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
@@ -149,6 +151,10 @@ export default function MyTasksScreen() {
   const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null);
   const [revoking, setRevoking] = useState<TaskAssignment | null>(null);
   const [filter, setFilter] = useState<UrgencyFilter>("todo");
+
+  // Hướng dẫn thao tác (ba-spec 43): chỉ dẫn, không ghi; chờ bảng giao việc nạp xong.
+  const tour = useMemo(() => buildMyTasksTour({ can: { assign: canAssign.create, editAssigned: canAssign.update } }), [canAssign.create, canAssign.update]);
+  usePageTour(assignmentStatus === "loading" ? null : tour);
 
   const upsert = (row: TaskAssignment, message: string) => {
     const prev = assignments;
@@ -313,23 +319,28 @@ export default function MyTasksScreen() {
           chốt, BTP chờ duyệt, chưa gắn lô, kỳ chưa chốt…). Sổ sửa xong thì việc tự hết. Tính từ {formatDateVN(TASKS_START_DATE)}.
         </p>
         {canAssign.create && (
-          <Button title="Giao một việc tay cho một người: tiêu đề, hạn và màn cần mở." onClick={() => setAssignTarget({ kind: "manual" })}>
+          <Button data-tour="my-tasks-assign-new" title="Giao một việc tay cho một người: tiêu đề, hạn và màn cần mở." onClick={() => setAssignTarget({ kind: "manual" })}>
             <Send className="mr-2 h-4 w-4" aria-hidden />
             Giao việc mới
           </Button>
         )}
       </div>
 
-      <StatCardGrid cards={cards} />
+      <div data-tour="my-tasks-stats">
+        <StatCardGrid cards={cards} />
+      </div>
 
-      <ChoiceGroup label="Lọc theo hạn" hideRequiredMark value={filter} onChange={(v) => setFilter(v as UrgencyFilter)} options={FILTERS} columns={4} />
+      <div data-tour="my-tasks-filter">
+        <ChoiceGroup label="Lọc theo hạn" hideRequiredMark value={filter} onChange={(v) => setFilter(v as UrgencyFilter)} options={FILTERS} columns={4} />
+      </div>
 
-      <Section id="assigned" title={`Được giao cho tôi (${assigned.length})`} description="Việc người khác giao riêng cho bạn — làm theo hạn người giao đặt.">
+      <Section id="assigned" tour="my-tasks-assigned" title={`Được giao cho tôi (${assigned.length})`} description="Việc người khác giao riêng cho bạn — làm theo hạn người giao đặt.">
         {table("assigned", assigned, "Không có việc nào được giao cho bạn.")}
       </Section>
 
       <Section
         id="mine"
+        tour="my-tasks-mine"
         title={`Việc theo quyền của tôi (${mine.length})`}
         description="Việc máy phát hiện thuộc phần việc của bạn (theo quyền và xưởng của bạn) mà chưa giao riêng cho ai. Bấm Mở việc để tới đúng ngày cần sửa."
       >
@@ -341,7 +352,7 @@ export default function MyTasksScreen() {
       </Section>
 
       {showDelegated && (
-        <Section id="delegated" title={`Tôi đã giao (${delegated.length})`} description="Việc bạn đã giao cho người khác — để đốc. Việc đã xong hiện thêm 7 ngày.">
+        <Section id="delegated" tour="my-tasks-delegated" title={`Tôi đã giao (${delegated.length})`} description="Việc bạn đã giao cho người khác — để đốc. Việc đã xong hiện thêm 7 ngày.">
           {table("delegated", delegated, "Chưa giao việc nào cho người khác.")}
         </Section>
       )}

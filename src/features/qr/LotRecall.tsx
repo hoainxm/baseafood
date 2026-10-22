@@ -55,7 +55,7 @@ export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: Lo
   };
 
   return (
-    <section className="space-y-3 rounded-xl border-2 border-border p-4">
+    <section data-tour="qr-recall" className="space-y-3 rounded-xl border-2 border-border p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-semibold">
           <ShieldAlert aria-hidden /> Thu hồi — ai đã nhận hàng từ lô này

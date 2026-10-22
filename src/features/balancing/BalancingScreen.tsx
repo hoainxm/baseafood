@@ -81,6 +81,8 @@ import {
 } from "lucide-react";
 import { PeriodLockDialog } from "./gridDialogs";
 import BalancingTable from "./BalancingTable";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildBalancingTour, pickTourPeriod } from "./balancingTour";
 
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
 function describeRange(fromDate?: string, toDate?: string): string {
@@ -105,6 +107,22 @@ export default function BalancingScreen() {
     }
   };
   const [catalogMaterialTypes, setCatalogMaterialTypes] = useMaterialTypes();
+
+  /* Hướng dẫn thao tác (ba-spec 43): kỳ minh họa chọn từ kỳ đang có; bước chỉ đổi đường dẫn
+     (replace, đường dẫn tuyệt đối) giữa danh sách ⇄ một kỳ — không ghi gì (R1). Thoát thì
+     PageTourProvider trả về chỗ cũ (R5). */
+  const tourPick = useMemo(() => pickTourPeriod(periods, selId), [periods, selId]);
+  const tour = useMemo(
+    () =>
+      buildBalancingTour({
+        pick: tourPick,
+        can: { create: allowed.create, update: allowed.update, lock: allowed.lock || allowed.unlock },
+        toList: () => navigate("/balancing", { replace: true }),
+        openPeriod: (id) => navigate(`/balancing/${id}`, { replace: true }),
+      }),
+    [tourPick, allowed.create, allowed.update, allowed.lock, allowed.unlock, navigate],
+  );
+  usePageTour(isLoadingPeriods ? null : tour);
 
   /* Xóa kỳ phải xóa luôn dòng con của nó (NL vào / phế liệu / TP ra), nếu không
      các dòng này mồ côi trong kho — chiếm chỗ, sai tổng khi thống kê sau này. */
@@ -349,6 +367,7 @@ export default function BalancingScreen() {
         </div>
         {allowed.create && (
           <Button
+            data-tour="balancing-create-period"
             title="Mở một kỳ cân đối mới (thường ~5 ngày một lô): khai khoảng ngày rồi hút số liệu nhập · sản xuất · bán vào." size="lg" onClick={openAdd}>
             <Plus />
             Tạo kỳ cân đối
@@ -374,6 +393,7 @@ export default function BalancingScreen() {
           }
         />
       ) : (
+        <div data-tour="balancing-period-list">
         <RecordTable
           columns={cols}
           rows={periods}
@@ -384,6 +404,7 @@ export default function BalancingScreen() {
           actions={(r) => (
             <>
               <Button
+                data-tour="balancing-open-period"
                 title="Mở lưới cân đối của kỳ này để nhập số và xem định mức, lãi lỗ." size="sm" onClick={() => setSelId(r.id)}>
                 Mở kỳ
               </Button>
@@ -413,6 +434,7 @@ export default function BalancingScreen() {
             </>
           )}
         />
+        </div>
       )}
 
       <Dialog
@@ -645,7 +667,7 @@ function PeriodDetail({
         Danh sách kỳ
       </Button>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div data-tour="balancing-period-header" className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-semibold text-foreground">Bảng cân đối {period.materialTypeName}</h1>
@@ -700,6 +722,7 @@ function PeriodDetail({
           </Button>
           {allowed.export && (
             <Button
+              data-tour="balancing-print"
               title="Xem bảng cân đối đúng khổ in A4 rồi in giấy hoặc lưu PDF." variant="outline" size="lg" onClick={() => setShowBang(true)}>
               <FileText />
               Xem / in bảng
@@ -800,6 +823,7 @@ function PeriodDetail({
         {/* Phần GHI TỪNG NGÀY: hai lưới vẽ vào đây (createPortal). Xếp ngang: đứng bên phải
             khi còn ≥ 28rem, không thì tự xuống dòng; Xếp dọc: luôn một hàng riêng bên dưới. */}
         <div
+          data-tour="balancing-days"
           className={`w-full min-w-0 border-t-2 border-border ${
             isHorizontal ? "xl:w-auto xl:min-w-[28rem] xl:flex-1 xl:basis-0 xl:border-t-0 xl:border-l-2" : ""
           } ${hideMaterialDays && hideFinishedGoodDays ? "hidden" : ""}`}
@@ -812,7 +836,7 @@ function PeriodDetail({
       {/* Vòng gối đầu: phần kỳ trước đẩy sang được kéo vào đây bằng một nút, thay
           cho việc mở file kỳ cũ ra chép tay. */}
       {grid.carryOverRowCount > 0 && !grid.isLocked && (
-        <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <Card data-tour="balancing-carry-over" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="text-base">
             Kỳ trước ({grid.previousPeriod?.dateRangeDescription || "…"}) có{" "}
             <strong>{grid.carryOverRowCount}</strong> dòng chuyển sang chưa nhận.
@@ -827,7 +851,7 @@ function PeriodDetail({
 
       {/* Chốt kỳ đặt CUỐI màn — xem hết số rồi mới chốt, đúng chỗ của thanh chốt
           ngày ở sổ nhập hàng. */}
-      <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <Card data-tour="balancing-lock" className="flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <p className="text-lg font-semibold">
             {period.isLocked ? "Kỳ đã chốt" : "Kỳ đang mở"}
@@ -844,6 +868,7 @@ function PeriodDetail({
         </div>
         {(period.isLocked ? allowed.unlock : allowed.lock) && (
           <Button
+            data-tour="balancing-lock-action"
             title="Chốt khi đã đối chiếu xong và gửi kế toán — mọi ô trong lưới khoá lại. Kỳ đã chốt thì bấm để mở lại (phải ghi lý do)."
             variant={period.isLocked ? "edit" : "lock"}
             size="lg"
@@ -933,6 +958,7 @@ function ResultNote({
   const isProfit = result.profitOrLoss >= 0;
   return (
     <section
+      data-tour="balancing-result"
       className="p-5 xl:p-3"
       aria-label="Ghi chú — kết quả cân đối"
     >

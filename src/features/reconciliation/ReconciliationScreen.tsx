@@ -60,6 +60,8 @@ import {
 } from "./ReconciliationModeView";
 import { RECONCILIATION_MODES, getDefaultReconciliationMode, type ReconciliationMode } from "./reconciliationMode";
 import { useCan } from "@/features/shared/PermissionProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildReconciliationTour } from "./reconciliationTour";
 import { useReconciliationRuns } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import type { ReconciliationRun } from "@/types";
@@ -167,7 +169,7 @@ function SavedRunsBox({
       : []),
   ];
   return (
-    <Card>
+    <Card data-tour="reconciliation-saved-runs">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <History className="size-5" aria-hidden />
@@ -951,6 +953,14 @@ export default function ReconciliationScreen() {
   /** Đang mở bản đã lưu ⇒ Lưu/Sửa là CẬP NHẬT bản đó; chưa ⇒ tạo bản mới. */
   const canEditRun = openRunId ? allowed.update : allowed.create;
 
+  // Hướng dẫn thao tác (ba-spec 43): chỉ dẫn + giải thích, không ghi gì.
+  const hasResult = !!reconResult;
+  const tour = useMemo(
+    () => buildReconciliationTour({ hasResult, can: { create: allowed.create, save: canEditRun, export: allowed.export } }),
+    [hasResult, allowed.create, allowed.export, canEditRun]
+  );
+  usePageTour(tour);
+
   return (
     <div className="space-y-6">
       {/* Tiêu đề cấp 1 cho trình đọc màn hình — thanh đầu AppShell không còn là h1. */}
@@ -970,7 +980,7 @@ export default function ReconciliationScreen() {
             số hóa đơn</b>. Hệ thống <b>KHÔNG tự sửa số liệu</b> — chỗ nghi sai chỉ được báo, bạn tự bấm Sửa từng dòng.
           </p>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
-          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
+          <div data-tour="reconciliation-file" className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
             {allowed.create && (
               <Button
                 title="Chọn file Excel hóa đơn điện tử để đối soát với sổ phần mềm." variant="outline" onClick={pickFile} className="w-full md:w-auto">
@@ -990,7 +1000,7 @@ export default function ReconciliationScreen() {
               <FileDown />
               Tải file mẫu
             </Button>
-            <div className="w-full md:w-56">
+            <div data-tour="reconciliation-threshold" className="w-full md:w-56">
               <NumberField
                 label="Ngưỡng khớp"
                 unit="đ"
@@ -1008,6 +1018,7 @@ export default function ReconciliationScreen() {
             )}
             {reconResult && allowed.export && (
               <Button
+                data-tour="reconciliation-export"
                 title="Tải toàn bộ kết quả đối soát ra file Excel để gửi kế toán." variant="outline" onClick={downloadExcel} className="w-full md:w-auto">
                 <Download />
                 Tải Excel kết quả
@@ -1043,7 +1054,7 @@ export default function ReconciliationScreen() {
           )}
           {/* Lưu bản đối soát theo tài khoản (v4) */}
           {reconResult && canEditRun && (
-            <div className="rounded-xl border border-border p-3">
+            <div data-tour="reconciliation-save" className="rounded-xl border border-border p-3">
               <p className="text-sm font-medium">Lưu bản đối soát này theo tài khoản</p>
               <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-end">
                 <div className="w-full md:flex-1">
@@ -1104,12 +1115,17 @@ export default function ReconciliationScreen() {
       ) : (
         <>
           <section className="space-y-3" aria-label="Việc cần soát">
-            <h2 className="font-semibold">Bạn cần soát việc gì?</h2>
-            <ReconciliationModePicker mode={mode} setMode={setMode} counts={modeCounts} />
-            <ReconciliationRulesBox warnings={reconResult.warnings} />
+            <div data-tour="reconciliation-modes" className="space-y-3">
+              <h2 className="font-semibold">Bạn cần soát việc gì?</h2>
+              <ReconciliationModePicker mode={mode} setMode={setMode} counts={modeCounts} />
+            </div>
+            <div data-tour="reconciliation-rules">
+              <ReconciliationRulesBox warnings={reconResult.warnings} />
+            </div>
           </section>
 
           {mode === "twoVersion" && (
+            <div data-tour="reconciliation-two-version">
             <TwoVersionView
               result={versionCompare}
               sheetNames={invoiceSheetNames}
@@ -1118,9 +1134,18 @@ export default function ReconciliationScreen() {
               onChangeSide={changeSide}
               onAutoDetect={() => setPickedTaxSides(null)}
             />
+            </div>
           )}
-          {mode === "columnSum" && <ColumnSumCheckView sheets={reconResult.invoiceSheets} />}
-          {mode === "sameDay" && <SameDayView groups={sameDayGroups} />}
+          {mode === "columnSum" && (
+            <div data-tour="reconciliation-column-sum">
+              <ColumnSumCheckView sheets={reconResult.invoiceSheets} />
+            </div>
+          )}
+          {mode === "sameDay" && (
+            <div data-tour="reconciliation-same-day">
+              <SameDayView groups={sameDayGroups} />
+            </div>
+          )}
 
           {mode === "ledger" && (
           <>
@@ -1130,7 +1155,9 @@ export default function ReconciliationScreen() {
               Nếu bạn chỉ cần kiểm cộng cột hay so hai bản hóa đơn, chọn kiểu tương ứng ở trên.
             </div>
           )}
-          <StatCardGrid cards={cards} columns={4} />
+          <div data-tour="reconciliation-ledger-cards">
+            <StatCardGrid cards={cards} columns={4} />
+          </div>
           <p className="text-sm text-muted-foreground">
             Bấm vào một thẻ số ở trên để nhảy thẳng xuống danh sách tương ứng bên dưới.
           </p>
@@ -1142,7 +1169,7 @@ export default function ReconciliationScreen() {
           )}
 
           {(reconResult.suspects.length > 0 || reconResult.mergedSuspects.length > 0 || Object.keys(editLog).length > 0) && (
-            <div id="ds-nghivan">
+            <div id="ds-nghivan" data-tour="reconciliation-suspects">
               <SuspectBox
                 suspects={reconResult.suspects}
                 mergedSuspects={reconResult.mergedSuspects}
@@ -1155,7 +1182,7 @@ export default function ReconciliationScreen() {
             </div>
           )}
 
-          <div id="ds-bang">
+          <div id="ds-bang" data-tour="reconciliation-tables">
             <Tabs value={tab} onValueChange={setTab}>
               <TabsList className="flex-wrap">
                 {reconResult.invoiceSheets.map((s) => (
@@ -1189,7 +1216,7 @@ export default function ReconciliationScreen() {
           </div>
 
           {/* Kiểm tra chi tiết — gập cho gọn; tự mở khi có phép chưa đạt hoặc có cảnh báo */}
-          <div className="space-y-4">
+          <div data-tour="reconciliation-self-check" className="space-y-4">
             <button
               title="Mở / thu phần máy tự kiểm tra và đối chiếu số liệu."
               type="button"

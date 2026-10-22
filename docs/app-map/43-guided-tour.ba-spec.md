@@ -1,9 +1,10 @@
-# 43 — ba-spec: Hướng dẫn thao tác trên trang (tour từng bước) — áp dụng đầu tiên: Xuất khẩu
+# 43 — ba-spec: Hướng dẫn thao tác trên trang (tour từng bước) — MỌI trang nghiệp vụ (đầu tiên: Xuất khẩu)
 
-> Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), hoặc trang Xuất khẩu đổi bố cục / luồng làm tour lệch.
-covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/export-planning/exportTour.ts
+> Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
+covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
 last_verified: 2026-10-22
 ttl_days: 90
+<!-- updated: 2026-10-22 (d) — v4: mở rộng ra MỌI trang nghiệp vụ (21 trang có route, trừ 5 trang quản trị miễn): NV5 + R13–R17 + AC-12…AC-16; quy tắc 18 CLAUDE.md; cổng `pageTourCoverage.test.ts` quét route ⇄ tour ⇄ hộp "?" ⇄ mốc data-tour; §9c kiểm kê theo trang. -->
 <!-- updated: 2026-10-22 — lời tour Xuất khẩu theo nhãn v5 (ba-spec 41 v5): bước "Lịch xuất hàng, Hợp đồng và Báo cáo" nói thêm tab Báo cáo · "số PO của khách" thay "số đơn của khách" · thẻ "Trễ hạn giao n ngày" · "Đang làm · xong k/5 bước bắt buộc" · bước 6 "Gửi chứng từ · tiền về". Không đổi mốc `data-tour`, số bước giữ nguyên; test `exportTour.test.ts` xanh. -->
 <!-- re-verified: 2026-10-21 — v3: áp nhánh nội dung của skill ba-flow-logic (references/06): §9b kiểm kê 9 nhóm mục có nguồn, R10–R12, AC-10/11 test đọc hằng số nhãn của lib/exportPlanning. -->
 <!-- re-verified: 2026-10-21 — v2: nhãn "Hướng dẫn thao tác", 21 bước (thêm trạng thái HĐ · việc tiếp · cột Tiến độ · trạng thái mục và file), chạy thật trên preview demo 1366 px + 360 px × 100 / 130 %. -->
@@ -33,12 +34,28 @@ ttl_days: 90
 | NV1 | Đi một vòng hướng dẫn trang Xuất khẩu (xem lịch → hồ sơ → chuyến) | Nhân viên Kế hoạch | Người xem, Người trình diễn (cùng luồng, bớt bước ghi) | — | thấp (lần đầu / khi quên) | Must |
 | NV2 | Dừng / quay lại / bỏ qua giữa chừng, trả trang về chỗ cũ | Nhân viên Kế hoạch | như NV1 | NV1 | mỗi lần tour | Must |
 | NV3 | Đọc hướng dẫn tóm tắt của trang (hộp "?") | Nhân viên Kế hoạch | Người xem | — | thấp | Should |
-| NV4 | Khung tour dùng lại cho trang khác (khai bước, không viết lại cơ chế) | Hệ thống (người phát triển khai bước) | — | NV1 | khi thêm trang | Must (cơ chế) / Could (trang khác) |
+| NV4 | Khung tour dùng lại cho trang khác (khai bước, không viết lại cơ chế) | Hệ thống (người phát triển khai bước) | — | NV1 | khi thêm trang | Must |
+| NV5 | Đi một vòng hướng dẫn ở **mọi trang nghiệp vụ** (Nhập hàng, Sản xuất, Đóng gói, QC, Kho, Đơn đặt, Bán hàng, Cân đối, Sổ kho tháng, các báo cáo tồn / NXT, Đối soát, Mã lô QR, Việc của tôi, Tài liệu, Danh mục, Tổng quan) + đọc hộp "?" của trang đó (v4) | Người dùng của trang (tổ trưởng / thủ kho / kế toán / kế hoạch) | Người trình diễn | NV4 | lần đầu / khi quên | Must |
+| NV6 | Trang mới (về sau) ra đời KÈM tour + hộp "?" — không có thì không lên được (v4) | Hệ thống (người phát triển) | — | NV4 | mỗi trang mới | Must |
 
 ## 4. Cross-user handoff map
 N/A — không cross. Tour chỉ ĐỌC và DẪN; không tạo bản ghi, không chuyển việc cho ai.
 
 ## 5. Flows
+### Flow NV5 — Đi một vòng ở một trang nghiệp vụ · owner: người dùng của trang (v4)
+- **Start**: đang ở một trang nghiệp vụ, dữ liệu đã tải; chọn nút "?" ở thanh tiêu đề → "Bắt đầu hướng dẫn thao tác" (hoặc nút "Hướng dẫn thao tác" trên trang nếu trang có).
+- **Input**: quyền của người dùng trên trang (ghi / chốt / chỉ xem), dữ liệu đang có, vị trí trang (ngày, kỳ, tab, bộ lọc).
+- **Steps**: (1) lời giới thiệu giữa trang — trang dùng làm gì, ai dùng, khâu nào của chuỗi nhập hàng → sản xuất → kho → bán / xuất, cách đi tour; (2) các khu vực theo thứ tự công việc của trang (chọn ngày / kỳ / bộ lọc → nhập / bảng → tổng / cảnh báo → chốt / xuất); (3) khu vực có trạng thái ⇒ bước giải thích trạng thái, điều kiện chuyển / "xong", cảnh báo, việc tiếp; (4) bước chỉ nút ghi chỉ có với người có quyền.
+- **Output**: người dùng biết làm việc chính của trang ở đâu, trạng thái nghĩa gì; trang về chỗ cũ; 0 bản ghi đổi (R1, R5).
+- **End**: Kết thúc ở bước cuối, hoặc thoát (NV2).
+
+### Flow NV6 — Khai trang mới kèm hướng dẫn · owner: Hệ thống (người phát triển) (v4)
+- **Start**: thêm một route trang mới vào app.
+- **Input**: ba-spec / app-map của trang (nguồn trạng thái, luật), màn hình.
+- **Steps**: kiểm kê nội dung (§9b / §9c) → file `<trang>Tour.ts` export `tourSpec` (pageId = đoạn đường dẫn) → mốc `data-tour` trên màn → `usePageTour` ở màn → hộp "?" (PAGE_GUIDES) → test phủ nhãn trạng thái (nếu trang có hằng số nhãn) → thử 360 px × 130 %.
+- **Output**: cổng `pageTourCoverage.test.ts` xanh; trang có lối vào tour + hộp "?".
+- **End**: commit cùng lúc với trang. Thiếu ⇒ CI đỏ (R13), trừ khi ghi vào danh sách MIỄN kèm lý do.
+
 ### Flow NV1 — Đi một vòng trang Xuất khẩu · owner: Nhân viên Kế hoạch
 - **Start**: đang ở Xuất khẩu (lịch xuất hàng, danh sách HĐ hoặc một hồ sơ), dữ liệu trang đã tải xong.
 - **Input**: quyền của người dùng (ghi / chỉ xem / xem tiền về), dữ liệu hợp đồng + chuyến hiện có (thật hoặc demo), vị trí hiện tại của trang (kỳ xem, tab, hồ sơ đang mở).
@@ -82,8 +99,9 @@ N/A — không cross. Tour chỉ ĐỌC và DẪN; không tạo bản ghi, khôn
 | NV2 | lùi qua ranh giới lịch ↔ hồ sơ: A giữ hồ sơ mở · B trả về lịch | Chọn B | bước lịch phải thấy đúng lịch (Input đủ / Output rõ) | Optimizer | — |
 
 ## 7. Scope & Priority
-- **IN**: cơ chế tour dùng chung (NV2, NV4); tour + hộp "?" cho Xuất khẩu (NV1, NV3).
-- **OUT**: tour cho màn đóng hàng (`.loading`) và các trang khác (khai sau bằng NV4); tự mở tour lần đầu vào trang; nhớ "đã xem tour"; mở hộp form trong tour; video / ảnh động.
+- **IN**: cơ chế tour dùng chung (NV2, NV4); tour + hộp "?" cho Xuất khẩu (NV1, NV3); **v4: tour + hộp "?" cho MỌI trang nghiệp vụ có route (NV5) và luật bắt buộc cho trang mới (NV6)**.
+- **MIỄN (R13)**: trang quản trị chỉ admin — `/users`, `/admin`, `/roles`, `/audit` — và `/kit` (trang mẫu giao diện). Màn đóng hàng của Xuất khẩu (`.loading`) là một chế độ của trang Xuất khẩu, chưa có tour riêng.
+- **OUT**: tự mở tour lần đầu vào trang; nhớ "đã xem tour"; mở hộp form trong tour; video / ảnh động; tour cho từng hộp thoại.
 
 ## 8. Success metric
 | Nghiệp vụ | Metric | Ngưỡng đạt |
@@ -92,6 +110,8 @@ N/A — không cross. Tour chỉ ĐỌC và DẪN; không tạo bản ghi, khôn
 | NV1 | bản ghi bị đổi sau một vòng tour | 0 |
 | NV2 | vị trí trang sau khi thoát (đường dẫn) | == lúc bắt đầu |
 | NV1 | khung lời tour ở điện thoại 360 px, chữ 130 % | nằm trọn trong màn (0 px tràn) |
+| NV5 | trang nghiệp vụ có route mà thiếu tour hoặc thiếu hộp "?" (ngoài danh sách MIỄN) | 0 |
+| NV6 | trang mới lên `main` không kèm tour | 0 (CI chặn) |
 
 ## 9. Rules & Invariants
 | # | Rule | Edge case |
@@ -108,6 +128,11 @@ N/A — không cross. Tour chỉ ĐỌC và DẪN; không tạo bản ghi, khôn
 | R10 | **Phủ nội dung**: lời tour + hộp "?" phủ đủ mọi mục ở §9b — khu vực có trạng thái thì giải thích trạng thái, điều kiện "Xong", cảnh báo và việc tiếp theo, không chỉ gọi tên khu vực | thêm trạng thái mới ở code ⇒ AC-10 đỏ cho tới khi lời tour có |
 | R11 | **Nguồn nội dung**: mọi điều kiện / cách tính trong lời trích từ luật của ba-spec 41 ghi ở cột Nguồn của §9b; không tự diễn đạt lại làm đổi nghĩa | luật 41 đổi ⇒ sửa dòng §9b và lời cùng commit |
 | R12 | **Đồng bộ**: `covers` gồm cả `src/lib/exportPlanning.ts` (nơi giữ hằng số nhãn) — đổi nhãn ở đó thì soát lời tour | — |
+| R13 | **Phủ trang (v4)**: MỌI route trang trong `App.tsx` (bỏ route chuyển hướng, route có tham số) phải có tour (`tourSpec.pageId` == đoạn đường dẫn, màn gọi `usePageTour`) **và** hộp "Hướng dẫn: <trang>" (`PAGE_GUIDES`), trừ danh sách MIỄN kèm lý do (quản trị chỉ admin, trang mẫu giao diện). Thêm trang mới ⇒ tour + hộp "?" cùng commit (quy tắc 18) | trang bị gỡ route ⇒ gỡ tour + bỏ khỏi MIỄN (test báo thừa) |
+| R14 | **Hộp "?" (v4)**: tóm tắt tĩnh của trang — các việc theo thứ tự, trạng thái và cảnh báo, mẹo; đầu hộp TỰ có lối "Bắt đầu hướng dẫn thao tác" khi trang có tour. Hộp và tour cùng nguồn luật, không mâu thuẫn | — |
+| R15 | **Khuôn tour mọi trang (v4)**: bước 1 = lời giới thiệu giữa trang (không gắn chỗ) — trang làm gì, ai dùng, khâu nào của chuỗi nhập → sản xuất → kho → bán / xuất, cách đi tour; 3 ≤ số bước ≤ 22; id bước không trùng; mọi mốc `data-tour` mà bước chỉ tới có trên màn; văn phong R9; bước chỉ nút ghi (Thêm / Lưu / Chốt / Nạp…) là bước tùy chọn và chỉ có với người có quyền ghi; khu vực có trạng thái có bước giải thích trạng thái (R10) | trang báo cáo chỉ xem ⇒ tour ngắn (5–9 bước), vẫn phải giải thích cách đọc cột / cách tính |
+| R16 | **Lối vào (v4)**: nút "?" ở thanh tiêu đề là lối vào chuẩn của mọi trang (hộp R14 + Bắt đầu). Nút "Hướng dẫn thao tác" ngay trên trang chỉ thêm cho trang nhiều khối, theo khuôn Xuất khẩu (`outline`, icon `Route`, `data-tour-start`) | — |
+| R17 | **Đồng bộ trang ⇄ tour (v4)**: đổi khu vực / nhãn trạng thái / nút chính của trang ⇒ sửa tour + hộp "?" cùng commit; mốc `data-tour` ổn định (đổi tên mốc = sửa bước) | mốc bị xoá khỏi màn ⇒ test "mốc có trên trang" đỏ |
 
 ## 9b. Kiểm kê nội dung (nhánh nội dung — skill ba-flow-logic references/06)
 Mỗi dòng: người đọc gặp gì · lời phải nói gì · nguồn. Văn phong: `src/design-system/noi-dung-va-label.md` (R9).
@@ -124,6 +149,142 @@ Mỗi dòng: người đọc gặp gì · lời phải nói gì · nguồn. Văn
 | Chuyến · trạng thái | Đang làm · k/5 bước · Đủ hồ sơ · Trễ hạn giao · Đã hủy | nghĩa từng thẻ | 41 NV12, R15 | `shipment-card` |
 | Mục · trạng thái + điều kiện "Xong" | Chưa làm · Đang làm · Xong · Không áp dụng; điều kiện file / số / chữ ký từng loại; Dùng chung | đủ vế điều kiện theo bảng NV8 (Lệnh SX cần file + HĐ đã duyệt + dòng hàng đã nối; Tờ khai cần số + file; Lệnh xuất cần file có chữ ký BGĐ; chứng từ cần số + ngày + file, công ty tự cấp không bắt số; 4a/4b tự xong khi có file); Không áp dụng phải có lý do | `ITEM_STATE_LABELS` · 41 bảng NV8, R4, R5, R16, R20 | `item-status` |
 | Tiền về | Ghi gửi chứng từ · Ghi tiền về · "Tiền về x / y" | số phải thu = tiền trên Commercial Invoice; bước 6 không tính vào đủ hồ sơ | 41 NV10, R7, H5 | `payments` |
+
+## 9c. Kiểm kê nội dung theo trang (v4 — nhánh nội dung, mỗi trang một bảng)
+Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời đầy đủ nằm trong file `<trang>Tour.ts`; test `<trang>Tour.test.ts` đọc hằng số nhãn của trang (khi có) để đổi nhãn mà quên lời là đỏ. Tài liệu lệch code phát hiện lúc kiểm kê ghi ở §11 (Open — lệch doc).
+
+### `/imports` Nhập hàng — 20 bước · `imports/importsTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Nhắc việc | dải "Việc hôm nay" / "Hôm nay đã chốt"; ngày chưa chốt sang Việc của tôi | 39 § hạn | daily-reminder |
+| Đầu chuyến | 1 chuyến = 1 đại lý 1 lượt; chọn đại lý tự điền loại + giá cũ | 30 §1 | shipment-header |
+| Đọc ảnh phiếu | chỉ là nháp, phải soát; nhãn Khớp danh mục / Mới, kiểm kỹ / Chưa khớp | 30 ghi chú 10-14 | ocr |
+| Hai ngày · ghi bù | tổng theo ngày hàng về; ghi bù / ngày đã chốt bắt lý do | 30 §2 §3 | backdate |
+| Dòng hàng · giá | loài → loại; để trống giá khi chờ hóa đơn ("Chưa có giá") | 30 §3 | lines |
+| Mã lô · SSCC | mỗi loại NL một lô, một tem; SSCC điền sau | 30 ghi chú 10-08 | lot |
+| Thanh lưu | "Chưa lưu được — còn thiếu"; Lưu chuyến vào sổ; nháp không tự vào sổ | 30 (j), quy tắc 17 | save-bar |
+| Phế liệu · chốt ngày | cân gộp cuối ngày; Chưa chốt / Đã chốt / Còn ghi bù +… kg; mở lại bắt lý do | 30 §4 §5 | scrap, day-lock, lock-action |
+| Báo cáo · sổ chi tiết | Chờ hóa đơn = kg chưa có giá; nhãn Ghi bù / Đã chốt / Dữ liệu cũ / Lô | 30 Hai tab, Edge cases | report-*, ledger-* |
+
+### `/wip` Sản xuất thành phẩm — 21 bước · `production/wipTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Chế độ | Ghi nhập (phiếu mở sẵn) · Sổ ngày & báo cáo | 34 (form-first 09-06) | mode-switch |
+| Đầu phiếu | ngày ghi sổ / ngày SX; ghi bù bắt lý do | 34 AC-1, F-N1 | session-header |
+| Lô NL của phiên | mỗi loại NL của chuyến là một lô; lưu tự gắn theo loại | 34 10-08; spec QR §6d §6e | session-lots |
+| Thành phẩm | kg = block × kg/khối, "≠" khi gõ tay; bột là phụ gia, không cộng kg | 34 10-15, 10-06 | production-lines |
+| Bán nội địa · Hàng tạm | sổ riêng, không vào sản lượng; Hàng tạm thành lô nhập Sổ kho tháng | 34 10-06, § Hàng tạm | domestic-sale, frozen-stock |
+| Trạng thái mẻ | Chờ nhập kho → Đã nhập kho (thủ kho duyệt kg thực ở Kho dự trữ) | 34 F-N2, AC-2/3 | ledger-table |
+| Báo cáo ngày | Gửi báo cáo chỉ lưu vết, không khóa | 34 09-05 (A4) | daily-report, send-report |
+| Chốt ngày | phải gắn lô hoặc ghi lý do; còn dở theo loại NL thành đông gửi; mở lại bắt lý do | 34 AC-1, 10-08 (2), 09-05 (A3) | day-lock, lock-action |
+
+### `/packaging` Đóng gói — 8 bước · `packaging/packagingTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Phiếu | hao hụt = BTP vào − TP ra; âm / vượt tồn thì cảnh báo nhưng vẫn ghi | 34 08-23 (G3) | add-packaging |
+| Tồn TP | = TP ra − bán nguồn Đóng gói, toàn sổ | 33 nguồn Đóng gói | finished-good-stock |
+| Lô BTP | chỉ nhận lô cùng mặt hàng; có lô trừ đúng lô, không có trừ lô cũ trước | 34 10-08 (4); spec QR §6d | row-lot |
+
+### `/qc` Kiểm tra QC — 10 bước · `quality-check/qcTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Ngày · xưởng · trạng thái | mỗi ngày × xưởng một bảng; Chưa chốt / Đã chốt; ngày cũ là ghi bù | màn; họp 02/09 | filter, status, backdate |
+| Kết quả | Đạt · Cần khắc phục · Không đạt (`RESULT_OPTIONS`); thang điểm chỉ là quy ước | họp 02/09 QĐ-8 | criteria |
+| Chốt | cần ít nhất một chỉ tiêu đã lưu | màn `lockDay` | lock-action |
+
+### `/warehouse` Kho dự trữ — 11 bước · `warehouse/warehouseTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Chỉ số · tồn lô | lô chờ nhập chưa tính tồn; tồn = kg thực − lệnh xuất − bán lẻ − đóng gói; có lô gắn trừ đúng lô | 34 F-N2; spec QR §6d | stats, stock |
+| Bán vượt | phần vượt không nằm trong Tổng tồn; kiểm phiếu bán / duyệt mẻ chờ | 34 (10-12 b) | oversold |
+| Duyệt nhập | chờ nhập kho → đã nhập kho bằng Xác nhận nhập kho, kg thực; quản đốc chỉ xưởng mình | 34 F-N2, AC-3; 35 | pending, scan, approve |
+| Tuổi tồn · dung tích | đếm từ ngày SX; xanh / vàng > 85 % / đỏ vượt | 34 (10-13); màn | age, capacity |
+
+### `/orders` Đơn đặt — 10 bước · `orders/ordersTour.ts` (mở đơn minh họa, `onExit` trả lại)
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Trạng thái đơn | Đang gom · Đủ (chỉ đổi trạng thái) · Đã xuất (đủ kg mọi dòng) | 34 F-N5, AC-9/10 | table, detail-actions |
+| Dòng hàng | Còn thiếu = Cần − Đã xuất; Khả dụng không tính lô chờ nhập | 34 H3 | detail-lines |
+| Lệnh xuất · kiểm lô | lô sản xuất sớm trước; tạo phiếu bán Xuất khẩu chưa có giá; quét lô, Thay lô | 34 F-N5, H5; spec QR §6c §6d | detail-actions, export-list |
+
+### `/sales` Bán hàng — 11 bước · `sales/salesTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Hai ngày | ngày xuất bán cho mọi tổng; ghi sổ muộn bắt lý do | 33 §2 | create, invoice |
+| Kênh · giá · nguồn | Xuất khẩu (USD) / Nội địa (VND); Chưa có giá; Block thô / Đóng gói trừ tồn | 33 §4, Bán trừ tồn | add-item, items |
+| Lô · tổng | gắn lô BTP / TP; tổng tiền cộng thẳng (xem tab Báo cáo theo kênh) | spec QR §6d; 33 §5 | lot, totals |
+
+### Báo cáo tồn / NXT — `reports/*Tour.ts`
+| Trang | Khu vực | Lời phải nói | Nguồn |
+|---|---|---|---|
+| `/nxt` (8) | chỉ số · bảng · tồn âm · tồn đầu | cuối = đầu + nhập − xuất (đơn + bán + gói); nhập = BTP đã duyệt; tồn đầu khai một lần theo mốc | `inventoryFinished`; 31 § mốc |
+| `/nxt-material` (10) | chỉ số · phạm vi · cảnh báo · bảng loại | Tồn cuối = Tồn đầu + Nhập − Xuất SX − Bán nội địa (PA-a); Đông gửi / Xả đông chỉ là cột thông tin; còn dở SX chưa hiện | 31 § Tồn kho NL; 38 §0 |
+| `/nxt-warehouse` (11) | nạp file · bất biến · kho lưu · ghi · kỳ sau | Khớp / Lệch bất biến; nạp lại không nhân đôi; tạo kỳ kế tiếp kế thừa tồn | màn; 04 (P5-A) |
+| `/production-report` (7) | lọc · lưới mặt hàng × ngày | sản lượng làm ra mọi trạng thái lô, không phải tồn | màn |
+| `/export-report` (7) | bảng theo đơn · trạng thái | đơn vào kỳ theo ngày xuất; Đang gom / Đủ / Đã xuất là trạng thái hiện tại | 34 F-N5/N6 |
+
+### `/monthly-stock` Sổ kho theo tháng — 17 bước · `monthly-stock/monthlyStockTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Nạp Excel | chọn ĐÚNG kho (nhầm kho = cộng đôi); nạp lại chỉ cập nhật | 36 § Nhập Excel | import-excel |
+| Tháng trống | Xem trước tồn đầu … CHƯA LƯU; Kế thừa & lưu vào sổ | 36 § Tháng trống | month-open |
+| Thẻ · bất biến · lệch dồn kỳ | tồn cuối = đầu + nhập − xuất; Khớp / Lệch bất biến; Lệch dồn kỳ ngưỡng 1 kg, chỉ soi | 36 § Bất biến, § Cờ lệch | stats, invariant, carry-gap |
+| Dòng vết · gõ thẳng · thao tác dòng | đừng sửa tay dòng Từ SX / Lấy xả đông / Gửi đông; ô = tổng tháng; Gửi kho ngoài không đổi tổng | 36 § Dòng do Cân đối ghi, § Gõ thẳng, § Thao tác một dòng | linked-rows, inline-edit, row-actions |
+| Dồn kỳ | dồn mọi kho, chỉ dòng còn tồn; chạy lại chỉ đổi tồn đầu | 36 § Dồn kỳ | carry-next |
+
+### `/balancing` Cân đối kỳ — 17 bước (5 khi chưa có kỳ) · `balancing/balancingTour.ts` (mở kỳ minh họa)
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Tạo kỳ | một kỳ = một họ NL + ngày tiếp nhận; tỉ giá mặc định 26.000 | 31 § Một kỳ | create-period |
+| Khối nguyên liệu | tiền = Σ kg × giá từng chuyến; dòng sổ nhập khóa, sửa qua ✎; dòng giảm gõ dương lưu âm | 31 § Hai khối, (i)/(j) | material, material-checks |
+| Dòng kho | Lấy xả đông / Gửi đông ghi thẳng Sổ kho tháng; chặn vượt tồn lô | 31 § Khối 1 hai dòng kho | stock-lines |
+| Khối BTP · kết quả | Tổng = Σ ngày + Trả + Nợ; định mức = NL ÷ TP; lãi / lỗ = giá trị xuất − giá thành | 31 § Công thức | finished-goods, result |
+| Chốt kỳ | Kỳ đang mở / Kỳ đã chốt; chốt khóa mọi ô; mở lại không xóa dấu chốt | 31 § Chốt kỳ | lock-status, lock-action |
+
+### `/reconciliation` Đối soát HĐĐT — 16 bước (6 khi chưa chạy) · `reconciliation/reconciliationTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| File · ngưỡng · bản lưu | khóa ghép MST · ký hiệu · số; chênh ≤ ngưỡng = Khớp; Nháp / Chính thức | 37 Khóa, v4, v7.1 | file, threshold, saved-runs |
+| Kiểu soát · quy tắc | 4 kiểu; ngoại tệ tự dò, không mặc định nhân | 37 v7 | modes, rules |
+| Kết quả | Khớp · Lệch tiền · Lệch thuế · Chưa vào sổ · …; Chênh = HĐ − sổ; máy không tự sửa | 37 Nhãn kết quả | ledger-cards, suspects, sheet-tables |
+| Tự kiểm · hai bản · cộng cột · cùng MST | Đạt / Không đạt; Thuế gửi / Tự tải; lệch thật vs lệch bình thường; nhóm trùng tiền | 37 v6–v7.1 | self-check, two-version, column-sum, same-day |
+| Lưu · xuất | Excel giữ định dạng gốc, mỗi lần một file | 37 v5 v6.5 | save-run, export |
+
+### `/qr` Mã lô QR — 13 bước · `qr/qrTour.ts` (mở lô minh họa qua `?lot=`)
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Loại lô · tra | Nguyên liệu · Bán thành phẩm · Thành phẩm; mã Đ- / BĐ- / TĐ- / NĐ- | spec QR §4.1 §6e | intro, scan |
+| Hộ chiếu | Chưa in tem / Đã in N tem; Còn lại = kg lô − các ngả đã đi, âm = sai kg / nhầm lô | §4.4 §6c §6d | lot-summary, mass-balance |
+| Truy ngược / xuôi · thu hồi | chỉ tính mối nối đã gắn lô; ai đã nhận hàng | §4.4 §6d | trace-*, recall |
+| Theo giai đoạn · in tem | 5 khâu, Còn thiếu N / Đủ; số tem theo block / thùng | §6b–§6d | stage-*, print-* |
+
+### `/dashboard` Tổng quan — 11 bước · `dashboard/dashboardTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Thẻ · năm khâu · đi đâu | nghĩa 8 thẻ; % so với khâu nguồn; Hao hụt / chưa ghi ra | che-do-demo §5b V1–V3 | kpis, stages, outflow |
+| Việc cần đốc | Sổ sai · Chưa làm · Để biết + 10 loại cảnh báo | `buildChainWarnings` | warnings |
+| Chế độ demo | bộ số trình diễn riêng, không chạm sổ thật; chỉ admin | quy tắc 15 | demo-mode |
+
+### `/my-tasks` Việc của tôi — 10 bước · `my-tasks/myTasksTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Thẻ · lọc | Quá hạn · Hạn hôm nay · Được giao cho tôi · Tôi đã giao; Cần làm bỏ việc Để biết | 39 § Hạn, § Chuông | stats, filter |
+| Việc theo quyền | 11 loại việc, hạn từng loại; việc máy tự hết khi sổ sửa xong | 39 § Hạn, § Ai làm được | mine, task-row |
+| Giao việc | giao cho đúng một người; Thu hồi có Hoàn tác | 39 § Giao việc | delegate, delegated, assign-new |
+
+### `/documents` Tài liệu công ty — 11 bước · `documents/documentsTour.ts`
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Phạm vi xem | phòng mình · cả công ty · phòng được chọn; máy chủ chặn cả file | 40 § Ba lớp chặn | visibility |
+| Trạng thái · hạn | Đang hiệu lực · Dự thảo · Chưa ban hành · Hết hiệu lực; hạn ≤ 60 ngày sang Việc của tôi | spec DOC-R7 | status |
+| Lần ban hành · đính file | lần mới không ghi đè; đính trong hộp chi tiết | 40 § Luật chính; DOC-R2/R3b | detail, detail-actions |
+
+### `/catalog` Danh mục — 14 bước · `catalog/catalogTour.ts` (đổi `?tab=`)
+| Khu vực | Lời phải nói | Nguồn | Bước |
+|---|---|---|---|
+| Tab · thêm / sửa / xóa | 7 tab theo quyền; sổ cũ không hồi tố; xóa có Hoàn tác; báo trùng mã / tên | 32 | tabs, write |
+| Từng danh mục | tên tiếng Anh mặc định; tên hàng trên chứng từ (trích xuất không ghi đè); bột là phụ gia; 141 mã chỉ tra | 32; 41 R23 R26 | products … finished-goods |
+| Sửa tại chỗ | gõ tên mới trong ô chọn là tạo; bút chì sửa nhanh | CLAUDE.md quy tắc 7 | quick-edit |
 
 ## 10. Acceptance Criteria — ORACLE
 > Repo chưa có harness E2E (màn hình thử tay trên preview — CLAUDE.md). Phần thuần (chọn hồ sơ, dựng bước, tính bước kế) = **unit**; phần trên trang = **manual** bằng script đo trên preview demo (lý do: không có e2e runner), Assert vẫn là số đo được.
@@ -177,10 +338,10 @@ Mỗi dòng: người đọc gặp gì · lời phải nói gì · nguồn. Văn
 - **Assert** mỗi bước: khung tour `left >= 0`, `right <= 360`; `documentElement.scrollWidth == 360`; mép trên chỗ được chỉ ≥ mép dưới thanh tiêu đề và < mép trên khung lời; thanh tiêu đề không trôi (`top >= 0`)
 
 ### AC-9 — Lối vào chỉ có ở trang đã khai · Maps to: NV4 · Test: manual
-- **Given** trang Xuất khẩu đã khai tour, trang Nhập hàng chưa
-- **When** mở lần lượt hai trang
-- **Then** Xuất khẩu có lối vào tour; Nhập hàng không
-- **Assert** số phần tử lối vào tour (`[data-tour-start]`) ở `/planning-export` ≥ 1, ở `/imports` == 0
+- **Given** trang Nhập hàng đã khai tour (v4), trang Người dùng (MIỄN) không
+- **When** mở lần lượt hai trang, mở hộp "?" nếu có
+- **Then** Nhập hàng có lối "Bắt đầu hướng dẫn thao tác"; Người dùng không
+- **Assert** số phần tử `[data-tour-start]` sau khi mở hộp "?" ở `/imports` ≥ 1, ở `/users` == 0
 
 ### AC-10 — Lời tour phủ đủ nhãn trạng thái · Maps to: NV1 · Test: unit
 - **Given** hằng số nhãn trong code: 5 trạng thái hợp đồng (gồm "Đã chốt HĐ"), 4 trạng thái mục, 6 tên bước, 4 thẻ chuyến (Đủ hồ sơ · Trễ hạn · Chờ booking · Dùng chung)
@@ -194,11 +355,44 @@ Mỗi dòng: người đọc gặp gì · lời phải nói gì · nguồn. Văn
 - **Then** tiêu đề không chấm cuối, lời kết thúc bằng dấu chấm, không dùng động từ "bấm / nhấn / click"
 - **Assert** số tiêu đề kết thúc "." == 0; số lời không kết thúc "." == 0; số lần xuất hiện "bấm" / "nhấn" / "click" (không phân hoa thường) == 0
 
+### AC-12 — Mọi trang nghiệp vụ có tour + hộp "?" · Maps to: NV5, NV6, R13 · Test: unit
+- **Given** danh sách route trang trong `App.tsx` (≥ 15 sau khi bỏ chuyển hướng / tham số) và danh sách MIỄN
+- **When** chạy `pageTourCoverage.test.ts`
+- **Assert** số trang ngoài MIỄN thiếu `tourSpec` == 0; thiếu `PAGE_GUIDES` == 0; tour / mục MIỄN không ứng với route nào == 0; `pageId` trùng == 0; file tour không được màn nào gọi qua `usePageTour` == 0
+
+### AC-13 — Khuôn + văn phong mọi tour · Maps to: NV5, R9, R15 · Test: unit
+- **Given** mọi `tourSpec` (bản đủ quyền)
+- **Assert** mỗi tour: 3 ≤ số bước ≤ 22; id trùng == 0; bước 1 không có `target`; tiêu đề kết thúc "." == 0; lời không kết thúc "." == 0; "bấm" / "nhấn" / "click" == 0
+
+### AC-14 — Mốc của mọi bước có trên trang · Maps to: NV5, R15, R17 · Test: unit
+- **Given** mọi `target` của mọi tour
+- **Assert** số mốc không xuất hiện thành chuỗi `"<mốc>"` trong file .tsx có `data-tour` ở `features/` hoặc `design-system/` == 0
+
+### AC-15 — Lời tour phủ nhãn trạng thái của trang · Maps to: NV5, R10, R15 · Test: unit
+- **Given** trang có hằng số nhãn trạng thái trong code (vd Việc của tôi, Tài liệu, Xuất khẩu)
+- **Assert** test `<trang>Tour.test.ts`: số nhãn không có nguyên văn trong lời tour == 0; bước ghi khi không có quyền ghi == 0
+
+### AC-16 — Chạy thật mọi tour không đổi dữ liệu, không tràn · Maps to: NV5, R1, R5 · Test: manual
+- **Given** preview chế độ demo (dữ liệu dưới máy), 1366 px rồi 360 px × 130 %
+- **When** mở từng trang, bắt đầu tour, đi tới Kết thúc
+- **Assert** mỗi trang: băm khóa `bsf*` trước == sau; số bước bắt buộc hiện lời giữa trang vì thiếu mốc == 0 (trừ bước 1); `documentElement.scrollWidth == clientWidth`; `location.hash` sau khi thoát == trước khi bắt đầu
+
 ## 11. Assumptions / Open
 - **Assumptions**: tour không tự bật lần đầu và không nhớ "đã xem" (R8, OUT); lối vào ở cả hộp "?" của trang lẫn một nút phụ trên trang (cùng một tour); chữ tour viết theo giọng hướng dẫn hiện có (nói việc, không thuật ngữ); tour dùng dữ liệu đang có (thật hay demo đều được) — không sinh số mẫu (quy tắc 15).
 - **Open (RED)**: không có.
+- **Open — lệch tài liệu / màn (v4, phát hiện lúc kiểm kê; lời tour theo CODE, chưa sửa):**
+  - CLAUDE.md mục G1 ghi "tồn cuối NL = tồn đầu + đông gửi − xả đông" — màn `/nxt-material` + 31 § Tồn kho NL (PA-a) + 38 §0: Tồn cuối = Tồn đầu + Nhập − Xuất SX − Bán nội địa; Đông gửi / Xả đông chỉ là cột thông tin.
+  - 31: thân doc khối nguyên liệu còn tả nút "n chuyến", "Tách theo đại lý", ô ngày ghi ngược sổ Nhập hàng (code: dòng sổ nhập khóa, sửa qua ✎, "n người bán"); doc nói khung "còn dở SX chưa hiện" đã bỏ nhưng `/nxt-material` vẫn hiện.
+  - 30 §1 còn tả hộp thoại ghi chuyến (nay ghi ngay trên trang).
+  - 35 còn tả hộp "Ghi sản lượng" + "chốt ngày SX → chờ nhập" (nay lưu là Chờ nhập kho ngay).
+  - 34 F-N6 / AC-13 (thủ kho xác nhận thực xuất) chưa có ở code — lập lệnh xuất là đóng ngay.
+  - 33: handoff Đơn đặt ghi "Lưu trữ", code ghi "Đơn đặt". Màn Bán hàng: thẻ "Tổng tiền bán" cộng thẳng USD với VND (trái 33 §4).
+  - 40 + spec DOC-R7: đính PDF "ở cột File" (thực tế trong hộp chi tiết); việc gia hạn giao "phòng sở hữu" (code: người xem được + có `documents.update`).
+  - QC: "Mở lại ngày" không hỏi lý do (khác Nhập hàng / Sản xuất); phụ đề "Ảnh kèm sẽ bổ sung sau" đã cũ. Cân đối: nút "Nhận chuyển kỳ" không kiểm quyền.
+  - Chữ trên vài màn còn "Bấm …" (Nhập hàng, Việc của tôi, Tài liệu, Đóng gói, Đối soát, QR) và empty state "Sản xuất BTP" (menu: "Sản xuất thành phẩm"). Hộp "?" (guideContent) đã sửa theo code ở v4.
 
 ## History
+- v4 (2026-10-22, chủ dự án: "bổ sung hướng dẫn thao tác cho các trang đã có và sau này, ghi quy tắc"): mở rộng ra MỌI trang nghiệp vụ (NV5, NV6), R13–R17, AC-12…AC-16, quy tắc 18 (CLAUDE.md), cổng `pageTourCoverage.test.ts` (route ⇄ tour ⇄ hộp "?" ⇄ mốc). Hộp "?" bổ sung cho 7 trang còn thiếu (Sản xuất, Đóng gói, QC, Tồn kho NL, NXT kho, Đối soát, Tổng quan). Orchestrator tự chấm (việc lặp khuôn đã duyệt ở v1–v3, không spawn team BA); viết lời giao cho 7 agent theo nhóm trang, mỗi trang kiểm kê nội dung riêng (§9c).
 - v3 (2026-10-21): áp nhánh nội dung (skill ba-flow-logic references/06) — §9b kiểm kê có nguồn, R10–R12, AC-10 phủ nhãn + AC-11 văn phong (unit, đọc thẳng hằng số nhãn).
 - v2 (2026-10-21): theo góp ý chủ dự án — tên "Hướng dẫn thao tác", lời viết lại theo văn phong tài liệu (R9), thêm bước giải thích trạng thái hợp đồng / chuyến / mục và điều kiện file; R5 trả cả vị trí cuộn; giới hạn 22 bước. Đã chạy: 21 bước đạt ở 1366 px và 360 px × 100 / 130 % (0 bước khuất / đè / tràn), dữ liệu dưới máy không đổi, đường dẫn trả về.
 - v1 (2026-10-21): khởi tạo — cơ chế tour dùng chung + tour Xuất khẩu + hộp "?" Xuất khẩu.

@@ -66,6 +66,8 @@ import {
 } from "lucide-react";
 import { useDraftAccount, useFormDraft } from "@/lib/formDraft";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildMaterialStockTour } from "./materialStockTour";
 
 const WORKSHOP_OPTIONS: ComboboxOption[] = [
   { value: "Tất cả", label: "Tất cả xưởng" },
@@ -100,7 +102,7 @@ export default function MaterialNxtScreen() {
   const isReadOnly = !allowed.create && !allowed.update;
   const [periods] = useBalancingPeriods();
   const [inputs] = useBalancingInputs();
-  const [imports] = useMaterialImports();
+  const [imports, , { status: importStatus }] = useMaterialImports();
   const [opening, writeOpening] = useMaterialOpeningStock();
   const [materialTypes, setMaterialTypes] = useMaterialTypes();
   /** Bút chì sửa nhanh danh mục ngay trong ô chọn. */
@@ -134,6 +136,10 @@ export default function MaterialNxtScreen() {
       setIsOpeningOpen(true);
     },
   });
+
+  /* Hướng dẫn thao tác (ba-spec 43) — chỉ dẫn, không ghi; lời khai tồn đầu theo quyền. */
+  const tour = useMemo(() => buildMaterialStockTour({ canCreateOpening: allowed.create }), [allowed.create]);
+  usePageTour(importStatus === "loading" && imports.length === 0 ? null : tour);
 
   const workshop = workshopFilter === "Tất cả" ? undefined : (workshopFilter as Workshop);
 
@@ -342,6 +348,7 @@ export default function MaterialNxtScreen() {
           </p>
         </div>
         <Button
+          data-tour="nxt-material-opening"
           title="Khai tồn đầu kho nguyên liệu cho các loại chưa có kỳ trước để kế thừa — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setIsOpeningOpen(true)}>
           <PackagePlus className="mr-2 h-4 w-4" />
           Tồn đầu ({filteredOpening.length})
@@ -349,7 +356,7 @@ export default function MaterialNxtScreen() {
       </div>
 
       {/* Bộ chọn kỳ + phân xưởng */}
-      <div className="flex flex-wrap items-end gap-4">
+      <div data-tour="nxt-material-filters" className="flex flex-wrap items-end gap-4">
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -395,10 +402,12 @@ export default function MaterialNxtScreen() {
         </div>
       </div>
 
-      <StatCardGrid cards={cards} />
+      <div data-tour="nxt-material-stats">
+        <StatCardGrid cards={cards} />
+      </div>
 
       {/* Chú thích phạm vi — trung thực (nhất là với BGĐ) */}
-      <div className="flex flex-wrap items-start gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
+      <div data-tour="nxt-material-scope-note" className="flex flex-wrap items-start gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
         <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
         <span className="text-base text-warning">
           <b>Xuất SX chưa được ghi</b> (màn Sản xuất chưa có ô "NL lấy ra sản xuất") nên tạm = 0 —
@@ -410,7 +419,7 @@ export default function MaterialNxtScreen() {
       {/* Còn dở SX ghi ở ngày không có kỳ cân đối phủ → không hiện ở cột đông gửi
           info nào. Gọi tên thay vì để số biến mất. */}
       {unmatchedLeftover > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
+        <div data-tour="nxt-material-leftover-warning" className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-warning" aria-hidden />
           <span className="text-base font-semibold text-warning">
             {num(unmatchedLeftover)} kg còn dở SX chưa hiện ở đâu — ghi ở ngày CHƯA có kỳ cân đối nào (cùng
@@ -421,7 +430,7 @@ export default function MaterialNxtScreen() {
 
       {/* Cảnh báo tồn âm — bộ dò lỗi ghi chép */}
       {data.warningCount > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
+        <div data-tour="nxt-material-negative-warning" className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-destructive bg-destructive/10 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" aria-hidden />
           <span className="text-base font-semibold text-destructive">
             {data.warningCount} loại có tồn cuối ÂM — kiểm lại tồn đầu / nhập hàng đã ghi đúng chưa.
@@ -439,7 +448,7 @@ export default function MaterialNxtScreen() {
         <>
           {/* Tồn theo NGÀY */}
           {data.days.length > 0 && (
-            <section className="space-y-2">
+            <section data-tour="nxt-material-by-day" className="space-y-2">
               <h3 className="text-lg font-semibold text-foreground">Tồn theo ngày</h3>
               <SummaryTable
                 rows={data.days}
@@ -452,7 +461,7 @@ export default function MaterialNxtScreen() {
           )}
 
           {/* Tồn theo loại NL */}
-          <section className="space-y-2">
+          <section data-tour="nxt-material-by-material" className="space-y-2">
             <h3 className="text-lg font-semibold text-foreground">Tồn theo loại nguyên liệu</h3>
             <SummaryTable
               rows={data.families}

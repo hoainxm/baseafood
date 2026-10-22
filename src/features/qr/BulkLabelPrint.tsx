@@ -54,7 +54,7 @@ export function BulkLabelPrint() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="qr-print-filters" className="space-y-4 rounded-xl border-2 border-border p-4">
         <div className="grid gap-4">
           <DateRangeField
             label="Ngày của lô"
@@ -117,7 +117,7 @@ export function BulkLabelPrint() {
           }
         />
       ) : (
-        <div className="space-y-3 rounded-xl border-2 border-border p-4">
+        <div data-tour="qr-print-list" className="space-y-3 rounded-xl border-2 border-border p-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-muted-foreground">
               Đã chọn <span className="tnum font-semibold text-foreground">{selected.length}</span> / {items.length} lô

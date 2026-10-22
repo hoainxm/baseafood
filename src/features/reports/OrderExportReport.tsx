@@ -44,6 +44,8 @@ import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/perio
 import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { useCan } from "@/features/shared/PermissionProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildExportReportTour } from "./exportReportTour";
 import {
   CalendarRange,
   FileSpreadsheet,
@@ -94,6 +96,9 @@ export default function OrderExportReport() {
   const [customers] = useCustomers();
   const [products] = useProducts();
   const isLoading = status === "loading" && exportOrders.length === 0;
+  /* Hướng dẫn thao tác (ba-spec 43) — chỉ dẫn, không ghi; bước xuất theo quyền. */
+  const tour = useMemo(() => buildExportReportTour({ canExport: allowed.export }), [allowed.export]);
+  usePageTour(isLoading ? null : tour);
 
   const [period, setPeriod] = useState<ViewPeriod>("month");
   const [anchor, setAnchor] = useState(todayIso());
@@ -215,7 +220,7 @@ export default function OrderExportReport() {
           Báo cáo đơn đặt được xuất hàng
         </h1>
         {allowed.export && (
-        <div className="flex flex-wrap gap-2">
+        <div data-tour="export-report-export" className="flex flex-wrap gap-2">
           <Button
             title="Xem trước bản in A4 báo cáo đơn xuất rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!group.length}>
             <Printer />
@@ -230,7 +235,7 @@ export default function OrderExportReport() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="export-report-filters" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -276,7 +281,9 @@ export default function OrderExportReport() {
         </div>
       </div>
 
-      <StatCardGrid cards={cards} />
+      <div data-tour="export-report-stats">
+        <StatCardGrid cards={cards} />
+      </div>
 
       {isLoading ? (
         <TableSkeleton />
@@ -287,6 +294,7 @@ export default function OrderExportReport() {
           description="Tạo lệnh xuất ở màn Đơn đặt, số liệu xuất sẽ tổng hợp về đây."
         />
       ) : (
+        <div data-tour="export-report-table">
         <HorizontalScroll viewportClassName="rounded-xl border-2 border-border">
           <Table>
             <TableHeader>
@@ -362,6 +370,7 @@ export default function OrderExportReport() {
             </TableFooter>
           </Table>
         </HorizontalScroll>
+        </div>
       )}
       <RowMarkToolbar marker={to} selectedKeys={rowKeys.filter((k) => rowSelection.selected.has(k))} onClearSelection={rowSelection.clearSelection} />
 

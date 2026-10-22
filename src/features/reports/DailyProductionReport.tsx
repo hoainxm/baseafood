@@ -38,6 +38,8 @@ import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/perio
 import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { useCan } from "@/features/shared/PermissionProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildProductionReportTour } from "./productionReportTour";
 import {
   CalendarRange,
   Factory,
@@ -85,6 +87,9 @@ export default function DailyProductionReport() {
   const allowed = useCan("production-report");
   const [products] = useProducts();
   const isLoading = status === "loading" && rows.length === 0;
+  /* Hướng dẫn thao tác (ba-spec 43) — chỉ dẫn, không ghi; bước xuất theo quyền. */
+  const tour = useMemo(() => buildProductionReportTour({ canExport: allowed.export }), [allowed.export]);
+  usePageTour(isLoading ? null : tour);
 
   const [period, setPeriod] = useState<ViewPeriod>("month");
   const [anchor, setAnchor] = useState(todayIso());
@@ -219,7 +224,7 @@ export default function DailyProductionReport() {
           Báo cáo thành phẩm hàng ngày
         </h1>
         {allowed.export && (
-        <div className="flex flex-wrap gap-2">
+        <div data-tour="production-report-export" className="flex flex-wrap gap-2">
           <Button
             title="Xem trước bản in A4 báo cáo sản lượng ngày rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!groups.length}>
             <Printer />
@@ -234,7 +239,7 @@ export default function DailyProductionReport() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="production-report-filters" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -280,7 +285,9 @@ export default function DailyProductionReport() {
         </div>
       </div>
 
-      <StatCardGrid cards={cards} />
+      <div data-tour="production-report-stats">
+        <StatCardGrid cards={cards} />
+      </div>
 
       {isLoading ? (
         <TableSkeleton />
@@ -293,7 +300,7 @@ export default function DailyProductionReport() {
       ) : (
         <>
           {chart.length > 1 && (
-            <section className="space-y-3 rounded-xl border-2 border-border bg-card p-5">
+            <section data-tour="production-report-chart" className="space-y-3 rounded-xl border-2 border-border bg-card p-5">
               <h3 className="text-lg font-semibold text-foreground">
                 Sản lượng làm ra theo ngày
               </h3>
@@ -301,6 +308,7 @@ export default function DailyProductionReport() {
             </section>
           )}
 
+          <div data-tour="production-report-table">
           <HorizontalScroll viewportClassName="rounded-xl border-2 border-border">
             <Table>
               <TableHeader>
@@ -386,6 +394,7 @@ export default function DailyProductionReport() {
               </TableFooter>
             </Table>
           </HorizontalScroll>
+          </div>
           <RowMarkToolbar marker={to} selectedKeys={rowKeys.filter((k) => rowSelection.selected.has(k))} onClearSelection={rowSelection.clearSelection} />
         </>
       )}

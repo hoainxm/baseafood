@@ -278,7 +278,7 @@ export default function ImportReport({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div data-tour="imports-report-filters" className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-1 flex-wrap items-end gap-4">
           <div className="min-w-[12rem]">
             <Combobox
@@ -338,7 +338,9 @@ export default function ImportReport({
         )}
       </div>
 
-      <StatCardGrid cards={cards} />
+      <div data-tour="imports-report-summary">
+        <StatCardGrid cards={cards} />
+      </div>
 
       {chart.length > 0 && (
         <section className="space-y-3 rounded-xl border-2 border-border bg-card p-5">

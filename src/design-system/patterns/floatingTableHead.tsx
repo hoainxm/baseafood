@@ -24,6 +24,19 @@ export function useFloatingTableHead(getFrame: () => HTMLElement | null, enabled
   const innerRef = React.useRef<HTMLDivElement>(null);
   const [frame, setFrame] = React.useState<HTMLElement | null>(null);
   const [show, setShow] = React.useState(false);
+  // Bảng nằm trong HỘP THOẠI: vùng cuộn là thân hộp, không có header trang phía trên ⇒ dính
+  // sát đỉnh (top-0). Dùng `top-header` ở đây làm hàng tên cột nổi lơ lửng giữa hộp, đè dòng
+  // (lỗi 2026-10-22 ở hộp "Tên hàng trên chứng từ").
+  const inDialog = !!frame?.closest('[role="dialog"]');
+  // Vùng cuộn của hộp có lề trên ⇒ sticky top-0 chừa khe bằng lề đó (lộ chữ dòng phía sau) — bù âm.
+  const [dialogTop, setDialogTop] = React.useState(0);
+  React.useLayoutEffect(() => {
+    if (!inDialog) return;
+    let el = holderRef.current?.parentElement ?? null;
+    while (el && !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) el = el.parentElement;
+    const pad = el ? parseFloat(getComputedStyle(el).paddingTop) || 0 : 0;
+    setDialogTop((prev) => (prev === -pad ? prev : -pad));
+  }, [inDialog]);
 
   // Tìm lại khung sau mỗi lần vẽ (bảng rỗng → có dòng thì khung mới xuất hiện).
   React.useLayoutEffect(() => {
@@ -106,7 +119,12 @@ export function useFloatingTableHead(getFrame: () => HTMLElement | null, enabled
   if (!enabled) return null;
   return (
     // m-0: chỗ neo cao 0 — đừng ăn khoảng cách space-y của khối cha (đẩy bảng xuống 16 px).
-    <div ref={holderRef} className="pointer-events-none sticky top-header z-20 m-0 h-0 print:hidden" aria-hidden>
+    <div
+      ref={holderRef}
+      className={`pointer-events-none sticky ${inDialog ? "" : "top-header"} z-20 m-0 h-0 print:hidden`}
+      style={inDialog ? { top: dialogTop } : undefined}
+      aria-hidden
+    >
       <div
         ref={innerRef}
         // inert: bản sao không nhận phím / chuột (tránh tab vào ô tick trùng).

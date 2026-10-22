@@ -16,9 +16,11 @@ import {
   FormDialog,
   InlineConfirmDelete,
   Input,
+  RecordTable,
   notify,
   type ComboboxOption,
   type FieldError,
+  type RecordTableColumn,
 } from "@/design-system";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useQuickCatalogEdit } from "./QuickCatalogEdit";
@@ -85,8 +87,13 @@ export function CustomerProductNamesDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở / đổi khách
   }, [customer?.id]);
 
-  const shown = customer ? namesOfCustomer(names, customer.id).sort((a, b) => nameKey(a.tradeName).localeCompare(nameKey(b.tradeName), "vi") || nameKey(a.sizeText).localeCompare(nameKey(b.sizeText), "vi")) : [];
+  const [query, setQuery] = useState("");
   const productName = (id: string) => products.find((p) => p.id === id)?.name || "(mặt hàng đã xóa)";
+  const productCode = (id: string) => products.find((p) => p.id === id)?.finishedGoodCode || "";
+  // Sắp theo tên rồi size ⇒ hai size cùng tên đứng cạnh nhau (dễ đối chiếu với HĐ).
+  const all = customer ? namesOfCustomer(names, customer.id).sort((a, b) => nameKey(a.tradeName).localeCompare(nameKey(b.tradeName), "vi") || nameKey(a.sizeText).localeCompare(nameKey(b.sizeText), "vi")) : [];
+  const q = nameKey(query);
+  const shown = q ? all.filter((n) => nameKey([n.tradeName, n.sizeText, n.packing, n.hsCode, n.note, productName(n.productId), productCode(n.productId)].join(" ")).includes(q)) : all;
   const productOptions: ComboboxOption[] = products.map((m) => ({ value: m.id, label: m.code ? `${m.code} · ${m.name}` : m.name, subLabel: m.code || undefined }));
   const addProduct = (name: string) => {
     const existing = products.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase());
@@ -121,6 +128,47 @@ export function CustomerProductNamesDialog({
     notify.deleted(`Đã xóa tên "${n.tradeName}"`, () => void setNames(prev));
   };
 
+  /** Size / quy cách dài: mỗi ý (ngăn bằng "·") một dòng — không nối thành đoạn khó dò. */
+  const parts = (v: string) => {
+    const xs = v.split(/\s*·\s*/).filter(Boolean);
+    if (!xs.length) return <span className="text-muted-foreground">—</span>;
+    return (
+      <span className="grid gap-0.5">
+        {xs.map((x, i) => (
+          <span key={i} className={`break-words ${i ? "text-muted-foreground" : ""}`}>
+            {x}
+          </span>
+        ))}
+      </span>
+    );
+  };
+  const columns: RecordTableColumn<CustomerProductName>[] = [
+    {
+      key: "trade-name",
+      header: "Tên trên chứng từ",
+      primary: true,
+      width: "20%",
+      render: (n) => <span className="font-semibold break-words">{n.tradeName}</span>,
+      getSortValue: (n) => `${nameKey(n.tradeName)}|${nameKey(n.sizeText)}`,
+    },
+    {
+      key: "product",
+      header: "Mặt hàng xưởng",
+      width: "24%",
+      render: (n) => (
+        <span className="grid gap-0.5">
+          <span className="break-words">{productName(n.productId)}</span>
+          {productCode(n.productId) && <span className="text-muted-foreground">{productCode(n.productId)}</span>}
+          {n.note && <span className="break-words text-muted-foreground">{n.note}</span>}
+        </span>
+      ),
+      getSortValue: (n) => nameKey(productName(n.productId)),
+    },
+    { key: "size", header: "Size", width: "26%", render: (n) => parts(n.sizeText), getSortValue: (n) => nameKey(n.sizeText) },
+    { key: "packing", header: "Quy cách", width: "18%", render: (n) => parts(n.packing), getSortValue: (n) => nameKey(n.packing) },
+    { key: "hs", header: "Mã HS", width: "12%", render: (n) => <span className="tnum">{n.hsCode || "—"}</span>, getSortValue: (n) => n.hsCode },
+  ];
+
   return (
     <FormDialog
       open={!!customer}
@@ -132,11 +180,11 @@ export function CustomerProductNamesDialog({
       title={`Tên hàng trên chứng từ · ${customer?.name ?? ""}`}
       description="Tên khách dùng trên hợp đồng / invoice cho từng mặt hàng của xưởng. App tự thêm khi nối mặt hàng ở hợp đồng; sửa ở đây không đổi hợp đồng đã lưu."
       icon={Languages}
-      size="lg"
+      size="xl"
       hasRequiredFields={!!form}
       footer={
         <>
-          <span className="tnum mr-auto min-w-0 text-sm text-muted-foreground">{shown.length} tên hàng</span>
+          <span className="tnum mr-auto min-w-0 text-sm text-muted-foreground">{all.length} tên hàng</span>
           {writable && !form && customer && (
             <Button onClick={() => open(emptyRow(customer.id), true)} title={`Thêm một tên hàng ${customer.name} dùng trên chứng từ cho một mặt hàng của xưởng.`}>
               <Plus className="mr-2 h-4 w-4" aria-hidden />
@@ -156,7 +204,7 @@ export function CustomerProductNamesDialog({
 
         {form && (
           <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 rounded-xl bg-muted/40 p-4">
-            <h3 className="font-semibold">{form.isNew ? "Thêm tên hàng" : "Sửa tên hàng"}</h3>
+            <h3 className="font-semibold">{form.isNew ? "Thêm tên hàng" : `Sửa tên hàng · ${productName(form.row.productId)}`}</h3>
             <ErrorSummary errors={errors} />
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Combobox
@@ -205,32 +253,38 @@ export function CustomerProductNamesDialog({
           </section>
         )}
 
-        {shown.length ? (
-          <ul className="grid min-w-0 grid-cols-[minmax(0,1fr)] divide-y divide-border rounded-lg border border-border">
-            {shown.map((n) => (
-              <li key={n.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-3 py-2">
-                <div className="grid min-w-0 gap-0.5 text-sm">
-                  <span className="font-semibold break-words">{n.tradeName}</span>
-                  {(n.sizeText || n.packing || n.hsCode) && (
-                    <span className="break-words text-muted-foreground">{[n.sizeText, n.packing, n.hsCode && `HS ${n.hsCode}`].filter(Boolean).join(" · ")}</span>
-                  )}
-                  <span className="break-words">
-                    Mặt hàng xưởng: {productName(n.productId)}
-                    {n.note ? <span className="text-muted-foreground"> · {n.note}</span> : null}
-                  </span>
-                </div>
-                {writable && (
-                  <div className="flex shrink-0 gap-1">
-                    <Button size="icon-sm" variant="edit" onClick={() => open(n, false)} title={`Sửa tên "${n.tradeName}" (hợp đồng đã lưu không đổi).`}>
-                      <Pencil className="h-4 w-4" aria-hidden />
-                      <span className="sr-only">Sửa</span>
-                    </Button>
-                    {canDelete && <InlineConfirmDelete recordDescription={`${n.tradeName} — ${productName(n.productId)}`} onConfirm={() => remove(n)} />}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+        {all.length ? (
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+            <div className="flex min-w-0 flex-wrap items-end gap-3">
+              <div className="min-w-0 flex-1 basis-56 sm:max-w-sm">
+                <Field label="Tra tên hàng">
+                  <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} title="Gõ một phần tên trên chứng từ, mặt hàng xưởng, size, mã HS hoặc mã kế toán — lọc ngay bảng dưới." />
+                </Field>
+              </div>
+              <span className="tnum pb-2 text-sm text-muted-foreground">
+                {q ? `${shown.length} / ${all.length} tên hàng` : `${all.length} tên hàng`}
+              </span>
+            </div>
+            <RecordTable
+              columns={columns}
+              rows={shown}
+              getKey={(n) => n.id}
+              emptyText="Không tên hàng nào khớp ô tra."
+              actions={
+                writable
+                  ? (n) => (
+                      <>
+                        <Button size="icon-sm" variant="edit" onClick={() => open(n, false)} title={`Sửa tên "${n.tradeName}" (hợp đồng đã lưu không đổi).`}>
+                          <Pencil className="h-4 w-4" aria-hidden />
+                          <span className="sr-only">Sửa</span>
+                        </Button>
+                        {canDelete && <InlineConfirmDelete recordDescription={`${n.tradeName} — ${productName(n.productId)}`} onConfirm={() => remove(n)} />}
+                      </>
+                    )
+                  : undefined
+              }
+            />
+          </div>
         ) : (
           !form && (
             <p className="text-sm text-muted-foreground">

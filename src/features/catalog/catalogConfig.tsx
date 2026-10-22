@@ -148,9 +148,9 @@ export function buildCatalogFields(
     },
     {
       key: "tradeName",
-      label: "Tên thương mại (tiếng Anh)",
+      label: "Tên tiếng Anh mặc định",
       hideInTable: true,
-      example: "VD: Frozen iwadako boiled cut — tên in trên hợp đồng, hóa đơn quốc tế",
+      example: "VD: Frozen boiled octopus — dùng khi khách chưa có tên riêng (Tên hàng ở danh mục Khách hàng)",
     },
     {
       key: "materialTypeId",
@@ -499,7 +499,7 @@ export function buildCatalogFields(
 
 const EXPORT_CUSTOMER_KEYS = new Set<string>(["country", "address", "defaultPort", "paymentTerms", "contactName", "contactEmail"]);
 const hasExportCustomerColumns = (rows: readonly Customer[]) => !hasExportStorage || rows.some((r) => r.country !== undefined);
-/** Mig 0076: máy chủ chưa có cột `products.trade_name` ⇒ ẩn ô Tên thương mại, khỏi gửi cột chưa có (kẹt hàng chờ). */
+/** Mig 0076: máy chủ chưa có cột `products.trade_name` ⇒ ẩn ô Tên tiếng Anh mặc định, khỏi gửi cột chưa có (kẹt hàng chờ). */
 const hasTradeNameColumn = (rows: readonly Product[]) => !hasExportStorage || rows.some((r) => r.tradeName !== undefined);
 
 /** Nguồn dữ liệu của một danh mục — PHẢI là đúng instance `useTable` của màn đang mở. */

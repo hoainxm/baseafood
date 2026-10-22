@@ -49,6 +49,7 @@ import {
   CalendarClock,
   CheckCircle2,
   FilePen,
+  Languages,
   FileSignature,
   Link2,
   LockOpen,
@@ -96,6 +97,7 @@ export function ContractDossier({
   onEditPayment,
   onDeletePayment,
   onMapProducts,
+  onOpenCustomerNames,
   products,
   today,
   onPreview,
@@ -126,6 +128,8 @@ export function ContractDossier({
   onDeletePayment: (p: ExportPayment) => void;
   /** Mở hộp nối dòng hàng ↔ danh mục mặt hàng (không tạo bản sửa). */
   onMapProducts: () => void;
+  /** Mở danh sách "Tên hàng trên chứng từ" của khách của HĐ (ba-spec 41 v6). */
+  onOpenCustomerNames: () => void;
   /** Danh mục mặt hàng — hiện mặt hàng đã nối của từng dòng hàng. */
   products: readonly Pick<Product, "id" | "code" | "name">[];
   today: string;
@@ -457,6 +461,12 @@ export function ContractDossier({
           summary={totals ? `${formatNumber(totals.units)} thùng/kiện · ${formatNumber(totals.kg)} kg${can.viewPrice ? ` · ${formatMoney(totals.amount)} ${currency}` : ""}${unmapped ? ` · ${unmapped} dòng chưa nối danh mục` : ""}` : undefined}
           defaultOpen={termsFirst}
         >
+          <div className="flex min-w-0 flex-wrap items-center gap-2 pb-2">
+            <Button size="sm" variant="ghost" onClick={onOpenCustomerNames} title={`Xem / sửa tên hàng ${customerName} dùng trên hợp đồng, invoice (theo từng mặt hàng, size).`}>
+              <Languages className="mr-1 h-4 w-4" aria-hidden />
+              Tên hàng của {customerName}
+            </Button>
+          </div>
           {can.update && isOpen && (
             <div className="flex min-w-0 flex-wrap items-center gap-2 pb-2">
               <Button size="sm" variant="outline" onClick={onMapProducts} title="Chọn mặt hàng trong danh mục cho từng dòng hàng — thông tin nội bộ, không tạo bản sửa, không cần BGĐ duyệt lại.">

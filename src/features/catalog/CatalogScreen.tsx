@@ -3,8 +3,10 @@
 // Tên tiếng Việt: Màn hình Quản lý Danh mục chung
 // Description: Master Catalog Management Screen
 // ============================================================
+import { useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  Button,
   CatalogCrud,
   Tabs,
   TabsContent,
@@ -16,6 +18,11 @@ import FinishedGoodScreen from "./FinishedGoodScreen";
 import { normalizeCatalogTab } from "@/lib/legacyUrls";
 import { useCan, usePermissions } from "@/features/shared/PermissionProvider";
 import { can } from "@/lib/permissions";
+import { useCustomerProductNameStore } from "@/lib/catalogRepo";
+import { namesOfCustomer } from "@/lib/customerProductNames";
+import type { Customer } from "@/types";
+import { Languages } from "lucide-react";
+import { CustomerProductNamesDialog } from "./CustomerProductNamesDialog";
 
 /** Tab ⇄ tài nguyên phân quyền (lib/permissions.ts) — mỗi tab quyền riêng. */
 const TAB_RESOURCE: Record<string, string> = {
@@ -62,6 +69,10 @@ export default function CatalogScreen() {
     );
 
   const c = useCatalogConfigs();
+  // Tên hàng trên chứng từ theo khách (mig 0077, ba-spec 41 v6) — nút riêng ở mỗi dòng khách.
+  const nameStore = useCustomerProductNameStore();
+  const customerCan = useCan("catalog.customers");
+  const [namesFor, setNamesFor] = useState<Customer | null>(null);
 
   return (
     <div className="space-y-6">
@@ -86,7 +97,28 @@ export default function CatalogScreen() {
         </TabsContent>
 
         <TabsContent value="customers" className="pt-6">
-          <CatalogCrudFor cfg={c.customer} rowMarkKey="danh-muc-khach-hang" resource={TAB_RESOURCE["customers"]} />
+          <CatalogCrudFor
+            cfg={c.customer}
+            rowMarkKey="danh-muc-khach-hang"
+            resource={TAB_RESOURCE["customers"]}
+            rowActions={(k) => (
+              <Button size="sm" variant="outline" onClick={() => setNamesFor(k)} title={`Xem / sửa tên hàng ${k.name} dùng trên hợp đồng, invoice xuất khẩu (theo từng mặt hàng, size).`}>
+                <Languages />
+                Tên hàng ({namesOfCustomer(nameStore.names, k.id).length})
+              </Button>
+            )}
+          />
+          <CustomerProductNamesDialog
+            customer={namesFor}
+            names={nameStore.names}
+            setNames={nameStore.setNames}
+            products={c.product.rows}
+            setProducts={c.product.onChange}
+            isAvailable={nameStore.isAvailable}
+            canWrite={customerCan.create || customerCan.update}
+            canDelete={customerCan.delete}
+            onClose={() => setNamesFor(null)}
+          />
         </TabsContent>
 
         <TabsContent value="suppliers" className="pt-6">
@@ -118,8 +150,11 @@ function CatalogCrudFor<T extends { id: string }>({
   cfg,
   rowMarkKey,
   resource,
+  rowActions,
 }: {
   cfg: CatalogConfig<T>;
+  /** Nút riêng của từng dòng (VD "Tên hàng" của khách). */
+  rowActions?: (row: T) => ReactNode;
   /** Khoá bảng tô màu dòng — một khoá cho mỗi tab, đừng đổi (mất dấu cũ). */
   rowMarkKey: string;
   /** Tài nguyên phân quyền của tab (catalog.*). */
@@ -143,6 +178,7 @@ function CatalogCrudFor<T extends { id: string }>({
       createEmpty={cfg.createEmpty}
       getSearchText={cfg.getSearchText}
       getRecordDescription={cfg.getRecordDescription}
+      rowActions={rowActions}
     />
   );
 }

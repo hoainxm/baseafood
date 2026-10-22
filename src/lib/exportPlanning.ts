@@ -25,7 +25,9 @@ import type {
   ExportStep,
   ExportStepItem,
   Product,
+  CustomerProductName,
 } from "@/types";
+import { nameKey, productsByCustomerName } from "./customerProductNames";
 
 /* ---------- Danh sách cố định + nhãn ---------- */
 
@@ -547,28 +549,35 @@ export function unmappedLines(lines: readonly ExportContractLine[]): ExportContr
   return lines.filter((l) => (l.description.trim() || l.quantity != null) && !l.productId);
 }
 
-/** Khóa so tên tiếng Anh: không phân hoa thường, gộp khoảng trắng. */
-const nameKey = (v: string | undefined) => (v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-
-/** Mặt hàng có tên thương mại khớp tên hàng trên HĐ (R23). */
+/** Mặt hàng có tên tiếng Anh MẶC ĐỊNH (`products.trade_name`) khớp tên hàng trên HĐ (R23 bậc 4). */
 export function productsByTradeName<P extends Pick<Product, "id" | "tradeName">>(description: string, products: readonly P[]): P[] {
   const key = nameKey(description);
   return key ? products.filter((p) => nameKey(p.tradeName) === key) : [];
 }
 
+/** Ngữ cảnh gợi ý theo khách (v6): size của dòng + danh sách tên hàng theo khách. */
+export interface LineMatchContext {
+  size?: string;
+  names?: readonly Pick<CustomerProductName, "customerId" | "productId" | "tradeName" | "sizeText">[];
+}
+
 /**
- * Gợi ý mặt hàng cho tên tiếng Anh (R16 + R23): (1) cặp (tên HĐ → mặt hàng) đã nối ở các HĐ trước,
- * ưu tiên cùng khách, rồi bản mới nhất; (2) chưa từng nối ⇒ mặt hàng có tên thương mại khớp — chỉ khi
- * khớp ĐÚNG MỘT (hai size cùng tên thương mại thì để người dùng chọn). Không dịch máy.
+ * Gợi ý mặt hàng cho một dòng hàng (R16 + R23 v6), lấy bậc đầu tiên ra ĐÚNG MỘT mặt hàng:
+ * (1) tên của khách khớp tên + size · (2) tên của khách khớp tên · (3) lịch sử nối ở HĐ trước
+ * (cùng khách trước, rồi bản mới nhất) · (4) tên tiếng Anh mặc định khớp. Không dịch máy.
  */
 export function suggestProductId(
   d: Pick<ExportData, "contracts" | "revisions">,
   description: string,
   customerId: string,
   products: readonly Pick<Product, "id" | "tradeName">[] = [],
+  ctx: LineMatchContext = {},
 ): string {
   const key = nameKey(description);
   if (!key) return "";
+  const byCustomer = productsByCustomerName(ctx.names ?? [], customerId, description, ctx.size ?? "");
+  if (byCustomer.productIds.length === 1) return byCustomer.productIds[0];
+  if (byCustomer.productIds.length > 1) return "";
   const customerOf = new Map(d.contracts.map((c) => [c.id, c.customerId]));
   let best: { productId: string; score: number; at: string } | null = null;
   for (const r of d.revisions) {
@@ -583,15 +592,18 @@ export function suggestProductId(
   return byTrade.length === 1 ? byTrade[0].id : "";
 }
 
-/** Danh sách chọn mặt hàng cho một dòng hàng: mục có tên thương mại khớp tên HĐ đứng đầu (R23). */
-export function rankProductsForLine<P extends Pick<Product, "id" | "tradeName">>(description: string, products: readonly P[]): P[] {
-  const hit = new Set(productsByTradeName(description, products).map((p) => p.id));
-  return [...products.filter((p) => hit.has(p.id)), ...products.filter((p) => !hit.has(p.id))];
-}
-
-/** Tên hàng sau khi chọn mặt hàng (R23): ô đang trống ⇒ tên thương mại; đã có chữ ⇒ giữ nguyên. */
-export function lineDescriptionAfterPick(current: string, product: Pick<Product, "tradeName"> | undefined): string {
-  return current.trim() ? current : (product?.tradeName ?? "").trim() || current;
+/** Danh sách chọn mặt hàng cho một dòng: mục khớp tên của khách, rồi khớp tên mặc định, đứng đầu (R23). */
+export function rankProductsForLine<P extends Pick<Product, "id" | "tradeName">>(
+  description: string,
+  products: readonly P[],
+  customerId = "",
+  ctx: LineMatchContext = {},
+): P[] {
+  const first = new Set([
+    ...productsByCustomerName(ctx.names ?? [], customerId, description, ctx.size ?? "").productIds,
+    ...productsByTradeName(description, products).map((p) => p.id),
+  ]);
+  return [...products.filter((p) => first.has(p.id)), ...products.filter((p) => !first.has(p.id))];
 }
 
 export function canMarkNotApplicable(_item: ExportStepItem, reason: string): { ok: boolean } {

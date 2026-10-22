@@ -59,6 +59,7 @@ import type {
   ExportDeadlineExtension,
   ExportFile,
   ExportPayment,
+  CustomerProductName,
   ExportShipment,
   ExportStepItem,
   BatterType,
@@ -2409,6 +2410,34 @@ export const EXPORT_PAYMENT_TABLE: TableMapping<ExportPayment> = {
   }),
 };
 
+/** Tên hàng theo khách (mig 0077) — tên in trên chứng từ xuất khẩu của từng khách cho từng mặt hàng. */
+export const CUSTOMER_PRODUCT_NAME_TABLE: TableMapping<CustomerProductName> = {
+  table: "customer_product_names",
+  localKey: "bsf.customer-product-names.v1",
+  getKey: theoId,
+  refColumns: ["customer_id", "product_id"],
+  toRow: (x) => ({
+    id: x.id,
+    customer_id: x.customerId,
+    product_id: x.productId,
+    trade_name: x.tradeName,
+    size_text: x.sizeText ?? "",
+    packing: x.packing ?? "",
+    hs_code: x.hsCode ?? "",
+    note: x.note ?? "",
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    customerId: s(r.customer_id),
+    productId: s(r.product_id),
+    tradeName: s(r.trade_name),
+    sizeText: s(r.size_text),
+    packing: s(r.packing),
+    hsCode: s(r.hs_code),
+    note: s(r.note),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
@@ -2456,6 +2485,7 @@ const TABLE_LABELS: Record<string, string> = {
   export_step_items: "Bước của chuyến xuất khẩu",
   export_files: "File hồ sơ xuất khẩu",
   export_payments: "Gửi chứng từ / tiền về",
+  customer_product_names: "Tên hàng theo khách",
   row_marks: "Tô màu dòng",
   app_roles: "Vai trò",
   role_permissions: "Quyền của vai trò",

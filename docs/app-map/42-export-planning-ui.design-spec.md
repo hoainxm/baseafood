@@ -4,6 +4,7 @@
 covers: src/features/export-planning/**
 last_verified: 2026-10-22
 ttl_days: 90
+<!-- updated: 2026-10-22 (b) — v6 (ba-spec 41 v6): hộp "Tên hàng trên chứng từ" của một khách (danh mục Khách hàng + lối từ hồ sơ HĐ), form HĐ chọn mặt hàng điền 4 ô theo tên của khách, hộp Nối mặt hàng gợi ý theo tên + size của khách, ô danh mục đổi thành "Tên tiếng Anh mặc định". -->
 <!-- updated: 2026-10-22 — v5 (ba-spec 41 v5): tab Báo cáo, danh sách file dọc, nhãn v5 (a–n), ô Tên thương mại ở danh mục / form HĐ / hộp Nối mặt hàng. -->
 <!-- re-verified: 2026-10-21 — v4 hướng dẫn thao tác (tour 21 bước, ba-spec 43): nút phụ "Hướng dẫn thao tác" + lối từ hộp "?", khung lời, mốc data-tour — chạy thật 1366 px + 360 px × 100 / 130 %. -->
 <!-- re-verified: 2026-10-21 — v3 triage giao diện (ui-ux-triage + ui-design-logic): tab 2 cột ở điện thoại, cột bảng theo khách thẳng hàng, thẻ số cùng khuôn, hàng checklist cùng khuôn, tên bước không lặp số, bảng Hợp đồng vừa 1366 px — thử preview demo 1366 px + 360 px × 100 / 130 %. -->
@@ -33,6 +34,7 @@ Trọng số thông tin (planner): **3** = tiến độ + mục còn thiếu, vi
 | Chuyến (trong hồ sơ) | chọn chuyến / HĐ 1 chuyến tự mở | điền bước còn thiếu | mục "đang" (bước đầu chưa xong) | nút Cập nhật / Đính ảnh của mục đầu còn thiếu |
 | Form Lập / sửa HĐ | Lập hợp đồng, Sửa bản chờ duyệt, Ghi bản sửa | ghi đúng HĐ giấy (+ nối mặt hàng nếu biết) | lưu ⇒ mở hồ sơ | Lưu hợp đồng |
 | Hộp Nối mặt hàng | nút "Nối mặt hàng" ở khối Dòng hàng của hồ sơ; lỗi chặn Lệnh SX chỉ tới đây | chọn mặt hàng danh mục cho từng dòng (không tạo bản sửa) | lưu ⇒ Lệnh SX đánh xong được | Lưu nối mặt hàng |
+| Hộp Tên hàng trên chứng từ (v6) | nút "Tên hàng" ở dòng khách (danh mục Khách hàng) · nút phụ "Tên hàng của <khách>" ở khối Dòng hàng của hồ sơ HĐ | xem / thêm / sửa / xóa 15–20 tên của một khách (NV14) | đóng hộp ⇒ HĐ lập sau dùng tên mới | Thêm tên hàng |
 | Hộp Ghi kết quả duyệt | nút chính "Ghi kết quả duyệt" | ghi BGĐ ký giấy: kết quả, **người ký chọn từ tài khoản BGĐ**, ngày, scan | lưu ⇒ nút chính đổi sang Lên chuyến | Lưu kết quả duyệt |
 | Màn đóng hàng | nav (chỉ quyền `.loading`) | chụp ảnh lớp / seal / số cont | Đính ảnh | Đính ảnh |
 | Hướng dẫn thao tác (lớp phủ) | nút phụ "Hướng dẫn thao tác" cạnh Lập hợp đồng · nút "Bắt đầu hướng dẫn thao tác" trong hộp "?" | đi một vòng các khu vực theo thứ tự công việc (ba-spec 43) | Hoàn tất ⇒ về đúng chỗ cũ | Tiếp theo |
@@ -102,6 +104,14 @@ Cột tiền ẩn hẳn khi không quyền giá (không để ô "—"). Bảng 
 
 **Danh mục Mặt hàng — Tên thương mại (v5, ba-spec R23).** Hộp Thêm/Sửa: ô chữ **"Tên thương mại (tiếng Anh)"** ngay dưới "Tên mặt hàng", ví dụ "VD: Frozen iwadako boiled cut"; cột bảng phụ (xem ở Chi tiết); ô tìm tìm cả tên này. Tiêu đề tab "Mặt hàng" (bỏ chữ "cân đối" — danh mục dùng chung). Máy chủ chưa có cột ⇒ ô tự ẩn. **Form HĐ:** chọn mặt hàng cho dòng tên trống ⇒ ô tên hàng tự điền tên thương mại. **Ô chọn mặt hàng** (form + hộp Nối): dòng phụ = tên thương mại (tìm được bằng tên này); hộp Nối mở ra điền sẵn khi khớp đúng 1 mặt hàng, các mục khớp đứng đầu danh sách.
 
+**Hộp Tên hàng trên chứng từ (v6 — ba-spec 41 NV14 · NV16 · R23).** `FormDialog` cỡ lg, tiêu đề "Tên hàng trên chứng từ · <Khách>", mô tả 1 câu: "Tên khách dùng trên hợp đồng / invoice cho từng mặt hàng của xưởng. App tự thêm khi nối mặt hàng ở hợp đồng; sửa ở đây không đổi hợp đồng đã lưu." Thân trên → dưới: (1) dải cảnh báo khi máy chủ chưa có bảng (ẩn Thêm / Sửa / Xóa); (2) danh sách — mỗi tên một hàng: **tên trên chứng từ** (đậm) + dòng phụ "size · quy cách · HS", dòng phụ thứ hai "Mặt hàng xưởng: <tên>" (+ ghi chú "Tự học từ HĐ …"), phải: bút chì `edit` + thùng rác `InlineConfirmDelete` (Hoàn tác); trống ⇒ câu "Chưa có tên nào — lưu một hợp đồng đã nối mặt hàng của khách này là app tự thêm, hoặc Thêm tên hàng."; (3) khối form (hiện khi Thêm / Sửa, nền nhạt): `Combobox` **Mặt hàng (xưởng)** (tạo mới + bút chì, luật 7) · **Tên trên chứng từ*** · Size · Quy cách đóng gói · Mã HS · Ghi chú — lưới 2 cột (sm) / 3 cột (lg) + Hủy (`outline`) + Lưu tên hàng (`save`), `ErrorSummary` đầu khối. Nút chính hộp: **Thêm tên hàng** (`default`, Plus). Nháp (luật 17): `useDialogDraft` cho khối form. Danh sách trong hộp ⇒ không tô màu dòng (ngoại lệ luật 12).
+
+**Form HĐ v6.** Chọn mặt hàng ⇒ ô tên · size · quy cách · mã HS **đang trống** điền theo tên của khách (khách chưa có ⇒ chỉ ô tên = tên tiếng Anh mặc định); dòng phụ ô chọn mặt hàng = "mã · tên của khách" (không có thì tên mặc định) ⇒ gõ tên tiếng Anh tìm được. Rời ô tên ⇒ gợi ý theo R23 (4 bậc, dùng size của dòng). Dòng nhắc "Gợi ý theo tên hàng của khách / HĐ trước — kiểm lại".
+
+**Hộp Nối mặt hàng v6.** Gợi ý theo tên + size của dòng (bậc 1–4); mục khớp tên của khách đứng đầu danh sách; câu dưới tiêu đề hộp: "Lưu xong, app tự thêm tên còn thiếu vào danh sách Tên hàng của khách."
+
+**Danh mục Mặt hàng v6.** Ô đổi nhãn **"Tên tiếng Anh mặc định"**, ví dụ "VD: Frozen boiled octopus — dùng khi khách chưa có tên riêng (Tên hàng ở danh mục Khách hàng)".
+
 ## Ma trận trạng thái
 
 | Màn | Đang tải | Trống | Lỗi | Không quyền | Dữ liệu cực đoan |
@@ -111,6 +121,7 @@ Cột tiền ẩn hẳn khi không quyền giá (không để ô "—"). Bảng 
 | Chuyến | — | chưa có mục chứng từ ⇒ câu hướng dẫn | — | không ghi: ẩn nút từng hàng | 27 ảnh lớp: chip ảnh gói gọn, xem trong hộp |
 | Form | — | — | `ErrorSummary` đầu form | — | 14 dòng hàng: tóm tắt từng dòng, tổng ở chân |
 | Không nối máy chủ | — | — | dải cảnh báo 1 dòng | — | ẩn nút tải file |
+| Hộp Tên hàng (v6) | danh sách mờ | câu hướng dẫn tự học / Thêm | `ErrorSummary` ở khối form; máy chủ chưa có bảng ⇒ dải cảnh báo, ẩn Thêm / Sửa / Xóa | không ghi danh mục khách lẫn Xuất khẩu ⇒ chỉ xem | 20+ tên: danh sách cuộn trong hộp, tên dài xuống dòng |
 | Báo cáo (v5) | `TableSkeleton` | kỳ không có chuyến lẫn HĐ ⇒ `EmptyState` "<kỳ> chưa có số xuất khẩu [của khách này]" + gợi ý đổi kỳ | như Lịch | không quyền giá ⇒ ẩn mọi cột / thẻ tiền | năm 40 chuyến / 20 khách: bảng khách sắp kg, tháng 0 vẫn hiện; tiền tới hàng trăm nghìn USD 2 số lẻ |
 | Hướng dẫn thao tác | chưa có lối vào khi trang đang tải (R7) | không có hợp đồng ⇒ phần hồ sơ gói thành 1 lời giữa trang | khu vực không hiện sau ~3 giây (đứng yên 300 ms thì thôi) ⇒ bước tùy chọn bỏ qua, bước bắt buộc thành lời giữa trang | chỉ xem ⇒ bỏ bước Lập hợp đồng / Cập nhật mục / Tiền về | khu vực cao hơn màn ⇒ thấy phần đầu; lời dài cuộn trong khung |
 
@@ -142,7 +153,10 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 
 - 2026-10-22 — **v5** (preview `baseafood-demo`, bộ demo sinh từ sandbox): tab Báo cáo năm / quý ở 1366 px (4 khối cùng bề ngang 1003 px, không khối nào tràn — bản đầu biểu đồ 12 tháng đẩy khối "Theo tháng" ra 1224 px ⇒ bọc `HorizontalScroll` + lưới `minmax(0,1fr)`; dòng Tổng đặt trong `tfoot` của bảng làm gãy 5 dòng + lỗi `<p>` trong `<tfoot>` ⇒ dời ra dưới bảng; tên cột tiền rút gọn, đơn vị USD nói ở câu dưới tiêu đề), 360 px × 100 / 130 % `scrollWidth == 360`, 0 phần tử tràn ngoài khung cuộn riêng; `FileList` 25 ảnh gập còn 6 → "Hiện tất cả 25 file" mở đủ → "Thu gọn" về 6, cụm "Gỡ lớp n" đã hết; khai tên thương mại ở danh mục rồi chọn mặt hàng ở form HĐ ⇒ tên hàng tự điền "Frozen iwadako boiled cut", ô chọn tìm được bằng tên tiếng Anh; console 0 lỗi sau tải lại.
 
+- 2026-10-22 (b) — **v6** (preview `baseafood-demo`, bộ demo mới 18 tên tự học): danh mục Khách hàng có "Tên hàng (n)" mỗi dòng; hộp Tên hàng của khách 9 tên (tên đậm · quy cách · mặt hàng xưởng · "Tự học từ HĐ …"), Thêm → Lưu trống ⇒ `ErrorSummary` 2 lỗi; form HĐ: chọn khách → ô mặt hàng có dòng phụ = tên của khách → chọn ⇒ tên + quy cách tự điền; hồ sơ HĐ có nút "Tên hàng của <khách>"; nối 1 dòng chưa nối ⇒ toast "… · thêm 1 tên hàng của khách" (Hoàn tác — chưa bấm thử); hộp Tên hàng 360 px × 130 % không tràn; console 0 lỗi của app.
+
 ## History
+- v6 (2026-10-22 chiều): hộp Tên hàng trên chứng từ theo khách · form HĐ điền 4 ô theo tên của khách · Nối mặt hàng theo tên + size · "Tên tiếng Anh mặc định" ở danh mục (ba-spec 41 v6).
 - v5 (2026-10-22): tab Báo cáo · `FileList` dọc thay chip · nhãn v5 (a–n) · Tên thương mại ở danh mục, form HĐ, hộp Nối mặt hàng (ba-spec 41 v5).
 - v4 (2026-10-21): hướng dẫn thao tác — tour 21 bước + mốc `data-tour` + hộp "?" cho Xuất khẩu (ba-spec 43).
 - v3 (2026-10-21): triage giao diện — tab điện thoại, cột thẳng hàng giữa bảng khách, thẻ số cùng khuôn, checklist cùng khuôn, bảng Hợp đồng gộp ngày ký vào hạn giao.

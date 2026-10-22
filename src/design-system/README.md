@@ -563,7 +563,7 @@ Màn hỏi quyền bằng `useCan("<tài nguyên>")` (`features/shared/Permissio
 | Không có quyền làm việc của nút (Thêm, Sửa, Xóa, Chốt, Mở lại, Duyệt, Nạp, Xuất) | **Ẩn hẳn nút**, không làm mờ. Luật "nút Lưu không bao giờ `disabled`" giữ nguyên: không quyền thì không có nút. |
 | Có Xem, không có Thêm lẫn Sửa | `ReadOnlyBadge` cạnh tiêu đề màn ("Chỉ xem", có `title` giải thích); ẩn form nhập / nút Lưu; `EditableGrid` đổi cột `kind: "input"` → `"computed"`. |
 | Không có `view-price` | Ẩn cột / ô giá, thành tiền, lãi lỗ (ẩn cả cột, không để ô trống). |
-| `CatalogCrud` | Prop `canCreate` / `canUpdate` / `canDelete` (mặc định `true`): ẩn "Thêm …", "Sửa", "Xóa"; không cả ba ⇒ `ReadOnlyBadge`. `CatalogScreen` truyền theo quyền từng tab `catalog.*`. |
+| `CatalogCrud` | Prop `canCreate` / `canUpdate` / `canDelete` (mặc định `true`): ẩn "Thêm …", "Sửa", "Xóa"; không cả ba ⇒ `ReadOnlyBadge`. `CatalogScreen` truyền theo quyền từng tab `catalog.*`. Prop `rowActions(row)` (2026-10-22): nút RIÊNG của từng dòng, đứng trước Sửa / Xóa — VD "Tên hàng (n)" của khách mở danh sách con; nút phải có nhãn chữ + `title`. |
 | Ô chọn danh mục ở màn nghiệp vụ | `useQuickCatalogEdit` tự ẩn bút chì khi không có quyền Sửa tab đó (`canEdit` trả false) và trả `canCreate` ⇒ màn truyền `onCreate={editor.canCreate ? addX : undefined}`. |
 | Tô màu dòng, lọc, chọn, cài đặt giao diện | Không gate. |
 

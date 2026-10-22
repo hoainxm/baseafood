@@ -50,6 +50,7 @@ import {
   EXPORT_STEP_ITEM_TABLE,
   EXPORT_FILE_TABLE,
   EXPORT_PAYMENT_TABLE,
+  CUSTOMER_PRODUCT_NAME_TABLE,
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
   DOMESTIC_SALE_TABLE,
@@ -57,6 +58,7 @@ import {
   ROLE_PERMISSION_TABLE,
   USER_PERMISSION_TABLE,
   useTable,
+  isServerConnected,
 } from "@/lib/repo";
 import type {
   BatterType,
@@ -317,6 +319,21 @@ export const useExportShipments = () => useTable(EXPORT_SHIPMENT_TABLE);
 export const useExportStepItems = () => useTable(EXPORT_STEP_ITEM_TABLE);
 export const useExportFiles = () => useTable(EXPORT_FILE_TABLE);
 export const useExportPayments = () => useTable(EXPORT_PAYMENT_TABLE);
+/** Tên hàng theo khách (mig 0077) — dùng qua `useCustomerProductNameStore` để biết máy chủ đã có bảng chưa. */
+export const useCustomerProductNames = () => useTable(CUSTOMER_PRODUCT_NAME_TABLE);
+
+/** Lỗi đọc vì máy chủ CHƯA có bảng (chưa chạy migration) — khác lỗi mạng tạm thời. */
+export const isMissingTableError = (msg: string | null | undefined) => /does not exist|schema cache|PGRST205|42P01/i.test(msg ?? "");
+
+/**
+ * Tên hàng theo khách + cờ `isAvailable`: chạy không máy chủ ⇒ luôn có; có máy chủ ⇒ đọc xong và
+ * KHÔNG phải lỗi thiếu bảng (chưa chạy 0077 thì không ghi gì — khỏi kẹt hàng chờ, ba-spec 41 AC-48).
+ */
+export function useCustomerProductNameStore() {
+  const [names, setNames, meta] = useCustomerProductNames();
+  const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
+  return { names, setNames, isAvailable, isLoading: meta.status === "loading" && names.length === 0 };
+}
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */

@@ -36,7 +36,6 @@ import {
   contractTotals,
   emptyTerms,
   lineAmount,
-  lineDescriptionAfterPick,
   lineKg,
   rankProductsForLine,
   suggestProductId,
@@ -46,7 +45,8 @@ import {
 } from "@/lib/exportPlanning";
 import { formatMoney } from "@/lib/format";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
-import type { Customer, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, Product } from "@/types";
+import { findCustomerName, lineTextAfterPick } from "@/lib/customerProductNames";
+import type { Customer, CustomerProductName, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, Product } from "@/types";
 import { FileSignature, Plus, Save, Trash2 } from "lucide-react";
 import { FilePicker } from "./parts";
 
@@ -164,6 +164,7 @@ export function ContractFormDialog({
   setCustomers,
   products,
   setProducts,
+  customerNames,
   data,
   recordedBy,
   canSeePrice,
@@ -176,6 +177,8 @@ export function ContractFormDialog({
   setCustomers: (rows: Customer[]) => boolean | void;
   /** Danh mục mặt hàng (mở) — mỗi dòng hàng nối một mặt hàng; 141 mã kế toán chỉ ánh xạ qua đây. */
   products: Product[];
+  /** Tên hàng theo khách (mig 0077) — điền dòng + gợi ý nối theo khách của HĐ. */
+  customerNames: readonly CustomerProductName[];
   setProducts: (rows: Product[]) => boolean | void;
   /** Dữ liệu module — gợi ý mặt hàng theo tên tiếng Anh đã nối ở HĐ trước. */
   data: Pick<ExportData, "contracts" | "revisions">;
@@ -196,12 +199,15 @@ export function ContractFormDialog({
   const productEditor = useQuickCatalogEdit("product", products, (rows) => void setProducts(rows));
   /** Dòng vừa được tự gợi ý mặt hàng (chỉ để hiện dòng nhắc "kiểm lại", không lưu). */
   const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
-  /** Ô chọn mặt hàng của một dòng: mục có tên thương mại khớp tên HĐ đứng đầu; dòng phụ = mã · tên thương mại (gõ tên tiếng Anh tìm được). */
-  const productOptionsFor = (description: string): ComboboxOption[] =>
-    rankProductsForLine(description, products).map((m) => ({
+  /**
+   * Ô chọn mặt hàng của một dòng (R23 v6): mục khớp tên của khách / tên mặc định đứng đầu; dòng phụ =
+   * mã · tên của khách (chưa có thì tên mặc định) ⇒ gõ tên tiếng Anh tìm được.
+   */
+  const productOptionsFor = (l: Pick<ExportContractLine, "description" | "size">, customerId: string): ComboboxOption[] =>
+    rankProductsForLine(l.description, products, customerId, { size: l.size, names: customerNames }).map((m) => ({
       value: m.id,
       label: m.code ? `${m.code} · ${m.name}` : m.name,
-      subLabel: [m.code, m.tradeName].filter(Boolean).join(" · ") || undefined,
+      subLabel: [m.code, findCustomerName(customerNames, customerId, m.id)?.tradeName || m.tradeName].filter(Boolean).join(" · ") || undefined,
     }));
   const addProduct = (name: string) => {
     const existing = products.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase());
@@ -217,7 +223,7 @@ export function ContractFormDialog({
       if (!f) return f;
       const l = f.lines.find((x) => x.id === lineId);
       if (!l || l.productId || !l.description.trim()) return f;
-      const pid = suggestProductId(data, l.description, f.customerId, products);
+      const pid = suggestProductId(data, l.description, f.customerId, products, { size: l.size, names: customerNames });
       if (!pid || !products.some((p) => p.id === pid)) return f;
       setSuggestedLines((s) => new Set(s).add(lineId));
       return { ...f, lines: f.lines.map((x) => (x.id === lineId ? { ...x, productId: pid } : x)) };
@@ -571,21 +577,25 @@ export function ContractFormDialog({
                           value={l.productId ?? ""}
                           onChange={(v) => {
                             // R23: tên hàng còn trống ⇒ điền tên thương mại của mặt hàng vừa chọn.
-                            setLine(l.id, { productId: v || undefined, description: lineDescriptionAfterPick(l.description, products.find((p) => p.id === v)) });
+                            // R23 v6: ô tên · size · quy cách · mã HS đang trống ⇒ theo tên của khách (chưa có ⇒ tên mặc định).
+                            setLine(l.id, {
+                              productId: v || undefined,
+                              ...(v ? lineTextAfterPick(l, products.find((p) => p.id === v), findCustomerName(customerNames, form.customerId, v)) : {}),
+                            });
                             setSuggestedLines((s) => {
                               const n = new Set(s);
                               n.delete(l.id);
                               return n;
                             });
                           }}
-                          options={productOptionsFor(l.description)}
+                          options={productOptionsFor(l, form.customerId)}
                           onCreate={productEditor.canCreate ? addProduct : undefined}
                           emptyText="Chưa có mặt hàng nào trong danh mục."
                           onEditItem={productEditor.openEdit}
                           canEdit={productEditor.canEdit}
                           editLabel={productEditor.editLabel}
                         />
-                        {suggestedLines.has(l.id) && <span className="text-sm text-muted-foreground">Gợi ý theo HĐ trước hoặc tên thương mại cùng tên hàng — kiểm lại.</span>}
+                        {suggestedLines.has(l.id) && <span className="text-sm text-muted-foreground">Gợi ý theo tên hàng của khách / HĐ trước — kiểm lại.</span>}
                       </div>
                       <Field label="Size">
                         <Input value={l.size} onChange={(e) => setLine(l.id, { size: e.target.value })} />

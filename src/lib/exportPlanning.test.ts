@@ -4,7 +4,6 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_EXPORT_DATA,
-  lineDescriptionAfterPick,
   rankProductsForLine,
   blankItem,
   buildMonthExcel,
@@ -593,37 +592,40 @@ describe("Trễ hạn giao n ngày (R15, nhãn v5 c)", () => {
   });
 });
 
-describe("Tên thương mại mặt hàng (AC-39, AC-40 — R23)", () => {
+describe("Gợi ý nối theo 4 bậc — tên theo khách, lịch sử, tên mặc định (AC-40 — R23 v6)", () => {
   const products = [
-    { id: "p-a", tradeName: "Frozen Tako tip raw" },
-    { id: "p-b", tradeName: "Frozen iwadako boiled cut" },
-    { id: "p-c", tradeName: "Frozen iwadako boiled cut" },
+    { id: "p-55", tradeName: "" },
+    { id: "p-67", tradeName: "" },
+    { id: "p-a", tradeName: "Frozen Tako tip boiled" },
     { id: "p-x", tradeName: "" },
     { id: "p-hist" },
   ];
-  it("chọn mặt hàng điền tên thương mại vào tên hàng TRỐNG, không ghi đè chữ đã gõ", () => {
-    expect(lineDescriptionAfterPick("", { tradeName: "Frozen iwadako blanched cut" })).toBe("Frozen iwadako blanched cut");
-    expect(lineDescriptionAfterPick("  ", { tradeName: "Frozen iwadako blanched cut" })).toBe("Frozen iwadako blanched cut");
-    expect(lineDescriptionAfterPick("Iwadako cut 2-3g", { tradeName: "Frozen iwadako blanched cut" })).toBe("Iwadako cut 2-3g");
-    expect(lineDescriptionAfterPick("", { tradeName: "" })).toBe("");
-    expect(lineDescriptionAfterPick("", undefined)).toBe("");
+  const names = [
+    { customerId: "scm", productId: "p-55", tradeName: "Frozen iwadako boiled cut", sizeText: "5-5.5 gr/pc" },
+    { customerId: "scm", productId: "p-67", tradeName: "Frozen iwadako boiled cut", sizeText: "6-7 gr/pc" },
+  ];
+  const d = {
+    contracts: [contract("c1")],
+    revisions: [revision("r1", "c1", 0, { lines: [{ ...LINES_1826[0], description: "Frozen Tako tip raw", productId: "p-hist" }] })],
+  };
+  it("bậc 1 tên + size tách hai size cùng tên; bậc 2 ra hai mặt hàng ⇒ không điền", () => {
+    expect(suggestProductId(d, "frozen  iwadako BOILED cut", "scm", products, { size: "6-7  GR/pc", names })).toBe("p-67");
+    expect(suggestProductId(d, "Frozen iwadako boiled cut", "scm", products, { size: "5-5.5 gr/pc", names })).toBe("p-55");
+    expect(suggestProductId(d, "Frozen iwadako boiled cut", "scm", products, { size: "", names })).toBe("");
   });
-  it("gợi ý theo tên thương mại chỉ khi khớp đúng một; lịch sử nối thắng", () => {
-    const empty = { contracts: [contract("c1")], revisions: [] };
-    expect(suggestProductId(empty, "frozen  tako TIP raw", "scm", products)).toBe("p-a");
-    expect(suggestProductId(empty, "Frozen iwadako boiled cut", "scm", products)).toBe("");
-    expect(suggestProductId(empty, "", "scm", products)).toBe("");
-    const withHistory = {
-      contracts: [contract("c1")],
-      revisions: [revision("r1", "c1", 0, { lines: [{ ...LINES_1826[0], description: "Frozen Tako tip raw", productId: "p-hist" }] })],
-    };
-    expect(suggestProductId(withHistory, "Frozen Tako tip raw", "scm", products)).toBe("p-hist");
+  it("bậc 3 lịch sử nối, bậc 4 tên mặc định khớp đúng một", () => {
+    expect(suggestProductId(d, "Frozen Tako tip raw", "scm", products, { names })).toBe("p-hist");
+    expect(suggestProductId(d, "Frozen Tako tip boiled", "mat", products, { names })).toBe("p-a");
+    expect(suggestProductId(d, "Tên chưa ai dùng", "scm", products, { names })).toBe("");
   });
-  it("danh sách chọn đưa mặt hàng khớp tên thương mại lên đầu, giữ thứ tự phần còn lại", () => {
-    const ranked = rankProductsForLine("Frozen iwadako boiled cut", products).map((p) => p.id);
-    expect(ranked.slice(0, 2).sort()).toEqual(["p-b", "p-c"]);
-    expect(ranked.slice(2)).toEqual(["p-a", "p-x", "p-hist"]);
-    expect(rankProductsForLine("", products).map((p) => p.id)).toEqual(["p-a", "p-b", "p-c", "p-x", "p-hist"]);
+  it("tên của khách khác không dùng cho khách này", () => {
+    expect(suggestProductId(d, "Frozen iwadako boiled cut", "mat", products, { size: "6-7 gr/pc", names })).toBe("");
+  });
+  it("danh sách chọn: mục khớp tên của khách rồi tên mặc định đứng đầu", () => {
+    const ranked = rankProductsForLine("Frozen iwadako boiled cut", products, "scm", { names }).map((p) => p.id);
+    expect(ranked.slice(0, 2).sort()).toEqual(["p-55", "p-67"]);
+    expect(rankProductsForLine("Frozen Tako tip boiled", products, "scm", { names })[0].id).toBe("p-a");
+    expect(rankProductsForLine("", products).map((p) => p.id)).toEqual(["p-55", "p-67", "p-a", "p-x", "p-hist"]);
   });
 });
 

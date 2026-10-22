@@ -1296,6 +1296,21 @@ export interface ExportFile {
 export type ExportPaymentKind = "payment" | "documents-sent";
 
 /** Bước 6: gửi bộ chứng từ cho khách + tiền về (cấp chuyến hoặc cấp HĐ — tiền cọc). Không chặn khép kín (Q5). */
+/**
+ * TÊN HÀNG THEO KHÁCH (mig 0077, ba-spec 41 v6 R23): tên · size · quy cách · mã HS mà MỘT khách
+ * dùng trên HĐ / invoice cho một mặt hàng của xưởng. Mỗi (khách, mặt hàng) một dòng.
+ */
+export interface CustomerProductName {
+  id: string;
+  customerId: string;
+  productId: string;
+  tradeName: string;
+  sizeText: string;
+  packing: string;
+  hsCode: string;
+  note: string;
+}
+
 export interface ExportPayment {
   id: string;
   contractId: string;

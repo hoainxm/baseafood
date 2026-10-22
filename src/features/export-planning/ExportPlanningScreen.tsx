@@ -10,7 +10,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, notify, todayIso } from "@/design-system";
-import { useCustomers, useProducts, useUserProfiles } from "@/lib/catalogRepo";
+import { useCustomerProductNameStore, useCustomers, useProducts, useUserProfiles } from "@/lib/catalogRepo";
+import { learnCustomerNames } from "@/lib/customerProductNames";
+import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNamesDialog";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { newId } from "@/lib/store";
@@ -95,6 +97,10 @@ export default function ExportPlanningScreen() {
   const d = store.data;
   const [customers, setCustomers] = useCustomers();
   const [products, setProducts] = useProducts();
+  // Tên hàng theo khách (mig 0077, ba-spec 41 v6): điền dòng hàng, gợi ý nối, tự học khi lưu.
+  const nameStore = useCustomerProductNameStore();
+  const customerCan = useCan("catalog.customers");
+  const [namesFor, setNamesFor] = useState<{ id: string; name: string } | null>(null);
   const [profiles] = useUserProfiles();
   /** Người ký duyệt = tài khoản có vai trò Giám đốc / Phó giám đốc (không gõ tự do — XK audit 2026-10-20). */
   const approvers = profiles
@@ -170,6 +176,19 @@ export default function ExportPlanningScreen() {
     return add;
   };
 
+  /**
+   * Tự học (NV16 · R26): thêm tên còn thiếu của khách từ các dòng đã nối. Máy chủ chưa có bảng
+   * hoặc không có quyền ghi ⇒ bỏ qua (HĐ vẫn lưu). Trả về số tên thêm + hàm Hoàn tác.
+   */
+  const learnNames = (customerId: string, lines: Parameters<typeof learnCustomerNames>[2], contractNo: string) => {
+    const allowed = nameStore.isAvailable && (can.create || can.update || customerCan.create || customerCan.update);
+    const prev = nameStore.names;
+    const created = allowed ? learnCustomerNames(prev, customerId, lines, contractNo, newId) : [];
+    if (created.length && nameStore.setNames([...prev, ...created]) === false) return { count: 0, undo: () => {} };
+    return { count: created.length, undo: () => (created.length ? void nameStore.setNames(prev) : undefined) };
+  };
+  const learnedText = (n: number) => (n ? ` · thêm ${n} tên hàng của khách` : "");
+
   const saveContract = (p: ContractSavePayload): boolean => {
     const prevC = d.contracts;
     const prevR = d.revisions;
@@ -180,11 +199,14 @@ export default function ExportPlanningScreen() {
       store.saveContracts(prevC);
       return false;
     }
+    const learned = learnNames(p.contract.customerId, p.revision.lines, p.contract.contractNo);
     notify.saved(
-      p.mode === "create" ? `Đã lập HĐ ${p.contract.contractNo} — chờ ghi kết quả duyệt` : p.mode === "revise" ? `Đã ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo}` : `Đã lưu bản chờ duyệt của HĐ ${p.contract.contractNo}`,
+      (p.mode === "create" ? `Đã lập HĐ ${p.contract.contractNo} — chờ ghi kết quả duyệt` : p.mode === "revise" ? `Đã ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo}` : `Đã lưu bản chờ duyệt của HĐ ${p.contract.contractNo}`) +
+        learnedText(learned.count),
       () => {
         store.saveContracts(prevC);
         store.saveRevisions(prevR);
+        learned.undo();
       },
     );
     setContractForm(null);
@@ -355,7 +377,13 @@ export default function ExportPlanningScreen() {
     const next = prev.map((r) => (r.id === revisionId ? { ...r, lines: r.lines.map((l) => ({ ...l, productId: map[l.id] || undefined })) } : r));
     if (!store.saveRevisions(next)) return false;
     const n = Object.values(map).filter(Boolean).length;
-    notify.saved(`Đã nối mặt hàng cho ${n} dòng hàng`, () => store.saveRevisions(prev));
+    const rev = next.find((r) => r.id === revisionId);
+    const c = rev ? d.contracts.find((x) => x.id === rev.contractId) : undefined;
+    const learned = rev && c ? learnNames(c.customerId, rev.lines, c.contractNo) : { count: 0, undo: () => {} };
+    notify.saved(`Đã nối mặt hàng cho ${n} dòng hàng${learnedText(learned.count)}`, () => {
+      store.saveRevisions(prev);
+      learned.undo();
+    });
     setMappingTarget(null);
     return true;
   };
@@ -572,6 +600,7 @@ export default function ExportPlanningScreen() {
           today={today}
           onEditPayment={(p) => setPaymentTarget({ contractId: contract.id, shipmentId: "", label: `HĐ ${contract.contractNo}`, kind: p.kind, currency, existing: p })}
           onDeletePayment={deletePayment}
+          onOpenCustomerNames={() => setNamesFor({ id: contract.customerId, name: customerName(contract.customerId) })}
           onMapProducts={() => {
             const r = workingRevision(d, contract.id);
             if (r) setMappingTarget({ contractNo: contract.contractNo, customerId: contract.customerId, revision: r });
@@ -667,6 +696,7 @@ export default function ExportPlanningScreen() {
         setCustomers={setCustomers}
         products={products}
         setProducts={setProducts}
+        customerNames={nameStore.names}
         data={d}
         recordedBy={recordedBy}
         canSeePrice={can["view-price"]}
@@ -691,7 +721,18 @@ export default function ExportPlanningScreen() {
       <LoadingUploadDialog target={loadingTarget} recordedBy={recordedBy} onClose={() => setLoadingTarget(null)} onSave={saveLoadingFiles} />
       <PaymentDialog target={paymentTarget} recordedBy={recordedBy} onClose={() => setPaymentTarget(null)} onSave={savePayment} />
       <ReasonDialog target={reasonTarget} onClose={() => setReasonTarget(null)} />
-      <ProductMappingDialog target={mappingTarget} data={d} products={products} setProducts={setProducts} onClose={() => setMappingTarget(null)} onSave={saveProductMapping} />
+      <ProductMappingDialog target={mappingTarget} data={d} products={products} setProducts={setProducts} customerNames={nameStore.names} onClose={() => setMappingTarget(null)} onSave={saveProductMapping} />
+      <CustomerProductNamesDialog
+        customer={namesFor}
+        names={nameStore.names}
+        setNames={nameStore.setNames}
+        products={products}
+        setProducts={setProducts}
+        isAvailable={nameStore.isAvailable}
+        canWrite={customerCan.create || customerCan.update}
+        canDelete={customerCan.delete}
+        onClose={() => setNamesFor(null)}
+      />
       <ExportFilePreview file={preview} onClose={() => setPreview(null)} />
 
       <ConfirmDelete

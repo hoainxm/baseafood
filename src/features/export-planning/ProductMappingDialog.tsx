@@ -14,7 +14,8 @@ import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import { rankProductsForLine, suggestProductId, type ExportData } from "@/lib/exportPlanning";
-import type { ExportContractRevision, Product } from "@/types";
+import { findCustomerName } from "@/lib/customerProductNames";
+import type { CustomerProductName, ExportContractLine, ExportContractRevision, Product } from "@/types";
 import { Link2, Save } from "lucide-react";
 
 export interface ProductMappingTarget {
@@ -37,6 +38,7 @@ export function ProductMappingDialog({
   target,
   data,
   products,
+  customerNames,
   setProducts,
   onClose,
   onSave,
@@ -44,6 +46,8 @@ export function ProductMappingDialog({
   target: ProductMappingTarget | null;
   data: Pick<ExportData, "contracts" | "revisions">;
   products: Product[];
+  /** Tên hàng theo khách (mig 0077) — gợi ý theo tên + size của khách (R23 v6). */
+  customerNames: readonly CustomerProductName[];
   setProducts: (rows: Product[]) => boolean | void;
   onClose: () => void;
   /** Ghi productId vào dòng hàng của bản; trả false nếu ghi hụt. */
@@ -56,14 +60,13 @@ export function ProductMappingDialog({
 
   useEffect(() => {
     if (!target) return;
-    // Dòng chưa nối ⇒ gợi ý theo tên tiếng Anh đã nối ở HĐ trước, rồi theo tên thương mại khớp đúng một
-    // mặt hàng (R16 + R23 — không dịch máy).
+    // Dòng chưa nối ⇒ gợi ý 4 bậc (R23 v6): tên + size của khách → tên của khách → HĐ trước → tên mặc định.
     const initialMap = Object.fromEntries(target.revision.lines.map((l) => [l.id, l.productId ?? ""]));
-    const suggest = (description: string) => {
-      const pid = suggestProductId(data, description, target.customerId, products);
+    const suggest = (l: ExportContractLine) => {
+      const pid = suggestProductId(data, l.description, target.customerId, products, { size: l.size, names: customerNames });
       return products.some((p) => p.id === pid) ? pid : "";
     };
-    const map = Object.fromEntries(target.revision.lines.map((l) => [l.id, l.productId || suggest(l.description)]));
+    const map = Object.fromEntries(target.revision.lines.map((l) => [l.id, l.productId || suggest(l)]));
     const fresh: MappingForm = { key: target.revision.id, tg: target, map, initial: mapSnap(initialMap) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
@@ -72,13 +75,15 @@ export function ProductMappingDialog({
   }, [target]);
 
   const tgt = target ?? form?.tg ?? null;
-  /** Mục có tên thương mại khớp tên HĐ đứng đầu; dòng phụ = mã · tên thương mại (gõ tên tiếng Anh tìm được). */
-  const optionsFor = (description: string): ComboboxOption[] =>
-    rankProductsForLine(description, products).map((m) => ({
+  /** Mục khớp tên của khách / tên mặc định đứng đầu; dòng phụ = mã · tên của khách (chưa có thì tên mặc định). */
+  const optionsFor = (l: ExportContractLine): ComboboxOption[] => {
+    const customerId = tgt?.customerId ?? "";
+    return rankProductsForLine(l.description, products, customerId, { size: l.size, names: customerNames }).map((m) => ({
       value: m.id,
       label: m.code ? `${m.code} · ${m.name}` : m.name,
-      subLabel: [m.code, m.tradeName].filter(Boolean).join(" · ") || undefined,
+      subLabel: [m.code, findCustomerName(customerNames, customerId, m.id)?.tradeName || m.tradeName].filter(Boolean).join(" · ") || undefined,
     }));
+  };
   const addProduct = (name: string) => {
     const existing = products.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase());
     if (existing) return existing.id;
@@ -109,7 +114,7 @@ export function ProductMappingDialog({
         onClose();
       }}
       title={`Nối mặt hàng · HĐ ${tgt?.contractNo ?? ""}`}
-      description="Chọn mặt hàng trong danh mục của xưởng cho từng dòng hàng (tên tiếng Anh giữ đúng như HĐ). Đây là thông tin nội bộ — không tạo bản sửa, không cần BGĐ duyệt lại."
+      description="Chọn mặt hàng trong danh mục của xưởng cho từng dòng hàng (tên tiếng Anh giữ đúng như HĐ). Đây là thông tin nội bộ — không tạo bản sửa, không cần BGĐ duyệt lại. Lưu xong, app tự thêm tên còn thiếu vào danh sách Tên hàng của khách."
       icon={Link2}
       size="lg"
       footer={
@@ -148,7 +153,7 @@ export function ProductMappingDialog({
                 label={`Mặt hàng (danh mục) · dòng ${i + 1}`}
                 value={form.map[l.id] ?? ""}
                 onChange={(v) => setForm((f) => (f ? { ...f, map: { ...f.map, [l.id]: v } } : f))}
-                options={optionsFor(l.description)}
+                options={optionsFor(l)}
                 onCreate={productEditor.canCreate ? addProduct : undefined}
                 emptyText="Chưa có mặt hàng nào trong danh mục."
                 onEditItem={productEditor.openEdit}

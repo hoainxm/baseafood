@@ -1,10 +1,11 @@
 # 41 — ba-spec: Phòng Kế hoạch · Xuất khẩu — Đợt 1 (khung tháng × khách × hợp đồng × chuyến)
 
 > Load khi: xây hoặc sửa module Xuất khẩu của Phòng Kế hoạch đợt 1: hồ sơ hợp đồng (dòng hàng, bản sửa, gia hạn, file ký, kết quả duyệt giấy), chuyến (mã lô MSL, booking, cont, seal, ngày đóng/ETD), 6 bước dạng checklist tay kèm file, thực xuất lấy từ invoice, khép kín chuyến/hợp đồng theo dung sai, tiền về, vai trò Phòng Kế hoạch, mở rộng danh mục khách.
-covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/exportReports.ts, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql
+covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql
 last_verified: 2026-10-22
 ttl_days: 90
-status: ba-spec v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Hoài Nam ↔ Lê Khiêm; ĐÃ BUILD 2026-10-22, `0077` ✅ chạy DB thật 2026-10-22) · v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+<!-- re-verified: 2026-10-22 (b) — v6: R23 · R26 + AC-39/40/46/47 = test `customerProductNames.test.ts` (11) + `exportPlanning.test.ts`; AC-48 = `useCustomerProductNameStore.isAvailable` (thử tay chưa có DB chưa chạy 0077 — chưa làm); AC-49 thử tay preview demo: bộ demo 18 tên tự học, hộp Tên hàng, form HĐ điền tên + quy cách của khách, nối mặt hàng tự thêm 1 tên + toast; RLS 0077 thử PGlite. -->
 <!-- re-verified: 2026-10-22 — v5: R23–R25 + AC-39…AC-44 = test `exportPlanning.test.ts` (52) + `exportReports.test.ts` (15) + `repo.test.ts` (AC-41); AC-45 thử bằng hàm Excel (0 ô tiền) — phần màn hình cần tài khoản không quyền giá (chưa thử tay); tên thương mại + báo cáo + danh sách file thử tay preview demo 1366 px + 360 px × 100 / 130 %. -->
 <!-- re-verified: 2026-10-20 17:30 — v4: R16–R22 + AC-30…AC-38 = test `exportPlanning.test.ts` (48) + `numberExpression.test.ts` + `format.test.ts`; nhãn / người ký / kỳ xem / nối mặt hàng thử tay preview sandbox, 360 px + 130 %. -->
 <!-- re-verified: 2026-10-20 15:00 — audit hồ sơ SCM trên preview: NV3–NV13 chạy tay (AC-4…AC-28 trừ AC-1/2/18/29 cần DB thật), 50 TC ở docs/test-cases; luật trong doc khớp code. -->
@@ -58,7 +59,8 @@ status: ba-spec v5 (2026-10-22: tên thương mại mặt hàng, số PO của k
 | NV11 | Theo dõi tháng (xem, lọc khách, tra số, xuất Excel) | U1 | U2, U3 (xem) | NV7 | hằng ngày | Must |
 | NV12 | Khép kín chuyến và hợp đồng | S1 (tự tính) | U1 (đóng tay có lý do) | NV8 | mỗi chuyến | Must |
 | NV13 | Hủy / xóa hợp đồng hoặc chuyến | U1 | — | NV3 / NV7 | hiếm | Must |
-| NV14 | Khai **tên thương mại** (tiếng Anh) cho mặt hàng — tên dùng trên HĐ, invoice quốc tế (v5) | U1 | — | — | khi có mặt hàng XK mới | Must |
+| NV14 | Khai **tên hàng theo khách** — tên · size · quy cách · mã HS mà MỖI KHÁCH dùng trên HĐ / invoice cho một mặt hàng của xưởng (v6; v5 là một tên / mặt hàng) | U1 | — | — | khi có khách / mặt hàng XK mới; 15–20 dòng / khách | Must |
+| NV16 | **Tự học** tên hàng theo khách từ dòng hàng HĐ đã nối mặt hàng (v6) | S1 (tự tính) | U1 (soát / sửa danh sách) | NV3, NV14 | mỗi lần lưu HĐ / nối mặt hàng | Must |
 | NV15 | Xem **báo cáo xuất khẩu** theo kỳ: sản lượng, giá trị, tiền về, đúng hạn, hồ sơ còn kẹt, HĐ cần chú ý (v5) | U2 | U3, U1 (xem cùng số) | NV7, NV8, NV10 | hằng tháng / quý | Must |
 
 ## 4. Cross-user handoff
@@ -187,12 +189,20 @@ status: ba-spec v5 (2026-10-22: tên thương mại mặt hàng, số PO của k
 - **Tiền về:** xóa được (ghi sai), có Hoàn tác.
 - Mọi xóa có xác nhận + **Hoàn tác** (luật repo 6).
 
-### Flow NV14 — Khai tên thương mại · owner U1 (v5)
-- **Start:** mặt hàng của xưởng sắp xuất khẩu (đã có ở danh mục mở `products`, hoặc tạo mới tại chỗ).
-- **Input:** tên thương mại tiếng Anh, viết như trên HĐ / invoice (VD "Frozen iwadako boiled cut"). Không bắt buộc, không duy nhất — hai size cùng một tên thương mại được (R23).
-- **Output:** mặt hàng có tên thương mại; tra được theo tên này ở danh mục.
-- **Dùng ở:** (a) lập HĐ — chọn mặt hàng cho dòng **chưa ghi tên hàng** ⇒ tên hàng = tên thương mại (sửa được); (b) nối mặt hàng (R16) — tên HĐ khớp đúng một tên thương mại ⇒ điền sẵn mặt hàng đó; khớp nhiều ⇒ không điền, các mặt hàng khớp đứng đầu danh sách chọn.
-- **End:** dòng hàng mới / dòng chưa nối của mọi HĐ dùng được ngay; dòng đã nối **không** đổi.
+### Flow NV14 — Khai tên hàng theo khách · owner U1 (v6)
+- **Vì sao (họp 2026-10-22, anh Lê Khiêm — Phòng Kế hoạch):** cùng một mặt hàng nhưng mỗi khách gọi một tên trên chứng từ (Matsuda: "Frozen boiled octopus"; Seachemot: "Iwadako…"); tên theo **giao dịch thực tế với từng khách**, không theo nước; mỗi khách chỉ ~15–20 tên, **theo từng size**. Iwadako = bạch tuộc 2 da · Iidako = 1 da · Eihire = cá đuối.
+- **Start:** khách xuất khẩu có trong danh mục; mặt hàng của xưởng có trong danh mục mở `products` (đã gồm size).
+- **Input:** khách · mặt hàng · **tên trên chứng từ** (bắt buộc) · size · quy cách đóng gói · mã HS · ghi chú (tùy chọn).
+- **Output:** dòng tên của cặp (khách, mặt hàng) — **mỗi cặp một dòng** (R23). Danh sách của một khách xem / sửa / xóa được ở **danh mục Khách hàng** (chủ dự án chọn).
+- **Dùng ở:** (a) lập HĐ — chọn mặt hàng cho một dòng ⇒ các ô tên · size · quy cách · mã HS **đang trống** lấy theo tên của khách của HĐ; khách chưa có tên cho mặt hàng ⇒ chỉ tên lấy **tên tiếng Anh mặc định** (`products.trade_name`); (b) nối mặt hàng (R16) theo thứ tự R23.
+- **End:** HĐ lập sau dùng được ngay; HĐ đã lưu **không** đổi khi sửa danh sách (sổ giữ chữ lúc ghi, như sổ nối theo tên ở danh mục).
+
+### Flow NV16 — Tự học tên hàng theo khách · owner S1 (v6)
+- **Start:** người dùng lưu HĐ / bản sửa (NV3, NV5) hoặc lưu hộp nối mặt hàng (R16).
+- **Input:** khách của HĐ · các dòng hàng có **mặt hàng** và **tên hàng** khác rỗng.
+- **Steps:** với mỗi dòng: cặp (khách, mặt hàng) **chưa có** tên ⇒ tạo dòng tên từ dòng hàng (tên · size · quy cách · mã HS, ghi chú "Tự học từ HĐ <số HĐ>"); **đã có** ⇒ giữ nguyên (không ghi đè — khách đổi tên thì U1 sửa ở danh sách). Hai dòng cùng HĐ cùng mặt hàng ⇒ lấy dòng đầu.
+- **Output:** danh sách tên của khách đủ thêm; HĐ 18.26 nối xong 14 dòng ⇒ Seachemot có 1 tên / mặt hàng đã nối.
+- **End:** không cần ai duyệt; U1 soát lại ở danh sách khi muốn. Máy chủ chưa có bảng ⇒ không tự học (không ghi gì), HĐ vẫn lưu bình thường.
 
 ### Flow NV15 — Xem báo cáo xuất khẩu · owner U2 (v5)
 - **Start:** người có quyền xem Xuất khẩu.
@@ -204,6 +214,11 @@ status: ba-spec v5 (2026-10-22: tên thương mại mặt hàng, số PO của k
 
 | Flow | Candidate | Chọn / Loại | Lý do (rubric) | Đánh giá bởi | Conflict |
 |---|---|---|---|---|---|
+| NV14 (v6) | A. Một tên / mặt hàng (v5) | Loại | Sai nghiệp vụ: cùng mặt hàng mỗi khách gọi khác (Matsuda "Frozen boiled octopus" ≠ Seachemot "Iwadako") — Domain (anh Lê Khiêm, Phòng Kế hoạch) | Domain | — |
+| NV14 (v6) | B. Tên theo nước | Loại | Cùng nước Nhật hai khách hai tên — chuyên gia sửa "theo giao dịch thực tế với khách" | Domain | — |
+| NV14 (v6) | C. Không bảng, suy từ HĐ cũ | Loại | Không khai trước được cho khách mới, không xem thành danh sách 15–20 dòng (rubric: Output không quan sát được) | Optimizer | — |
+| NV14 + NV16 (v6) | D. Bảng tên theo khách + tự học từ HĐ, lưu tên · size · quy cách · HS | **Chọn** (chủ dự án 2026-10-22) | Ít bước nhất: HĐ đầu tiên của khách tự sinh danh sách; tên + size tách được hai size cùng tên (HĐ 18.26 dòng 3–4) | Optimizer + chủ dự án | — |
+| NV16 (v6) | E. Tự học ghi đè khi tên khác | Loại | Một HĐ gõ sai làm hỏng tên chuẩn của khách (an toàn) — sửa là việc của U1 | Optimizer | — |
 | Trục | A: HĐ là trục, bước gắn HĐ · B: chuyến là trục · C: HĐ 1..n chuyến, bước 2–5 gắn chuyến | **C** | A sai thực tế (lô trải 3 cont); B mất dung sai + chứng từ yêu cầu của HĐ. Đúng Q2 | Orchestrator + Domain (XK) | Hình "HĐ → các bước" của chủ dự án giữ đúng khi 1 chuyến |
 | NV7 tháng | A: tháng ký · B: tháng kế hoạch · C: ngày đóng → ETD → kế hoạch | **C** | Q1; đổi ngày đóng là chuyến tự sang tháng (rubric #5) | Optimizer | — |
 | NV4 duyệt | A: BGĐ duyệt trên app · B: U1 ghi kết quả giấy | **B** | Q4 | Optimizer | Đổi sang A sau không đổi dữ liệu |
@@ -272,7 +287,8 @@ status: ba-spec v5 (2026-10-22: tên thương mại mặt hàng, số PO của k
 | R20 | Chứng từ có người cấp "công ty tự cấp" không bắt số chứng từ (vẫn bắt ngày + file / ghi chú) | H/C lô 165 không in số |
 | R21 | Mục bước 5 theo chứng từ khách yêu cầu (gồm Commercial Invoice, bảo hiểm CIF/CIP) **không xóa được**; mục thêm tay xóa được, hỏi lại trước, có Hoàn tác | xóa C/O form VJ để chuyến đủ hồ sơ ⇒ không làm được |
 | R22 | Ô số hiểu số chép từ chứng từ tiếng Anh: có cả "." lẫn "," ⇒ dấu đứng sau là phần lẻ; chỉ "." mà không đúng nhóm nghìn kiểu Việt ⇒ "." là phần lẻ; có kiểu này ⇒ ô hiện lại số đã hiểu. Kiểu Việt giữ nguyên | "10.50" → 10,5 · "194,557.60" → 194.557,6 · "1.234" → 1234 |
-| R23 | **Tên thương mại** (`products.trade_name`, v5): một tên tiếng Anh / mặt hàng, tự do, không bắt buộc, không duy nhất. Lập HĐ: chọn mặt hàng cho dòng có tên hàng **trống** ⇒ tên hàng = tên thương mại; dòng đã có chữ **không** bị ghi đè. Gợi ý nối: lịch sử nối R16 thắng; không có lịch sử ⇒ khớp tên thương mại (không phân hoa thường, gộp khoảng trắng) — **đúng 1** mặt hàng khớp mới điền sẵn. Máy chủ chưa có cột ⇒ không gửi cột, mặt hàng vẫn lưu được | "Frozen iwadako boiled cut" khớp 2 mặt hàng (5,5gr · 6-7) ⇒ không điền, hai mục lên đầu |
+| R23 | **Tên hàng theo khách** (v6 — thay R23 v5). Bảng `customer_product_names`: khách · mặt hàng · tên (bắt buộc) · size · quy cách · mã HS · ghi chú. **Một (khách, mặt hàng) một dòng.** Hai mặt hàng của cùng khách được trùng tên nếu **khác size**; trùng cả tên lẫn size (so không phân hoa thường, gộp khoảng trắng) ⇒ chặn lưu (không biết nối về mặt hàng nào). `products.trade_name` (mig 0076) đổi nghĩa thành **tên tiếng Anh mặc định** — dùng khi khách chưa có tên riêng. **Lập HĐ:** chọn mặt hàng ⇒ ô nào đang trống thì điền theo thứ tự tên của khách → (chỉ ô tên) tên mặc định → để trống; ô đã có chữ **không** bị ghi đè. **Gợi ý nối** (lấy bậc đầu tiên ra đúng MỘT mặt hàng): (1) tên của khách khớp **tên + size** của dòng · (2) tên của khách khớp tên, duy nhất trong khách · (3) lịch sử nối R16 (cùng khách trước) · (4) tên mặc định khớp đúng một mặt hàng. Không bậc nào ra một ⇒ không điền; các mặt hàng khớp tên đứng đầu danh sách chọn. Máy chủ chưa có bảng / cột ⇒ app không gửi, không kẹt hàng chờ | HĐ 18.26 dòng 3 (5-5.5 gr) và dòng 4 (6-7 gr) cùng tên "Frozen iwadako boiled cut" ⇒ bậc 1 nối đúng hai mặt hàng khác nhau |
+| R26 | **Tự học** (NV16): chỉ TẠO dòng tên cho cặp (khách, mặt hàng) chưa có, từ dòng hàng có mặt hàng + tên; **không bao giờ sửa** dòng đã có; không tạo khi dòng trùng tên + size với mặt hàng khác của cùng khách (để R23 không vỡ). Sửa / xóa dòng tên không hồi tố HĐ đã lưu | lưu lại HĐ 18.26 với tên khác ⇒ tên của Seachemot giữ bản cũ |
 | R24 | **Số PO của khách** (`orderRef`): mã đơn của khách in ở dòng "Order" trên HĐ giấy (HĐ 18.26: `#B182`). Một HĐ một số; chỉ để tra cứu. **Không phải** số booking — booking là của hãng tàu, theo từng chuyến (NV7) | — |
 | R25 | **Báo cáo kỳ** (NV15). Kỳ = tháng · quý · năm. Chuyến của kỳ = chuyến **chưa hủy** thuộc kỳ theo R18. Mỗi chuyến tính: cont (chỉ loại cont), kg kế hoạch, thực xuất R7, **còn chưa về** = max(0, thực xuất tiền − tiền về của chuyến). **Tiền về trong kỳ** = Σ lần tiền về có **ngày** trong kỳ (cả cọc cấp HĐ). Đúng hạn / trễ theo R15, chỉ đếm chuyến đã có ngày giao (on board ?? ETD). Bước kẹt = số chuyến của kỳ có bước n (1–5) chưa xong / không áp dụng. HĐ ký trong kỳ = ngày ký trong kỳ, HĐ chưa hủy; kg / tiền HĐ theo bản đang dùng. **HĐ cần chú ý** (HĐ chưa hủy, chưa chốt tay, có chuyến trong kỳ hoặc hạn giao hiệu lực trong kỳ): quá hạn giao mà chưa lên đủ chuyến · thực xuất vượt (kg hoặc tiền) quá dung sai · đã khép đủ hồ sơ mà thiếu dung sai · còn tiền chưa về. Lọc khách áp mọi số | lô 165 / HĐ 18.26, năm 2026 ⇒ T9: 1 chuyến · 1 cont · 19.000 → 22.214 kg · 194.557,60 USD · trễ 1 · HĐ 18.26 "vượt dung sai: thừa 16,9%" |
 
@@ -503,15 +519,15 @@ status: ba-spec v5 (2026-10-22: tên thương mại mặt hàng, số PO của k
 - **Assert** `searchContracts(d, "test-g")` == [HĐ TEST-G]; tra theo số đơn "b182" và tên khách "matsu" đều ra đúng 1 HĐ
 
 
-### AC-39 — Chọn mặt hàng điền tên thương mại vào tên hàng trống · Maps to: NV3, NV14, R23 · Test: unit
-- **Given** mặt hàng p1 tên thương mại "Frozen iwadako blanched cut"
-- **When** chọn p1 cho dòng tên hàng trống; chọn p1 cho dòng đã ghi "Iwadako cut 2-3g"
-- **Assert** `lineDescriptionAfterPick("", p1) == "Frozen iwadako blanched cut"`; `lineDescriptionAfterPick("Iwadako cut 2-3g", p1) == "Iwadako cut 2-3g"`
+### AC-39 — Chọn mặt hàng điền theo tên của khách, không ghi đè · Maps to: NV3, NV14, R23 · Test: unit
+- **Given** Seachemot có tên cho p-55 = {tên "Frozen iwadako boiled cut", size "5-5.5 gr/pc", quy cách "Net weight IQF 1kg/PE x 10/CTN", HS "16055500"}; p-55 có tên mặc định "Frozen boiled octopus"; Matsuda chưa có tên cho p-55
+- **When** chọn p-55 cho dòng trống của HĐ Seachemot; cho dòng đã ghi tên "Iwadako cut" + size trống; cho dòng trống của HĐ Matsuda
+- **Assert** dòng 1 == 4 ô của Seachemot; dòng 2: tên == "Iwadako cut", size == "5-5.5 gr/pc"; dòng 3: tên == "Frozen boiled octopus", size == ""
 
-### AC-40 — Gợi ý nối theo tên thương mại, chỉ khi khớp đúng một · Maps to: NV14, R16, R23 · Test: unit
-- **Given** chưa có lịch sử nối; p-a tên TM "Frozen Tako tip raw"; p-b, p-c cùng tên TM "Frozen iwadako boiled cut"; p-hist đã nối tên "Frozen Tako tip raw" ở HĐ trước
-- **When** gợi ý cho "frozen  tako TIP raw" (không lịch sử), "Frozen iwadako boiled cut", rồi có lịch sử
-- **Assert** lần lượt == "p-a", "", "p-hist"; `rankProductsForLine("Frozen iwadako boiled cut", products).slice(0,2)` == {p-b, p-c}
+### AC-40 — Gợi ý nối theo 4 bậc, tên + size tách được hai size · Maps to: NV14, R16, R23 · Test: unit
+- **Given** Seachemot có tên cho p-55 (size "5-5.5 gr/pc") và p-67 (size "6-7 gr/pc"), cùng tên "Frozen iwadako boiled cut"; lịch sử nối "Frozen Tako tip raw" → p-hist; p-a có tên mặc định "Frozen Tako tip boiled"
+- **When** gợi ý cho (Seachemot, "frozen  iwadako BOILED cut", "6-7 gr/pc"); (Seachemot, cùng tên, size "") ; (Seachemot, "Frozen Tako tip raw"); (Matsuda, "Frozen Tako tip boiled")
+- **Assert** lần lượt == "p-67", "" (bậc 2 ra 2 mặt hàng), "p-hist", "p-a"
 
 ### AC-41 — Máy chủ chưa có cột tên thương mại không kẹt lưu · Maps to: NV14, R23 · Test: unit
 - **Assert** `PRODUCT_TABLE.toRow({...p, tradeName: undefined})` không có khóa `trade_name`; `toRow({...p, tradeName: "X"}).trade_name == "X"`; `fromRow({id:"1",name:"a"}).tradeName === undefined`; `fromRow({..., trade_name: null}).tradeName == ""`
@@ -532,6 +548,21 @@ status: ba-spec v5 (2026-10-22: tên thương mại mặt hàng, số PO của k
 ### AC-45 — Không quyền xem giá thì báo cáo không có tiền · Maps to: NV15, R11 · Test: manual
 - **Given** tài khoản có `export-plans.view` mà không có `view-price`
 - **Assert** tab báo cáo hiện kg / số chuyến; số ô tiền (USD) trên trang == 0; file Excel không có cột tiền
+### AC-46 — Tự học tên từ HĐ, không ghi đè · Maps to: NV16, R26 · Test: unit
+- **Given** Seachemot chưa có tên nào; HĐ 18.26 có 14 dòng đã nối 14 mặt hàng khác nhau
+- **When** `learnCustomerNames(existing, "scm", lines, "18.26/BSF-SCM.2026")`; rồi gọi lại với dòng 1 đổi tên thành "X"
+- **Assert** lần 1 tạo đúng 14 dòng, ghi chú == "Tự học từ HĐ 18.26/BSF-SCM.2026"; lần 2 tạo 0 dòng và tên của dòng 1 vẫn == tên cũ; dòng không có mặt hàng hoặc tên rỗng ⇒ 0 dòng
+
+### AC-47 — Chặn trùng trong danh sách của một khách · Maps to: NV14, R23 · Test: unit
+- **Assert** thêm dòng thứ 2 cho (Seachemot, p-55) ⇒ lỗi "mặt hàng đã có tên"; thêm (Seachemot, p-67) trùng tên + size của p-55 (khác hoa thường) ⇒ lỗi "trùng tên + size"; cùng tên khác size ⇒ hợp lệ; (Matsuda, p-55) trùng tên của Seachemot ⇒ hợp lệ
+
+### AC-48 — Máy chủ chưa có bảng tên theo khách không kẹt · Maps to: NV16, R23 · Test: integration + manual
+- **Given** chạy có máy chủ mà chưa chạy mig `0077`
+- **Assert** lưu HĐ thành công; số dòng tên được gửi lên máy chủ == 0; hàng chờ của bảng tên == 0 sau khi tải lại; chạy không máy chủ (localStorage) thì tự học bình thường
+
+### AC-49 — Demo có tên theo khách, số thật không đổi · Maps to: NV14, R14 · Test: manual (vòng §4b spec chế độ demo)
+- **Assert** bộ demo có ≥ 1 dòng tên theo khách; đếm dòng `customer_product_names` có `site_id <> 'site-demo'` trước / sau khi bật demo → thao tác → thoát == bằng nhau
+
 ## 11. Assumptions / Open
 
 **Assumptions (tự quyết, đổi được không tốn dữ liệu):**
@@ -544,6 +575,10 @@ status: ba-spec v5 (2026-10-22: tên thương mại mặt hàng, số PO của k
 - A7. Kho file riêng (`export-files`), không dùng chung kho của Tài liệu công ty. Lý do: kho đó lọc theo phòng ban; nới ra là đổi RLS đang chạy (🔴).
 - A8. Số liệu tháng 10/2026 nhập tay từ sổ Excel tháng 10 (Q6). Không nạp lịch sử.
 - A9. "Chuyến đã đóng cont" (chặn hủy HĐ) = chuyến đã có số cont (hoặc biển số xe).
+- A10 (v6). Khóa tên theo khách = (khách, mặt hàng) vì mặt hàng của xưởng đã gồm size ("cắt luộc 5,5gr"); cột size của dòng tên là **chữ in trên chứng từ** ("5-5.5 gr/pc, 190-210 pcs/kg"), không phải khóa.
+- A11 (v6). So tên + size: không phân hoa thường, gộp khoảng trắng — size chép khác một ký tự thì rơi xuống bậc 2–4 của R23, không nối sai.
+- A12 (v6). Quyền: bảng tên theo khách theo quyền danh mục Khách hàng (`catalog.customers`); Kế hoạch đã có quyền ghi (R11). Tự học chạy dưới quyền người đang lưu HĐ — không có quyền ghi danh mục khách thì bỏ qua tự học, HĐ vẫn lưu.
+- A13 (v6). Không chép tên theo khách từ khách này sang khách khác; khách mới bắt đầu từ tên mặc định.
 
 **Open (RED):** không có. Ma trận quyền (R11) đã được đồng ý ở Q11. Lúc build, migration thay ma trận mặc định vẫn theo khuôn `0073` (thay trọn, chạy 2 lần không lỗi, có câu lùi).
 
@@ -559,6 +594,7 @@ status: ba-spec v5 (2026-10-22: tên thương mại mặt hàng, số PO của k
 
 ## History
 
+- v6 (2026-10-22 chiều, họp Hoài Nam ↔ Lê Khiêm — Phòng Kế hoạch): tên trên chứng từ theo **từng khách** (không theo mặt hàng, không theo nước), ~15–20 tên / khách theo size. NV14 viết lại (danh sách tên theo khách ở danh mục Khách hàng: tên · size · quy cách · mã HS), thêm NV16 tự học từ HĐ (chỉ tạo, không ghi đè — R26), R23 viết lại (thứ tự điền + 4 bậc gợi ý nối, tên + size tách hai size cùng tên), `products.trade_name` thành tên mặc định. AC-39/40 viết lại, thêm AC-46…49. Chủ dự án chọn cả 4 đề xuất (cách lưu, nội dung, cột cũ, chỗ quản lý). ⏳ Chưa build — cần mig `0077_customer_product_names.sql`.
 - v5 (2026-10-22, góp ý chủ dự án): **tên thương mại** mặt hàng (NV14, R23 — một tên tiếng Anh / mặt hàng, dùng điền tên hàng và gợi ý nối); ô "Số đơn của khách" gọi là **Số PO của khách** (R24 — mã "Order" trên HĐ giấy; KHÔNG đổi thành "Số booking" vì booking là của hãng tàu theo chuyến — chủ dự án chốt sau khi đối chiếu HĐ 18.26 + sổ Kế hoạch xuất hàng); **báo cáo kỳ** (NV15, R25). Orchestrator tự chấm (việc nhỏ, không spawn team): tách hai số tiền — tiền về theo ngày nhận (gồm cọc HĐ) · còn chưa về theo chuyến — vì cọc HĐ không gắn chuyến nên không cộng được vào chuyến.
 - v4 (2026-10-20, sau audit hồ sơ SCM — chủ dự án góp ý): nhãn "khép kín" đổi theo ngôn ngữ chứng từ XK (chuyến **Đủ hồ sơ**, HĐ **Đã xuất đủ** / **Đã chốt HĐ**, "Ngoài dung sai thừa / thiếu"); người ký duyệt chọn từ tài khoản BGĐ (R17 — trước gõ tự do, đã gõ sai tên GĐ); kỳ xem tháng / tuần / khoảng ngày + lọc khách áp cả 4 con số (R18); dòng hàng nối danh mục mặt hàng, bắt trước Lệnh SX, nối không cần bản sửa (R16); bảo hiểm CIF/CIP (R19); H/C tự cấp không bắt số (R20); chứng từ bắt buộc không xóa (R21); số kiểu Anh (R22); cọc cấp HĐ xem / sửa / xóa; khôi phục chuyến hủy; Excel phần còn thiếu + tuần lịch. Domain-Specialist XK veto: "thanh lý" (thuật ngữ pháp lý), gõ tự do người ký, lọc theo ngày ký, thay tên tiếng Anh bằng tên Việt, nối thẳng 141 mã kế toán.
 - v3 (2026-10-20): ĐÃ BUILD v1. Lệch nhỏ so với v2: route `/planning-export` (phẳng); kế toán không có Xóa tiền về (giữ luật vai trò — KTT / phòng KH xóa); thực xuất của chuyến "dùng chung" Commercial Invoice tính ở chuyến gốc (không cộng đôi); chạy không nối máy chủ thì ghi chú / số chứng từ thay file làm bằng chứng (như /documents).

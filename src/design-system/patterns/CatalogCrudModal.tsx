@@ -79,6 +79,7 @@ export function CatalogCrud<T extends { id: string }>({
   canCreate = true,
   canUpdate = true,
   canDelete = true,
+  rowActions,
 }: {
   title: string;
   description?: string;
@@ -104,6 +105,11 @@ export function CatalogCrud<T extends { id: string }>({
   canCreate?: boolean;
   canUpdate?: boolean;
   canDelete?: boolean;
+  /**
+   * Nút RIÊNG của từng dòng, đứng trước Sửa / Xóa (VD "Tên hàng" của một khách — mở danh sách
+   * con). Nút phải có nhãn chữ + `title` (luật §9).
+   */
+  rowActions?: (row: T) => React.ReactNode;
 }) {
   const [editing, setEditing] = React.useState<T | null>(null);
   const [isAdding, setIsAdding] = React.useState(false);
@@ -213,9 +219,10 @@ export function CatalogCrud<T extends { id: string }>({
           searchLabel={`Tìm ${entityName}…`}
           rowMarkKey={rowMarkKey}
           actions={
-            canUpdate || canDelete
+            canUpdate || canDelete || rowActions
               ? (r) => (
                   <>
+                    {rowActions?.(r)}
                     {canUpdate && (
                       <Button
                         variant="edit"

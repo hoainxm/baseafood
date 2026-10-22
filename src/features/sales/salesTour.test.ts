@@ -22,12 +22,12 @@ describe("buildSalesTour", () => {
 
   it("không quyền xem giá ⇒ lời tour không nhắc đơn giá, thành tiền, tổng tiền", () => {
     const text = textOf({ ...FULL, viewPrice: false });
-    expect(["Đơn giá", "Thành tiền", "Chưa có giá", "Tổng tiền bán"].filter((l) => text.includes(l))).toEqual([]);
+    expect(["Đơn giá", "Thành tiền", "Chưa có giá", "Tiền bán"].filter((l) => text.includes(l))).toEqual([]);
   });
 
   it("thứ tự theo công việc: tab → ghi phiếu → kỳ xem → phiếu → dòng → gắn lô → tổng (R2)", () => {
     const ids = buildSalesTour({ can: FULL }).steps.map((s) => s.id);
-    const order = ["intro", "create", "add-item", "stats", "filter", "invoice", "items", "lot", "totals", "outro"];
+    const order = ["intro", "tabs", "create", "add-item", "stats", "filter", "invoice", "items", "lot", "totals", "report-filters", "report-stats", "report-table", "outro"];
     expect(ids).toEqual(order);
   });
 
@@ -38,6 +38,8 @@ describe("buildSalesTour", () => {
       ...PERIOD_OPTIONS.map((o) => o.label),
       "Block thô (kho dự trữ)",
       "Đóng gói (kho thành phẩm)",
+      "Sổ bán hàng",
+      "Báo cáo",
       "Ghi bù",
       "Lý do ghi bù",
       "Chưa có giá",

@@ -1,6 +1,6 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
-covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts, src/lib/inventory.ts
-last_verified: 2026-10-17
+covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts, src/lib/inventory.ts, src/lib/salesTotals.ts
+last_verified: 2026-10-22
 <!-- updated: 2026-10-17 — (1) NHÁP PHIẾU BÁN (quy tắc 17, `lib/formDraft.ts`, khoá `bsf.draft.sales.<user>`): giữ đầu phiếu + dòng mặt hàng đang gõ dở (`session`, `sessionInvoiceId`, `editRowIds`, `newRows`); rời trang / tải lại / đăng nhập lại ⇒ hộp phiếu tự mở lại kèm dải "Đã mở lại phiếu đang gõ dở" (Bỏ bản nháp chỉ xoá dòng mặt hàng đang gõ). Dòng đã bấm "Thêm mặt hàng vào sổ" vốn vào sổ ngay nên không nằm trong nháp; đóng phiếu ⇒ nháp tự xoá. (2) HÚT BÁN VÀO CÂN ĐỐI (sửa 2026-10-16, `balancingGrid.salesItemToOutput`): kg đặt vào ô NGÀY giao của dòng (trước chỉ đặt quantityKg ⇒ lưới mất kg); dòng hút hỏng cũ được hút lại. (3) GỘP MẶT HÀNG TRÙNG TÊN (mig 0069) đổi luôn `sales_items.product_id` sang mục giữ — dòng bán không mất, chỉ đổi sang mặt hàng cùng tên. repo.ts thêm `reloadTables` / hàm gộp — không đổi luồng phiếu bán. -->
 <!-- updated: 2026-10-15 — phân quyền Đợt 3: `useCan("sales")` — Ghi phiếu (Thêm), Sửa phiếu/dòng (Sửa), Bỏ/Xóa phiếu (Xóa), gắn lô (Thêm/Sửa), giá + thành tiền theo Xem giá; Đơn đặt `useCan("orders")`. -->
 <!-- re-verified: 2026-10-13 09:00 — repo.ts đổi ở ranh giới máy chủ cho chế độ demo (khóa tiền tố `demo:`, xóa lọc site_id) — luồng phiếu bán / quy cách / hút bán KHÔNG đổi. -->
@@ -40,7 +40,7 @@ Chưa có (backlog): **chốt ngày bán** (bảng `chot_ngay` hiện chỉ dùn
 
 Bảng dùng: `phieu_ban`, `ban_hang`, đọc danh mục `mat_hang` / `khach_hang`. Migration `0005`.
 
-**Hai tab** (bọc ở `SalesTab.tsx`): **Sổ bán hàng** = màn ghi (`SalesScreen`) · **Báo cáo** (`SalesReport`) = tổng bán theo kỳ, gom **khách × kênh**, trình bày bằng thẻ `StatCardGrid` + `BarChart` (sản lượng theo khách) + `SummaryTable`. Giá trị để **riêng theo kênh** (Xuất khẩu USD ≠ Nội địa VND — không cộng thẳng, đúng bẫy §4); chỉ tổng kg gộp được (thẻ + chart chỉ dùng kg).
+**Hai tab** (`SalesTab.tsx` — route `/sales` qua `features/sales/index.ts`; NỐI LẠI 2026-10-22, trước đó tab bị bỏ rơi, `/sales` nạp thẳng sổ). Tab nằm ở đường dẫn: `/sales` = **Sổ bán hàng** (màn ghi `SalesScreen`) · `/sales?tab=report` = **Báo cáo** (`SalesReport`) = tổng bán theo kỳ, gom **khách × kênh**, trình bày bằng thẻ `StatCardGrid` + `BarChart` (sản lượng theo khách) + `SummaryTable`. Giá trị để **riêng theo kênh** (Xuất khẩu USD ≠ Nội địa VND — không cộng thẳng, đúng bẫy §4); chỉ tổng kg gộp được (thẻ + chart chỉ dùng kg). Thẻ **Giá trị Xuất khẩu** (USD) / **Giá trị Nội địa** (đ) cộng riêng theo kênh (`sumSalesAmountByChannel`, chỉ người có quyền xem giá, chỉ kênh có dòng). Hướng dẫn thao tác đăng ký ở `SalesTab` (đi cả hai tab, đổi `?tab=` bằng replace).
 
 ## Logic / Rules
 
@@ -60,7 +60,7 @@ Mặt hàng bán = **thành phẩm + quy cách**. Tên trên sổ mẫu ẩn b�
 
 ### 4. Kênh + đơn giá (bẫy hai kênh)
 
-Kênh ở **phiếu**: Xuất khẩu ⇒ đơn giá **USD**, Nội địa ⇒ **VND**. Cùng một cột `don_gia`, đơn vị hiển thị đổi theo kênh (`donViGia`). Khi tính giá trị phải **quy tỉ giá**, KHÔNG cộng thẳng hai kênh — bẫy kinh điển của cân đối, xem [31-can-doi-ky.md](31-can-doi-ky.md).
+Kênh ở **phiếu**: Xuất khẩu ⇒ đơn giá **USD**, Nội địa ⇒ **VND**. Cùng một cột `don_gia`, đơn vị hiển thị đổi theo kênh (`donViGia`). Khi tính giá trị phải **quy tỉ giá**, KHÔNG cộng thẳng hai kênh — bẫy kinh điển của cân đối, xem [31-can-doi-ky.md](31-can-doi-ky.md). **Cuối sổ bán** (2026-10-22): tiền tách theo kênh của phiếu — "Tiền bán Xuất khẩu … USD" · "Tiền bán Nội địa … đ" (chỉ hiện kênh có dòng trong phần đang xem), tính ở `lib/salesTotals.ts` `sumSalesAmountByChannel` (+ test); kg vẫn cộng chung. Trước đó ô "Tổng tiền bán" cộng thẳng USD + VND (sai).
 
 ### 5. Hút bán vào cân đối — COPY, chống trùng
 

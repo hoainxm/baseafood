@@ -67,9 +67,8 @@ import { useFormDraft } from "@/lib/formDraft";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
+import { sumSalesAmountByChannel } from "@/lib/salesTotals";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
-import { usePageTour } from "@/features/shared/PageTourProvider";
-import { buildSalesTour } from "./salesTour";
 import {
   CalendarRange,
   CircleCheck,
@@ -300,10 +299,8 @@ export default function SalesScreen() {
     () => view.reduce((s, r) => s + (r.quantityKg || 0), 0),
     [view]
   );
-  const totalAmount = useMemo(
-    () => view.reduce((s, r) => s + calculateSalesAmount(r), 0),
-    [view]
-  );
+  // Tiền theo kênh: Xuất khẩu (USD) và Nội địa (VND) KHÔNG cộng chung (33 §4).
+  const amountByChannel = useMemo(() => sumSalesAmountByChannel(view, salesInvoices).byChannel.filter((c) => c.lineCount > 0), [view, salesInvoices]);
 
   const postingDate = isSingleDay ? effectiveFrom : effectiveTo;
   const recordWorkshop: Workshop = workshop === "Tất cả" ? "Đông" : workshop;
@@ -587,13 +584,6 @@ export default function SalesScreen() {
     },
   ] : [];
 
-  // Hướng dẫn thao tác (ba-spec 43): chỉ dẫn, không ghi; bước ghi theo quyền, lời về giá theo quyền xem giá.
-  const tour = useMemo(
-    () => buildSalesTour({ can: { create: allowed.create, update: allowed.update, viewPrice: canViewPrice } }),
-    [allowed.create, allowed.update, canViewPrice],
-  );
-  usePageTour(isLoading ? null : tour);
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -797,16 +787,17 @@ export default function SalesScreen() {
               </span>
               <span className="tnum text-xl font-semibold">{kg(total)}</span>
             </div>
-            {canViewPrice && (
-            <div className="flex items-baseline gap-3">
-              <span className="text-base text-muted-foreground">
-                Tổng tiền bán
-              </span>
-              <span className="tnum text-xl font-semibold">
-                {num(totalAmount)}
-              </span>
-            </div>
-            )}
+            {canViewPrice &&
+              amountByChannel.map((c) => (
+                <div key={c.channel} className="flex items-baseline gap-3">
+                  <span className="text-base text-muted-foreground">
+                    Tiền bán {c.channel}
+                  </span>
+                  <span className="tnum whitespace-nowrap text-xl font-semibold">
+                    {num(c.amount)} {c.unit}
+                  </span>
+                </div>
+              ))}
           </div>
         </>
       )}

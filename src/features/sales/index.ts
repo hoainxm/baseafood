@@ -1,1 +1,1 @@
-export { default } from "./SalesScreen";
+export { default } from "./SalesTab";

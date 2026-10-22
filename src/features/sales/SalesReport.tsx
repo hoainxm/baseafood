@@ -21,7 +21,8 @@ import { useCan } from "@/features/shared/PermissionProvider";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { calculateSalesAmount, type SalesChannel } from "@/types";
-import { CalendarRange, Scale, Users } from "lucide-react";
+import { SALES_CHANNEL_UNITS, sumSalesAmountByChannel } from "@/lib/salesTotals";
+import { CalendarRange, Coins, Scale, Users } from "lucide-react";
 
 interface TotalRow {
   customerName: string;
@@ -32,7 +33,7 @@ interface TotalRow {
 
 /** Đơn vị tiền theo kênh: Xuất khẩu bằng USD, Nội địa bằng VND. */
 function unitOf(channel: SalesChannel): string {
-  return channel === "Xuất khẩu" ? "$" : "đ";
+  return SALES_CHANNEL_UNITS[channel];
 }
 
 /**
@@ -90,10 +91,20 @@ export default function SalesReport() {
     };
   }, [items, invoices, customers, fromDate, toDate]);
 
+  // Giá trị theo kênh — USD và VND không cộng chung (33 §4); chỉ kênh có dòng trong kỳ.
+  const valueCards = useMemo(() => {
+    if (!canViewPrice) return [];
+    const inPeriod = items.filter((it) => it.deliveryDate >= fromDate && it.deliveryDate <= toDate);
+    return sumSalesAmountByChannel(inPeriod, invoices)
+      .byChannel.filter((c) => c.lineCount > 0)
+      .map((c): StatCardData => ({ label: `Giá trị ${c.channel}`, value: `${num(c.amount)} ${c.unit}`, numeric: true, icon: Coins, color: "success" }));
+  }, [canViewPrice, items, invoices, fromDate, toDate]);
+
   const cards: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
     { label: "Tổng bán", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
     { label: "Số khách", value: num(customerCount), numeric: true, icon: Users, color: "neutral" },
+    ...valueCards,
   ];
 
   const columns: SummaryTableColumn<TotalRow>[] = [
@@ -121,7 +132,7 @@ export default function SalesReport() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-4">
+      <div data-tour="sales-report-filters" className="flex flex-wrap items-end gap-4">
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -157,7 +168,9 @@ export default function SalesReport() {
         </div>
       </div>
 
-      <StatCardGrid cards={cards} />
+      <div data-tour="sales-report-stats">
+        <StatCardGrid cards={cards} />
+      </div>
 
       {chart.length > 0 && (
         <section className="space-y-3 rounded-xl border-2 border-border bg-card p-5">
@@ -168,13 +181,15 @@ export default function SalesReport() {
         </section>
       )}
 
+      <div data-tour="sales-report-table">
       <SummaryTable
         rows={row}
         columns={columns}
         getKey={(r) => `${r.customerName}|||${r.channel}`}
-        rowMarkKey={`bao-cao-ban|${fromDate}|${toDate}`}
+        rowMarkKey={`sales-report|${fromDate}|${toDate}`}
         emptyText="Không có phiếu bán trong kỳ này."
       />
+      </div>
     </div>
   );
 }

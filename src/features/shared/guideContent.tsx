@@ -264,8 +264,15 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         </Section>
         <Section title="Tổng của kỳ">
           <p>
-            Cuối sổ có tổng khối lượng và tổng tiền của các phiếu đang xem. Tổng tiền cộng thẳng thành tiền các dòng,
-            không quy đổi tỉ giá — kỳ có cả Xuất khẩu (USD) và Nội địa (VND) thì đọc giá trị theo từng phiếu.
+            Cuối sổ có tổng khối lượng (kg mọi kênh) và tiền bán <b>tách theo kênh</b>: <b>Tiền bán Xuất khẩu</b> (USD) và{" "}
+            <b>Tiền bán Nội địa</b> (đ). Hai đơn vị không cộng chung, không quy đổi tỉ giá.
+          </p>
+        </Section>
+        <Section title="Tab Báo cáo">
+          <p>
+            Chọn tab <b>Báo cáo</b> để xem tổng bán theo <b>khách × kênh</b> trong kỳ: số cân (kg), giá trị theo đơn vị của
+            kênh, thẻ <b>Giá trị Xuất khẩu</b> (USD) và <b>Giá trị Nội địa</b> (đ) riêng, biểu đồ sản lượng theo khách. Báo cáo
+            chỉ đọc sổ bán, không ghi gì.
           </p>
         </Section>
       </>

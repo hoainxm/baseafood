@@ -9,6 +9,9 @@
 // ============================================================
 import type { PageTour, PageTourSpec, TourStep } from "@/lib/guidedTour";
 
+/** Hai tab của trang (`?tab=`): Sổ bán hàng (mặc định) · Báo cáo. */
+export type SalesTabId = "ledger" | "report";
+
 export interface SalesTourContext {
   can: {
     /** Ghi phiếu bán, thêm mặt hàng. */
@@ -18,6 +21,8 @@ export interface SalesTourContext {
     /** Xem đơn giá, thành tiền. */
     viewPrice: boolean;
   };
+  /** Đổi tab (chỉ đổi đường dẫn `?tab=`, replace). Không truyền ⇒ bước không đổi chỗ xem (test). */
+  showTab?: (tab: SalesTabId) => void;
 }
 
 /** Dựng các bước theo thứ tự công việc (R2). Bước tùy chọn tự bỏ khi chỗ không có (R3). */
@@ -125,7 +130,7 @@ export function buildSalesTour(ctx: SalesTourContext): PageTour {
       body:
         "Tổng khối lượng: tổng kg mọi dòng trong kỳ và xưởng đang xem." +
         (can.viewPrice
-          ? "\nTổng tiền bán: cộng thẳng thành tiền các dòng đang xem, không quy đổi tỉ giá. Kỳ có cả Xuất khẩu (USD) và Nội địa (VND) thì con số này cộng lẫn hai đơn vị — đọc giá trị theo từng phiếu (kênh ghi ở đầu phiếu)."
+          ? "\nTiền bán Xuất khẩu (USD) và Tiền bán Nội địa (đ): thành tiền các dòng đang xem, cộng riêng theo kênh của phiếu — hai đơn vị không bao giờ cộng chung, không quy đổi tỉ giá. Kỳ chỉ có một kênh thì chỉ hiện một dòng tiền."
           : ""),
     },
     {
@@ -136,11 +141,60 @@ export function buildSalesTour(ctx: SalesTourContext): PageTour {
         "Chọn Hoàn tất để trở về trang. Để xem lại, chọn nút ? trên thanh tiêu đề rồi chọn Bắt đầu hướng dẫn thao tác.",
     },
   );
-  return { title: "Bán hàng", steps };
+  // Bước Sổ bán hàng đổi về tab Sổ; bước Báo cáo đổi sang tab Báo cáo — mỗi tab MỘT hàm prepare chung (R6).
+  const toLedger = ctx.showTab ? () => ctx.showTab?.("ledger") : undefined;
+  const toReport = ctx.showTab ? () => ctx.showTab?.("report") : undefined;
+  const outro = steps.pop() as TourStep;
+  const ledgerSteps = steps.slice(1).map((st) => ({ ...st, prepare: toLedger }));
+  const tabs: TourStep = {
+    id: "tabs",
+    target: "sales-tabs",
+    title: "Sổ bán hàng và Báo cáo",
+    prepare: toLedger,
+    body:
+      "Trang có hai tab:\n" +
+      "• Sổ bán hàng: ghi, sửa và xem từng phiếu bán theo kỳ.\n" +
+      "• Báo cáo: tổng bán theo kỳ, gom theo khách × kênh. Chỉ đọc sổ bán, không ghi gì.",
+  };
+  const reportSteps: TourStep[] = [
+    {
+      id: "report-filters",
+      target: "sales-report-filters",
+      title: "Kỳ báo cáo",
+      prepare: toReport,
+      body: "Ở tab Báo cáo, chọn Kỳ báo cáo (Ngày · Tuần · Tháng · Năm · Khoảng tự chọn) rồi chọn một ngày bất kỳ trong kỳ. Phiếu vào kỳ theo ngày xuất bán, giống sổ bán.",
+    },
+    {
+      id: "report-stats",
+      target: "sales-report-stats",
+      title: "Thẻ số của báo cáo",
+      prepare: toReport,
+      body:
+        "Kỳ báo cáo · Tổng bán (kg của mọi kênh) · Số khách có mua trong kỳ." +
+        (can.viewPrice
+          ? "\nGiá trị Xuất khẩu (USD) và Giá trị Nội địa (đ): thành tiền cộng riêng theo kênh của phiếu — hai đơn vị không cộng chung, không quy đổi tỉ giá."
+          : ""),
+    },
+    {
+      id: "report-table",
+      target: "sales-report-table",
+      optional: true,
+      title: "Bảng theo khách và kênh",
+      prepare: toReport,
+      body:
+        "Mỗi dòng là một khách × một kênh: Số cân (kg)" +
+        (can.viewPrice ? " và Giá trị theo đơn vị của kênh (USD hoặc đ)" : "") +
+        ". Dòng tổng chỉ cộng kg" +
+        (can.viewPrice ? "; giá trị không cộng vì hai kênh khác đơn vị" : "") +
+        ". Biểu đồ Sản lượng bán theo khách phía trên tính theo kg.",
+    },
+  ];
+  // Lời giới thiệu cũng về tab Sổ: bắt đầu từ tab Báo cáo thì tab Sổ kịp vẽ trước khi dò chỗ của các bước sau.
+  return { title: "Bán hàng", steps: [{ ...steps[0], prepare: toLedger }, tabs, ...ledgerSteps, ...reportSteps, outro] };
 }
 
 /** Bản khai cho test quét chung (ba-spec 43 v4 R13): đủ quyền. */
 export const tourSpec: PageTourSpec = {
   pageId: "sales",
-  build: () => buildSalesTour({ can: { create: true, update: true, viewPrice: true } }),
+  build: () => buildSalesTour({ can: { create: true, update: true, viewPrice: true }, showTab: () => {} }),
 };

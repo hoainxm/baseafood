@@ -27,8 +27,11 @@ import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useQuickCatalogEdit } from "./QuickCatalogEdit";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
-import { nameKey, namesOfCustomer, validateCustomerProductName } from "@/lib/customerProductNames";
+import { extractCustomerNames, nameKey, namesOfCustomer, validateCustomerProductName } from "@/lib/customerProductNames";
 import { extractCustomerNamesFromContracts, type ExportData } from "@/lib/exportPlanning";
+import { invoiceFilesOfCustomer, invoiceNameLines, matchInvoiceLines } from "@/lib/invoiceReader";
+import { readInvoiceFile } from "@/lib/invoiceFileReader";
+import { downloadExportFile } from "@/lib/exportFileStorage";
 import type { Customer, CustomerProductName, Product } from "@/types";
 import { FileSearch, Languages, Pencil, Plus, Save } from "lucide-react";
 
@@ -73,8 +76,8 @@ export function CustomerProductNamesDialog({
   isAvailable: boolean;
   canWrite: boolean;
   canDelete: boolean;
-  /** Hợp đồng xuất khẩu để "Trích xuất từ chứng từ" (ba-spec 41 NV16). Không có ⇒ ẩn nút. */
-  extractSource?: Pick<ExportData, "contracts" | "revisions" | "approvals">;
+  /** Hợp đồng + Commercial Invoice đã đính để "Trích xuất từ chứng từ" (ba-spec 41 NV16 · R27). Không có ⇒ ẩn nút. */
+  extractSource?: Pick<ExportData, "contracts" | "revisions" | "approvals" | "items" | "files">;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<NameForm | null>(null);
@@ -95,6 +98,7 @@ export function CustomerProductNamesDialog({
   const [query, setQuery] = useState("");
   /** Kết quả lần "Trích xuất từ chứng từ" gần nhất (không thêm gì thì chỉ báo tại chỗ, không toast — luật 13). */
   const [extractNote, setExtractNote] = useState("");
+  const [extracting, setExtracting] = useState(false);
   const productName = (id: string) => products.find((p) => p.id === id)?.name || "(mặt hàng đã xóa)";
   const productCode = (id: string) => products.find((p) => p.id === id)?.finishedGoodCode || "";
   // Sắp theo tên rồi size ⇒ hai size cùng tên đứng cạnh nhau (dễ đối chiếu với HĐ).
@@ -129,26 +133,52 @@ export function CustomerProductNamesDialog({
     notify.saved(form.isNew ? `Đã thêm tên "${row.tradeName}" cho ${customer.name}` : "Đã lưu tên hàng", () => void setNames(prev));
     draft.done();
   };
-  const extract = () => {
-    if (!customer || !extractSource) return;
-    const prev = names;
-    const { created, contractCount } = extractCustomerNamesFromContracts(extractSource, names, customer.id, newId);
-    if (!created.length) {
-      setExtractNote(contractCount ? `Đã quét ${contractCount} hợp đồng của ${customer.name} — không có tên hàng mới.` : `${customer.name} chưa có hợp đồng xuất khẩu nào để trích xuất.`);
-      return;
-    }
-    if (setNames([...names, ...created]) === false) return;
+  /**
+   * Quét HĐ (dòng hàng đã nối) rồi Commercial Invoice đã đính đọc được (Excel / PDF xuất từ Excel — R27):
+   * dòng invoice nối mặt hàng theo HĐ / tên của khách / tên mặc định; bản scan bỏ qua, báo số file bỏ qua.
+   */
+  const extract = async () => {
+    if (!customer || !extractSource || extracting) return;
+    setExtracting(true);
     setExtractNote("");
-    notify.saved(`Đã trích xuất ${created.length} tên hàng từ ${contractCount} hợp đồng của ${customer.name}`, () => void setNames(prev));
+    try {
+      const prev = names;
+      const { created, contractCount } = extractCustomerNamesFromContracts(extractSource, names, customer.id, newId);
+      const invoiceFiles = invoiceFilesOfCustomer(extractSource, customer.id);
+      let invoiceRead = 0;
+      let invoiceSkipped = 0;
+      for (const f of invoiceFiles) {
+        const blob = await downloadExportFile(f.file.path);
+        const r = blob ? await readInvoiceFile(blob, f.file.fileName) : null;
+        if (!r?.ok) {
+          invoiceSkipped += 1;
+          continue;
+        }
+        invoiceRead += 1;
+        const ids = matchInvoiceLines(r.invoice, f.contractLines, customer.id, [...names, ...created], products).map((m) => m.productId);
+        created.push(...extractCustomerNames([...names, ...created], customer.id, invoiceNameLines(r.invoice.lines, ids), r.invoice.invoiceNo || f.file.fileName, newId, "Invoice"));
+      }
+      const scanned = [`${contractCount} hợp đồng`, invoiceFiles.length ? `${invoiceRead} invoice` : ""].filter(Boolean).join(" và ");
+      const skipped = invoiceSkipped ? ` Bỏ qua ${invoiceSkipped} file invoice không đọc được (bản scan, file lỗi, hoặc chưa tải được từ kho file).` : "";
+      if (!created.length) {
+        setExtractNote(contractCount ? `Đã quét ${scanned} của ${customer.name} — không có tên hàng mới.${skipped}` : `${customer.name} chưa có hợp đồng xuất khẩu nào để trích xuất.`);
+        return;
+      }
+      if (setNames([...names, ...created]) === false) return;
+      setExtractNote(skipped.trim());
+      notify.saved(`Đã trích xuất ${created.length} tên hàng từ ${scanned} của ${customer.name}`, () => void setNames(prev));
+    } finally {
+      setExtracting(false);
+    }
   };
   const extractButton = writable && extractSource && customer && (
     <Button
       variant="outline"
-      onClick={extract}
-      title={`Quét mọi hợp đồng xuất khẩu của ${customer.name}: dòng hàng đã nối mặt hàng mà chưa có trong bảng thì thêm vào (không ghi đè tên đang có).`}
+      onClick={() => void extract()}
+      title={`Quét mọi hợp đồng xuất khẩu và Commercial Invoice (Excel / PDF xuất từ Excel) đã đính của ${customer.name}: dòng hàng đã nối mặt hàng mà chưa có trong bảng thì thêm vào (không ghi đè tên đang có).`}
     >
       <FileSearch className="mr-2 h-4 w-4" aria-hidden />
-      Trích xuất từ chứng từ
+      {extracting ? "Đang trích xuất…" : "Trích xuất từ chứng từ"}
     </Button>
   );
 
@@ -208,7 +238,7 @@ export function CustomerProductNamesDialog({
         onClose();
       }}
       title={`Tên hàng trên chứng từ · ${customer?.name ?? ""}`}
-      description="Đối chiếu mặt hàng của xưởng với tên, size, quy cách và mã HS mà khách dùng trên hợp đồng, invoice. Tên được trích xuất từ các dòng hàng hợp đồng đã nối mặt hàng; chỉnh sửa tại đây không làm thay đổi hợp đồng đã lưu."
+      description="Đối chiếu mặt hàng của xưởng với tên, size, quy cách và mã HS mà khách dùng trên hợp đồng, invoice. Tên được trích xuất từ dòng hàng hợp đồng đã nối mặt hàng và từ Commercial Invoice đã đính (file Excel hoặc PDF xuất từ Excel); chỉnh sửa tại đây không làm thay đổi chứng từ đã lưu."
       icon={Languages}
       size="xl"
       hasRequiredFields={!!form}
@@ -326,7 +356,7 @@ export function CustomerProductNamesDialog({
             <div className="grid min-w-0 justify-items-start gap-3">
               <p className="text-sm text-muted-foreground">
                 Chưa có tên hàng nào cho khách này. Tên được trích xuất khi lưu hợp đồng đã nối mặt hàng
-                {extractButton ? '; chọn "Trích xuất từ chứng từ" để lấy ngay từ các hợp đồng đã có' : ""}
+                {extractButton ? '; chọn "Trích xuất từ chứng từ" để lấy ngay từ các hợp đồng và invoice đã có' : ""}
                 {writable ? ', hoặc "Thêm tên hàng" để khai tay' : ""}.
               </p>
               {extractButton}

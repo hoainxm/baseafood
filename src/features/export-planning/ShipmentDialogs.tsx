@@ -40,12 +40,15 @@ import {
   requiredDocumentLabel,
   shareCandidates,
   validateShipment,
+  workingRevision,
   type ExportData,
 } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
-import type { ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem } from "@/types";
+import { invoiceNameLines } from "@/lib/invoiceReader";
+import type { CustomerProductName, ExportContractLine, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem, Product } from "@/types";
 import { Camera, ClipboardList, Container, Save } from "lucide-react";
 import { FileList, FilePicker, type PreviewTarget } from "./parts";
+import { InvoiceReadPanel, type InvoiceReadState } from "./InvoiceReadPanel";
 
 /** Tải nhiều file lên (theo thứ tự); lỗi giữa chừng ⇒ gỡ các file đã lên rồi báo. */
 async function uploadAll(files: File[], contractId: string, area: "shipment" | "loading", prefix: string): Promise<{ path: string; fileName: string }[]> {
@@ -267,12 +270,20 @@ interface StepItemForm {
 }
 const itemSnap = (i: ExportStepItem) => JSON.stringify(i);
 
+/** Dòng invoice đã nối mặt hàng ⇒ trích xuất tên hàng của khách khi Lưu (R27). */
+export interface InvoiceNameExtract {
+  docNo: string;
+  lines: Pick<ExportContractLine, "productId" | "description" | "size" | "packing" | "hsCode">[];
+}
+
 export function StepItemDialog({
   target,
   data,
   filesAvailable,
   recordedBy,
   canDelete,
+  invoiceCatalog,
+  canViewPrice,
   onClose,
   onSave,
   onRemoveFile,
@@ -284,8 +295,11 @@ export function StepItemDialog({
   filesAvailable: boolean;
   recordedBy: string;
   canDelete: boolean;
+  /** Danh mục cho khối Đọc invoice: nối dòng invoice với mặt hàng (luật 7 — tạo mới + bút chì). */
+  invoiceCatalog: { products: Product[]; setProducts: (rows: Product[]) => boolean | void; customerNames: readonly CustomerProductName[] };
+  canViewPrice: boolean;
   onClose: () => void;
-  onSave: (item: ExportStepItem, newFiles: ExportFile[], isNew: boolean) => boolean;
+  onSave: (item: ExportStepItem, newFiles: ExportFile[], isNew: boolean, extract?: InvoiceNameExtract) => boolean;
   onRemoveFile: (f: ExportFile) => void;
   onDeleteItem: (item: ExportStepItem) => void;
   onPreview: (f: PreviewTarget) => void;
@@ -294,6 +308,7 @@ export function StepItemDialog({
   const [files, setFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [busy, setBusy] = useState(false);
+  const [invoiceRead, setInvoiceRead] = useState<InvoiceReadState | null>(null);
   const draft = useDialogDraft({ form: "export-step-item", value: form, setValue: setForm, isEmpty: (f) => itemSnap(f.item) === f.initial });
 
   useEffect(() => {
@@ -303,6 +318,7 @@ export function StepItemDialog({
     setForm(kept && kept.key === fresh.key ? kept : fresh);
     setFiles([]);
     setErrors([]);
+    setInvoiceRead(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
 
@@ -320,6 +336,7 @@ export function StepItemDialog({
   const isDoc = item?.step === "document";
   const isInvoice = item?.docKind === "commercial-invoice";
   const isBl = item?.docKind === "bill-of-lading";
+  const invoiceContract = isInvoice && tgt ? data.contracts.find((c) => c.id === tgt.contractId) : undefined;
   const title = item ? (isDoc ? requiredDocumentLabel({ kind: item.docKind, form: item.docForm, issuer: item.docIssuer }) : SUB_STEP_LABELS[item.step]) : "";
 
   const save = async () => {
@@ -384,7 +401,10 @@ export function StepItemDialog({
         createdAt: new Date().toISOString(),
       }));
       const clean: ExportStepItem = { ...it, naReason: it.state === "not-applicable" ? it.naReason.trim() : "", number: it.number.trim(), note: it.note.trim() };
-      if (!onSave(clean, rows, tgt.isNew)) {
+      const inv = invoiceRead?.result?.ok ? invoiceRead.result.invoice : null;
+      const extract: InvoiceNameExtract | undefined =
+        inv && invoiceRead?.productIds.some(Boolean) ? { docNo: inv.invoiceNo || clean.number, lines: invoiceNameLines(inv.lines, invoiceRead.productIds) } : undefined;
+      if (!onSave(clean, rows, tgt.isNew, extract)) {
         void removeExportFiles(uploaded.map((u) => u.path));
         return;
       }
@@ -409,7 +429,7 @@ export function StepItemDialog({
       title={title}
       description="Đánh dấu Xong cần đủ bằng chứng (file, số, ngày). Không áp dụng thì ghi lý do."
       icon={ClipboardList}
-      size="lg"
+      size={isInvoice ? "xl" : "lg"}
       hasRequiredFields
       footer={
         <>
@@ -514,6 +534,25 @@ export function StepItemDialog({
                   )}
                 </div>
               </Field>
+              {isInvoice && invoiceContract && (
+                <InvoiceReadPanel
+                  pickedFiles={files}
+                  savedFiles={savedFiles}
+                  item={item}
+                  onPatchItem={(patch) => setForm((f) => (f ? { ...f, item: { ...f.item, ...patch } } : f))}
+                  state={invoiceRead}
+                  onStateChange={setInvoiceRead}
+                  contractLines={workingRevision(data, invoiceContract.id)?.lines ?? []}
+                  customerId={invoiceContract.customerId}
+                  customerNames={invoiceCatalog.customerNames}
+                  products={invoiceCatalog.products}
+                  setProducts={invoiceCatalog.setProducts}
+                  canViewPrice={canViewPrice}
+                  currency={termsOf(data, invoiceContract.id)?.currency || "USD"}
+                  contractNo={invoiceContract.contractNo}
+                  readOnlyPick={!hasExportStorage}
+                />
+              )}
             </>
           )}
         </div>

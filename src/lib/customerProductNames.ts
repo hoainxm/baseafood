@@ -96,7 +96,7 @@ export function validateCustomerProductName(
 }
 
 /**
- * Trích xuất từ chứng từ (NV16 · R26): từ các dòng hàng đã nối mặt hàng, TẠO dòng tên cho cặp (khách, mặt hàng)
+ * Trích xuất từ chứng từ (NV16 · R26 · R27): từ các dòng hàng (HĐ hoặc invoice) đã nối mặt hàng, TẠO dòng tên cho cặp (khách, mặt hàng)
  * chưa có. Không sửa dòng đã có; dòng không có mặt hàng / tên rỗng bỏ qua; cùng mặt hàng lấy dòng
  * đầu; trùng tên + size với mặt hàng khác của khách thì bỏ qua (giữ R23).
  */
@@ -104,8 +104,10 @@ export function extractCustomerNames(
   existing: readonly CustomerProductName[],
   customerId: string,
   lines: readonly Pick<ExportContractLine, "productId" | "description" | "size" | "packing" | "hsCode">[],
-  contractNo: string,
+  docNo: string,
   newId: () => string,
+  /** Loại chứng từ nguồn cho ghi chú: "HĐ" (hợp đồng) hoặc "Invoice" (Commercial Invoice — R27). */
+  docKind: "HĐ" | "Invoice" = "HĐ",
 ): CustomerProductName[] {
   if (!customerId) return [];
   const created: CustomerProductName[] = [];
@@ -121,7 +123,7 @@ export function extractCustomerNames(
       sizeText: l.size.trim(),
       packing: l.packing.trim(),
       hsCode: l.hsCode.trim(),
-      note: contractNo ? `Trích xuất từ HĐ ${contractNo}` : "Trích xuất từ hợp đồng",
+      note: docNo ? `Trích xuất từ ${docKind} ${docNo}` : docKind === "HĐ" ? "Trích xuất từ hợp đồng" : "Trích xuất từ invoice",
     };
     if (validateCustomerProductName(row, pool).length) continue;
     created.push(row);

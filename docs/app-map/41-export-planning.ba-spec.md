@@ -1,10 +1,11 @@
 # 41 — ba-spec: Phòng Kế hoạch · Xuất khẩu — Đợt 1 (khung tháng × khách × hợp đồng × chuyến)
 
 > Load khi: xây hoặc sửa module Xuất khẩu của Phòng Kế hoạch đợt 1: hồ sơ hợp đồng (dòng hàng, bản sửa, gia hạn, file ký, kết quả duyệt giấy), chuyến (mã lô MSL, booking, cont, seal, ngày đóng/ETD), 6 bước dạng checklist tay kèm file, thực xuất lấy từ invoice, khép kín chuyến/hợp đồng theo dung sai, tiền về, vai trò Phòng Kế hoạch, mở rộng danh mục khách.
-covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql
+covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql
 last_verified: 2026-10-22
 ttl_days: 90
-status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Hoài Nam ↔ Lê Khiêm; ĐÃ BUILD 2026-10-22, `0077` ✅ chạy DB thật 2026-10-22) · v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+status: ba-spec v7 (2026-10-22 tối: **đọc Commercial Invoice** từ file Excel gốc / PDF xuất từ Excel — NV17 · R27; ĐÃ BUILD 2026-10-22, không migration) · v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Hoài Nam ↔ Lê Khiêm; ĐÃ BUILD 2026-10-22, `0077` ✅ chạy DB thật 2026-10-22) · v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+<!-- re-verified: 2026-10-22 (c) — v7: R27 + AC-51…AC-55 = test `invoiceReader.test.ts` (18, oracle invoice 234/26 chép từng ô); thử tay preview demo (localStorage): file Excel → điền số / ngày / 3 số tổng, PDF có chữ ra cùng kết quả, bản scan 234/26 → câu "bản scan", ô đã có số khác → báo + "Dùng số trên invoice", nối 1 dòng → Lưu trích xuất 1 tên "Trích xuất từ Invoice 234/26" + Hoàn tác, Hủy không ghi; 360 px × 130 % không tràn. Chưa thử: tải file từ kho file thật (cần DB), file Excel gốc THẬT của Phòng KH (chưa có). -->
 <!-- re-verified: 2026-10-22 (b) — v6: R23 · R26 + AC-39/40/46/47 = test `customerProductNames.test.ts` (11) + `exportPlanning.test.ts`; AC-48 = `useCustomerProductNameStore.isAvailable` (thử tay chưa có DB chưa chạy 0077 — chưa làm); AC-49 thử tay preview demo: bộ demo 18 tên trích xuất, hộp Tên hàng, form HĐ điền tên + quy cách của khách, nối mặt hàng tự thêm 1 tên + toast; RLS 0077 thử PGlite. -->
 <!-- re-verified: 2026-10-22 — v5: R23–R25 + AC-39…AC-44 = test `exportPlanning.test.ts` (52) + `exportReports.test.ts` (15) + `repo.test.ts` (AC-41); AC-45 thử bằng hàm Excel (0 ô tiền) — phần màn hình cần tài khoản không quyền giá (chưa thử tay); tên thương mại + báo cáo + danh sách file thử tay preview demo 1366 px + 360 px × 100 / 130 %. -->
 <!-- re-verified: 2026-10-20 17:30 — v4: R16–R22 + AC-30…AC-38 = test `exportPlanning.test.ts` (48) + `numberExpression.test.ts` + `format.test.ts`; nhãn / người ký / kỳ xem / nối mặt hàng thử tay preview sandbox, 360 px + 130 %. -->
@@ -60,7 +61,8 @@ status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Ho�
 | NV12 | Khép kín chuyến và hợp đồng | S1 (tự tính) | U1 (đóng tay có lý do) | NV8 | mỗi chuyến | Must |
 | NV13 | Hủy / xóa hợp đồng hoặc chuyến | U1 | — | NV3 / NV7 | hiếm | Must |
 | NV14 | Khai **tên hàng theo khách** — tên · size · quy cách · mã HS mà MỖI KHÁCH dùng trên HĐ / invoice cho một mặt hàng của xưởng (v6; v5 là một tên / mặt hàng) | U1 | — | — | khi có khách / mặt hàng XK mới; 15–20 dòng / khách | Must |
-| NV16 | **Trích xuất** tên hàng theo khách từ dòng hàng HĐ đã nối mặt hàng (v6) | S1 (tự tính) | U1 (soát / sửa danh sách) | NV3, NV14 | mỗi lần lưu HĐ / nối mặt hàng | Must |
+| NV16 | **Trích xuất** tên hàng theo khách từ dòng hàng HĐ đã nối mặt hàng (v6) và từ Commercial Invoice đọc được (v7) | S1 (tự tính) | U1 (soát / sửa danh sách) | NV3, NV14, NV17 | mỗi lần lưu HĐ / nối mặt hàng / lưu invoice | Must |
+| NV17 | **Đọc Commercial Invoice** từ file Excel gốc / PDF xuất từ Excel: điền số, ngày, 3 số tổng; so với HĐ; nối dòng để trích xuất tên (v7) | U1 | — | NV8 | mỗi chuyến | Should |
 | NV15 | Xem **báo cáo xuất khẩu** theo kỳ: sản lượng, giá trị, tiền về, đúng hạn, hồ sơ còn kẹt, HĐ cần chú ý (v5) | U2 | U3, U1 (xem cùng số) | NV7, NV8, NV10 | hằng tháng / quý | Must |
 
 ## 4. Cross-user handoff
@@ -199,11 +201,19 @@ status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Ho�
 
 ### Flow NV16 — Trích xuất tên hàng theo khách từ chứng từ · owner S1 (v6.2)
 - **Tên gọi (chủ dự án 2026-10-22):** "Trích xuất từ chứng từ" — thay chữ "tự học" ở mọi chỗ (nút, ghi chú dòng "Trích xuất từ HĐ <số>", thông báo).
-- **Start:** (a) người dùng lưu HĐ / bản sửa (NV3, NV5) hoặc lưu hộp nối mặt hàng (R16) — trích xuất các dòng của HĐ đó; (b) người dùng chọn **"Trích xuất từ chứng từ"** ở bảng tên hàng của khách — quét MỌI hợp đồng xuất khẩu chưa hủy của khách (bản đang dùng; HĐ ký trước xét trước). Nguồn là dòng hàng hợp đồng vì Commercial Invoice trong app chỉ lưu tổng + file PDF (đọc PDF invoice: đợt sau).
+- **Start:** (a) người dùng lưu HĐ / bản sửa (NV3, NV5) hoặc lưu hộp nối mặt hàng (R16) — trích xuất các dòng của HĐ đó; (b) người dùng chọn **"Trích xuất từ chứng từ"** ở bảng tên hàng của khách — quét MỌI hợp đồng xuất khẩu chưa hủy của khách (bản đang dùng; HĐ ký trước xét trước), **rồi mọi file Commercial Invoice đọc được đã đính ở các HĐ đó** (v7, R27 — bản scan / file lỗi bỏ qua, báo số file bỏ qua); (c) người dùng lưu mục Commercial Invoice sau khi đọc file (NV17) — trích xuất các dòng invoice đã nối mặt hàng.
 - **Input:** khách của HĐ · các dòng hàng có **mặt hàng** và **tên hàng** khác rỗng.
-- **Steps:** với mỗi dòng: cặp (khách, mặt hàng) **chưa có** tên ⇒ tạo dòng tên từ dòng hàng (tên · size · quy cách · mã HS, ghi chú "Trích xuất từ HĐ <số HĐ>"); **đã có** ⇒ giữ nguyên (không ghi đè — khách đổi tên thì U1 sửa ở danh sách). Hai dòng cùng HĐ cùng mặt hàng ⇒ lấy dòng đầu.
+- **Steps:** với mỗi dòng: cặp (khách, mặt hàng) **chưa có** tên ⇒ tạo dòng tên từ dòng hàng (tên · size · quy cách · mã HS, ghi chú "Trích xuất từ HĐ <số HĐ>" — từ invoice: "Trích xuất từ Invoice <số invoice>", mã HS trống vì invoice không in); **đã có** ⇒ giữ nguyên (không ghi đè — khách đổi tên thì U1 sửa ở danh sách). Hai dòng cùng HĐ cùng mặt hàng ⇒ lấy dòng đầu.
 - **Output:** danh sách tên của khách đủ thêm; HĐ 18.26 nối xong 14 dòng ⇒ Seachemot có 1 tên / mặt hàng đã nối.
 - **End:** không cần ai duyệt; U1 soát lại ở danh sách khi muốn. Máy chủ chưa có bảng ⇒ không trích xuất (không ghi gì), HĐ vẫn lưu bình thường.
+
+### Flow NV17 — Đọc Commercial Invoice · owner U1 (v7)
+- **Vì sao (chủ dự án 2026-10-22):** bỏ gõ tay 3 số tổng của invoice (thực xuất R7) và lấy tên hàng của khách từ invoice. Chủ dự án chốt: **không đọc bản scan** (ảnh — invoice 234/26 trong app là bản HP Scan đã ký, đóng dấu, 0 chữ); chỉ đọc **file gốc**: Excel (.xlsx, .xls) hoặc PDF xuất từ Excel (có lớp chữ). Invoice do chính Baseafood lập từ mẫu Excel.
+- **Start:** U1 mở mục **Commercial Invoice** của chuyến (bước 5) và chọn file Excel / PDF; hoặc chọn "Đọc file đã đính" khi mục đã có file đọc được. Chạy không nối máy chủ (không lưu được file): chọn file **chỉ để đọc**, file không lưu.
+- **Input:** file invoice · mục đang mở (số, ngày, 3 số tổng) · dòng hàng của bản đang dùng của HĐ · tên hàng của khách (R23) · danh mục mặt hàng.
+- **Steps:** (1) đọc bảng theo R27 ra số invoice, ngày lập, khách, tiền tệ, các dòng (tên · size · quy cách · thùng · kg · đơn giá · tiền) và dòng TOTAL; (2) ô **đang trống** của mục ⇒ điền; ô **đã có số khác** ⇒ báo "đang ghi … — invoice …", không ghi đè, U1 chọn "Dùng số trên invoice" nếu muốn; (3) so với HĐ: dòng không có dòng cùng tên + size trong HĐ, đơn giá khác HĐ; dòng TOTAL khác cộng các dòng; (4) mỗi dòng gợi ý mặt hàng (R27), U1 sửa / chọn; (5) U1 bấm Lưu.
+- **Output:** mục Commercial Invoice có số, ngày, 3 số tổng (thực xuất R7 cập nhật); file (nếu chọn ở ô File) được đính; dòng đã nối mặt hàng ⇒ trích xuất tên hàng của khách còn thiếu (NV16, không ghi đè); thông báo "Đã lưu · trích xuất n tên hàng của khách" có Hoàn tác (hoàn cả tên).
+- **End:** không ai duyệt. Không bấm Lưu (Hủy / đóng) ⇒ không ghi gì. Đọc không được (bản scan, file khác loại, không nhận ra bảng) ⇒ câu báo tại chỗ, mục vẫn sửa / lưu tay như cũ.
 
 ### Flow NV15 — Xem báo cáo xuất khẩu · owner U2 (v5)
 - **Start:** người có quyền xem Xuất khẩu.
@@ -219,6 +229,10 @@ status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Ho�
 | NV14 (v6) | B. Tên theo nước | Loại | Cùng nước Nhật hai khách hai tên — chuyên gia sửa "theo giao dịch thực tế với khách" | Domain | — |
 | NV14 (v6) | C. Không bảng, suy từ HĐ cũ | Loại | Không khai trước được cho khách mới, không xem thành danh sách 15–20 dòng (rubric: Output không quan sát được) | Optimizer | — |
 | NV14 + NV16 (v6) | D. Bảng tên theo khách + trích xuất từ HĐ, lưu tên · size · quy cách · HS | **Chọn** (chủ dự án 2026-10-22) | Ít bước nhất: HĐ đầu tiên của khách tự sinh danh sách; tên + size tách được hai size cùng tên (HĐ 18.26 dòng 3–4) | Optimizer + chủ dự án | — |
+| NV17 (v7) | A. Đọc bản scan bằng Tesseract trên máy | Loại | Bảng + số trên ảnh scan đóng dấu dễ sai; người soát phải dò lại cả 13 dòng — không bớt việc (rubric #5) | Optimizer + chủ dự án | — |
+| NV17 (v7) | B. Đọc bản scan bằng AI trên cloud | Loại (đợt này) | Tốn phí theo trang + key đặt ở máy chủ (🔴 đụng key) — chủ dự án chưa duyệt | Orchestrator | Mở lại khi chủ dự án duyệt phí |
+| NV17 (v7) | C. Chỉ đọc file gốc (Excel / PDF xuất từ Excel), scan chỉ làm bằng chứng | **Chọn** (chủ dự án 2026-10-22) | Chính xác 100%, không phí, không key; invoice do xưởng tự lập nên có sẵn file gốc | Optimizer + chủ dự án | Phòng KH phải đính thêm file gốc — chưa xác nhận giữ Excel hay PDF ⇒ đọc cả hai |
+| NV17 (v7) | D. Ghi đè ô đã có số bằng số invoice | Loại | Số gõ tay có thể đúng hơn file nhầm (đính nhầm invoice HĐ khác) — báo lệch, U1 chọn (an toàn) | Optimizer | — |
 | NV16 (v6) | E. Trích xuất ghi đè khi tên khác | Loại | Một HĐ gõ sai làm hỏng tên chuẩn của khách (an toàn) — sửa là việc của U1 | Optimizer | — |
 | Trục | A: HĐ là trục, bước gắn HĐ · B: chuyến là trục · C: HĐ 1..n chuyến, bước 2–5 gắn chuyến | **C** | A sai thực tế (lô trải 3 cont); B mất dung sai + chứng từ yêu cầu của HĐ. Đúng Q2 | Orchestrator + Domain (XK) | Hình "HĐ → các bước" của chủ dự án giữ đúng khi 1 chuyến |
 | NV7 tháng | A: tháng ký · B: tháng kế hoạch · C: ngày đóng → ETD → kế hoạch | **C** | Q1; đổi ngày đóng là chuyến tự sang tháng (rubric #5) | Optimizer | — |
@@ -241,7 +255,7 @@ status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Ho�
 
 ## 7. Scope & Priority
 
-- **IN (đợt 1):** NV1–NV13.
+- **IN (đợt 1):** NV1–NV13. **v5–v7:** NV14–NV17 (NV17 = đọc Commercial Invoice từ file gốc — phần "số liệu dòng của chứng từ" của đợt 4 làm trước cho riêng invoice; đối chiếu chéo các chứng từ khác vẫn để đợt 4).
 - **OUT (đợt sau):**
   - Lệnh SX có cấu trúc + 3 nơi nhận (đợt 2).
   - Mẫu thùng / phiên bản / đợt in (đợt 2).
@@ -290,6 +304,7 @@ status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Ho�
 | R22 | Ô số hiểu số chép từ chứng từ tiếng Anh: có cả "." lẫn "," ⇒ dấu đứng sau là phần lẻ; chỉ "." mà không đúng nhóm nghìn kiểu Việt ⇒ "." là phần lẻ; có kiểu này ⇒ ô hiện lại số đã hiểu. Kiểu Việt giữ nguyên | "10.50" → 10,5 · "194,557.60" → 194.557,6 · "1.234" → 1234 |
 | R23 | **Tên hàng theo khách** (v6 — thay R23 v5). Bảng `customer_product_names`: khách · mặt hàng · tên (bắt buộc) · size · quy cách · mã HS · ghi chú. **Một (khách, mặt hàng) một dòng.** Hai mặt hàng của cùng khách được trùng tên nếu **khác size**; trùng cả tên lẫn size (so không phân hoa thường, gộp khoảng trắng) ⇒ chặn lưu (không biết nối về mặt hàng nào). `products.trade_name` (mig 0076) đổi nghĩa thành **tên tiếng Anh mặc định** — dùng khi khách chưa có tên riêng. **Lập HĐ:** chọn mặt hàng ⇒ ô nào đang trống thì điền theo thứ tự tên của khách → (chỉ ô tên) tên mặc định → để trống; ô đã có chữ **không** bị ghi đè. **Gợi ý nối** (lấy bậc đầu tiên ra đúng MỘT mặt hàng): (1) tên của khách khớp **tên + size** của dòng · (2) tên của khách khớp tên, duy nhất trong khách · (3) lịch sử nối R16 (cùng khách trước) · (4) tên mặc định khớp đúng một mặt hàng. Không bậc nào ra một ⇒ không điền; các mặt hàng khớp tên đứng đầu danh sách chọn. Máy chủ chưa có bảng / cột ⇒ app không gửi, không kẹt hàng chờ | HĐ 18.26 dòng 3 (5-5.5 gr) và dòng 4 (6-7 gr) cùng tên "Frozen iwadako boiled cut" ⇒ bậc 1 nối đúng hai mặt hàng khác nhau |
 | R26 | **Trích xuất** (NV16): chỉ TẠO dòng tên cho cặp (khách, mặt hàng) chưa có, từ dòng hàng có mặt hàng + tên; **không bao giờ sửa** dòng đã có; không tạo khi dòng trùng tên + size với mặt hàng khác của cùng khách (để R23 không vỡ). Sửa / xóa dòng tên không hồi tố HĐ đã lưu | lưu lại HĐ 18.26 với tên khác ⇒ tên của Seachemot giữ bản cũ |
+| R27 | **Đọc Commercial Invoice** (NV17, v7). **Loại file:** chỉ .xlsx / .xls / .pdf; PDF có < 40 ký tự chữ ⇒ "bản scan", không đọc; ảnh / Word / zip ⇒ không đọc. Nhiều sheet ⇒ sheet có chữ "COMMERCIAL INVOICE", không có thì sheet có "DESCRIPTION". **Bảng:** bắt đầu sau dòng có chữ "DESCRIPTION", dừng ở dòng "TOTAL" (hoặc "Says"). Dòng chữ khác (không phải SIZE / Packing / tiêu đề cột) = **tên hàng** của nhóm; dòng "SIZE…" có ≥ 2 số ⇒ một dòng hàng; dòng "SIZE…" không số ⇒ size chờ cho dòng "Packing" có số kế tiếp; dòng "Packing…" có ≥ 2 số ⇒ một dòng hàng (size = size chờ), không số ⇒ quy cách cho các dòng của nhóm từ dòng "Packing" trước; nhóm không có dòng con mà dòng tên có số ⇒ một dòng hàng. Số của dòng: 4+ số = thùng · kg · đơn giá · tiền; 3 = thùng · kg · tiền; 2 = thùng · kg; số đứng trước ô chữ đầu (số thứ tự) bỏ. Số đọc theo R22 (thêm: chỉ "," đúng nhóm nghìn kiểu Anh "3,000" ⇒ phân nghìn). **Tổng** = dòng TOTAL; không có ⇒ cộng dòng + cảnh báo; khác cộng dòng ⇒ cảnh báo, giữ số TOTAL. **Đầu invoice:** số = "Invoice No …" hoặc chữ dạng "234/26" cạnh "COMMERCIAL INVOICE"; ngày lập = ngày đầu tiên của phần đầu, **bỏ** dòng có chữ delivery / ETD / ETA / shipment / on board. **Điền mục:** ô trống ⇒ điền; ô khác ⇒ báo, không ghi đè; số so sai lệch ≤ 0,005 coi là bằng. **Nối mặt hàng** (bậc đầu ra ĐÚNG MỘT): (1) dòng HĐ cùng tên + size (so size không phân hoa thường, bỏ chữ "size:", bỏ khoảng trắng; dòng HĐ không ghi size khớp theo tên) · (2) tên của khách khớp tên + size — invoice không ghi size mới nhận khớp tên (R23) · (3) tên tiếng Anh mặc định. Không đoán theo lịch sử tên-không-size. **So với HĐ:** dòng không có dòng HĐ cùng tên + size ⇒ "Không có trong HĐ"; đơn giá khác đơn giá dòng HĐ ⇒ "Giá khác HĐ" (người không có quyền xem giá không thấy) | invoice 234/26 ⇒ 13 dòng, 2.251 thùng · 22.214 kg · 194.557,60 USD, ngày 25/09/2026 (không lấy ngày giao 26/09) |
 | R24 | **Số PO của khách** (`orderRef`): mã đơn của khách in ở dòng "Order" trên HĐ giấy (HĐ 18.26: `#B182`). Một HĐ một số; chỉ để tra cứu. **Không phải** số booking — booking là của hãng tàu, theo từng chuyến (NV7) | — |
 | R25 | **Báo cáo kỳ** (NV15). Kỳ = tháng · quý · năm. Chuyến của kỳ = chuyến **chưa hủy** thuộc kỳ theo R18. Mỗi chuyến tính: cont (chỉ loại cont), kg kế hoạch, thực xuất R7, **còn chưa về** = max(0, thực xuất tiền − tiền về của chuyến). **Tiền về trong kỳ** = Σ lần tiền về có **ngày** trong kỳ (cả cọc cấp HĐ). Đúng hạn / trễ theo R15, chỉ đếm chuyến đã có ngày giao (on board ?? ETD). Bước kẹt = số chuyến của kỳ có bước n (1–5) chưa xong / không áp dụng. HĐ ký trong kỳ = ngày ký trong kỳ, HĐ chưa hủy; kg / tiền HĐ theo bản đang dùng. **HĐ cần chú ý** (HĐ chưa hủy, chưa chốt tay, có chuyến trong kỳ hoặc hạn giao hiệu lực trong kỳ): quá hạn giao mà chưa lên đủ chuyến · thực xuất vượt (kg hoặc tiền) quá dung sai · đã khép đủ hồ sơ mà thiếu dung sai · còn tiền chưa về. Lọc khách áp mọi số | lô 165 / HĐ 18.26, năm 2026 ⇒ T9: 1 chuyến · 1 cont · 19.000 → 22.214 kg · 194.557,60 USD · trễ 1 · HĐ 18.26 "vượt dung sai: thừa 16,9%" |
 
@@ -566,6 +581,27 @@ status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Ho�
 - **When** `extractCustomerNamesFromContracts(d, existing, "scm", newId)`, rồi chạy lại
 - **Assert** `contractCount == 2`; tạo đúng 2 dòng [p-55 "Trích xuất từ HĐ 18.26/BSF-SCM.2026", p-67 "Trích xuất từ HĐ 21.26/BSF-SCM.2026"]; p-tip giữ tên cũ; lần chạy lại tạo 0 dòng
 
+### AC-51 — Đọc invoice 234/26 ra đúng dòng và tổng · Maps to: NV17, R27 · Test: unit
+- **Given** bảng invoice 234/26 chép từng ô theo bố cục Excel (8 nhóm hàng, dòng Packing sau 2 size, nhóm không size, dòng SIZE không số, "Size" không dấu hai chấm)
+- **When** `parseInvoiceRows(rows)`; và cùng bảng với số in kiểu Anh như chữ PDF ("3,000.00")
+- **Assert** số == "234/26"; ngày == "2026-09-25"; khách == "SEACHEMOT CO., LTD"; tiền tệ == "USD"; số dòng == 13; tổng == {2251, 22214, 194557.6} == cộng các dòng; cảnh báo == 0; bản chữ PDF ra 13 dòng giống hệt
+
+### AC-52 — Invoice không đọc được hoặc lệch tổng · Maps to: NV17, R27 · Test: unit + manual
+- **Given** bảng không có dòng DESCRIPTION; bảng thiếu dòng TOTAL; dòng TOTAL ghi 22.000 kg; file .jpg / .docx; file PDF bản scan 234/26
+- **Assert** không có DESCRIPTION ⇒ `reason == "no-table"`; thiếu TOTAL ⇒ tổng == cộng dòng + 1 cảnh báo; TOTAL 22.000 ⇒ giữ 22000 + cảnh báo "cộng các dòng ra 22214 kg"; .jpg / .docx ⇒ không đọc; PDF scan (thử tay) ⇒ câu "bản scan (ảnh), không có chữ để đọc", số ô được điền == 0
+
+### AC-53 — Nối dòng invoice tách hai size cùng tên · Maps to: NV17, R27, R23 · Test: unit
+- **Given** HĐ có 2 dòng "Frozen iwadako blanched cut" size 2-3 (p-23) và 5g (p-5g), 1 dòng "Frozen tako tip raw" không size (p-tip, giá 2,0), 1 dòng iidako 26-40 chưa nối; khách có tên iidako 26-40 → p-io; mặt hàng p-k có tên mặc định "Frozen tako karaage"
+- **Assert** "2-3 GR/PC" ⇒ p-23 (HĐ); "5g ±0.5g  gr/pc" ⇒ p-5g; size 8-9 ⇒ "" (không đoán); iidako 26-40 ⇒ p-io (tên của khách); karaage ⇒ p-k (tên mặc định); so 234/26 với HĐ ⇒ dòng 8 "đơn giá invoice 2.15, hợp đồng 2", số dòng "Không có trong HĐ" == 9
+
+### AC-54 — Điền mục invoice không ghi đè · Maps to: NV17, R27 · Test: unit + manual
+- **Given** mục Commercial Invoice trống; mục đã có số "234 / 26", 2.251 thùng, 22.000 kg
+- **Assert** mục trống ⇒ điền đủ 5 ô (số, ngày, thùng, kg, tiền); mục đã có ⇒ kg giữ 22000, báo đúng 1 ô lệch {kg 22000 ≠ 22214}, ô trùng (số khác khoảng trắng, thùng bằng) không báo; thử tay: Hủy ⇒ số dòng mục / tên trong sổ không đổi; Lưu sau khi nối 1 dòng ⇒ thêm đúng 1 tên ghi chú "Trích xuất từ Invoice 234/26", Hoàn tác gỡ cả tên
+
+### AC-55 — Trích xuất quét thêm invoice của khách · Maps to: NV16, NV17, R27 · Test: unit + manual
+- **Given** khách có HĐ C1 (ký 30/07: file PDF + file .jpg ở mục invoice), HĐ C2 (ký 01/09: file .xlsx), HĐ đã hủy có file, HĐ khách khác có file, file .xlsx ở mục Packing List
+- **Assert** `invoiceFilesOfCustomer` == [C1 PDF, C2 xlsx] (đúng thứ tự); thử tay chạy không nối máy chủ ⇒ câu "Đã quét 2 hợp đồng và 0 invoice … Bỏ qua 2 file invoice không đọc được", không toast
+
 ### AC-49 — Demo có tên theo khách, số thật không đổi · Maps to: NV14, R14 · Test: manual (vòng §4b spec chế độ demo)
 - **Assert** bộ demo có ≥ 1 dòng tên theo khách; đếm dòng `customer_product_names` có `site_id <> 'site-demo'` trước / sau khi bật demo → thao tác → thoát == bằng nhau
 
@@ -585,6 +621,9 @@ status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Ho�
 - A11 (v6). So tên + size: không phân hoa thường, gộp khoảng trắng — size chép khác một ký tự thì rơi xuống bậc 2–4 của R23, không nối sai.
 - A12 (v6). Quyền: bảng tên theo khách theo quyền danh mục Khách hàng (`catalog.customers`); Kế hoạch đã có quyền ghi (R11). Trích xuất chạy dưới quyền người đang lưu HĐ — không có quyền ghi danh mục khách thì bỏ qua trích xuất, HĐ vẫn lưu.
 - A13 (v6). Không chép tên theo khách từ khách này sang khách khác; khách mới bắt đầu từ tên mặc định.
+- A14 (v7). Chưa có file Excel gốc THẬT của invoice (Phòng KH chưa xác nhận giữ Excel hay PDF) ⇒ bộ đọc canh theo bản in 234/26, đọc được cả .xlsx lẫn PDF có chữ. Có file thật thì chạy thử, lệch bố cục thì sửa R27 + test.
+- A15 (v7). Đọc invoice chỉ GỢI Ý — mọi thứ chỉ vào sổ khi U1 bấm Lưu; kết quả đọc không vào nháp (file chọn từ máy không lưu nháp được), số đã điền vào ô thì theo nháp như mọi ô khác.
+- A16 (v7). Chạy không nối máy chủ: khối Đọc invoice có ô chọn file riêng chỉ để đọc (file không lưu) — vẫn bỏ được việc gõ 3 số tổng.
 
 **Open (RED):** không có. Ma trận quyền (R11) đã được đồng ý ở Q11. Lúc build, migration thay ma trận mặc định vẫn theo khuôn `0073` (thay trọn, chạy 2 lần không lỗi, có câu lùi).
 
@@ -600,6 +639,7 @@ status: ba-spec v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Ho�
 
 ## History
 
+- v7 (2026-10-22 tối): **đọc Commercial Invoice** (NV17, R27, AC-51…55; NV16 thêm nguồn invoice). Chủ dự án chốt 3 điểm: không đọc bản scan (cần file gốc), chưa rõ Phòng KH giữ Excel hay PDF ⇒ đọc cả hai, đọc xong tự điền 3 số tổng + báo chỗ lệch (không ghi đè). Orchestrator tự chấm (việc nhỏ, không spawn team): loại OCR Tesseract (sai trên bảng scan), hoãn AI cloud (phí + key), loại ghi đè ô đã có số. Không migration; thêm thư viện `pdfjs-dist` (nạp khi đính PDF).
 - v6.2 (2026-10-22 chiều): chủ dự án đặt tên chức năng **"Trích xuất từ chứng từ"** (thay "tự học" ở mọi chỗ) + thêm lối chủ động: nút quét mọi HĐ của khách (NV16 (b), AC-50). Nguồn = dòng hàng hợp đồng (Commercial Invoice chỉ có tổng + PDF). Ghi chú dòng mới "Trích xuất từ HĐ <số>".
 - v6 (2026-10-22 chiều, họp Hoài Nam ↔ Lê Khiêm — Phòng Kế hoạch): tên trên chứng từ theo **từng khách** (không theo mặt hàng, không theo nước), ~15–20 tên / khách theo size. NV14 viết lại (danh sách tên theo khách ở danh mục Khách hàng: tên · size · quy cách · mã HS), thêm NV16 trích xuất từ HĐ (chỉ tạo, không ghi đè — R26), R23 viết lại (thứ tự điền + 4 bậc gợi ý nối, tên + size tách hai size cùng tên), `products.trade_name` thành tên mặc định. AC-39/40 viết lại, thêm AC-46…49. Chủ dự án chọn cả 4 đề xuất (cách lưu, nội dung, cột cũ, chỗ quản lý). ⏳ Chưa build — cần mig `0077_customer_product_names.sql`.
 - v5 (2026-10-22, góp ý chủ dự án): **tên thương mại** mặt hàng (NV14, R23 — một tên tiếng Anh / mặt hàng, dùng điền tên hàng và gợi ý nối); ô "Số đơn của khách" gọi là **Số PO của khách** (R24 — mã "Order" trên HĐ giấy; KHÔNG đổi thành "Số booking" vì booking là của hãng tàu theo chuyến — chủ dự án chốt sau khi đối chiếu HĐ 18.26 + sổ Kế hoạch xuất hàng); **báo cáo kỳ** (NV15, R25). Orchestrator tự chấm (việc nhỏ, không spawn team): tách hai số tiền — tiền về theo ngày nhận (gồm cọc HĐ) · còn chưa về theo chuyến — vì cọc HĐ không gắn chuyến nên không cộng được vào chuyến.

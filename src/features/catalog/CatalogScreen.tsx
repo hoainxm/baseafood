@@ -18,7 +18,7 @@ import FinishedGoodScreen from "./FinishedGoodScreen";
 import { normalizeCatalogTab } from "@/lib/legacyUrls";
 import { useCan, usePermissions } from "@/features/shared/PermissionProvider";
 import { can } from "@/lib/permissions";
-import { useCustomerProductNameStore, useExportContractApprovals, useExportContractRevisions, useExportContracts } from "@/lib/catalogRepo";
+import { useCustomerProductNameStore, useExportContractApprovals, useExportContractRevisions, useExportContracts, useExportFiles, useExportStepItems } from "@/lib/catalogRepo";
 import { namesOfCustomer } from "@/lib/customerProductNames";
 import type { Customer } from "@/types";
 import { Languages } from "lucide-react";
@@ -77,6 +77,9 @@ export default function CatalogScreen() {
   const [exportContracts] = useExportContracts();
   const [exportRevisions] = useExportContractRevisions();
   const [exportApprovals] = useExportContractApprovals();
+  // Mục Commercial Invoice + file đã đính — "Trích xuất từ chứng từ" đọc thêm invoice Excel / PDF (R27).
+  const [exportItems] = useExportStepItems();
+  const [exportFiles] = useExportFiles();
 
   return (
     <div className="space-y-6">
@@ -121,7 +124,7 @@ export default function CatalogScreen() {
             isAvailable={nameStore.isAvailable}
             canWrite={customerCan.create || customerCan.update}
             canDelete={customerCan.delete}
-            extractSource={{ contracts: exportContracts, revisions: exportRevisions, approvals: exportApprovals }}
+            extractSource={{ contracts: exportContracts, revisions: exportRevisions, approvals: exportApprovals, items: exportItems, files: exportFiles }}
             onClose={() => setNamesFor(null)}
           />
         </TabsContent>

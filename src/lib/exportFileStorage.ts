@@ -74,6 +74,13 @@ export async function getExportFileUrl(path: string, seconds = 600, downloadName
   return data?.signedUrl ?? null;
 }
 
+/** Tải nội dung một file đã đính (đọc Commercial Invoice — R27). File giữ chỗ của demo / lỗi ⇒ null. */
+export async function downloadExportFile(path: string): Promise<Blob | null> {
+  if (!supabase || !path || path.startsWith(DEMO_PLACEHOLDER_PREFIX)) return null;
+  const { data, error } = await supabase.storage.from(EXPORT_FILE_BUCKET).download(path);
+  return error ? null : data;
+}
+
 /** Gỡ file (tải nhầm / ghi dòng thất bại). */
 export async function removeExportFiles(paths: readonly string[]): Promise<boolean> {
   const xs = paths.filter((p) => p && !p.startsWith(DEMO_PLACEHOLDER_PREFIX));

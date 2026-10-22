@@ -70,6 +70,7 @@ import {
   type LoadingUploadTarget,
   type ShipmentTarget,
   type StepItemTarget,
+  type InvoiceNameExtract,
 } from "./ShipmentDialogs";
 import { useExportData } from "./useExportData";
 import { buildExportTour, pickTourContract } from "./exportTour";
@@ -180,10 +181,10 @@ export default function ExportPlanningScreen() {
    * Trích xuất từ chứng từ (NV16 · R26): thêm tên còn thiếu của khách từ các dòng đã nối. Máy chủ chưa có bảng
    * hoặc không có quyền ghi ⇒ bỏ qua (HĐ vẫn lưu). Trả về số tên thêm + hàm Hoàn tác.
    */
-  const learnNames = (customerId: string, lines: Parameters<typeof extractCustomerNames>[2], contractNo: string) => {
+  const learnNames = (customerId: string, lines: Parameters<typeof extractCustomerNames>[2], docNo: string, docKind: "HĐ" | "Invoice" = "HĐ") => {
     const allowed = nameStore.isAvailable && (can.create || can.update || customerCan.create || customerCan.update);
     const prev = nameStore.names;
-    const created = allowed ? extractCustomerNames(prev, customerId, lines, contractNo, newId) : [];
+    const created = allowed ? extractCustomerNames(prev, customerId, lines, docNo, newId, docKind) : [];
     if (created.length && nameStore.setNames([...prev, ...created]) === false) return { count: 0, undo: () => {} };
     return { count: created.length, undo: () => (created.length ? void nameStore.setNames(prev) : undefined) };
   };
@@ -272,7 +273,7 @@ export default function ExportPlanningScreen() {
     return true;
   };
 
-  const saveItem = (item: ExportStepItem, newFiles: ExportFile[], isNew: boolean): boolean => {
+  const saveItem = (item: ExportStepItem, newFiles: ExportFile[], isNew: boolean, extract?: InvoiceNameExtract): boolean => {
     const prevI = d.items;
     const prevF = d.files;
     const nextI = isNew ? [...prevI, item] : prevI.map((x) => (x.id === item.id ? item : x));
@@ -281,9 +282,14 @@ export default function ExportPlanningScreen() {
       store.saveItems(prevI);
       return false;
     }
-    notify.saved(`Đã lưu${newFiles.length ? ` (kèm ${newFiles.length} file)` : ""}`, () => {
+    // Đọc Commercial Invoice (R27): dòng đã nối mặt hàng ⇒ trích xuất tên hàng của khách còn thiếu.
+    const ship = d.shipments.find((x) => x.id === item.shipmentId);
+    const customerId = ship ? (d.contracts.find((c) => c.id === ship.contractId)?.customerId ?? "") : "";
+    const learned = extract && customerId ? learnNames(customerId, extract.lines, extract.docNo, "Invoice") : { count: 0, undo: () => {} };
+    notify.saved(`Đã lưu${newFiles.length ? ` (kèm ${newFiles.length} file)` : ""}${learnedText(learned.count)}`, () => {
       store.saveItems(prevI);
       store.saveFiles(prevF);
+      learned.undo();
     });
     setItemTarget(null);
     return true;
@@ -712,6 +718,8 @@ export default function ExportPlanningScreen() {
         filesAvailable={filesAvailable}
         recordedBy={recordedBy}
         canDelete={can.update}
+        invoiceCatalog={{ products, setProducts, customerNames: nameStore.names }}
+        canViewPrice={can["view-price"]}
         onClose={() => setItemTarget(null)}
         onSave={saveItem}
         onRemoveFile={removeFile}

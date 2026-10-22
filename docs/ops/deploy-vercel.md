@@ -1,6 +1,6 @@
 > Load khi: deploy app lên Vercel, đổi env production, nối repo cá nhân, hoặc người mới tiếp nhận cần dựng bản chạy thật.
 covers: index.html, package.json, vite.config.ts, src/lib/supabase.ts
-last_verified: 2026-08-10
+last_verified: 2026-10-22
 ttl_days: 90
 
 # Deploy Vercel — Baseafood MES
@@ -91,6 +91,7 @@ Không thao tác thêm. Mỗi branch/PR khác sinh **Preview deploy** riêng.
 | Node | mặc định Vercel (22) | hợp Vite 8, không cần pin `engines` |
 | Env timing | build-time | đổi env ⇒ **Redeploy**, không nóng |
 | Favicon | `public/favicon.png` + `?v=2` trong [`index.html`](../../index.html) | cache-bust; đã bỏ `favicon.svg` rác template |
+| `pdfjs-dist` (đọc PDF Commercial Invoice, 2026-10-22) | nạp động khi đính PDF; worker là file riêng `assets/pdf.worker.min-*.mjs` (~1,3 MB) qua `?url` | không làm nặng trang đầu; Vercel phục vụ `.mjs` đúng kiểu JS, không cần cấu hình. Gói khai `engines` Node ≥ 22.13 — Node 22 mặc định của Vercel đủ |
 
 ## Nhắc "có bản cập nhật mới" (version.json)
 

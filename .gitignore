@@ -27,3 +27,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Cài đặt Claude Code cá nhân (không commit)
+.claude/settings.local.json

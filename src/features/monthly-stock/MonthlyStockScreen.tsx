@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Sổ kho theo THÁNG — dồn tồn cuối kỳ → đầu kỳ sau
 // Description: Monthly stock ledger — carry closing balance into next month
 // ============================================================
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MonthlyStockLine, MaterialType, Product } from "@/types";
 import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES, STORAGE_KIND_LABELS } from "@/types";
 import { useMonthlyStock, useMaterialTypes, useProducts, useStorageLocations } from "@/lib/catalogRepo";
@@ -49,6 +49,7 @@ import {
   moveStockRow,
   resetStockRowOrder,
   speciesRank,
+  groupBySpecies,
   type LotActionKind,
   type MonthlyStockRow,
   type CarryForwardDiff,
@@ -2728,7 +2729,7 @@ export default function MonthlyStockScreen() {
                 <PrintTd bold right>{num(Math.round(printTotal.remainingValue))}</PrintTd>
               </tr>
               {printGroups.map((g) => (
-                <FragmentGroup key={g.category} group={g} />
+                <FragmentGroup key={g.category} group={g} speciesOf={speciesOf} />
               ))}
             </tbody>
           </table>
@@ -2743,31 +2744,52 @@ export default function MonthlyStockScreen() {
 }
 
 /** Một nhóm trên bản in: dòng tiêu đề nhóm + các mặt hàng + dòng cộng nhóm. */
-function FragmentGroup({ group }: { group: ReturnType<typeof groupByCategory>[number] }) {
+function FragmentGroup({
+  group,
+  speciesOf,
+}: {
+  group: ReturnType<typeof groupByCategory>[number];
+  speciesOf: (itemName: string) => string;
+}) {
+  /* Ô loài riêng + cộng riêng từng loài (như màn hình) — bảng chỉ một loài thì khỏi chia. */
+  const species = groupBySpecies(group.rows, speciesOf);
+  const totalRow = (label: string, t: ReturnType<typeof sumMonthlyStockRows>) => (
+    <tr>
+      <PrintTd bold colSpan={2}>{label}</PrintTd>
+      <PrintTd bold right>{num(t.openKg)}</PrintTd>
+      <PrintTd bold right>{num(t.inKg)}</PrintTd>
+      <PrintTd bold right>{num(t.outKg)}</PrintTd>
+      <PrintTd bold right>{num(t.closeKg)}</PrintTd>
+      <PrintTd bold right>{num(Math.round(t.remainingValue))}</PrintTd>
+    </tr>
+  );
   return (
     <>
       <tr>
         <PrintTd bold colSpan={7}>{group.category}</PrintTd>
       </tr>
-      {group.rows.map((r) => (
-        <tr key={r.id}>
-          <PrintTd>{r.itemName}</PrintTd>
-          <PrintTd>{r.size}</PrintTd>
-          <PrintTd right>{num(r.openKg)}</PrintTd>
-          <PrintTd right>{r.inKg ? num(r.inKg) : ""}</PrintTd>
-          <PrintTd right>{r.outKg ? num(r.outKg) : ""}</PrintTd>
-          <PrintTd right>{num(r.closeKg)}</PrintTd>
-          <PrintTd right>{r.remainingValue ? num(Math.round(r.remainingValue)) : ""}</PrintTd>
-        </tr>
+      {species.map((sp) => (
+        <Fragment key={sp.species}>
+          {species.length > 1 && (
+            <tr>
+              <PrintTd bold colSpan={7}>{sp.species}</PrintTd>
+            </tr>
+          )}
+          {sp.rows.map((r) => (
+            <tr key={r.id}>
+              <PrintTd>{r.itemName}</PrintTd>
+              <PrintTd>{r.size}</PrintTd>
+              <PrintTd right>{num(r.openKg)}</PrintTd>
+              <PrintTd right>{r.inKg ? num(r.inKg) : ""}</PrintTd>
+              <PrintTd right>{r.outKg ? num(r.outKg) : ""}</PrintTd>
+              <PrintTd right>{num(r.closeKg)}</PrintTd>
+              <PrintTd right>{r.remainingValue ? num(Math.round(r.remainingValue)) : ""}</PrintTd>
+            </tr>
+          ))}
+          {species.length > 1 && totalRow(`Cộng ${sp.species}`, sp.totals)}
+        </Fragment>
       ))}
-      <tr>
-        <PrintTd bold colSpan={2}>Cộng {group.category}</PrintTd>
-        <PrintTd bold right>{num(group.totals.openKg)}</PrintTd>
-        <PrintTd bold right>{num(group.totals.inKg)}</PrintTd>
-        <PrintTd bold right>{num(group.totals.outKg)}</PrintTd>
-        <PrintTd bold right>{num(group.totals.closeKg)}</PrintTd>
-        <PrintTd bold right>{num(Math.round(group.totals.remainingValue))}</PrintTd>
-      </tr>
+      {totalRow(`Cộng ${group.category}`, group.totals)}
     </>
   );
 }

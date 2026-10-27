@@ -14,6 +14,8 @@ import {
   moveStockRow,
   resetStockRowOrder,
   speciesRank,
+  inferMaterialCategory,
+  groupBySpecies,
 } from "./monthlyStock";
 
 const row = (id: string, period: string, p: Partial<MonthlyStockLine> = {}): MonthlyStockLine => ({
@@ -303,9 +305,35 @@ describe("loài trong bảng — cá trên, bạch tuộc dưới; xếp dòng t
     expect(resetStockRowOrder(ls, ls.map((l) => l.id), speciesOf)).toBe(ls);
   });
 
+  test("ô loài riêng + cộng riêng từng loài; tổng các ô = tổng bảng", () => {
+    const rows = groupByCategory(ledger().map(deriveRow), speciesOf)[0].rows;
+    const g = groupBySpecies(rows, speciesOf);
+    expect(g.map((x) => [x.species, x.rows.length])).toEqual([["Cá", 2], ["Bạch tuộc", 3], ["Mực", 1]]);
+    expect(g.reduce((s, x) => s + x.totals.closeKg, 0)).toBe(rows.reduce((s, r) => s + r.closeKg, 0));
+    expect(g[0].totals.closeKg).toBe(2000);
+  });
+
   test("dồn kỳ mang thứ tự xếp sang tháng sau", () => {
     const moved = moveStockRow(ledger(), order(ledger()), "b250", -1, speciesOf)!;
     const nov = carryForwardIntoLedger(moved, "2026-11").lines.filter((l) => l.period === "2026-11");
     expect(groupByCategory(nov.map(deriveRow), speciesOf)[0].rows.map((r) => r.carriedFromId)).toEqual(["song", "saba", "b250", "b80", "mada", "muc"]);
+  });
+});
+
+describe("inferMaterialCategory — đoán loài theo bảng kê kho thật của kế toán (T9/2026)", () => {
+  // Tên lấy nguyên văn từ file "kho 1000 năm 2026", sheet 9: khối Hàng tạm xếp cá trên, bạch tuộc dưới.
+  const fish = ["CÁ TRÁO PXC", "TRÁO BẾP", "CÁ ĐỔNG CỜ NCLS", "CÁ ĐỤC MIẾNG", "CÁ NỤC CẮT ĐẦU", "SANMA", "SABA", "KINMEDAI", "SARDINE"];
+  const octopus = [
+    "1 DA  ĐÔNG XÔ", "1 DA  DẠT MÀU", "TUÝP", "CỔ MADA", "CỔ", "BAO TỬ 2DA  CÒN CỔ", "BAO TỬ 2DA CÒN CỔ <100",
+    "BAO TỬ 2 DA NHẬP 50-100", "BAO TỬ MADA", "BAO TỬ BỘT", "ĐUÔI B TUỘC", "1 RÂU 2 DA", "2 DA  80up", "B.TUỘC  2 DA",
+    "TIP", "TIP 1 DA", "MADA B", "Bạch tuộc 2 da lớn (80↑)",
+  ];
+  const squid = ["ỐNG", "MỰC ỐNG", "ĐẦU ỐNG"];
+  test.each(fish)("cá: %s", (n) => expect(inferMaterialCategory(n)).toBe("Cá"));
+  test.each(octopus)("bạch tuộc: %s", (n) => expect(inferMaterialCategory(n)).toBe("Bạch tuộc"));
+  test.each(squid)("mực: %s", (n) => expect(inferMaterialCategory(n)).toBe("Mực"));
+  test("tôm vẫn là tôm; tên không rõ là Khác", () => {
+    expect(inferMaterialCategory("TÔM HỒNG")).toBe("Tôm");
+    expect(inferMaterialCategory("HÀNG LẠ")).toBe("Khác");
   });
 });

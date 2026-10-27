@@ -215,6 +215,31 @@ export function resetStockRowOrder(
   return renumber(lines, ordered);
 }
 
+/** Một ô loài trong bảng (cá riêng, bạch tuộc riêng…) + dòng cộng riêng của loài. */
+export interface StockSpeciesGroup {
+  species: string;
+  rows: MonthlyStockRow[];
+  totals: MonthlyStockTotals;
+}
+
+/**
+ * Chia dòng của MỘT bảng theo loài (kế toán 2026-10-27: "làm ô cá riêng, rồi cộng riêng từng
+ * cái"). Loài theo `SPECIES_DISPLAY_ORDER` (cá trên, bạch tuộc dưới); dòng trong loài giữ thứ tự
+ * đưa vào. Dùng cho bản in A4 — màn hình chia bằng `SummaryTable groupBy` cùng luật.
+ */
+export function groupBySpecies(rows: MonthlyStockRow[], speciesOf: (itemName: string) => string): StockSpeciesGroup[] {
+  const map = new Map<string, MonthlyStockRow[]>();
+  for (const r of rows) {
+    const k = speciesOf(r.itemName);
+    const list = map.get(k);
+    if (list) list.push(r);
+    else map.set(k, [r]);
+  }
+  return [...map.entries()]
+    .sort((a, b) => speciesRank(a[0]) - speciesRank(b[0]))
+    .map(([species, rs]) => ({ species, rows: rs, totals: sumMonthlyStockRows(rs) }));
+}
+
 /**
  * Gom dòng theo NHÓM (category). Nhóm mặc định lên trước theo thứ tự
  * MONTHLY_STOCK_CATEGORIES (khối con "<nhóm> – <tên>" ngay sau nhóm cha), nhóm lạ
@@ -418,15 +443,26 @@ const normalizeForMatch = (s: string) => (s || "").trim().toLowerCase().replace(
 /** Chuẩn hoá NGẶT để dò TRÙNG CÁCH GHI: bỏ hết khoảng trắng + dấu câu (250UP≡250 UP). */
 const normalizeCompact = (s: string) => (s || "").toLowerCase().replace(/[\s.,\-()/]+/g, "");
 
-/** Đoán nhóm (category, loài) từ tên — chỉ gợi ý, người dùng sửa được. */
+/** "Từ riêng" có chữ tiếng Việt: `\b` của JS không hiểu chữ có dấu ("ống") ⇒ tự chặn hai đầu bằng chữ cái Unicode. */
+const word = (w: string) => new RegExp(`(?<!\\p{L})(?:${w})(?!\\p{L})`, "u");
+
+/**
+ * Đoán nhóm (category, loài) từ tên — chỉ gợi ý, người dùng sửa được ở Danh mục.
+ * Thứ tự dò: tên nói thẳng loài (bạch tuộc · mực · cá) trước, rồi tới dấu bộ phận / phân loại.
+ * Dấu bộ phận bạch tuộc đối chiếu bảng kê kho thật của kế toán (T9/2026, khối Hàng tạm):
+ * "1 DA" / "2DA" · mada · râu · dạt · bao tử · cổ · tuýp / tip · đuôi.
+ */
 export function inferMaterialCategory(name: string): string {
   const s = name.toLowerCase();
-  if (/(b[aạ]ch\s*tu[ộo]c|b\.\s*tu[ộo]c|\bda\b|mada|râu|dạt)/.test(s)) return "Bạch tuộc";
-  if (/(m[ựu]c|\bống\b|nang|bao\s*t[ửu]|đầu\s*ống)/.test(s)) return "Mực";
+  if (/b[aạ]ch\s*tu[ộo]c|(?<!\p{L})b\.?\s*tu[ộo]c/u.test(s)) return "Bạch tuộc";
+  if (/m[ựu]c/.test(s)) return "Mực";
+  if (word("cá").test(s)) return "Cá";
+  if (/(?<!\p{L})da(?!\p{L})|mada|râu|dạt|bao\s*t[ửu]|tu[ýy]p|đuôi/u.test(s) || word("cổ|tip").test(s)) return "Bạch tuộc";
+  if (word("ống|nang").test(s)) return "Mực";
   if (/ghẹ/.test(s)) return "Ghẹ";
   if (/(t[ôo]m)/.test(s)) return "Tôm";
   if (/(b[àa]o\s*ng[ưu])/.test(s)) return "Bào ngư";
-  if (/(cá|saba|sanma|nodoguro|sòng|nục|thu|mòi|cơm|chỉ|nhồng|bò|đổng|hố|sardine|tráo|trích|đục)/.test(s)) return "Cá";
+  if (/(saba|sanma|nodoguro|kinmedai|sòng|nục|thu|mòi|cơm|chỉ|nhồng|bò|đổng|hố|sardine|tráo|trích|đục)/.test(s)) return "Cá";
   return "Khác";
 }
 

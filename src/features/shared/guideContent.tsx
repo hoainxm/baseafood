@@ -533,6 +533,25 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
             <li>Chuyển nhầm thì chọn Hoàn tác trên thông báo, hoặc nút Hoàn tác (Ctrl+Z) của sổ.</li>
           </Y>
         </Section>
+        <Section title="Thứ tự dòng: theo loài, xếp tay">
+          <Y>
+            <li>
+              Mỗi bảng chia theo <b>loài</b>: <b>cá trên, bạch tuộc dưới</b>, rồi mực, tôm, ghẹ, bào ngư, khác.
+              Mỗi loài có dòng <b>Cộng</b> riêng; dòng Cộng của bảng vẫn cộng cả bảng.
+            </li>
+            <li>
+              Loài lấy theo Danh mục (loại nguyên liệu, mặt hàng). Tên chưa có trong danh mục thì hệ thống đoán từ
+              tên hàng. Xếp sai loài thì sửa loài của tên đó ở Danh mục.
+            </li>
+            <li>
+              Muốn tự xếp: chọn <b>Xếp dòng</b> ở đầu bảng → chọn mũi tên <b>lên / xuống</b> trên từng dòng (chỉ đổi
+              chỗ trong cùng loài) → chọn <b>Xong</b>. Thứ tự lưu vào sổ và theo sang tháng sau khi dồn kỳ.
+            </li>
+            <li>
+              <b>Về mặc định</b> xếp lại cá trên, bạch tuộc dưới, trong mỗi loài theo tên A → Z. Lỡ tay thì Ctrl+Z.
+            </li>
+          </Y>
+        </Section>
         <Section title="Hàng mới về">
           <Y>
             <li>

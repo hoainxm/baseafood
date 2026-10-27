@@ -112,13 +112,116 @@ export interface StockCategoryGroup {
   totals: MonthlyStockTotals;
 }
 
+/* ---------- Loài trong từng bảng: chia nhóm + thứ tự dòng (2026-10-27) ---------- */
+
+/**
+ * Thứ tự LOÀI trong mỗi bảng của sổ: cá trên, bạch tuộc dưới (kế toán chốt 2026-10-27), rồi
+ * các loài khác theo danh sách chuẩn, "Khác" cuối. Loài lạ (gõ tay ở danh mục) xếp ngay trước "Khác".
+ */
+export const SPECIES_DISPLAY_ORDER = ["Cá", "Bạch tuộc", "Mực", "Tôm", "Ghẹ", "Bào ngư", "Khác"] as const;
+
+export function speciesRank(species: string): number {
+  const i = (SPECIES_DISPLAY_ORDER as readonly string[]).indexOf(species);
+  return i === -1 ? SPECIES_DISPLAY_ORDER.length - 1.5 : i;
+}
+
+/**
+ * Hàm "loài của tên hàng" cho sổ kho: tên trùng (không phân hoa thường, bỏ khoảng trắng thừa)
+ * với loại NL / mặt hàng trong danh mục ⇒ loài của danh mục (sửa được ở Danh mục); danh mục
+ * không có hoặc để "Khác" ⇒ đoán từ tên (`inferMaterialCategory`).
+ */
+export function buildSpeciesLookup(
+  ...catalogs: readonly { name: string; category?: string }[][]
+): (itemName: string) => string {
+  const byName = new Map<string, string>();
+  for (const list of catalogs)
+    for (const x of list) {
+      const k = normalizeForMatch(x.name);
+      const c = (x.category ?? "").trim();
+      if (k && c && c !== "Khác" && !byName.has(k)) byName.set(k, c);
+    }
+  return (itemName) => byName.get(normalizeForMatch(itemName)) ?? inferMaterialCategory(itemName);
+}
+
+const nameCollator = new Intl.Collator("vi", { numeric: true });
+
+/** Thứ tự dòng trong MỘT bảng: loài (cá trên, bạch tuộc dưới) → thứ tự người dùng xếp → tên. */
+export function compareStockRowsBySpecies(
+  speciesOf: (itemName: string) => string
+): (a: Pick<MonthlyStockLine, "itemName" | "sortOrder">, b: Pick<MonthlyStockLine, "itemName" | "sortOrder">) => number {
+  return (a, b) =>
+    speciesRank(speciesOf(a.itemName)) - speciesRank(speciesOf(b.itemName)) ||
+    a.sortOrder - b.sortOrder ||
+    nameCollator.compare(a.itemName, b.itemName);
+}
+
+/** Đánh lại `sortOrder` = vị trí trong `orderedIds` (chỉ dòng có trong danh sách, chỉ dòng đổi số). */
+function renumber(lines: MonthlyStockLine[], orderedIds: readonly string[]): MonthlyStockLine[] {
+  const at = new Map(orderedIds.map((id, i) => [id, i]));
+  let changed = false;
+  const next = lines.map((l) => {
+    const i = at.get(l.id);
+    if (i == null || l.sortOrder === i) return l;
+    changed = true;
+    return { ...l, sortOrder: i };
+  });
+  return changed ? next : lines;
+}
+
+/**
+ * XẾP DÒNG TUỲ CHỈNH: đưa dòng `rowId` lên (−1) / xuống (+1) một bậc. `orderedIds` = thứ tự
+ * của CẢ bảng (mọi dòng của nhóm trong tháng); `visibleIds` = dòng đang hiện khi có lọc (tìm,
+ * ẩn dòng trống, một kho) — đổi chỗ với dòng hiện liền kề, dòng ẩn đứng yên. Chỉ đổi chỗ với
+ * dòng CÙNG LOÀI — loài vẫn theo thứ tự mặc định. Đầu / cuối nhóm loài ⇒ null. Ghi bằng
+ * `sortOrder` (dồn kỳ mang theo sang tháng sau). Không đụng số kg.
+ */
+export function moveStockRow(
+  lines: MonthlyStockLine[],
+  orderedIds: readonly string[],
+  rowId: string,
+  step: -1 | 1,
+  speciesOf: (itemName: string) => string,
+  visibleIds: readonly string[] = orderedIds
+): MonthlyStockLine[] | null {
+  const v = visibleIds.indexOf(rowId);
+  const neighbor = v === -1 ? undefined : visibleIds[v + step];
+  const i = orderedIds.indexOf(rowId);
+  const j = neighbor == null ? -1 : orderedIds.indexOf(neighbor);
+  if (i === -1 || j === -1) return null;
+  const nameOf = new Map(lines.map((l) => [l.id, l.itemName]));
+  if (speciesOf(nameOf.get(rowId) ?? "") !== speciesOf(nameOf.get(neighbor as string) ?? "")) return null;
+  const ids = [...orderedIds];
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  return renumber(lines, ids);
+}
+
+/** Về thứ tự MẶC ĐỊNH của một bảng: loài (cá trên, bạch tuộc dưới) rồi tên A → Z, size, invoice. */
+export function resetStockRowOrder(
+  lines: MonthlyStockLine[],
+  ids: readonly string[],
+  speciesOf: (itemName: string) => string
+): MonthlyStockLine[] {
+  const wanted = new Set(ids);
+  const ordered = lines
+    .filter((l) => wanted.has(l.id))
+    .sort(
+      (a, b) =>
+        speciesRank(speciesOf(a.itemName)) - speciesRank(speciesOf(b.itemName)) ||
+        nameCollator.compare(a.itemName, b.itemName) ||
+        nameCollator.compare(a.size, b.size) ||
+        nameCollator.compare(a.origin, b.origin)
+    )
+    .map((l) => l.id);
+  return renumber(lines, ordered);
+}
+
 /**
  * Gom dòng theo NHÓM (category). Nhóm mặc định lên trước theo thứ tự
  * MONTHLY_STOCK_CATEGORIES (khối con "<nhóm> – <tên>" ngay sau nhóm cha), nhóm lạ
- * xếp cuối theo bảng chữ cái. Trong mỗi nhóm
- * giữ `sortOrder` rồi tới tên.
+ * xếp cuối theo bảng chữ cái. Trong mỗi nhóm giữ `sortOrder` rồi tới tên; truyền
+ * `speciesOf` ⇒ loài lên trước (cá trên, bạch tuộc dưới — `compareStockRowsBySpecies`).
  */
-export function groupByCategory(rows: MonthlyStockRow[]): StockCategoryGroup[] {
+export function groupByCategory(rows: MonthlyStockRow[], speciesOf?: (itemName: string) => string): StockCategoryGroup[] {
   const map = new Map<string, MonthlyStockRow[]>();
   for (const r of rows) {
     const k = r.category || "(Chưa phân nhóm)";
@@ -139,7 +242,7 @@ export function groupByCategory(rows: MonthlyStockRow[]): StockCategoryGroup[] {
   return [...map.entries()]
     .sort((a, b) => priorityOf(a[0]) - priorityOf(b[0]) || a[0].localeCompare(b[0]))
     .map(([category, rs]) => {
-      rs.sort((x, y) => x.sortOrder - y.sortOrder || x.itemName.localeCompare(y.itemName));
+      rs.sort(speciesOf ? compareStockRowsBySpecies(speciesOf) : (x, y) => x.sortOrder - y.sortOrder || x.itemName.localeCompare(y.itemName));
       return { category, rows: rs, totals: sumMonthlyStockRows(rs) };
     });
 }

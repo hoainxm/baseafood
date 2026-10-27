@@ -44,6 +44,11 @@ import {
   applyLotAction,
   moveLinesToTable,
   followTableChange,
+  buildSpeciesLookup,
+  compareStockRowsBySpecies,
+  moveStockRow,
+  resetStockRowOrder,
+  speciesRank,
   type LotActionKind,
   type MonthlyStockRow,
   type CarryForwardDiff,
@@ -101,6 +106,9 @@ import {
   AlertTriangle,
   ArrowDownToLine,
   ArrowRightLeft,
+  ArrowUp,
+  ArrowDown,
+  ListOrdered,
   CalendarRange,
   ChevronLeft,
   ChevronRight,
@@ -281,7 +289,9 @@ export default function MonthlyStockScreen() {
     );
   }, [sourceRows, searchQuery, hideEmptyRows]);
 
-  const groups = useMemo(() => groupByCategory(monthRows), [monthRows]);
+  /* Loài của tên hàng (danh mục trước, rồi đoán từ tên) — chia bảng theo loài, cá trên bạch tuộc dưới. */
+  const speciesOf = useMemo(() => buildSpeciesLookup(mtypes, products), [mtypes, products]);
+  const groups = useMemo(() => groupByCategory(monthRows, speciesOf), [monthRows, speciesOf]);
   const total = useMemo(() => sumMonthlyStockRows(monthRows), [monthRows]);
   const invariantHolds = Math.abs(total.openKg + total.inKg - total.outKg - total.closeKg) < 0.001;
 
@@ -718,7 +728,7 @@ export default function MonthlyStockScreen() {
 
   /** Bản in: có tick thì in đúng mấy dòng đó, không thì in cả tháng đang xem. */
   const rowsIn = selectedRows.length ? selectedRows : monthRows;
-  const printGroups = useMemo(() => groupByCategory(rowsIn), [rowsIn]);
+  const printGroups = useMemo(() => groupByCategory(rowsIn, speciesOf), [rowsIn, speciesOf]);
   const printTotal = useMemo(() => sumMonthlyStockRows(rowsIn), [rowsIn]);
 
   /** Chọn hết các dòng đang hiện (mọi nhóm) — nút ở thanh công cụ. */
@@ -1241,7 +1251,60 @@ export default function MonthlyStockScreen() {
       className={`${textCell} w-full ${template ?? ""}`}
     />
   );
-  const summaryColumns = (t: ReturnType<typeof sumMonthlyStockRows>): SummaryTableColumn<MonthlyStockRow>[] => [
+  // ---------- Xếp dòng tuỳ chỉnh (trong từng loài) ----------
+  /** Bảng (nhóm) đang ở chế độ xếp dòng — một bảng một lúc. */
+  const [reorderCategory, setReorderCategory] = useState<string | null>(null);
+  /** Thứ tự CẢ bảng của tháng (mọi kho, kể cả dòng đang bị lọc ẩn) — như lúc hiện. */
+  const tableOrder = (category: string) =>
+    lines
+      .filter((l) => l.period === month && l.category === category)
+      .sort(compareStockRowsBySpecies(speciesOf))
+      .map((l) => l.id);
+  /* Xếp dòng chỉ đổi thứ tự hiển thị (không đổi số) ⇒ không toast (quy tắc 13); Ctrl+Z vẫn lùi được. */
+  const moveRow = (g: { category: string; rows: MonthlyStockRow[] }, rowId: string, step: -1 | 1) => {
+    const next = moveStockRow(lines, tableOrder(g.category), rowId, step, speciesOf, g.rows.map((r) => r.id));
+    if (next) writeLines(next);
+  };
+  const resetOrder = (category: string) => {
+    const next = resetStockRowOrder(lines, tableOrder(category), speciesOf);
+    if (next !== lines) writeLines(next);
+  };
+  const reorderColumn = (g: { category: string; rows: MonthlyStockRow[] }): SummaryTableColumn<MonthlyStockRow> => ({
+    key: "thuTu",
+    header: "Thứ tự",
+    sortable: false,
+    render: (r) => {
+      const i = g.rows.indexOf(r);
+      const sameSpecies = (j: number) => g.rows[j] && speciesOf(g.rows[j].itemName) === speciesOf(r.itemName);
+      return (
+        <span className="flex items-center gap-0.5">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            disabled={!sameSpecies(i - 1)}
+            onClick={() => moveRow(g, r.id, -1)}
+            aria-label={`Đưa ${r.itemName} lên`}
+            title="Đưa dòng này lên trên một bậc (trong cùng loài)."
+          >
+            <ArrowUp className="size-4" />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            disabled={!sameSpecies(i + 1)}
+            onClick={() => moveRow(g, r.id, 1)}
+            aria-label={`Đưa ${r.itemName} xuống`}
+            title="Đưa dòng này xuống dưới một bậc (trong cùng loài)."
+          >
+            <ArrowDown className="size-4" />
+          </Button>
+        </span>
+      );
+    },
+  });
+  /* Tổng cộng tính trên đúng tập dòng được đưa vào (cả bảng, hoặc một nhóm loài). */
+  const summaryColumns = (g: { category: string; rows: MonthlyStockRow[] }): SummaryTableColumn<MonthlyStockRow>[] => [
+    ...(reorderCategory === g.category ? [reorderColumn(g)] : []),
     {
       key: "ngay",
       header: "Ngày nhập",
@@ -1325,7 +1388,7 @@ export default function MonthlyStockScreen() {
     {
       key: "odKg", header: "Tồn đầu kỳ (kg)", numeric: true, sortValue: (r) => r.openKg,
       render: (r) => (canEdit ? numberCell(r, "openKg", "Tồn đầu kỳ") : numberOrDash(r.openKg)),
-      total: () => num(t.openKg),
+      total: (rs) => num(sumMonthlyStockRows(rs).openKg),
     },
     {
       key: "inKg", header: "Nhập trong kỳ (kg)", numeric: true, sortValue: (r) => r.inKg,
@@ -1337,7 +1400,7 @@ export default function MonthlyStockScreen() {
         ) : (
           "—"
         ),
-      total: () => num(t.inKg),
+      total: (rs) => num(sumMonthlyStockRows(rs).inKg),
     },
     {
       key: "outKg", header: "Xuất trong kỳ (kg)", numeric: true, sortValue: (r) => r.outKg,
@@ -1349,17 +1412,17 @@ export default function MonthlyStockScreen() {
         ) : (
           "—"
         ),
-      total: () => num(t.outKg),
+      total: (rs) => num(sumMonthlyStockRows(rs).outKg),
     },
     {
       key: "ocKg", header: "Tồn cuối kỳ (kg)", numeric: true, sortValue: (r) => r.closeKg,
       render: (r) => <span className="tnum font-bold text-foreground">{num(r.closeKg)}</span>,
-      total: () => num(t.closeKg),
+      total: (rs) => num(sumMonthlyStockRows(rs).closeKg),
     },
     {
       key: "tien", header: "Tiền còn lại (đ)", numeric: true, sortValue: (r) => r.remainingValue,
       render: (r) => (r.remainingValue ? num(Math.round(r.remainingValue)) : "—"),
-      total: () => num(Math.round(t.remainingValue)),
+      total: (rs) => num(Math.round(sumMonthlyStockRows(rs).remainingValue)),
     },
     {
       key: "viTri",
@@ -1784,6 +1847,33 @@ export default function MonthlyStockScreen() {
                   <span className="flex flex-wrap gap-1">
                     <Tag variant="muted">Tồn cuối {num(g.totals.closeKg)} kg</Tag>
                     <Tag variant="muted">{g.rows.length} mặt hàng</Tag>
+                    {!isPreview && allowed.update && (
+                      reorderCategory === g.category ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => resetOrder(g.category)}
+                            title="Xếp lại bảng này theo mặc định: cá trên, bạch tuộc dưới, rồi các loài khác; trong mỗi loài theo tên A → Z. Ctrl+Z để lùi."
+                          >
+                            Về mặc định
+                          </Button>
+                          <Button size="sm" variant="default" onClick={() => setReorderCategory(null)} title="Xong xếp dòng — bảng trở lại bấm tên cột để sắp như thường.">
+                            Xong
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setReorderCategory(g.category)}
+                          title="Tự xếp thứ tự dòng của bảng này: mỗi dòng có nút lên / xuống trong cùng loài. Thứ tự lưu vào sổ và theo sang tháng sau khi dồn kỳ."
+                        >
+                          <ListOrdered className="mr-1 h-4 w-4" />
+                          Xếp dòng
+                        </Button>
+                      )
+                    )}
                   </span>
                 </div>
                 {g.category === TEMPORARY_GOODS_CATEGORY && (() => {
@@ -1810,10 +1900,13 @@ export default function MonthlyStockScreen() {
                 })()}
                 <SummaryTable
                   rows={g.rows}
-                  columns={summaryColumns(g.totals)}
+                  columns={summaryColumns(g)}
                   getKey={(r) => r.id}
                   totalLabel={`Cộng ${g.category}`}
                   selection={tableSelection}
+                  groupBy={{ key: (r) => speciesOf(r.itemName), rank: speciesRank }}
+                  // Đang xếp dòng tay ⇒ tắt sắp theo cột (thứ tự đang hiện phải là thứ tự sẽ lưu).
+                  sortable={reorderCategory !== g.category}
                   fullHeight
                   rowMarkKey="ton-kho-thang"
                   addRow={

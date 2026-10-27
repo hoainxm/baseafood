@@ -111,6 +111,8 @@ export function buildMonthlyStockTour(ctx: MonthlyStockTourContext): PageTour {
         "Cột: Ngày nhập · Mặt hàng · Size · Invoice · Đơn giá (đ) · Tồn đầu kỳ · Nhập trong kỳ · Xuất trong kỳ · Tồn cuối kỳ (kg) · Tiền còn lại (đ) · Vị trí.\n" +
         "• Vị trí để trống (tên kho chữ mờ): hàng nằm ở chính kho của sổ. Thẻ Gửi: <kho>: hàng gửi ra kho ngoài, ví dụ Kho Ánh Dương. Đổi vị trí không đổi số kg.\n" +
         "• Thẻ Từ SX ở nhóm Hàng tạm: lô hàng đông lạnh do xưởng ghi.\n" +
+        "• Trong mỗi bảng, dòng chia theo loài: cá trên, bạch tuộc dưới, rồi các loài khác; mỗi loài có dòng Cộng riêng. Loài lấy theo danh mục, chưa có thì đoán từ tên hàng.\n" +
+        "• Xếp dòng (đầu bảng): mỗi dòng có nút lên / xuống trong cùng loài; thứ tự lưu vào sổ, dồn sang tháng sau. Về mặc định xếp lại cá trên, bạch tuộc dưới, tên A → Z.\n" +
         "• Nút Thẻ kho (hình đồng hồ) cuối dòng: lịch sử mặt hàng qua tối đa 24 tháng. Đọc dọc tồn cuối với tồn đầu tháng sau để thấy chỗ đứt vòng.",
     },
     {

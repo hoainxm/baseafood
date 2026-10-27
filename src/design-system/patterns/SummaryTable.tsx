@@ -18,6 +18,7 @@ import { RowMarkToolbar } from "./RowMarkToolbar";
 import { useTopScrollbar } from "./topScrollbar";
 import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
 import { ariaSort, SortHeaderButton, useTableSort } from "./SortableHeader";
+import { splitGroups, type SummaryTableGroupBy } from "./summaryTableGroups";
 import { nodeText, type SortKind, type SortValue } from "./tableSort";
 
 /**
@@ -76,6 +77,7 @@ export function SummaryTable<T>({
   addRow,
   rowMarkKey,
   sortable = true,
+  groupBy,
 }: {
   rows: T[];
   columns: SummaryTableColumn<T>[];
@@ -117,6 +119,12 @@ export function SummaryTable<T>({
    * dòng là nghĩa nghiệp vụ (dòng tổng / dòng nhóm xen giữa, sổ phải đọc theo thứ tự ghi).
    */
   sortable?: boolean;
+  /**
+   * CHIA NHÓM trong bảng (VD theo loài: cá trên, bạch tuộc dưới): mỗi nhóm một dòng tiêu đề
+   * + dòng cộng riêng, hàng tổng chân bảng vẫn cộng cả bảng. Sắp theo cột ⇒ sắp TRONG từng
+   * nhóm. Chỉ chia khi bảng có ≥ 2 nhóm (một nhóm thì tiêu đề chỉ là chữ thừa).
+   */
+  groupBy?: SummaryTableGroupBy<T>;
 }) {
   // Sắp theo cột: hàng tổng không đổi (cộng trên cùng tập dòng); `getKey` vẫn nhận chỉ số GỐC.
   const originalIndex = React.useMemo(() => new Map(rows.map((r, i) => [r, i])), [rows]);
@@ -134,7 +142,9 @@ export function SummaryTable<T>({
     })),
     sortable
   );
-  const viewRows = tableSort.rows;
+  /* Chia nhóm SAU khi sắp: tách ổn định theo nhóm ⇒ thứ tự sắp giữ nguyên trong từng nhóm. */
+  const groups = groupBy ? splitGroups(tableSort.rows, groupBy) : null;
+  const viewRows: T[] = groups ? groups.flatMap((g) => g.rows) : [...tableSort.rows];
   const isExpanded = fullHeight ?? !stickyHeader;
   const to = useRowMarkTools(rowMarkKey);
   // Tick dòng: màn truyền `chon` thì dùng của màn (màn tự đặt nút tô vào thanh
@@ -186,6 +196,22 @@ export function SummaryTable<T>({
      (VD Ngày nhập) rộng gấp rưỡi, cả bảng phải kéo ngang thêm. */
   const firstTotalIdx = Math.max(0, columns.findIndex((c) => c.total));
   const labelColumnCount = columns.some((c) => c.total) ? firstTotalIdx : columns.length;
+
+  /** Các ô của một dòng cộng (chân bảng, hoặc cuối mỗi nhóm khi chia nhóm). */
+  const totalCells = (subset: T[], label: React.ReactNode, weight: string) => (
+    <>
+      {(hasLeadColumn ? 1 : 0) + labelColumnCount > 0 && (
+        <TableCell colSpan={(hasLeadColumn ? 1 : 0) + labelColumnCount} className={cn(weight, "whitespace-normal")}>
+          {label}
+        </TableCell>
+      )}
+      {columns.slice(labelColumnCount).map((c) => (
+        <TableCell key={c.key} className={cn(weight, c.numeric && "text-right tnum")}>
+          {c.total ? c.total(subset) : null}
+        </TableCell>
+      ))}
+    </>
+  );
 
   /** Hàng tên cột — vẽ ở bảng thật và (chế độ fullHeight) ở hàng tên cột nổi. */
   const headerRow = (isSticky: boolean) => (
@@ -272,39 +298,55 @@ export function SummaryTable<T>({
       <Table ref={tableRef}>
         <TableHeader>{headerRow(false)}</TableHeader>
         <TableBody>
-          {viewRows.map((r) => {
-            const k = keyOf(r);
-            const tick = !!effectiveSelection?.selectedKeys.has(k);
-            return (
-              <TableRow
-                key={k}
-                data-picked={tick || undefined}
-                className={cn(tick && "bg-primary/5")}
-                {...to.getRowProps(k)}
-              >
-                {effectiveSelection && (
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      className="size-5"
-                      checked={tick}
-                      onChange={() => {}}
-                      onClick={(e) => bamTick(k, e.shiftKey)}
-                      aria-label={`Chọn dòng ${selection?.getRowLabel ? selection.getRowLabel(r) : k}`}
-                    />
+          {(groups ?? [{ key: "", rows: viewRows }]).map((g) => (
+            <React.Fragment key={`group:${g.key}`}>
+              {groups && (
+                <TableRow className="bg-muted/40 hover:bg-muted/40" data-group-head={g.key}>
+                  <TableCell colSpan={columnCount} className="py-1.5 font-semibold text-foreground">
+                    {groupBy?.label ? groupBy.label(g.key, g.rows) : `${g.key} · ${g.rows.length} dòng`}
                   </TableCell>
-                )}
-                {columns.map((c) => (
-                  <TableCell
-                    key={c.key}
-                    className={cn(c.numeric && "text-right tnum")}
+                </TableRow>
+              )}
+              {g.rows.map((r) => {
+                const k = keyOf(r);
+                const tick = !!effectiveSelection?.selectedKeys.has(k);
+                return (
+                  <TableRow
+                    key={k}
+                    data-picked={tick || undefined}
+                    className={cn(tick && "bg-primary/5")}
+                    {...to.getRowProps(k)}
                   >
-                    {c.render(r)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            );
-          })}
+                    {effectiveSelection && (
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          className="size-5"
+                          checked={tick}
+                          onChange={() => {}}
+                          onClick={(e) => bamTick(k, e.shiftKey)}
+                          aria-label={`Chọn dòng ${selection?.getRowLabel ? selection.getRowLabel(r) : k}`}
+                        />
+                      </TableCell>
+                    )}
+                    {columns.map((c) => (
+                      <TableCell
+                        key={c.key}
+                        className={cn(c.numeric && "text-right tnum")}
+                      >
+                        {c.render(r)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
+              {groups && hasTotal && groupBy?.totalLabel !== false && (
+                <TableRow className="hover:bg-transparent">
+                  {totalCells(g.rows, groupBy?.totalLabel ? groupBy.totalLabel(g.key) : `Cộng ${g.key}`, "font-semibold")}
+                </TableRow>
+              )}
+            </React.Fragment>
+          ))}
           {addRow && (
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={columnCount} className="bg-muted/30">
@@ -315,21 +357,7 @@ export function SummaryTable<T>({
         </TableBody>
         {hasTotal && (
           <TableFooter>
-            <TableRow>
-              {(hasLeadColumn ? 1 : 0) + labelColumnCount > 0 && (
-                <TableCell colSpan={(hasLeadColumn ? 1 : 0) + labelColumnCount} className="font-bold whitespace-normal">
-                  {totalLabel}
-                </TableCell>
-              )}
-              {columns.slice(labelColumnCount).map((c) => (
-                <TableCell
-                  key={c.key}
-                  className={cn("font-bold", c.numeric && "text-right tnum")}
-                >
-                  {c.total ? c.total(rows) : null}
-                </TableCell>
-              ))}
-            </TableRow>
+            <TableRow>{totalCells(rows, totalLabel, "font-bold")}</TableRow>
           </TableFooter>
         )}
       </Table>

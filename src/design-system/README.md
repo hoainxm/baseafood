@@ -794,6 +794,14 @@ xuống máy (tải lại trang ⇒ về thứ tự gốc).
   **thứ tự đang hiện**, không theo mảng gốc — bảng đang sắp mà dán theo thứ tự gốc là đổ số nhầm
   dòng (Sổ kho tháng đọc thứ tự từ ô `data-row` trong `[data-grid-nav]`).
 - Bản in A4 / Excel xuất ra giữ thứ tự gốc của sổ (không theo cách sắp trên màn).
+- **Chia nhóm trong `SummaryTable`** (prop `groupBy`, 2026-10-27): `{ key, rank?, label?, totalLabel? }` ⇒
+  mỗi nhóm một dòng tiêu đề ("Cá · 2 dòng") + dòng "Cộng <nhóm>" (dùng chính `total` của cột trên tập
+  dòng nhóm — cột `total` phải tính từ tham số `rows`, đừng đóng số tổng sẵn), hàng chân vẫn cộng cả
+  bảng. Sắp theo cột ⇒ sắp TRONG từng nhóm. Bảng chỉ có 1 nhóm ⇒ không chia. Hàm tách: `splitGroups`
+  (`patterns/summaryTableGroups.ts`, có test). Dùng ở Sổ kho tháng: chia theo LOÀI, cá trên bạch tuộc dưới.
+- **Xếp dòng tay** (thứ tự lưu vào sổ, khác với sắp cột chỉ để xem): màn tự giữ chế độ "Xếp dòng" và
+  truyền `sortable={false}` khi đang xếp — thứ tự đang hiện phải đúng là thứ tự sẽ lưu. Mẫu: Sổ kho tháng
+  (`moveStockRow` / `resetStockRowOrder`, ghi `sortOrder`, không toast, Ctrl+Z lùi được).
 
 **Cách dùng:**
 

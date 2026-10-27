@@ -9,6 +9,11 @@ import {
   carryChainIds,
   followTableChange,
   moveLinesToTable,
+  buildSpeciesLookup,
+  groupByCategory,
+  moveStockRow,
+  resetStockRowOrder,
+  speciesRank,
 } from "./monthlyStock";
 
 const row = (id: string, period: string, p: Partial<MonthlyStockLine> = {}): MonthlyStockLine => ({
@@ -239,5 +244,68 @@ describe("moveLinesToTable — Chuyển bảng dòng đã tick, chuỗi dồn k�
     const r = moveLinesToTable(ledger(), [idDon("X")], { category: BUY });
     expect(findLine(r.lines, "X")?.category).toBe(OLD);
     expect(findLine(r.lines, idDon(idDon("X")))?.category).toBe(BUY);
+  });
+});
+
+describe("loài trong bảng — cá trên, bạch tuộc dưới; xếp dòng tuỳ chỉnh", () => {
+  const T = "Hàng tạm";
+  // Đúng thứ tự ghi như ảnh kế toán (bạch tuộc trước, cá xen giữa).
+  const ledger = () => [
+    row("b80", "2026-10", { category: T, itemName: "Bạch tuộc 2 da 80up", origin: "HỒNG PHÚ", sortOrder: 0 }),
+    row("song", "2026-10", { category: T, itemName: "CÁ SÒNG", sortOrder: 1 }),
+    row("b250", "2026-10", { category: T, itemName: "Bạch tuộc 2 da 250up", sortOrder: 2 }),
+    row("muc", "2026-10", { category: T, itemName: "Mực ống", sortOrder: 3 }),
+    row("saba", "2026-10", { category: T, itemName: "Saba", sortOrder: 4 }),
+    row("mada", "2026-10", { category: T, itemName: "MADA", sortOrder: 5 }),
+  ];
+  const speciesOf = buildSpeciesLookup([{ name: "MADA", category: "Bạch tuộc" }, { name: "Saba", category: "Khác" }]);
+  const order = (ls: MonthlyStockLine[]) => groupByCategory(ls.map(deriveRow), speciesOf)[0].rows.map((r) => r.id);
+
+  test("mặc định: cá lên trên, bạch tuộc dưới, rồi mực; trong loài giữ thứ tự ghi", () => {
+    expect(order(ledger())).toEqual(["song", "saba", "b80", "b250", "mada", "muc"]);
+    expect(speciesRank("Cá")).toBeLessThan(speciesRank("Bạch tuộc"));
+    expect(speciesRank("Loài gõ tay")).toBeGreaterThan(speciesRank("Bào ngư"));
+    expect(speciesRank("Loài gõ tay")).toBeLessThan(speciesRank("Khác"));
+  });
+
+  test("loài: danh mục thắng đoán tên; danh mục để 'Khác' thì vẫn đoán từ tên", () => {
+    expect(speciesOf("MADA")).toBe("Bạch tuộc");
+    expect(speciesOf("saba")).toBe("Cá"); // danh mục 'Khác' ⇒ đoán ra cá
+    expect(speciesOf("Bạch tuộc 2 da lớn (80↑)")).toBe("Bạch tuộc");
+  });
+
+  test("đưa dòng lên / xuống trong cùng loài ⇒ thứ tự mới đứng yên khi gom lại", () => {
+    const shown = order(ledger());
+    const moved = moveStockRow(ledger(), shown, "b250", -1, speciesOf)!;
+    expect(order(moved)).toEqual(["song", "saba", "b250", "b80", "mada", "muc"]);
+    // Không đụng số kg / dòng khác bảng.
+    expect(moved.map((l) => deriveRow(l).closeKg)).toEqual(ledger().map((l) => deriveRow(l).closeKg));
+  });
+
+  test("không vượt ranh giới loài: dòng đầu bạch tuộc không lên được vùng cá; đầu / cuối bảng ⇒ null", () => {
+    const shown = order(ledger());
+    expect(moveStockRow(ledger(), shown, "b80", -1, speciesOf)).toBeNull();
+    expect(moveStockRow(ledger(), shown, "saba", 1, speciesOf)).toBeNull();
+    expect(moveStockRow(ledger(), shown, "song", -1, speciesOf)).toBeNull();
+    expect(moveStockRow(ledger(), shown, "muc", 1, speciesOf)).toBeNull();
+  });
+
+  test("đang lọc (dòng ẩn): đổi chỗ với dòng HIỆN liền kề, dòng ẩn giữ vị trí", () => {
+    const shown = order(ledger()); // song saba b80 b250 mada muc
+    const visible = shown.filter((id) => id !== "b250"); // b250 bị ẩn
+    const moved = moveStockRow(ledger(), shown, "mada", -1, speciesOf, visible)!;
+    expect(order(moved)).toEqual(["song", "saba", "mada", "b250", "b80", "muc"]);
+  });
+
+  test("về mặc định: loài rồi tên A → Z (số trong tên so theo giá trị); gọi lại không đổi gì", () => {
+    const ls = resetStockRowOrder(ledger(), ledger().map((l) => l.id), speciesOf);
+    expect(order(ls)).toEqual(["song", "saba", "b80", "b250", "mada", "muc"]);
+    expect(resetStockRowOrder(ls, ls.map((l) => l.id), speciesOf)).toBe(ls);
+  });
+
+  test("dồn kỳ mang thứ tự xếp sang tháng sau", () => {
+    const moved = moveStockRow(ledger(), order(ledger()), "b250", -1, speciesOf)!;
+    const nov = carryForwardIntoLedger(moved, "2026-11").lines.filter((l) => l.period === "2026-11");
+    expect(groupByCategory(nov.map(deriveRow), speciesOf)[0].rows.map((r) => r.carriedFromId)).toEqual(["song", "saba", "b250", "b80", "mada", "muc"]);
   });
 });

@@ -1,6 +1,7 @@
 > Load khi: thiết kế/build 3 màn module WIP — Sản xuất BTP, Kho dự trữ, Đơn đặt.
 covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/features/orders/ExportLotCheck.tsx, src/features/production/wipHelpers.ts, src/features/production/ProductionLinesTable.tsx, src/features/production/FrozenStockSection.tsx, src/features/production/BatterSection.tsx, src/features/production/DomesticSaleSection.tsx
-last_verified: 2026-10-15
+last_verified: 2026-10-27
+<!-- re-verified: 2026-10-27 10:00 — /wip ghi bằng form inline (không dialog Ghi sản lượng), lưu là status "pending" = "Chờ nhập kho" ngay (WipProductionScreen.tsx), nav "Sản xuất thành phẩm" (AppShell) -->
 <!-- updated: 2026-10-15 (d) — bảng thành phẩm BỎ chặn `max-w-[64rem]`: màn rộng (~1900px) bảng chỉ chiếm ~60% bề ngang, người dùng thấy như bị cắt đôi ⇒ `w-full` (cột tên ăn phần còn lại), thẳng mép với khối lô / bán nội địa. Câu hướng dẫn nằm NGAY DƯỚI tiêu đề (trước dạt sang mép phải). -->
 <!-- updated: 2026-10-15 (c) — /wip form GỌN NGANG (người dùng yêu cầu): (1) Ngày ghi sổ · Ngày sản xuất · Phân xưởng MỘT hàng (`grid sm:grid-cols-3`), Lý do ghi bù xuống dưới khi cần. (2) Khối "Lô nguyên liệu dùng cho phiên này": đầu khối một hàng (tên + nút i `InfoTip` chứa câu giải thích dài + Tag "Chưa khai lô — chốt ngày sẽ hỏi" / "N lô"), ba cách khai lô một hàng md+ (`grid md:grid-cols-[auto_1fr_1.4fr]`: Quét tem NL · Gõ mã lô [ô + Thêm] · Chọn lô — hint thành `info`), chip lô bên dưới; nhãn phụ lô dùng `subLabel` (trước truyền `phu` nên mất). (3) BỎ khách hàng + nhóm ở bảng thành phẩm, bỏ nút "Thêm thành phẩm" / "Thêm nhóm" (dòng trống tự hiện), bỏ khung lồng quanh bảng. (4) Dòng thành phẩm NGANG: Thành phẩm · Số block × kg/khối (mặt hàng có quy cách ⇒ đơn vị ô "× 4 kg"; chưa có ⇒ ô quy cách nhỏ cạnh, ô block bỏ chữ đơn vị) · Số lượng (kg) · [✂ tách — chỉ mã không đánh dấu tách] [✕]. Bỏ nút "Chi tiết". Hàng phụ chỉ khi cần và là MỘT hàng ngang: "Tách: Râu [ ] Bao tử [ ] = N kg" · "Bột tẩm: 232 [ ] 20802 [ ] [+ Loại bột khác] = N kg · %" (`BatterSection compact`). Cột: block 11rem · kg 8.25rem · thao tác 5.75rem, `min-w-[34rem]` (điện thoại cuộn trong khung). Đo: 1024px tên 209px không tràn; 360px chữ 130% trang không cuộn ngang. -->
 <!-- updated: 2026-10-15 (b) — đánh giá UX vòng 2 (người dùng duyệt sửa hết): (1) thứ tự cột **Thành phẩm · Số block · Số lượng (kg)** — block trước vì xưởng đếm block; có quy cách thì đơn vị ô block là "× 4 kg" (bỏ dòng chữ dưới ô — từng làm lệch hàng); kg gõ tay khác block × quy cách thì GIỮ, đơn vị ô kg thành "kg ≠12" + title giải thích. (2) Nút cuối dòng có CHỮ "Chi tiết ▾" (nền secondary khi đang mở / có tách); vùng bảng < 40rem (tablet có thanh bên ~570px, `@container`) thu về icon, vẫn aria-label + title. Nút Chi tiết chỉ có khi đã chọn thành phẩm. (3) Bảng `table-fixed w-full max-w-[64rem]`: block 8.75rem · kg 9rem · thao tác 6.25rem / 10.75rem, cột tên ăn phần còn lại — 1024px không cuộn ngang, màn rộng tên và số không cách xa. Ô Thành phẩm trong lưới `clearable={false}` (đã có ✕ bỏ dòng). (4) Chi tiết: Quy cách luôn có; Râu/Bao tử chỉ hiện với mã đánh dấu tách / dòng đã tách / sau khi bấm "+ Tách râu + bao tử" (`ProductionLine.splitOpen`). (5) Câu hướng dẫn rút còn một dòng. (6) Ô chọn / nút outline hết xám khi máy để chế độ tối — xem README design-system (`@custom-variant dark`). -->
@@ -57,7 +58,7 @@ Oracle **giao diện** cho module WIP. Đọc cùng oracle **hành vi** [34-btp-
 ## Object model + Flows (tiếp nối §B4 ba-spec)
 
 Đối tượng: **Dòng sản xuất** (ngày) → **Lô tồn** (mặt hàng×quy cách×lô×kho×trạng thái) → **Đơn đặt** (dòng cần) → **Lệnh xuất** (dòng thực xuất) → handoff **Phiếu bán** (đã có).
-Flow chính (đường user đi): Tổ trưởng ghi+chốt SX → Thủ kho duyệt lô cuối ca (tồn +) → Phòng KH thấy khả dụng tăng, đơn đạt đủ → xác nhận đủ → Thủ kho xuất thực → Bán hàng ráp phiếu. Mỗi màn = 1 chặng, không ôm 2.
+Flow chính (đường user đi): Tổ trưởng ghi SX — **lưu xong là mẻ "Chờ nhập kho" ngay** (`status: "pending"`, không đợi chốt ngày; chốt ngày chỉ khoá số của ngày) → Thủ kho duyệt lô (tồn +) → Phòng KH thấy khả dụng tăng, đơn đạt đủ → xác nhận đủ → Thủ kho xuất thực → Bán hàng ráp phiếu. Mỗi màn = 1 chặng, không ôm 2.
 
 ## IA — ngân sách điều hướng
 
@@ -76,8 +77,8 @@ Tablet/desktop: sidebar 4 nhóm collapse được. Mobile 390px: bottom tab 5 m�
 
 | # | Màn hình | Vào từ | User đến để làm gì | Step tiếp theo mong muốn | Primary action | Widget chính | Density |
 |---|---|---|---|---|---|---|---|
-| 1 | **Sản xuất BTP ngày** | nav "Sản xuất BTP" | ghi sản lượng BTP làm ra hôm nay + chốt | chốt ngày để khoá số | **Ghi sản lượng** | ContextBar ngày/xưởng · RecordTable dòng SX · nút Chốt ngày | vừa 44px |
-| 1b | Ghi sản lượng (dialog) | nút Ghi sản lượng | nhập 1 dòng: mặt hàng·quy cách·kg·block·ngày SX | lưu → thấy dòng trong sổ | **Lưu dòng** | Dialog + Combobox/NumberField | — |
+| 1 | **Sản xuất BTP ngày** | nav "Sản xuất thành phẩm" (`/wip`) | ghi sản lượng BTP làm ra hôm nay + chốt | chốt ngày để khoá số | **Lưu** (form ghi ngay trên trang) | ContextBar ngày/xưởng · form nhóm (chế biến × khách) inline · sổ dòng SX · nút Chốt ngày | vừa 44px |
+| ~~1b~~ | ~~Ghi sản lượng (dialog)~~ — **đã bỏ 2026-09-07**: ghi bằng form INLINE ngay trên màn 1 (xem khung cập nhật đầu file), không có hộp "Ghi sản lượng" | — | — | — | — | — | — |
 | 2 | **Kho dự trữ** | nav "Kho dự trữ" | duyệt lô chờ nhập + xem tồn từng kho | duyệt lô để tồn lên đúng | **Duyệt lô chờ nhập** | Khối "chờ nhập" (mời duyệt) · RecordTable tồn nhóm theo kho×mặt hàng×quy cách×lô | gọn 40px (tồn nhiều dòng) |
 | 2b | Duyệt lô (dialog) | nút Duyệt | đối chiếu kg/block thực, chọn kho, ghi lệch | tồn cộng vào kho đã chọn | **Xác nhận nhập kho** | Dialog + NumberField + Combobox kho | — |
 | 3 | **Đơn đặt & lệnh xuất** | nav "Đơn đặt" | xem đơn nào đủ, xác nhận đủ, ra lệnh xuất | ra lệnh xuất (toàn/một phần) | **Xác nhận đủ → lệnh xuất** | RecordTable đơn (badge đủ/đang gom) · chi tiết đơn: dòng cần vs khả dụng | vừa 44px |
@@ -100,7 +101,7 @@ Tablet/desktop: sidebar 4 nhóm collapse được. Mobile 390px: bottom tab 5 m�
 
 | Màn hình | Chưa đăng nhập | Theo vai trò | Trống | Đang tải | Lỗi | Dữ liệu cực đoan |
 |---|---|---|---|---|---|---|
-| Sản xuất BTP | gate ở App | ai cũng xem; ghi/chốt = tổ trưởng+ | "Chưa ghi sản lượng hôm nay — bấm Ghi sản lượng" | skeleton hàng | `DataSyncStatus` + thử lại | nhiều dòng → RecordTable cuộn dọc, không ngang |
+| Sản xuất BTP | gate ở App | ai cũng xem; ghi/chốt = tổ trưởng+ | form trống mở sẵn (nhóm + dòng trống) để gõ ngay | skeleton hàng | `DataSyncStatus` + thử lại | nhiều dòng → RecordTable cuộn dọc, không ngang |
 | Kho dự trữ | gate ở App | xem chung; duyệt/xuất = thủ kho | "Chưa có tồn / không có lô chờ nhập" (vẫn hiện lời mời nếu có chờ) | skeleton | như trên | tồn hàng trăm lô → nhóm gập theo kho, tìm+lọc |
 | Đơn đặt | gate ở App | xem chung; xác nhận/xuất = Phòng KH+thủ kho | "Chưa có đơn đặt — bấm Tạo đơn" | skeleton | như trên | đơn nhiều dòng size → cuộn trong thẻ đơn |
 
@@ -108,7 +109,7 @@ Tablet/desktop: sidebar 4 nhóm collapse được. Mobile 390px: bottom tab 5 m�
 
 | Hành động | Kỳ vọng thấy ngay |
 |---|---|
-| Ghi 1 dòng sản lượng | dòng hiện trong sổ ngày + tổng kg ngày cập nhật |
+| Lưu sản lượng (form inline) | dòng hiện trong sổ ngày với nhãn **"Chờ nhập kho"** + tổng kg ngày cập nhật; thủ kho thấy ngay ở khối chờ nhập `/warehouse` |
 | Chốt ngày SX | badge "Đã chốt"; sửa sau bắt lý do ghi bù |
 | Duyệt lô chờ nhập | lô rời danh sách "chờ nhập", tồn kho đã chọn +kg; lệch hiện rõ |
 | Xác nhận đủ | đơn badge "Đủ"; nút "Lệnh xuất" bật |

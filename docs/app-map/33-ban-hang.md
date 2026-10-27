@@ -1,6 +1,7 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
 covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts, src/lib/inventory.ts, src/lib/salesTotals.ts
-last_verified: 2026-10-22
+last_verified: 2026-10-27
+<!-- re-verified: 2026-10-27 10:00 — handoff Đơn đặt ghi sourceWarehouse "Đơn đặt" (SalesOrderScreen.tsx:324); filterRetailSales chỉ giữ dòng đúng marker (Kho dự trữ / Kho thành phẩm). Chú thích trong inventory.ts còn ghi "Lưu trữ" — nợ code, ghi backlog -->
 <!-- updated: 2026-10-17 — (1) NHÁP PHIẾU BÁN (quy tắc 17, `lib/formDraft.ts`, khoá `bsf.draft.sales.<user>`): giữ đầu phiếu + dòng mặt hàng đang gõ dở (`session`, `sessionInvoiceId`, `editRowIds`, `newRows`); rời trang / tải lại / đăng nhập lại ⇒ hộp phiếu tự mở lại kèm dải "Đã mở lại phiếu đang gõ dở" (Bỏ bản nháp chỉ xoá dòng mặt hàng đang gõ). Dòng đã bấm "Thêm mặt hàng vào sổ" vốn vào sổ ngay nên không nằm trong nháp; đóng phiếu ⇒ nháp tự xoá. (2) HÚT BÁN VÀO CÂN ĐỐI (sửa 2026-10-16, `balancingGrid.salesItemToOutput`): kg đặt vào ô NGÀY giao của dòng (trước chỉ đặt quantityKg ⇒ lưới mất kg); dòng hút hỏng cũ được hút lại. (3) GỘP MẶT HÀNG TRÙNG TÊN (mig 0069) đổi luôn `sales_items.product_id` sang mục giữ — dòng bán không mất, chỉ đổi sang mặt hàng cùng tên. repo.ts thêm `reloadTables` / hàm gộp — không đổi luồng phiếu bán. -->
 <!-- updated: 2026-10-15 — phân quyền Đợt 3: `useCan("sales")` — Ghi phiếu (Thêm), Sửa phiếu/dòng (Sửa), Bỏ/Xóa phiếu (Xóa), gắn lô (Thêm/Sửa), giá + thành tiền theo Xem giá; Đơn đặt `useCan("orders")`. -->
 <!-- re-verified: 2026-10-13 09:00 — repo.ts đổi ở ranh giới máy chủ cho chế độ demo (khóa tiền tố `demo:`, xóa lọc site_id) — luồng phiếu bán / quy cách / hút bán KHÔNG đổi. -->
@@ -34,7 +35,7 @@ Số hóa sổ **bán hàng** — bán thành phẩm chế biến (bạch tuộc
 - **Block thô** = `RETAIL_WAREHOUSE` (`"Kho dự trữ"`) ⇒ trừ tồn **BTP** suy qua `computeWipStock(sanXuat, dongLenh, [...filterRetailSales(rows), ...collectPackagingDeductions(packagings)])`.
 - **Đóng gói** = `FG_WAREHOUSE` (`"Kho thành phẩm"`) ⇒ trừ tồn **TP đóng gói** suy qua `computeFinishedGoodStock(packagings, filterRetailSales(rows, FG_WAREHOUSE))` (G3, xem [flow §3 G3](../trien-khai/flow-end-to-end-2-bo-phan.md)).
 
-FIFO theo (mặt hàng × quy cách). `filterRetailSales(rows, marker)` **bỏ** handoff Đơn đặt (`"Lưu trữ"`, đã trừ qua `export_items`) và dòng cũ (`""`). Trừ suy nên xóa/sửa dòng bán = tồn tự hồi, không trừ hai lần. Màn hiện **tồn khả dụng** (theo pool đã chọn) + cảnh báo bán vượt (vẫn ghi được). `warehouse`/`cold-storage`/`orders`/`packaging` cùng dùng `collectPackagingDeductions` ⇒ tồn BTP nhất quán.
+FIFO theo (mặt hàng × quy cách). `filterRetailSales(rows, marker)` **bỏ** handoff Đơn đặt (`sourceWarehouse = "Đơn đặt"` — ghi ở `SalesOrderScreen` khi đóng lệnh xuất, đã trừ qua `export_items`; hàm chỉ giữ dòng đúng marker nên dòng `"Đơn đặt"` / `"Lưu trữ"` cũ đều bị bỏ) và dòng cũ (`""`). Trừ suy nên xóa/sửa dòng bán = tồn tự hồi, không trừ hai lần. Màn hiện **tồn khả dụng** (theo pool đã chọn) + cảnh báo bán vượt (vẫn ghi được). `warehouse`/`cold-storage`/`orders`/`packaging` cùng dùng `collectPackagingDeductions` ⇒ tồn BTP nhất quán.
 
 Chưa có (backlog): **chốt ngày bán** (bảng `chot_ngay` hiện chỉ dùng cho nhập — bán cần bảng chốt riêng, chưa làm); **phiếu bán in A4** riêng (bảng cân đối đã in được); tách kho TP theo nhiệt/vị trí.
 

@@ -30,3 +30,5 @@
 2026-10-22 | 35-btp-ui.design-spec.md | còn tả dialog Ghi sản lượng + chốt ngày → chờ nhập | hook: covers 35 thêm WipProductionScreen.tsx
 2026-10-22 | 40-documents.md | đính PDF "ở cột File" — thực tế trong hộp chi tiết | hook: test phủ nhãn hộp "?" đọc nhãn nút ở màn
 2026-10-22 | 33-ban-hang.md | handoff Đơn đặt ghi "Lưu trữ", code "Đơn đặt" | hook: covers 33 thêm lib/inventory.ts
+2026-10-27 | 04-tang-du-lieu.md (chế độ demo) | ghi "DB có đúng 3 khóa ngoại giữa bảng nghiệp vụ" ⇒ chỉ khai refColumns period_id; khóa ngoại MỀM (customer_id, product_id, lot_id… không có `references`) bị bỏ sót, 19 cột ở site-demo mồ côi | hook: test demoForeignKeys quét mọi cột *_id của toRow repo.ts (đã thêm, kèm danh sách MIỄN có lý do)
+2026-10-27 | 31-can-doi-ky.md | "sumUnmatchedLeftover không còn hiển thị" + bảng "ô ngày ghi ngược về sổ Nhập hàng" — code: khung cảnh báo còn dở vẫn hiện, ô sổ nhập KHÓA | hook: đổi lockReason / data-tour ở MaterialGrid.tsx hay MaterialNxtScreen.tsx ⇒ nhắc soát 31

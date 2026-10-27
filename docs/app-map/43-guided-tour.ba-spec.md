@@ -2,7 +2,8 @@
 
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
-last_verified: 2026-10-22
+last_verified: 2026-10-27
+<!-- re-verified: 2026-10-27 10:00 — §11 lệch doc: đối chiếu từng mục với code (MaterialNxtScreen, MaterialGrid, MaterialImportScreen, WipProductionScreen, DocumentDetailDialog, documents.buildDocumentWarnings + myTasks, SalesOrderScreen, QcChecklistScreen.reopen, BalancingScreen carry-over) — khớp mô tả §11 -->
 ttl_days: 90
 <!-- updated: 2026-10-22 (d) — v4: mở rộng ra MỌI trang nghiệp vụ (21 trang có route, trừ 5 trang quản trị miễn): NV5 + R13–R17 + AC-12…AC-16; quy tắc 18 CLAUDE.md; cổng `pageTourCoverage.test.ts` quét route ⇄ tour ⇄ hộp "?" ⇄ mốc data-tour; §9c kiểm kê theo trang. -->
 <!-- updated: 2026-10-22 — lời tour Xuất khẩu theo nhãn v5 (ba-spec 41 v5): bước "Lịch xuất hàng, Hợp đồng và Báo cáo" nói thêm tab Báo cáo · "số PO của khách" thay "số đơn của khách" · thẻ "Trễ hạn giao n ngày" · "Đang làm · xong k/5 bước bắt buộc" · bước 6 "Gửi chứng từ · tiền về". Không đổi mốc `data-tour`, số bước giữ nguyên; test `exportTour.test.ts` xanh. -->
@@ -381,7 +382,7 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
 ## 11. Assumptions / Open
 - **Assumptions**: tour không tự bật lần đầu và không nhớ "đã xem" (R8, OUT); lối vào ở cả hộp "?" của trang lẫn một nút phụ trên trang (cùng một tour); chữ tour viết theo giọng hướng dẫn hiện có (nói việc, không thuật ngữ); tour dùng dữ liệu đang có (thật hay demo đều được) — không sinh số mẫu (quy tắc 15).
 - **Open (RED)**: không có.
-- **Open — lệch tài liệu / màn (v4, phát hiện lúc kiểm kê; lời tour theo CODE, chưa sửa):**
+- **Open — lệch tài liệu / màn (v4, phát hiện lúc kiểm kê; lời tour theo CODE).** 2026-10-27: phần lệch DOC đã sửa theo code (CLAUDE.md G1 · 31 · 30 §1 · 35 · 40 vị trí nút đính PDF · 33); phần lệch ở CODE chuyển vào [BAN-GIAO-tiep-theo §4 mục 9](../BAN-GIAO-tiep-theo.md). **Còn treo:** luật giao việc gia hạn (DOC-R7 "phòng sở hữu" ≠ code "người xem được + `documents.update`") — chờ chủ dự án chốt.
   - CLAUDE.md mục G1 ghi "tồn cuối NL = tồn đầu + đông gửi − xả đông" — màn `/nxt-material` + 31 § Tồn kho NL (PA-a) + 38 §0: Tồn cuối = Tồn đầu + Nhập − Xuất SX − Bán nội địa; Đông gửi / Xả đông chỉ là cột thông tin.
   - 31: thân doc khối nguyên liệu còn tả nút "n chuyến", "Tách theo đại lý", ô ngày ghi ngược sổ Nhập hàng (code: dòng sổ nhập khóa, sửa qua ✎, "n người bán"); doc nói khung "còn dở SX chưa hiện" đã bỏ nhưng `/nxt-material` vẫn hiện.
   - 30 §1 còn tả hộp thoại ghi chuyến (nay ghi ngay trên trang).

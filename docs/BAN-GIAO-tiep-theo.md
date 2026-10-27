@@ -37,6 +37,14 @@
      - Việc kế tiếp: chủ dự án trả lời §9 (nhỏ) + gửi **file mềm T7 & T8 mọi phân xưởng** → mở **session mới** build Pha 1 (migration 🟡 2 bảng + màn import).
 7. **Định mức NL→TP; báo cáo tháng 6 khối.**
 8. **Định hướng họp 2026-09-02** (canonical: [`docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md`](trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md)) — chốt số chạy realtime **từ tháng 9**; ưu tiên: (a) 🟩 **form nhập chuẩn + chụp ảnh phiếu tay → OCR** (giảm gõ tay ở xưởng; viết tay song song app ~1 tháng); (b) 🟨 **giá & bình quân gia quyền theo ngày** — **chốt PA trước khi sửa `balancingCalc.ts`**; (c) 🟨 **định danh lô + QR** trace nội bộ (khớp SPEC cấp lô; SSCC chừa ô trống, làm sau); (d) 🟩 **mã KH/đại lý bằng số**; (e) 🟨 **QC checklist chấm điểm + ảnh**; (f) 🟩 **khung nhân sự gắn từng khâu** (Dung/Trúc/Luyên/Hạnh/Lan; Nam soạn biểu mẫu → 4 người xuống xưởng ~2h). Để sau (🅿️): lương/BHXH/nghỉ phép qua app; điện thoại trong xưởng.
+9. **Lệch màn ↔ tài liệu còn ở CODE (rà 2026-10-27, nguồn: [43 §11](app-map/43-guided-tour.ba-spec.md)) — doc đã ghi đúng hiện trạng, code chưa sửa:**
+   - **Thủ kho xác nhận thực xuất** ([34](app-map/34-btp-san-xuat-kho.ba-spec.md) F-N6 / AC-13) chưa có: lập lệnh xuất ở `/orders` là đóng ngay, tồn trừ theo lệnh.
+   - **QC "Mở lại ngày" không hỏi lý do** (`QcChecklistScreen.tsx` `reopen`) — khác Nhập hàng / Sản xuất (bắt lý do). Phụ đề "Ảnh kèm sẽ bổ sung sau" đã cũ.
+   - **Cân đối "Nhận n dòng chuyển kỳ" không kiểm quyền** (`BalancingScreen.tsx` — chỉ ẩn khi kỳ đã chốt, không gate `balancing.update`).
+   - **Chữ "Bấm …" còn trên màn** (Nhập hàng, Việc của tôi, Tài liệu, Đóng gói, Đối soát, QR…) — văn phong tài liệu dùng "Chọn …".
+   - **Tên màn cũ "Sản xuất BTP"** còn ở empty state / lời nhắc (`ReserveWarehouseScreen`, `NxtReportScreen`, `QrLookupScreen`, `guideContent`) — menu là "Sản xuất thành phẩm".
+   - Chú thích `filterRetailSales` (`lib/inventory.ts`) còn ghi handoff Đơn đặt là `"Lưu trữ"` — giá trị thật `"Đơn đặt"` (`SalesOrderScreen`).
+   - Chế độ demo: tham chiếu nằm TRONG jsonb (`production_wips.batter_kg` khóa theo id bột) chưa mang tiền tố `demo:`.
 
 ## 5. Cạm bẫy cần nhớ
 - `useBang` ghi CẢ LÔ, offline có hàng chờ — sửa `repo.ts` phải giữ `patchLegacy` + không nuốt dòng chưa đẩy.

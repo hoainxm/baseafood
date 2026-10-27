@@ -1,6 +1,7 @@
 > Load khi: sửa màn Cân đối, lưới theo ngày, công thức định mức/lãi lỗ, hay bảng in A4.
 covers: src/lib/dailyShipments.ts, src/features/balancing/EditImportTripsDialog.tsx, src/features/balancing/TripPriceList.tsx, src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx, src/lib/balancingStockLines.ts, src/lib/domesticSales.ts
-last_verified: 2026-10-20
+last_verified: 2026-10-27
+<!-- re-verified: 2026-10-27 10:00 — khối NL theo MaterialGrid.tsx: dòng sổ nhập KHÓA (lockReason → ✎ Sửa chuyến nhập), dòng con "n người bán" gập sẵn, không còn "n chuyến" / "Tách theo đại lý" / ghi ngược ô ngày về sổ nhập; /nxt-material vẫn hiện cảnh báo còn dở SX chưa có kỳ phủ (sumUnmatchedLeftover); tồn cuối NL = đầu + nhập − xuất SX − bán NĐ -->
 <!-- re-verified: 2026-10-19 15:00 — Khối 1 hai dòng kho: lô gửi đông id cd|<id dòng>|<ngày>, invoice GĐ-yyyymmdd, đơn giá lô = unitPrice của dòng (balancingStockLines.syncMonthlyStockLedger); hộp DepositTargetDialog ghi Giá gửi vào unitPrice dòng; chọn lô Lấy xả đông ⇒ unitPrice = giá lô (MaterialGrid.pickLot); giá gợi ý Lấy xả đông = lastFreezeDepositPrice. Khớp code. -->
 <!-- updated: 2026-10-20 (s) — GHI CHÚ RIÊNG TỪNG LOẠI (làm tiếp (p)): dòng LOẠI (2 da lớn · 2 da nhỏ) có ô Ghi chú ở bảng theo ngày, lưu trên dòng kỳ `typeNotes[<tên loại>]` (mig 0074). Loại ĐẦU TIÊN chưa có ghi chú riêng ⇒ hiện ghi chú cũ của dòng gộp (`note`) để chữ cũ không mất; sửa ô đó lần đầu ⇒ chữ chuyển sang loại, `note` xoá (`patchImportTypeNote`). Hàm thuần `parseImportTypeRowId` · `importTypeNote` · `patchImportTypeNote` ở lib/balancingGrid (có test). Kiểm demo: ghi chú cũ hiện ở 2 da lớn, gõ 2 da nhỏ riêng, sửa 2 da lớn ⇒ note rỗng + typeNotes 2 khoá, tải lại còn nguyên. Mig 0074 ✅ đã chạy trên DB thật 2026-10-20. -->
 <!-- updated: 2026-10-20 (r) — BỎ HẲN BẢNG "Nguyên liệu gửi đông" (kế toán: "chỉ xài bảng có sẵn, không thêm vô ô nào hết"): lô gửi đông KHÔNG BAO GIỜ ghi vào bảng cũ nữa — `depositLotCategory` (balancingStockLines) = nhóm người dùng chọn → nhóm lô đã ghi (nếu không phải bảng cũ) → "Nguyên liệu mua ngoài". Lô đang nằm ở bảng cũ: tính là LỆCH (`countMonthlyStockMismatches`) ⇒ Cân đối hiện "Sổ kho tháng lệch n chỗ" + nút "Ghi lại vào sổ kho" dời lô sang bảng đã chọn (kg giữ nguyên, có Hoàn tác); lưu lại hộp "Gửi đông vào sổ kho" cùng nhóm cũng dời (trước đây bị coi "không đổi gì" nên lô kẹt ở bảng cũ — lỗi kế toán gặp). Không tự dời hàng loạt khi mở màn (dữ liệu sổ thật — người dùng bấm). Dòng `carry|…` đã dồn sang tháng sau giữ nhóm cũ cho tới lần dồn kỳ kế tiếp. -->
@@ -140,6 +141,8 @@ Kỳ tên `Bạch tuộc 2 da` gom **cả hai size**: `Bạch tuộc 2 da lớn 
 
 ⇒ **Khối 1 GỘP SIZE thành MỘT dòng** (chốt với chủ dự án 2026-09-10): khi hút, `groupImportsByMaterialType` gom nhập theo **HỌ** (`getMaterialFamily`) nên `2 da lớn (80↑)` + `2 da nhỏ (80↓)` ra **một dòng `Bạch tuộc 2 da`**, cộng kg cả hai size. ~~Đơn giá để trống khi gộp nhiều size khác giá (kế toán gõ một giá chung)~~ — **từ 2026-10-20 tiền dòng = Σ kg × giá TỪNG chuyến nguồn**, ô Đơn giá khoá ("theo chuyến" khi nhiều mức giá), giá sửa ở Nhập hàng — xem (i) đầu file. `buildMaterialGridRows` tra nguồn theo họ (`getMaterialFamily(r.name)`) nên dòng cũ mang tên size vẫn khớp; `hutNhapHang` chống trùng theo họ; ghi ngược ô ngày (`ghiNhapNhieuNgay`) tra chuyến nhập theo họ, chỉnh chuyến size cuối của ngày cho khớp tổng (KHÔNG đẻ chuyến "họ" ma). **Chỉ gộp ở CÂN ĐỐI** — sổ Nhập hàng & Tồn kho NL vẫn giữ tên có size để truy nguyên. `calculateBalancing` KHÔNG đổi (đọc `quantityKg`/`unitPrice` của dòng đã gộp).
 
+> **Hiển thị đổi từ 2026-10-20 (p):** dòng kỳ vẫn gộp họ để tính, nhưng lưới KHÔNG hiện dòng gộp nữa — mỗi LOẠI là một dòng chính chỉ đọc (id `<dòng kỳ>::type::<loại>`). Ô ngày sổ nhập đã khóa ⇒ "ghi ngược ô ngày (`ghiNhapNhieuNgay`)" ở trên không còn đường vào từ lưới; sửa số nhập qua ✎ Sửa chuyến nhập.
+
 ⚠️ **Gộp ở tầng DỮ LIỆU (một dòng `balancing_inputs` cho mỗi họ), KHÔNG gộp ở tầng hiển thị.** Hút tạo sẵn MỘT dòng/họ (đúng). Dòng NHẬP TAY cùng họ (VD seed cũ "2 da nl lớn"/"2 da nl nhỏ") thì phải là MỘT dòng — seed đã gộp thành "Bạch tuộc 2 da" (bình quân gia quyền để giữ Giá trị NL). **ĐÃ THỬ gộp ở `buildMaterialGridRows` (giữ 2 dòng, hiện 1) rồi BỎ**: `usePeriodGrid.nlChoTinh` đồng bộ `quantityKg` TỪNG dòng theo `hangNL.id`, dòng gộp làm dòng neo mang TỔNG gộp còn dòng kia giữ số cũ ⇒ `calculateBalancing` (Σ `quantityKg` mỗi dòng) **CỘNG ĐÔI**; giá gộp để trống cũng không khớp 2 giá lưu. Muốn gộp arbitrary dòng tay ⇒ phải gộp ở tầng dữ liệu (một dòng thật), không phải hiển thị.
 
 **Nút "Gộp cùng loại" (Khối 1) — gộp MỘT LẦN, an toàn.** Hiện khi có ≥2 dòng nhập
@@ -159,11 +162,11 @@ Cùng một cách với mọi nguồn: gán kỳ lên bản ghi gốc, không nh
 
 | Khối | Nguồn | Cách hút | Ô ngày trong lưới |
 |---|---|---|---|
-| NL vào, nhóm `Thủy sản` | `material_imports` | TỰ lấy theo cùng họ NL + ngày trong kỳ (dùng chung giữa kỳ chồng ngày, 2026-10-20); dòng khác loại tự chọn thì gán `balancing_period_id` | gõ được, **ghi ngược về sổ Nhập hàng** |
+| NL vào, nhóm `Thủy sản` | `material_imports` | TỰ lấy theo cùng họ NL + ngày trong kỳ (dùng chung giữa kỳ chồng ngày, 2026-10-20); dòng khác loại tự chọn thì gán `balancing_period_id` | **KHÓA** (từ 2026-10-20) — sửa qua nút ✎ **Sửa chuyến nhập** ở dòng (xem lại + xác nhận rồi mới ghi sổ Nhập hàng) |
 | NL vào, `Xả đông` / `Bột phụ gia` / Giảm | nhập tay | — | gõ được, lưu ở `daily_quantities` |
 | Bán thành phẩm | `production_wips` | gán `balancing_period_id`, ngày trong kỳ (KHÔNG lọc theo loại NL — một lô NL ra nhiều mặt hàng) | gõ được, **ghi ngược về sổ Sản xuất** |
 
-**Không khoá ô.** Bản đầu khoá ô ngày của dòng hút với lý do "sửa ở sổ gốc cho khỏi lệch". Người dùng đọc ra là ô hỏng. Số vẫn không lệch được vì ô ghi THẲNG về sổ gốc chứ không giữ bản sao — khoá là thừa.
+**Ô khối 2 không khoá** — ô ghi THẲNG về sổ Sản xuất, không giữ bản sao. **Khối 1 (sổ nhập) KHÓA lại từ 2026-10-20**: người dùng muốn "hỏi trước khi xác nhận và lưu log rõ ràng" khi sửa số nhập từ Cân đối ⇒ ô ngày, đơn giá của dòng sổ nhập chỉ đọc (`MaterialGrid.tsx` `lockReason`: "Số của sổ Nhập hàng — sửa bằng nút ✎ Sửa chuyến nhập ở dòng này"); nút ✎ mở `EditImportTripsDialog` xem lại rồi xác nhận mới ghi.
 
 ### Màn phải TỰ GIẢI THÍCH khi trống
 
@@ -192,13 +195,13 @@ Người dùng đến từ Excel: ở đó Ctrl+Z lùi **mọi** thứ vừa là
 
 Hai lưới bật `EditableGrid rowMarkKey` (`can-doi-nl` · `can-doi-tp`), danh sách kỳ bật `RecordTable rowMarkKey="can-doi-ky"`: kế toán dò bảng cân đối tới đâu tô màu/in đậm dòng đó, lưu chung (`row_marks`). Khoá dòng là id dòng cân đối (mỗi kỳ một bộ id) ⇒ dấu không lan sang kỳ khác. Bản in A4 (`BalancingTable`) KHÔNG tô — giữ bố cục giấy. Luật: [README design-system § Tô màu dòng](../../src/design-system/README.md#tô-màu-dòng-đã-dò-kiểu-excel).
 
-### Chuyến nhập NGAY TRONG lưới (khối 1, chỉ đọc — 2026-10-07)
+### Chuyến nhập NGAY TRONG lưới (khối 1, chỉ đọc — 2026-10-07, đổi 2026-10-20)
 
-Kế toán dò ô ngày: "ô này gồm những chuyến nào, của đại lý nào". Trả lời ngay trong lưới, bằng chính các dòng sổ nhập đã lấy vào kỳ (`nhapDaGan` ∩ `nguonIds` của dòng, nhóm theo ngày hàng về):
+Kế toán dò ô ngày: "ô này gồm những chuyến nào, của người bán nào". Trả lời ngay trong lưới, bằng chính các dòng sổ nhập đã lấy vào kỳ (`MaterialGrid.tsx`):
 
-- **Ô ngày** của dòng lấy từ sổ nhập: nút **"🚚 n chuyến"** dưới số kg (`CellShipments.tsx`, `GridColumn.phuO`) → đại lý → chuyến (mã lô / "Chuyến n", kg, xe · tài xế) → loại NL · kg × giá.
-- **Dòng con theo đại lý**: nút **"▸ n đại lý"** dưới tên dòng (hoặc **Tách theo đại lý** trên thanh công cụ mở hết) — mỗi đại lý một dòng chỉ đọc (`GridRow.kieu = "con"`): kg theo ngày (kèm "n chuyến" trong ô), giá bình quân làm tròn, thành tiền thật; tổng các đại lý = dòng cha (`lib/groupDailyShipments.groupImportsBySupplier`).
-- CHỈ ĐỌC — sửa số vẫn gõ vào ô dòng cha (ghi về sổ nhập qua `ghiNhapNhieuNgay`) hoặc ở màn Nhập hàng. Dán khối đi theo thứ tự trên màn, bỏ qua ô dòng con.
+- **Mỗi LOẠI NL một dòng chính** (2 da lớn · 2 da nhỏ tách riêng, không còn dòng gộp họ): kg theo ngày, giá theo từng chuyến (cùng giá thì hiện giá đó; bấm số giá gạch chân để xem giá từng chuyến), tiền = Σ kg × giá từng chuyến. Nút ✎ **Sửa chuyến nhập** ở dòng (`variant=edit`, chỉ người có quyền nhập hàng) — xem lại rồi xác nhận mới ghi sổ Nhập hàng.
+- **Dòng con theo người bán**: dưới tên loại nút **"n người bán"** (GẬP sẵn, bấm mới mở) — mỗi người bán (đại lý) một dòng chỉ đọc: kg theo ngày, giá bình quân theo kg, tiền.
+- **Đã bỏ:** nút "🚚 n chuyến" dưới ô ngày (`CellShipments.tsx` đã xoá, 2026-10-20 — kế toán không cần), nút "Tách theo đại lý" trên thanh công cụ, và ghi ngược từ ô ngày về sổ nhập (ô đã khóa, xem bảng trên).
 - Thay khối riêng "Chuyến nhập theo ngày" (2026-10-06, đã bỏ — kế toán muốn thấy ngay trong ô).
 
 ### Khi tên loại nguyên liệu không khớp
@@ -209,7 +212,7 @@ Sổ nhập ghi loại NL theo tên tự do. Xưởng gõ "2 da nguyên liệu" 
 
 Dòng lưới (`balancing_inputs` / `balancing_outputs`) chỉ giữ **tên · đơn giá · khách · quy cách · chuyển kỳ**. Sản lượng ngày đọc thẳng từ sổ nguồn ⇒ sổ và bảng cân đối không bao giờ lệch. `quantityKg` của dòng hút được **đồng bộ trong `usePeriodGrid`** (tính ngay cho kết quả trên màn, rồi ghi xuống kho bằng effect) vì `calculateBalancing` đọc trường đó — công thức không được sửa.
 
-Ghi ngược bằng effect là ghi **tự động** (người dùng không bấm) nên có **hai cổng** (2026-10-12):
+Ghi ngược bằng effect là ghi **tự động** (người dùng không bấm) nên có **hai cổng** (2026-10-12) — ghi `quantityKg` của dòng KỲ (không phải sổ nhập; ô sổ nhập đã khóa từ 2026-10-20):
 1. **Mọi bảng đã nạp xong từ máy chủ** (`status === "ready"`, phần tử thứ ba của `useTable`): khối 1 cần `balancing_inputs` + `material_imports` + `monthly_stock_ledger`, khối 2 cần `balancing_outputs` + `production_wips`. Thiếu cổng này: máy mới (localStorage trống) mở kỳ, `balancing_inputs` về trước còn sổ nhập chưa về ⇒ tổng 0 ⇒ ghi `quantityKg = 0` lên máy chủ + nhật ký "Sửa"; sổ nhập nạp lỗi ⇒ số 0 ở lại. Bảng đích chưa nạp thì `ghiNL` ghép với bản local cũ ⇒ có thể xoá dòng kỳ khác.
 2. **Kỳ chưa chốt** (`daChot`). Sổ nhập / sổ SX sửa sau khi chốt kỳ: màn vẫn TÍNH theo sổ (ô ngày + kết quả), nhưng số đã lưu của kỳ đã chốt không bị đổi lặng lẽ; muốn nhận số mới ⇒ mở lại kỳ (bắt lý do), effect tự ghi.
 
@@ -274,7 +277,8 @@ Màn **Tồn kho NL** (`/nxt-material`, [`features/reports/MaterialNxtScreen.tsx
 - **Engine kỳ đọc hai dòng kho (2026-10-06):** xả đông = cả dòng **Lấy xả đông** (ngày + chuyển kỳ) + chuyển kỳ dương của dòng thường (cách cũ); đông gửi lấy MỘT nguồn theo ưu tiên **Gửi đông ở Cân đối › còn dở SX › chuyển kỳ âm cũ** (`nguonDongGui`; vẫn trả `guiDongCanDoi` + `conDoSX` để màn Cân đối đối chiếu). Test: `src/lib/inventoryMaterial.test.ts`.
 - **Đông gửi / Xả đông = CỘT THÔNG TIN, KHÔNG vào tổng** (PA-a — tránh đếm đôi: leftover cấp đông vốn đã nằm trong nhập hàng; xả đông kho mình cũng đã đếm khi nhập). Số này đọc lại từ engine kỳ `computeMaterialNxt` (đông gửi / xả đông theo luật hai dòng kho ở dòng trên) và chỉ hiển thị bên cạnh làm tham khảo vòng gối đầu.
 - **Tồn cuối < 0** = badge "Tồn âm" + banner (sai ghi chép), đúng luật "màn tự giải thích".
-- ⚠️ Engine kỳ cũ `computeMaterialNxt` (`Tồn cuối = Tồn đầu + Đông gửi − Xả đông`, theo KỲ × họ NL, chỉ xưởng Đông) **VẪN CÒN** — nay chỉ dùng làm nguồn 2 cột thông tin đông gửi/xả đông cho `computeMaterialTotalStock`, không còn là công thức tồn chính. `sumUnmatchedLeftover` không còn hiển thị.
+- ⚠️ Engine kỳ cũ `computeMaterialNxt` (`Tồn cuối = Tồn đầu + Đông gửi − Xả đông`, theo KỲ × họ NL, chỉ xưởng Đông) **VẪN CÒN** — nay chỉ dùng làm nguồn 2 cột thông tin đông gửi/xả đông cho `computeMaterialTotalStock`, không còn là công thức tồn chính.
+- **Khung cảnh báo "n kg còn dở SX chưa hiện ở đâu" VẪN HIỆN** (`sumUnmatchedLeftover`, mốc tour `nxt-material-leftover-warning`): còn dở SX ghi ở ngày chưa có kỳ cân đối nào (cùng họ NL) phủ ⇒ không vào cột Đông gửi; màn gọi tên thay vì để số biến mất, chỉ cách tạo kỳ phủ ngày đó.
 
 ### Ngày trong kỳ — bẫy múi giờ
 

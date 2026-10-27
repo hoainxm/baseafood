@@ -2636,7 +2636,7 @@ export function reloadTables(tables: string[]): void {
   window.dispatchEvent(new CustomEvent(TABLE_RELOAD_EVENT, { detail: tables }));
 }
 
-/* ---------- Gộp mặt hàng trùng tên (hàm máy chủ 0069, một giao dịch) ---------- */
+/* ---------- Gộp mặt hàng trùng tên (hàm máy chủ 0069 → bản 0078, một giao dịch) ---------- */
 
 /** Bảng có cột trỏ mặt hàng — nạp lại sau khi gộp / hoàn tác. */
 export const PRODUCT_REFERENCE_TABLES = [
@@ -2654,7 +2654,8 @@ export type ProductMergeResult = { ok: true; payload: unknown; movedCount: numbe
 
 /**
  * Gộp mặt hàng `dropId` vào `keepId` (cùng tên) TRÊN MÁY CHỦ — chuyển mọi dòng sổ rồi xoá
- * mục trùng trong một giao dịch (supabase/migrations/0069). Chỉ chạy khi có máy chủ;
+ * mục trùng trong một giao dịch (supabase/migrations/0069, bản 0078 nhận `product_id` có tiền tố
+ * `demo:` ở site demo — refColumns). Chỉ chạy khi có máy chủ;
  * chế độ localStorage ⇒ màn gọi tự gộp qua các hook.
  */
 export async function mergeProductsOnServer(keepId: string, dropId: string): Promise<ProductMergeResult> {

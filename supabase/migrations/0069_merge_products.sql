@@ -25,6 +25,9 @@
 -- Chế độ demo (site 'site-demo'): khoá chính trên máy chủ có tiền tố `demo:` (lib/demoMode),
 -- cột product_id thì KHÔNG (không khai refColumns) ⇒ hàm nhận id thô, tự thêm tiền tố khi
 -- tra bảng products.
+-- ⚠️ ĐÃ THAY bởi 0078 (2026-10-27): từ commit cdc0804 app KHAI product_id là refColumns ⇒ dòng
+-- demo mới lưu `demo:<id>`, hàm bản này không chuyển được dòng đó. Đã chạy 0078 thì ĐỪNG chạy
+-- lại file này (trả về hàm cũ).
 --
 -- Chỉ THÊM hàm. Không đổi bảng, dữ liệu, policy. Mức độ 🟡 (chạy file); gọi hàm là ghi sổ
 -- thật — app hỏi xác nhận + có Hoàn tác. Idempotent (create or replace).

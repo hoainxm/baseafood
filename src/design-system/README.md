@@ -768,6 +768,58 @@ Không cần migration — cột `color` không có CHECK; mã lạ bị bỏ qu
 (`column_key`) từ bản bút tô cũ vẫn nằm trong DB nhưng không còn hiện / không còn
 cách tạo.
 
+## Sắp xếp cột — bấm tên cột, mỗi kiểu dữ liệu một cách xếp (từ 2026-10-27)
+
+**Luật:** mọi bảng nghiệp vụ bấm TÊN CỘT để sắp — kể cả bảng thêm về sau (CLAUDE.md quy tắc 19).
+Sắp xếp là thao tác **trình bày**: không đổi số, không ghi gì, **không toast** (luật 8), không lưu
+xuống máy (tải lại trang ⇒ về thứ tự gốc).
+
+| Kiểu (`SortKind`) | Lần bấm 1 | Lần bấm 2 | Cột nào |
+|---|---|---|---|
+| `text` | A → Z | Z → A | tên, mã, đại lý, ghi chú… — theo bảng chữ cái tiếng Việt (`Intl.Collator("vi")`), số trong chữ so theo giá trị ("Lô 2" trước "Lô 10", "5 - 6" trước "380 - 420") |
+| `number` | bé → lớn | lớn → bé | kg, tiền, đơn giá, số dòng — đọc được chữ đã định dạng `1.234,5 kg`, `(2.000)` = âm, `12%` |
+| `date` | cũ → mới | mới → cũ | ngày nhập, hạn, lúc lưu — ISO, `dd/mm/yyyy`, `dd/mm`, `mm/yyyy`, `T10/2026`, có giờ trước/sau |
+| `rank` | gấp trước | gấp sau | cột TRẠNG THÁI / MỨC — theo thứ tự nghiệp vụ ("Sổ sai" → "Chưa làm" → "Để biết"), không theo chữ cái |
+
+- **Lần bấm 3 ⇒ về thứ tự gốc** của màn. Mũi tên trên tên cột: ↑ đang tăng · ↓ đang giảm · ⇅ mờ =
+  sắp được, chưa sắp. Tooltip (`title`) nói rõ bấm sẽ xếp kiểu gì (luật §9) — `sortHint` tự viết.
+- **Ô trống luôn xếp CUỐI** ở cả hai chiều (`—`, rỗng, `null`). Sắp **ổn định**: dòng bằng nhau
+  giữ thứ tự gốc.
+- **Thứ tự ĐỨNG YÊN khi sửa số** ngay trên bảng (như Excel — sắp là một lần bấm): gõ Nhập ở Sổ kho
+  tháng đang sắp theo Tồn cuối thì dòng không nhảy chỗ. Thêm / bớt dòng (lọc, thêm dòng) ⇒ sắp lại.
+- **Dòng tổng không đổi** (cộng trên cùng tập dòng). Bảng có **dòng nhóm** (tiêu đề đơn, "Cộng
+  xưởng") ⇒ sắp TRONG từng nhóm, tiêu đề + dòng cộng giữ chỗ (mẫu `OrderExportReport`,
+  `DailyProductionReport`).
+- Tick dòng + Shift (tô màu), **dán khối từ Excel** và mọi thao tác "từ dòng này xuống" phải đi theo
+  **thứ tự đang hiện**, không theo mảng gốc — bảng đang sắp mà dán theo thứ tự gốc là đổ số nhầm
+  dòng (Sổ kho tháng đọc thứ tự từ ô `data-row` trong `[data-grid-nav]`).
+- Bản in A4 / Excel xuất ra giữ thứ tự gốc của sổ (không theo cách sắp trên màn).
+
+**Cách dùng:**
+
+- `SummaryTable` / `RecordTable` / `CatalogCrud`: **tự có, mặc định bật cho mọi cột có tên**. Kiểu
+  tự đoán: cột `numeric` là số; còn lại đọc chữ đang hiện (mọi ô là ngày ⇒ `date`, đều là số ⇒
+  `number`, khác ⇒ `text`). **PHẢI khai giá trị sắp** (`sortValue` ở SummaryTable, `getSortValue` ở
+  RecordTable — số thô / ngày ISO / chữ) khi ô là **ô nhập** (input, Combobox, NumberInput), **huy
+  hiệu có chữ khác nghĩa** (Tag "Quá hạn 3 ngày" ⇒ sắp theo `dueDate`), hay **trạng thái** (⇒
+  `sortKind: "rank"` + số thứ tự). Cột nút / ảnh: `sortable: false` (cột tên rỗng tự bỏ).
+- Cả bảng không được sắp (thứ tự dòng là nghĩa nghiệp vụ, VD sổ phải đọc theo thứ tự ghi):
+  `<SummaryTable sortable={false}>` **kèm comment lý do ngay trên dòng** (test đỏ nếu thiếu).
+- **Bảng tự dựng** ở features: `const s = useTableSort(rows, getKey, COLUMNS)` (mỗi cột
+  `{ key, sortKind, getValue }`), vẽ `s.rows`, tên cột `<th aria-sort={s.ariaSortOf("kg")}>
+  {s.header("kg", "Kg", "right")}</th>`. `getKey` là id bản ghi (khoá trùng ⇒ vẫn sắp, chỉ mất
+  "đứng yên khi sửa số").
+
+**Ngoại lệ (không sắp):** bản in A4 · lưới nhập `EditableGrid` của Cân đối (dòng nhóm / dòng tổng /
+dòng con theo cấu trúc kỳ — sắp là vỡ cấu trúc) · dòng phiếu đang gõ / nháp chưa lưu (OCR) · bảng
+trong hộp thoại / xem trước · bảng tóm tắt nhỏ vài dòng · ma trận phân quyền. Danh sách miễn sống ở
+`design-system/patterns/tableSortCoverageSource.test.ts` — bảng tự dựng mới không `useTableSort` và
+không có lý do miễn ⇒ CI đỏ.
+
+**Mã nguồn:** `patterns/tableSort.ts` (hàm thuần: đọc số/ngày, đoán kiểu, so, sắp — test
+`tableSort.test.ts`) · `patterns/SortableHeader.tsx` (`useTableSort`, `SortHeaderButton`,
+`ariaSort`).
+
 ## Animation & Loading → "Thinking"
 
 Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn ào*.

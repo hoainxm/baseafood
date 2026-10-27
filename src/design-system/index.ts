@@ -55,6 +55,8 @@ export { GuidedTour } from "./patterns/GuidedTour";
 export type { PageTour, PageTourSpec, TourStep } from "@/lib/guidedTour";
 export { FormDialog, CloseButton } from "./patterns/FormDialog";
 export { SummaryTable, type SummaryTableColumn, type TableSelection } from "./patterns/SummaryTable";
+export { useTableSort, SortHeaderButton, ariaSort, type SortColumnSpec } from "./patterns/SortableHeader";
+export { type SortKind, type SortDirection, type SortValue } from "./patterns/tableSort";
 export { RowMarkActions, RowMarkToolbar } from "./patterns/RowMarkToolbar";
 export { HorizontalScroll } from "./patterns/HorizontalScroll";
 export { useTopScrollbar } from "./patterns/topScrollbar";

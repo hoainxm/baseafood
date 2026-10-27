@@ -169,6 +169,9 @@ const LEVEL_LABELS: Record<FlowWarning["level"], { text: string; variant: TagVar
   info: { text: "Để biết", variant: "muted" },
 };
 
+/** Thứ tự mức khi sắp cột "Mức": sổ sai trước, để biết sau. */
+const LEVEL_RANK: Record<FlowWarning["level"], number> = { error: 0, reminder: 1, info: 2 };
+
 const formatMoney = (n: number) => `${n < 0 ? "−" : ""}${num(Math.abs(Math.round(n)))} đ`;
 const shortDate = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
@@ -376,6 +379,8 @@ export default function DashboardScreen() {
     {
       key: "muc",
       header: "Mức",
+      sortValue: (r) => LEVEL_RANK[r.level],
+      sortKind: "rank",
       render: (r) => (
         <Tag variant={LEVEL_LABELS[r.level].variant}>
           {LEVEL_LABELS[r.level].text}

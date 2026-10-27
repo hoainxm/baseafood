@@ -33,6 +33,8 @@ import {
   RowMarkToolbar,
   useRowSelection,
   useRowMarkTools,
+  useTableSort,
+  type SortColumnSpec,
 } from "@/design-system";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
@@ -175,7 +177,21 @@ export default function DailyProductionReport() {
       };
     }, [rows, products, fromDate, toDate, workshop]);
   /** Khoá các dòng mặt hàng đang hiện — thứ tự cho Shift+tick chọn khoảng. */
-  const rowKeys = groups.flatMap((g) => g.rows.map((r) => `${r.workshop}|||${r.productId}|||${r.spec}`));
+  const pivotKey = (r: PivotRow) => `${r.workshop}|||${r.productId}|||${r.spec}`;
+  // Sắp TRONG từng phân xưởng — dòng tiêu đề + "Cộng xưởng" giữ nguyên (README § Sắp xếp cột).
+  const pivotSortColumns = useMemo<SortColumnSpec<PivotRow>[]>(
+    () => [
+      { key: "productName", sortKind: "text", getValue: (r) => r.productName },
+      { key: "spec", sortKind: "text", getValue: (r) => r.spec },
+      ...days.map<SortColumnSpec<PivotRow>>((d) => ({ key: `day:${d}`, sortKind: "number", getValue: (r) => r.byDate[d] ?? null })),
+      { key: "totalKg", sortKind: "number", getValue: (r) => r.totalKg },
+      { key: "totalBlocks", sortKind: "number", getValue: (r) => r.totalBlocks },
+    ],
+    [days]
+  );
+  const pivotSort = useTableSort(useMemo(() => groups.flatMap((g) => g.rows), [groups]), pivotKey, pivotSortColumns);
+  const rowsOf = (w: Workshop) => pivotSort.rows.filter((r) => r.workshop === w);
+  const rowKeys = groups.flatMap((g) => rowsOf(g.workshop).map(pivotKey));
 
   const chart: VerticalBarChartItem[] = days.map((d) => ({
     label: formatDateVN(d).slice(0, 5),
@@ -313,15 +329,15 @@ export default function DailyProductionReport() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Mặt hàng</TableHead>
-                  <TableHead>Quy cách</TableHead>
+                  <TableHead aria-sort={pivotSort.ariaSortOf("productName")}>{pivotSort.header("productName", "Mặt hàng")}</TableHead>
+                  <TableHead aria-sort={pivotSort.ariaSortOf("spec")}>{pivotSort.header("spec", "Quy cách")}</TableHead>
                   {days.map((d) => (
-                    <TableHead key={d} className="whitespace-nowrap text-right">
-                      {formatDateVN(d).slice(0, 5)}
+                    <TableHead key={d} className="whitespace-nowrap text-right" aria-sort={pivotSort.ariaSortOf(`day:${d}`)}>
+                      {pivotSort.header(`day:${d}`, formatDateVN(d).slice(0, 5), "right")}
                     </TableHead>
                   ))}
-                  <TableHead className="text-right">Tổng kg</TableHead>
-                  <TableHead className="text-right">Block</TableHead>
+                  <TableHead className="text-right" aria-sort={pivotSort.ariaSortOf("totalKg")}>{pivotSort.header("totalKg", "Tổng kg", "right")}</TableHead>
+                  <TableHead className="text-right" aria-sort={pivotSort.ariaSortOf("totalBlocks")}>{pivotSort.header("totalBlocks", "Block", "right")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -332,8 +348,8 @@ export default function DailyProductionReport() {
                         Phân xưởng {g.workshop}
                       </TableCell>
                     </TableRow>
-                    {g.rows.map((r) => {
-                      const k = `${r.workshop}|||${r.productId}|||${r.spec}`;
+                    {rowsOf(g.workshop).map((r) => {
+                      const k = pivotKey(r);
                       return (
                       <TableRow key={k} {...to.getRowProps(k)}>
                         <TableCell className="font-medium">

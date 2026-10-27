@@ -8,11 +8,23 @@
 import { useMemo, useState } from "react";
 import { kg, formatDateVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, buildLotStockIndex, buildRecallList, buildRecallListForLots, getLotStockKg, type TraceData, type LotNode } from "@/lib/lotTraceability";
-import { Button, InfoTip, HorizontalScroll, PrintSheet, PrintTd, PrintTh } from "@/design-system";
+import { Button, InfoTip, HorizontalScroll, PrintSheet, PrintTd, PrintTh, useTableSort, type SortColumnSpec } from "@/design-system";
 import { FileSpreadsheet, Printer, ShieldAlert } from "lucide-react";
 import { useCan } from "@/features/shared/PermissionProvider";
 
 const kgOrBlank = (v: number | null) => (v == null ? "chưa ghi kg" : kg(v));
+
+type RecallItem = ReturnType<typeof buildRecallList>["shippedItems"][number];
+/** Cột sắp được của bảng "ai đã nhận hàng" (README § Sắp xếp cột). */
+const RECALL_SORT_COLUMNS: SortColumnSpec<RecallItem>[] = [
+  { key: "customer", sortKind: "text", getValue: (r) => r.customer },
+  { key: "date", sortKind: "date", getValue: (r) => r.date },
+  { key: "document", sortKind: "text", getValue: (r) => r.document },
+  { key: "product", sortKind: "text", getValue: (r) => r.product },
+  { key: "kg", sortKind: "number", getValue: (r) => r.kg },
+  { key: "fromLot", sortKind: "text", getValue: (r) => r.fromLot },
+];
+const recallRowKey = (r: RecallItem) => `${r.customer}|${r.date}|${r.document}|${r.product}|${r.fromLot}|${r.kg}`;
 
 export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: LotNode; traceData: TraceData; sameShipmentLots?: LotNode[] }) {
   const [isPrinting, setIsPrinting] = useState(false);
@@ -33,6 +45,8 @@ export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: Lo
     },
     [lotsInPlant, traceData]
   );
+  // Sắp chỉ trên màn — bản in / Excel vẫn theo thứ tự gốc của danh sách thu hồi.
+  const recallSort = useTableSort(outboundItems, recallRowKey, RECALL_SORT_COLUMNS);
   const customerCount = new Set(outboundItems.map((r) => r.customer || "khách ?")).size;
   const totalKg = outboundItems.reduce((s, r) => s + (r.kg ?? 0), 0);
 
@@ -96,16 +110,16 @@ export function LotRecall({ node, traceData, sameShipmentLots = [] }: { node: Lo
           <table className="w-full min-w-[40rem] border-collapse">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-1 pr-3 font-medium">Khách</th>
-                <th className="py-1 pr-3 font-medium">Ngày</th>
-                <th className="py-1 pr-3 font-medium">Chứng từ</th>
-                <th className="py-1 pr-3 font-medium">Mặt hàng</th>
-                <th className="py-1 pr-3 text-right font-medium">Kg</th>
-                <th className="py-1 font-medium">Từ lô</th>
+                <th className="py-1 pr-3 font-medium" aria-sort={recallSort.ariaSortOf("customer")}>{recallSort.header("customer", "Khách")}</th>
+                <th className="py-1 pr-3 font-medium" aria-sort={recallSort.ariaSortOf("date")}>{recallSort.header("date", "Ngày")}</th>
+                <th className="py-1 pr-3 font-medium" aria-sort={recallSort.ariaSortOf("document")}>{recallSort.header("document", "Chứng từ")}</th>
+                <th className="py-1 pr-3 font-medium" aria-sort={recallSort.ariaSortOf("product")}>{recallSort.header("product", "Mặt hàng")}</th>
+                <th className="py-1 pr-3 text-right font-medium" aria-sort={recallSort.ariaSortOf("kg")}>{recallSort.header("kg", "Kg", "right")}</th>
+                <th className="py-1 font-medium" aria-sort={recallSort.ariaSortOf("fromLot")}>{recallSort.header("fromLot", "Từ lô")}</th>
               </tr>
             </thead>
             <tbody>
-              {outboundItems.map((r, i) => (
+              {recallSort.rows.map((r, i) => (
                 <tr key={i} className="border-b border-border">
                   <td className="py-1 pr-3 font-medium">{r.customer || "khách ?"}</td>
                   <td className="tnum py-1 pr-3">{r.date ? formatDateVN(r.date) : "—"}</td>

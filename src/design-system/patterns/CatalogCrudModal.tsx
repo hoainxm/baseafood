@@ -160,7 +160,8 @@ export function CatalogCrud<T extends { id: string }>({
       primary: f === fields.find((x) => x.required) || undefined,
       hideOnMobile: f.hideOnMobile,
       secondary: f.hideInTable,
-      getSortValue: (r) => String(r[f.key] ?? ""),
+      // Ô hiện tên (renderValue, VD chọn loại NL theo id) ⇒ sắp theo chữ đang hiện, không theo id.
+      getSortValue: f.renderValue ? undefined : (r) => String(r[f.key] ?? ""),
       render: (r) =>
         f.renderValue ? (
           f.renderValue(r)

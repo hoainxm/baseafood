@@ -174,6 +174,9 @@ export default function MyTasksScreen() {
     {
       key: "due",
       header: "Hạn",
+      // Sắp theo NGÀY HẠN (hạn sớm / quá hạn lên đầu), không theo chữ "Quá hạn 3 ngày".
+      sortValue: (r) => r.dueDate,
+      sortKind: "date",
       render: (r) => {
         if (r.isResolved || r.assignment?.status === "done") return <Tag variant="done">Đã xong</Tag>;
         if (r.assignment?.status === "cancelled") return <Tag variant="muted">Đã thu hồi</Tag>;

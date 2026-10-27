@@ -16,6 +16,8 @@ import { RowMarkToolbar } from "./RowMarkToolbar";
 import { useTopScrollbar } from "./topScrollbar";
 import { useFloatingTableHead } from "./floatingTableHead";
 import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
+import { ariaSort, sortHint, useTableSort } from "./SortableHeader";
+import { nodeText, SORT_LABELS, type SortKind } from "./tableSort";
 
 export interface RecordTableColumn<T> {
   key: string;
@@ -30,16 +32,21 @@ export interface RecordTableColumn<T> {
   /** Cột phụ: ẩn khỏi BẢNG (desktop) cho bảng gọn, xem qua nút "Chi tiết" ở
    *  cuối dòng. Cột `chinh` không bao giờ bị ẩn. */
   secondary?: boolean;
-  /** Giá trị dùng để sắp xếp. Không có → cột không sắp xếp được. */
-  getSortValue?: (row: T) => string | number;
+  /**
+   * Giá trị dùng để sắp xếp (số thô / ngày ISO / chữ). Bỏ trống ⇒ sắp theo chữ đang hiện
+   * trong ô — PHẢI khai khi ô là huy hiệu / nút / chữ đã định dạng lạ (README § Sắp xếp cột).
+   */
+  getSortValue?: (row: T) => string | number | null | undefined;
+  /** Kiểu sắp: "text" A→Z · "number" bé→lớn · "date" cũ→mới. Bỏ trống ⇒ cột numeric là số, còn lại tự đoán. */
+  sortKind?: SortKind;
+  /** false ⇒ cột không sắp được (cột nút, ảnh, ô tick…). Mặc định MỌI cột sắp được. */
+  sortable?: boolean;
   /**
    * Bề rộng cột ở BẢNG desktop (VD "30%"). Dùng khi nhiều bảng cùng cột xếp chồng
    * nhau (mỗi khách một bảng) để cột thẳng hàng giữa các bảng thay vì co theo chữ.
    */
   width?: string;
 }
-
-type SortDir = "asc" | "desc";
 
 /**
  * RecordTable — một nguồn dữ liệu, hai hình thức.
@@ -103,8 +110,6 @@ export function RecordTable<T>({
     () => tableFrameRef.current?.querySelector<HTMLElement>('[data-slot="table-container"]') ?? null
   );
   const [q, setQ] = React.useState("");
-  const [sapTheo, setSapTheo] = React.useState<string | null>(null);
-  const [sortDir, setSortDir] = React.useState<SortDir>("asc");
   const [expandedRows, setExpandedRows] = React.useState<ReadonlySet<string>>(() => new Set());
   const toggleExpanded = (k: string) =>
     setExpandedRows((s) => {
@@ -114,40 +119,31 @@ export function RecordTable<T>({
       return n;
     });
 
-  const sortableColumns = columns.filter((c) => c.getSortValue);
-  // Chế độ thẻ: chỉ đưa nút sắp theo cột ĐANG HIỆN trên thẻ — 9 nút cho mọi
-  // trường (kể cả trường ẩn) rối hơn là giúp.
-  const cardSortableColumns = sortableColumns.filter((c) => !c.hideOnMobile);
-
   const filtered = React.useMemo(() => {
     const kw = q.trim().toLowerCase();
     if (!kw || !getSearchText) return rows;
     return rows.filter((r) => getSearchText(r).toLowerCase().includes(kw));
   }, [rows, q, getSearchText]);
 
-  const daSap = React.useMemo(() => {
-    const column = columns.find((c) => c.key === sapTheo);
-    if (!column?.getSortValue) return filtered;
-    const fn = column.getSortValue;
-    return [...filtered].sort((a, b) => {
-      const patch = fn(a);
-      const vb = fn(b);
-      const cmp =
-        typeof patch === "number" && typeof vb === "number"
-          ? patch - vb
-          : String(patch).localeCompare(String(vb), "vi");
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [filtered, columns, sapTheo, sortDir]);
-
-  const toggleSort = (key: string) => {
-    if (sapTheo === key) {
-      setSortDir((h) => (h === "asc" ? "desc" : "asc"));
-    } else {
-      setSapTheo(key);
-      setSortDir("asc");
-    }
-  };
+  // Sắp theo cột (README § Sắp xếp cột): bấm tên cột tăng → giảm → thứ tự gốc.
+  const tableSort = useTableSort(
+    filtered,
+    getKey,
+    columns.map((c) => ({
+      key: c.key,
+      // Cột không tên (cột nút thao tác) không sắp.
+      sortable: c.sortable ?? Boolean(c.header),
+      sortKind: c.sortKind,
+      numeric: c.numeric,
+      getValue: c.getSortValue ?? ((r: T) => nodeText(c.render(r))),
+    }))
+  );
+  const daSap = tableSort.rows;
+  const sapTheo = tableSort.sort?.key ?? null;
+  const toggleSort = tableSort.toggle;
+  // Chế độ thẻ: chỉ đưa nút sắp theo cột ĐANG HIỆN trên thẻ — nút cho mọi
+  // trường (kể cả trường ẩn) rối hơn là giúp.
+  const cardSortableColumns = columns.filter((c) => !c.hideOnMobile && tableSort.isSortable(c.key));
 
   // Sắp 1–2 dòng chẳng để làm gì — khỏi bày hàng nút "Sắp theo" trên thẻ điện thoại.
   const showCardSort = cardSortableColumns.length > 0 && rows.length > 2;
@@ -182,11 +178,14 @@ export function RecordTable<T>({
               size="sm"
               onClick={() => toggleSort(c.key)}
               className="max-w-full min-w-0"
-              title={`Sắp danh sách theo cột "${c.header}". Bấm lại để đảo tăng ↔ giảm.`}
+              title={sortHint(c.header, tableSort.kindOf(c.key), tableSort.directionOf(c.key))}
             >
               <span className="truncate">{c.header}</span>
+              {sapTheo === c.key && (
+                <span className="text-xs opacity-80">{SORT_LABELS[tableSort.kindOf(c.key)][tableSort.directionOf(c.key) ?? "asc"]}</span>
+              )}
               {sapTheo === c.key ? (
-                sortDir === "asc" ? (
+                tableSort.directionOf(c.key) === "asc" ? (
                   <ArrowUp />
                 ) : (
                   <ArrowDown />
@@ -203,7 +202,7 @@ export function RecordTable<T>({
           title="Bỏ ô tìm và bỏ sắp xếp — về lại danh sách đầy đủ theo thứ tự gốc."
           onClick={() => {
             setQ("");
-            setSapTheo(null);
+            tableSort.reset();
           }}
         >
           <X />
@@ -317,13 +316,7 @@ export function RecordTable<T>({
                       key={c.key}
                       className={cn(c.numeric && "text-right", "p-0 whitespace-normal")}
                       style={c.width ? { width: c.width } : undefined}
-                      aria-sort={
-                        sapTheo === c.key
-                          ? sortDir === "asc"
-                            ? "ascending"
-                            : "descending"
-                          : undefined
-                      }
+                      aria-sort={ariaSort(tableSort.directionOf(c.key))}
                     >
                       <div className="flex items-center">
                       {to.enabled && ci === 0 && (
@@ -336,11 +329,11 @@ export function RecordTable<T>({
                           title={isAllSelected ? "Bỏ tick mọi dòng đang hiện." : "Tick mọi dòng đang hiện (để tô màu / in đậm cùng lúc)."}
                         />
                       )}
-                      {c.getSortValue ? (
+                      {tableSort.isSortable(c.key) ? (
                         <button
                           type="button"
                           onClick={() => toggleSort(c.key)}
-                          title={`Sắp danh sách theo cột "${c.header}". Bấm lại để đảo tăng ↔ giảm.`}
+                          title={sortHint(c.header, tableSort.kindOf(c.key), tableSort.directionOf(c.key))}
                           className={cn(
                             "flex min-h-11 w-full items-center gap-2 px-(--cell-pad,0.75rem) py-1.5 text-left text-sm leading-snug font-semibold hover:bg-accent",
                             c.numeric && "justify-end text-right"
@@ -348,7 +341,7 @@ export function RecordTable<T>({
                         >
                           {c.header}
                           {sapTheo === c.key ? (
-                            sortDir === "asc" ? (
+                            tableSort.directionOf(c.key) === "asc" ? (
                               <ArrowUp className="size-5 shrink-0 text-primary" />
                             ) : (
                               <ArrowDown className="size-5 shrink-0 text-primary" />

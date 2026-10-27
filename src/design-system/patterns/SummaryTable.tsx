@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 import { RowMarkToolbar } from "./RowMarkToolbar";
 import { useTopScrollbar } from "./topScrollbar";
 import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
+import { ariaSort, SortHeaderButton, useTableSort } from "./SortableHeader";
+import { nodeText, type SortKind, type SortValue } from "./tableSort";
 
 /**
  * Tick chọn dòng (tuỳ chọn). Bật lên thì SummaryTable thêm một cột ô tick ở đầu bảng;
@@ -43,6 +45,15 @@ export interface SummaryTableColumn<T> {
   numeric?: boolean;
   /** Nội dung ô tổng cột (thường là tổng số). Bỏ trống ⇒ ô tổng để rỗng. */
   total?: (rows: T[]) => React.ReactNode;
+  /**
+   * Giá trị để sắp khi bấm tên cột (số thô / ngày ISO / chữ). Bỏ trống ⇒ lấy chữ đang hiện
+   * trong ô. PHẢI khai khi ô là ô nhập / nút / huy hiệu không có chữ (README § Sắp xếp cột).
+   */
+  sortValue?: (row: T) => SortValue;
+  /** Kiểu sắp: "text" A→Z · "number" bé→lớn · "date" cũ→mới. Bỏ trống ⇒ cột numeric là số, còn lại tự đoán. */
+  sortKind?: SortKind;
+  /** false ⇒ cột này không sắp được (cột nút, cột ảnh…). */
+  sortable?: boolean;
 }
 
 /**
@@ -64,6 +75,7 @@ export function SummaryTable<T>({
   fullHeight,
   addRow,
   rowMarkKey,
+  sortable = true,
 }: {
   rows: T[];
   columns: SummaryTableColumn<T>[];
@@ -100,7 +112,29 @@ export function SummaryTable<T>({
    * còn chỗ thêm dòng đầu tiên).
    */
   addRow?: React.ReactNode;
+  /**
+   * Bấm tên cột để sắp (MẶC ĐỊNH BẬT — README § Sắp xếp cột). Tắt chỉ cho bảng mà thứ tự
+   * dòng là nghĩa nghiệp vụ (dòng tổng / dòng nhóm xen giữa, sổ phải đọc theo thứ tự ghi).
+   */
+  sortable?: boolean;
 }) {
+  // Sắp theo cột: hàng tổng không đổi (cộng trên cùng tập dòng); `getKey` vẫn nhận chỉ số GỐC.
+  const originalIndex = React.useMemo(() => new Map(rows.map((r, i) => [r, i])), [rows]);
+  const keyOf = (r: T) => getKey(r, originalIndex.get(r) ?? 0);
+  const tableSort = useTableSort(
+    rows,
+    getKey,
+    columns.map((c) => ({
+      key: c.key,
+      // Cột không tên (cột nút thao tác) không sắp.
+      sortable: c.sortable ?? Boolean(c.header),
+      sortKind: c.sortKind,
+      numeric: c.numeric,
+      getValue: c.sortValue ?? ((r: T) => nodeText(c.render(r))),
+    })),
+    sortable
+  );
+  const viewRows = tableSort.rows;
   const isExpanded = fullHeight ?? !stickyHeader;
   const to = useRowMarkTools(rowMarkKey);
   // Tick dòng: màn truyền `chon` thì dùng của màn (màn tự đặt nút tô vào thanh
@@ -126,7 +160,7 @@ export function SummaryTable<T>({
   }
 
   const hasTotal = columns.some((c) => c.total);
-  const rowKey = rows.map((r, i) => getKey(r, i));
+  const rowKey = viewRows.map(keyOf);
   const effectiveSelection: TableSelection<T> | undefined =
     selection ??
     (to.enabled
@@ -171,11 +205,29 @@ export function SummaryTable<T>({
       )}
       {/* Tên cột XUỐNG DÒNG ("Nhập trong kỳ (kg)" thành 2 dòng): cột số rộng theo
           con số, không theo tên cột dài — bớt kéo ngang. */}
-      {columns.map((c) => (
-        <TableHead key={c.key} className={cn("leading-tight whitespace-normal", c.numeric && "text-right")}>
-          {c.header}
-        </TableHead>
-      ))}
+      {columns.map((c) => {
+        const dir = tableSort.directionOf(c.key);
+        return (
+          <TableHead
+            key={c.key}
+            className={cn("leading-tight whitespace-normal", c.numeric && "text-right")}
+            aria-sort={isSticky ? undefined : ariaSort(dir)}
+          >
+            {tableSort.isSortable(c.key) ? (
+              <SortHeaderButton
+                label={c.header}
+                kind={tableSort.kindOf(c.key)}
+                direction={dir}
+                onToggle={() => tableSort.toggle(c.key)}
+                align={c.numeric ? "right" : "left"}
+                tabIndex={isSticky ? -1 : undefined}
+              />
+            ) : (
+              c.header
+            )}
+          </TableHead>
+        );
+      })}
     </TableRow>
   );
 
@@ -220,8 +272,8 @@ export function SummaryTable<T>({
       <Table ref={tableRef}>
         <TableHeader>{headerRow(false)}</TableHeader>
         <TableBody>
-          {rows.map((r, i) => {
-            const k = getKey(r, i);
+          {viewRows.map((r) => {
+            const k = keyOf(r);
             const tick = !!effectiveSelection?.selectedKeys.has(k);
             return (
               <TableRow

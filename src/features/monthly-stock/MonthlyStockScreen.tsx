@@ -499,7 +499,15 @@ export default function MonthlyStockScreen() {
           return num == null ? null : am ? -num : num;
         })
       );
-    const allRows = groups.flatMap((g) => g.rows);
+    // Dòng theo thứ tự ĐANG HIỆN trên màn (bảng có thể đang sắp theo cột) — đọc từ ô số
+    // `data-row` trong khung `[data-grid-nav]`; dán theo thứ tự gốc sẽ đổ số nhầm dòng.
+    const sourceRows = groups.flatMap((g) => g.rows);
+    const scope = e.currentTarget.closest("[data-grid-nav]");
+    const shownIds = scope
+      ? Array.from(scope.querySelectorAll<HTMLElement>(`[data-navcol="${CSS.escape(columns)}"][data-row]`), (el) => el.dataset.row ?? "")
+      : [];
+    const byId = new Map(sourceRows.map((r) => [r.id, r]));
+    const allRows = shownIds.length ? shownIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])) : sourceRows;
     const iH = allRows.findIndex((r) => r.id === rowId);
     const iC = NUMERIC_COLS.indexOf(columns);
     if (iH < 0 || iC < 0) return;
@@ -1190,6 +1198,9 @@ export default function MonthlyStockScreen() {
     {
       key: "ngay",
       header: "Ngày nhập",
+      // Ô sửa thẳng ⇒ khai giá trị sắp (README § Sắp xếp cột), không đọc chữ trong ô nhập.
+      sortValue: (r) => r.importDate,
+      sortKind: "date",
       render: (r) =>
         canEdit ? (
           <input
@@ -1207,6 +1218,7 @@ export default function MonthlyStockScreen() {
     {
       key: "ten",
       header: "Mặt hàng",
+      sortValue: (r) => r.itemName,
       // Tên dài xuống dòng trong khung ≤ 13rem thay vì kéo cả bảng rộng ra.
       render: (r) => (
         <span className="block max-w-52 min-w-28 font-semibold whitespace-normal text-foreground">
@@ -1226,6 +1238,8 @@ export default function MonthlyStockScreen() {
     {
       key: "size",
       header: "Size",
+      sortValue: (r) => r.size,
+      sortKind: "text",
       render: (r) =>
         canEdit ? (
           <input
@@ -1242,6 +1256,8 @@ export default function MonthlyStockScreen() {
     {
       key: "invoice",
       header: "Invoice",
+      sortValue: (r) => r.origin,
+      sortKind: "text",
       render: (r) =>
         canEdit ? (
           <input
@@ -1256,16 +1272,16 @@ export default function MonthlyStockScreen() {
         ),
     },
     {
-      key: "gia", header: "Đơn giá (đ)", numeric: true,
+      key: "gia", header: "Đơn giá (đ)", numeric: true, sortValue: (r) => r.unitPrice,
       render: (r) => (canEdit ? numberCell(r, "unitPrice", "Đơn giá") : numberOrDash(r.unitPrice ?? 0)),
     },
     {
-      key: "odKg", header: "Tồn đầu kỳ (kg)", numeric: true,
+      key: "odKg", header: "Tồn đầu kỳ (kg)", numeric: true, sortValue: (r) => r.openKg,
       render: (r) => (canEdit ? numberCell(r, "openKg", "Tồn đầu kỳ") : numberOrDash(r.openKg)),
       total: () => num(t.openKg),
     },
     {
-      key: "inKg", header: "Nhập trong kỳ (kg)", numeric: true,
+      key: "inKg", header: "Nhập trong kỳ (kg)", numeric: true, sortValue: (r) => r.inKg,
       render: (r) =>
         canEdit ? (
           numberCell(r, "inKg", "Nhập trong kỳ", r.inKg ? "font-semibold text-success" : "")
@@ -1277,7 +1293,7 @@ export default function MonthlyStockScreen() {
       total: () => num(t.inKg),
     },
     {
-      key: "outKg", header: "Xuất trong kỳ (kg)", numeric: true,
+      key: "outKg", header: "Xuất trong kỳ (kg)", numeric: true, sortValue: (r) => r.outKg,
       render: (r) =>
         canEdit ? (
           numberCell(r, "outKg", "Xuất trong kỳ", r.outKg ? "font-semibold text-warning" : "")
@@ -1289,18 +1305,20 @@ export default function MonthlyStockScreen() {
       total: () => num(t.outKg),
     },
     {
-      key: "ocKg", header: "Tồn cuối kỳ (kg)", numeric: true,
+      key: "ocKg", header: "Tồn cuối kỳ (kg)", numeric: true, sortValue: (r) => r.closeKg,
       render: (r) => <span className="tnum font-bold text-foreground">{num(r.closeKg)}</span>,
       total: () => num(t.closeKg),
     },
     {
-      key: "tien", header: "Tiền còn lại (đ)", numeric: true,
+      key: "tien", header: "Tiền còn lại (đ)", numeric: true, sortValue: (r) => r.remainingValue,
       render: (r) => (r.remainingValue ? num(Math.round(r.remainingValue)) : "—"),
       total: () => num(Math.round(t.remainingValue)),
     },
     {
       key: "viTri",
       header: "Vị trí",
+      sortValue: (r) => locationLabel(r),
+      sortKind: "text",
       render: (r) =>
         canEdit ? (
           <div className="w-40">
@@ -1334,7 +1352,7 @@ export default function MonthlyStockScreen() {
         ),
     },
     {
-      key: "thaotac", header: "", render: (r) => (
+      key: "thaotac", header: "", sortable: false, render: (r) => (
         <div data-tour="monthly-stock-row-actions" className="flex items-center justify-end gap-0.5">
           <Button
             size="icon-sm"

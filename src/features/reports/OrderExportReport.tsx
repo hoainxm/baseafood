@@ -39,6 +39,8 @@ import {
   RowMarkToolbar,
   useRowSelection,
   useRowMarkTools,
+  useTableSort,
+  type SortColumnSpec,
 } from "@/design-system";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
@@ -70,6 +72,15 @@ interface ExportRow {
   quantityKg: number;
   blocksCount: number;
 }
+/** Cột sắp được — sắp TRONG từng đơn, dòng tiêu đề đơn giữ nguyên (README § Sắp xếp cột). */
+const EXPORT_SORT_COLUMNS: SortColumnSpec<ExportRow>[] = [
+  { key: "exportDate", sortKind: "date", getValue: (l) => l.exportDate },
+  { key: "productName", sortKind: "text", getValue: (l) => l.productName },
+  { key: "spec", sortKind: "text", getValue: (l) => l.spec },
+  { key: "quantityKg", sortKind: "number", getValue: (l) => l.quantityKg },
+  { key: "blocksCount", sortKind: "number", getValue: (l) => l.blocksCount },
+];
+
 interface OrderGroup {
   orderId: string;
   customerName: string;
@@ -178,8 +189,23 @@ export default function OrderExportReport() {
       totalBlocks: groups.reduce((s, g) => s + g.totalBlocks, 0),
     };
   }, [exportOrders, exportItems, don, orderItems, customers, products, fromDate, toDate, customerFilter]);
+  const lineSort = useTableSort(
+    useMemo(() => group.flatMap((g) => g.lines), [group]),
+    (l) => l.id,
+    EXPORT_SORT_COLUMNS
+  );
+  /** Dòng của từng đơn theo thứ tự đang sắp (chưa sắp ⇒ thứ tự gốc). */
+  const linesByOrder = useMemo(() => {
+    const orderOf = new Map(group.flatMap((g) => g.lines.map((l) => [l.id, g.orderId] as const)));
+    const m = new Map<string, ExportRow[]>();
+    for (const l of lineSort.rows) {
+      const k = orderOf.get(l.id) ?? "";
+      m.set(k, [...(m.get(k) ?? []), l]);
+    }
+    return m;
+  }, [group, lineSort.rows]);
   /** Khoá dòng lệnh xuất đang hiện — thứ tự cho Shift+tick chọn khoảng. */
-  const rowKeys = group.flatMap((g) => g.lines.map((l) => l.id));
+  const rowKeys = group.flatMap((g) => (linesByOrder.get(g.orderId) ?? []).map((l) => l.id));
 
   const cards: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
@@ -299,11 +325,11 @@ export default function OrderExportReport() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="whitespace-nowrap">Ngày xuất</TableHead>
-                <TableHead>Mặt hàng</TableHead>
-                <TableHead>Quy cách</TableHead>
-                <TableHead className="text-right">Kg xuất</TableHead>
-                <TableHead className="text-right">Block</TableHead>
+                <TableHead className="whitespace-nowrap" aria-sort={lineSort.ariaSortOf("exportDate")}>{lineSort.header("exportDate", "Ngày xuất")}</TableHead>
+                <TableHead aria-sort={lineSort.ariaSortOf("productName")}>{lineSort.header("productName", "Mặt hàng")}</TableHead>
+                <TableHead aria-sort={lineSort.ariaSortOf("spec")}>{lineSort.header("spec", "Quy cách")}</TableHead>
+                <TableHead className="text-right" aria-sort={lineSort.ariaSortOf("quantityKg")}>{lineSort.header("quantityKg", "Kg xuất", "right")}</TableHead>
+                <TableHead className="text-right" aria-sort={lineSort.ariaSortOf("blocksCount")}>{lineSort.header("blocksCount", "Block", "right")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -327,7 +353,7 @@ export default function OrderExportReport() {
                       </span>
                     </TableCell>
                   </TableRow>
-                  {g.lines.map((l) => (
+                  {(linesByOrder.get(g.orderId) ?? []).map((l) => (
                     <TableRow key={l.id} {...to.getRowProps(l.id)}>
                       <TableCell className="whitespace-nowrap">
                         <span className="flex items-center gap-2">

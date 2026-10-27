@@ -778,7 +778,7 @@ xuống máy (tải lại trang ⇒ về thứ tự gốc).
 |---|---|---|---|
 | `text` | A → Z | Z → A | tên, mã, đại lý, ghi chú… — theo bảng chữ cái tiếng Việt (`Intl.Collator("vi")`), số trong chữ so theo giá trị ("Lô 2" trước "Lô 10", "5 - 6" trước "380 - 420") |
 | `number` | bé → lớn | lớn → bé | kg, tiền, đơn giá, số dòng — đọc được chữ đã định dạng `1.234,5 kg`, `(2.000)` = âm, `12%` |
-| `date` | cũ → mới | mới → cũ | ngày nhập, hạn, lúc lưu — ISO, `dd/mm/yyyy`, `dd/mm`, `mm/yyyy`, `T10/2026`, có giờ trước/sau |
+| `date` | cũ → mới | mới → cũ | ngày nhập, hạn, lúc lưu — ISO, `dd/mm/yyyy`, `mm/yyyy`, `T10/2026`, có giờ trước/sau; `dd/mm` thiếu năm chỉ khi khai `sortKind: "date"` |
 | `rank` | gấp trước | gấp sau | cột TRẠNG THÁI / MỨC — theo thứ tự nghiệp vụ ("Sổ sai" → "Chưa làm" → "Để biết"), không theo chữ cái |
 
 - **Lần bấm 3 ⇒ về thứ tự gốc** của màn. Mũi tên trên tên cột: ↑ đang tăng · ↓ đang giảm · ⇅ mờ =
@@ -798,7 +798,7 @@ xuống máy (tải lại trang ⇒ về thứ tự gốc).
 **Cách dùng:**
 
 - `SummaryTable` / `RecordTable` / `CatalogCrud`: **tự có, mặc định bật cho mọi cột có tên**. Kiểu
-  tự đoán: cột `numeric` là số; còn lại đọc chữ đang hiện (mọi ô là ngày ⇒ `date`, đều là số ⇒
+  tự đoán: cột `numeric` là số; còn lại đọc chữ đang hiện (mọi ô là ngày **có năm** ⇒ `date` — size "1/2", "8/12" trông như ngày/tháng nên chữ thiếu năm không tính; đều là số ⇒
   `number`, khác ⇒ `text`). **PHẢI khai giá trị sắp** (`sortValue` ở SummaryTable, `getSortValue` ở
   RecordTable — số thô / ngày ISO / chữ) khi ô là **ô nhập** (input, Combobox, NumberInput), **huy
   hiệu có chữ khác nghĩa** (Tag "Quá hạn 3 ngày" ⇒ sắp theo `dueDate`), hay **trạng thái** (⇒

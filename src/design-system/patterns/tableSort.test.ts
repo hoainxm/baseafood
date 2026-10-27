@@ -50,6 +50,18 @@ describe("inferSortKind — đoán kiểu cột từ chữ", () => {
     expect(inferSortKind(["Lô 12 cá ngừ", "30"])).toBe("text");
     expect(inferSortKind([])).toBe("text");
   });
+  it("size hải sản dạng a/b KHÔNG bị coi là ngày (thiếu năm)", () => {
+    const sizes = ["1/2", "2/4", "4/6", "6/8", "8/12", "10/12", "1/6"];
+    expect(inferSortKind(sizes)).toBe("text");
+    // Sắp như chữ có số: 1/2 < 1/6 < 2/4 … < 10/12 (trước đây "1/6" bị xếp như ngày 1 tháng 6).
+    expect(sortRows(sizes, (r) => r, inferSortKind(sizes), "asc")).toEqual(["1/2", "1/6", "2/4", "4/6", "6/8", "8/12", "10/12"]);
+    expect(inferSortKind(["16/20", "21/25", "8/12"])).toBe("text");
+  });
+  it("ngày có năm vẫn nhận là ngày; tháng/năm và ISO cũng vậy", () => {
+    expect(inferSortKind(["05/10/2026", "1/9/2026 14:30"])).toBe("date");
+    expect(inferSortKind(["9/2026", "T10/2026", "2026-10-05"])).toBe("date");
+    expect(inferSortKind(["05/10", "06/10"])).toBe("text");
+  });
 });
 
 describe("sortRows — mỗi kiểu một cách so", () => {

@@ -96,11 +96,18 @@ export function parseSortDate(raw: string): number | null {
   return ((y * 100 + mo) * 100 + d) * 10000 + hm;
 }
 
-/** Đoán kiểu cột từ chữ đang hiện: mọi ô có chữ đều là ngày ⇒ date; đều là số ⇒ number; còn lại text. */
+/**
+ * Chữ chắc chắn là ngày khi tự đoán kiểu cột: phải có NĂM 4 chữ số ("05/10/2026", "10/2026",
+ * ISO "2026-10-05"). "dd/mm" thiếu năm KHÔNG tính — size hải sản "1/2", "4/6", "8/12" trông y hệt
+ * ngày/tháng. Cột ngày thiếu năm thì màn khai `sortKind: "date"`.
+ */
+const looksLikeDatedText = (s: string) => /(^|\D)\d{4}(\D|$)/.test(s) && parseSortDate(s) != null;
+
+/** Đoán kiểu cột từ chữ đang hiện: mọi ô có chữ đều là ngày (có năm) ⇒ date; đều là số ⇒ number; còn lại text. */
 export function inferSortKind(samples: string[]): SortKind {
   const filled = samples.filter((s) => !isBlankText(s));
   if (filled.length === 0) return "text";
-  if (filled.every((s) => parseSortDate(s) != null)) return "date";
+  if (filled.every(looksLikeDatedText)) return "date";
   // "Số" phải là cả chuỗi số (kèm đơn vị ngắn) — "Lô 12 cá ngừ" là chữ.
   if (filled.every((s) => /^[(\s]*[-+−]?\s*\d[\d.,\s]*\)?\s*(%|kg|đ|₫|block|khối|thùng|kiện|bao)?\.?$/i.test(s.replace(/[  ]/g, " ").trim())))
     return "number";

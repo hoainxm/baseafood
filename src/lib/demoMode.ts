@@ -62,7 +62,8 @@ export function fromServerKey(k: string, demo: boolean = IS_DEMO): string | null
 }
 
 /** Dòng (đã `toRow`) gửi lên: đổi khóa chính + cột khóa ngoại theo chế độ, gắn `site_id`.
- *  Cột khóa ngoại rỗng / null giữ nguyên (không trỏ đi đâu). */
+ *  Cột khóa ngoại rỗng / null giữ nguyên (không trỏ đi đâu); cột MẢNG id (`text[]`,
+ *  VD `products.batter_ids`) đổi từng phần tử. */
 export function rowToServer(
   row: Record<string, unknown>,
   keyColumn: string,
@@ -73,10 +74,13 @@ export function rowToServer(
   const result: Record<string, unknown> = { ...row, site_id: siteId };
   for (const c of [keyColumn, ...refColumns]) {
     const v = row[c];
-    if (v != null && v !== "") result[c] = toServerKey(String(v), demo);
+    if (Array.isArray(v)) result[c] = v.map((x) => (typeof x === "string" && x !== "" ? toServerKey(x, demo) : x));
+    else if (v != null && v !== "") result[c] = toServerKey(String(v), demo);
   }
   return result;
 }
+
+const stripDemoKey = (v: unknown) => (typeof v === "string" && v.startsWith(DEMO_KEY_PREFIX) ? v.slice(DEMO_KEY_PREFIX.length) : v);
 
 /** Dòng đọc từ máy chủ → bỏ tiền tố khóa; `null` = không thuộc chế độ này, bỏ qua. */
 export function rowFromServer(
@@ -90,8 +94,9 @@ export function rowFromServer(
   if (k == null) return null;
   const result: Record<string, unknown> = { ...row, [keyColumn]: k };
   for (const c of refColumns) {
+    if (!(c in row)) continue;
     const v = row[c];
-    if (typeof v === "string" && v.startsWith(DEMO_KEY_PREFIX)) result[c] = v.slice(DEMO_KEY_PREFIX.length);
+    result[c] = Array.isArray(v) ? v.map(stripDemoKey) : stripDemoKey(v);
   }
   return result;
 }

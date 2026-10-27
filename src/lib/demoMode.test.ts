@@ -59,3 +59,22 @@ describe("cột khóa ngoại (refColumns) — period_id → balancing_periods.i
     expect(rowToServer({ id: "v1", period_id: "ky-1" }, "id", "bsf1", false, ["period_id"]).period_id).toBe("ky-1");
   });
 });
+
+describe("khóa ngoại mềm (customer_id, mảng batter_ids)", () => {
+  it("demo: customer_id mang tiền tố như customers.id — hết mồ côi trên máy chủ", () => {
+    const customer = rowToServer({ id: "dm-kh-0" }, "id", SITE_DEMO, true);
+    const output = rowToServer({ id: "o1", customer_id: "dm-kh-0" }, "id", SITE_DEMO, true, ["customer_id"]);
+    expect(output.customer_id).toBe(customer.id);
+  });
+  it("demo: cột mảng id đổi từng phần tử, đọc về bỏ tiền tố từng phần tử", () => {
+    const up = rowToServer({ id: "p1", batter_ids: ["bot-24v", "", "demo:bot-18v"] }, "id", SITE_DEMO, true, ["batter_ids"]);
+    expect(up.batter_ids).toEqual(["demo:bot-24v", "", "demo:bot-18v"]);
+    expect(rowFromServer(up, "id", true, ["batter_ids"])?.batter_ids).toEqual(["bot-24v", "", "bot-18v"]);
+  });
+  it("demo: dòng cũ trên máy chủ còn id thiếu tiền tố vẫn đọc về nguyên vẹn (không vỡ app)", () => {
+    expect(rowFromServer({ id: "demo:o1", customer_id: "dm-kh-0" }, "id", true, ["customer_id"])?.customer_id).toBe("dm-kh-0");
+  });
+  it("đọc về: cột không có trong dòng thì không thêm khóa", () => {
+    expect(rowFromServer({ id: "demo:o1" }, "id", true, ["customer_id"])).toEqual({ id: "o1" });
+  });
+});

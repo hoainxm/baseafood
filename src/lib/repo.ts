@@ -129,7 +129,11 @@ export interface TableMapping<T> {
    * Cột (tên DB) là KHÓA NGOẠI trỏ tới khóa chính bảng khác — chế độ demo phải thêm
    * tiền tố `demo:` cho cả cột này như khóa chính (lib/demoMode.ts), không thì máy chủ
    * từ chối (23503). DB thật: `period_id → balancing_periods.id` ở balancing_inputs,
-   * balancing_outputs, scraps. Thêm khóa ngoại mới giữa hai bảng nghiệp vụ ⇒ khai ở đây.
+   * balancing_outputs, scraps. Khóa ngoại MỀM (cột lưu id bản ghi bảng khác, không có
+   * `references` trong SQL — `customer_id`, `product_id`, `lot_id`…) cũng phải khai, không
+   * thì máy chủ giữ id thiếu tiền tố ⇒ mồ côi (lọt 2026-10-21). Cột mảng id (`text[]`) được.
+   * KHÔNG khai: id người dùng (auth), mã hằng (kho hệ thống), `row_marks.row_id` (đa hình).
+   * Test `demoForeignKeys.test.ts` canh: cột `*_id` mới chưa khai ⇒ đỏ.
    */
   refColumns?: string[];
 }
@@ -264,6 +268,8 @@ export const FINISHED_GOOD_TABLE: TableMapping<FinishedGood> = {
 export const PRODUCT_TABLE: TableMapping<Product> = {
   table: "products",
   localKey: "bsf.products.v2",
+  // Khóa ngoại MỀM → material_types.id + mảng id bột tẩm (batters) — chế độ demo thêm tiền tố.
+  refColumns: ["material_type_id", "batter_ids"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -418,6 +424,8 @@ export const DAILY_LOCK_TABLE: TableMapping<DailyLock> = {
 export const MATERIAL_IMPORT_TABLE: TableMapping<MaterialImportItem> = {
   table: "material_imports",
   localKey: "bsf.material-imports.v2",
+  // Khóa ngoại MỀM → import_shipments.id · balancing_periods.id — chế độ demo thêm tiền tố.
+  refColumns: ["shipment_id", "balancing_period_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -507,7 +515,9 @@ export const BALANCING_INPUT_TABLE: TableMapping<BalancingInputItem> = {
   localKey: "bsf.balancing-inputs.v2",
   getKey: theoId,
   // Khóa ngoại → balancing_periods.id (ON DELETE CASCADE) — chế độ demo thêm tiền tố.
-  refColumns: ["period_id"],
+  // Khóa MỀM: carry_over_period_id → balancing_periods.id · stock_line_id → monthly_stock_ledger.id.
+  // reduction_warehouse_id là mã kho hệ thống (WORKSHOP_WAREHOUSES), không phải id bản ghi ⇒ không khai.
+  refColumns: ["period_id", "carry_over_period_id", "stock_line_id"],
   toRow: (x) => ({
     id: x.id,
     period_id: x.periodId,
@@ -609,7 +619,9 @@ export const BALANCING_OUTPUT_TABLE: TableMapping<BalancingOutputItem> = {
   localKey: "bsf.balancing-outputs.v2",
   getKey: theoId,
   // Khóa ngoại → balancing_periods.id (ON DELETE CASCADE) — chế độ demo thêm tiền tố.
-  refColumns: ["period_id"],
+  // Khóa MỀM: product_id → products.id · customer_id → customers.id · sales_item_id →
+  // sales_items.id · carry_over_period_id → balancing_periods.id (thiếu customer_id: 2026-10-21).
+  refColumns: ["period_id", "product_id", "customer_id", "sales_item_id", "carry_over_period_id"],
   toRow: (x) => ({
     id: x.id,
     period_id: x.periodId,
@@ -683,6 +695,8 @@ export const USER_PROFILE_TABLE: TableMapping<UserProfile> = {
 export const SALES_INVOICE_TABLE: TableMapping<SalesInvoice> = {
   table: "sales_invoices",
   localKey: "bsf.sales-invoices.v2",
+  // Khóa ngoại MỀM → customers.id — chế độ demo thêm tiền tố.
+  refColumns: ["customer_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -710,6 +724,8 @@ export const SALES_INVOICE_TABLE: TableMapping<SalesInvoice> = {
 export const SALES_ITEM_TABLE: TableMapping<SalesItem> = {
   table: "sales_items",
   localKey: "bsf.sales-items.v2",
+  // Khóa ngoại MỀM → sales_invoices.id · products.id — chế độ demo thêm tiền tố.
+  refColumns: ["invoice_id", "product_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -739,6 +755,8 @@ export const SALES_ITEM_TABLE: TableMapping<SalesItem> = {
 export const WIP_PRODUCTION_TABLE: TableMapping<WipProductionItem> = {
   table: "production_wips",
   localKey: "bsf.production-wips.v2",
+  // Khóa ngoại MỀM → products.id · balancing_periods.id — chế độ demo thêm tiền tố.
+  refColumns: ["product_id", "balancing_period_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -903,6 +921,8 @@ export const QC_LOCK_TABLE: TableMapping<DailyLock> = {
 export const PACKAGING_TABLE: TableMapping<Packaging> = {
   table: "packagings",
   localKey: "bsf.packagings.v1",
+  // Khóa ngoại MỀM → products.id — chế độ demo thêm tiền tố.
+  refColumns: ["from_product_id", "to_product_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -940,6 +960,8 @@ export const PACKAGING_TABLE: TableMapping<Packaging> = {
 export const SALES_ORDER_TABLE: TableMapping<SalesOrder> = {
   table: "sales_orders",
   localKey: "bsf.sales-orders.v2",
+  // Khóa ngoại MỀM → customers.id — chế độ demo thêm tiền tố.
+  refColumns: ["customer_id"],
   patchLegacy: (x) => ({ ...x, status: normalizeSalesOrderStatus(x.status) }),
   getKey: theoId,
   toRow: (x) => ({
@@ -962,6 +984,8 @@ export const SALES_ORDER_TABLE: TableMapping<SalesOrder> = {
 export const ORDER_ITEM_TABLE: TableMapping<OrderItem> = {
   table: "order_items",
   localKey: "bsf.order-items.v2",
+  // Khóa ngoại MỀM → sales_orders.id · products.id — chế độ demo thêm tiền tố.
+  refColumns: ["order_id", "product_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -985,6 +1009,8 @@ export const ORDER_ITEM_TABLE: TableMapping<OrderItem> = {
 export const EXPORT_ORDER_TABLE: TableMapping<ExportOrder> = {
   table: "export_orders",
   localKey: "bsf.export-orders.v2",
+  // Khóa ngoại MỀM → sales_orders.id — chế độ demo thêm tiền tố.
+  refColumns: ["order_id"],
   patchLegacy: (x) => ({ ...x, status: normalizeExportOrderStatus(x.status) }),
   getKey: theoId,
   toRow: (x) => ({
@@ -1007,6 +1033,8 @@ export const EXPORT_ORDER_TABLE: TableMapping<ExportOrder> = {
 export const EXPORT_ITEM_TABLE: TableMapping<ExportItem> = {
   table: "export_items",
   localKey: "bsf.export-items.v2",
+  // Khóa ngoại MỀM → export_orders.id · production_wips.id · products.id — chế độ demo thêm tiền tố.
+  refColumns: ["export_id", "wip_id", "product_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -1055,6 +1083,8 @@ export const OPENING_STOCK_TABLE: TableMapping<MaterialOpeningStock> = {
 export const FINISHED_OPENING_STOCK_TABLE: TableMapping<FinishedGoodsOpeningStock> = {
   table: "finished_goods_opening_stock",
   localKey: "bsf.finished-opening-stock.v2",
+  // Khóa ngoại MỀM → products.id — chế độ demo thêm tiền tố.
+  refColumns: ["product_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -1288,6 +1318,8 @@ export const BATTER_TYPE_TABLE: TableMapping<BatterType> = {
 export const MONTHLY_STOCK_TABLE: TableMapping<MonthlyStockLine> = {
   table: "monthly_stock_ledger",
   localKey: "bsf.monthly-stock.v2",
+  // Khóa ngoại MỀM → monthly_stock_ledger.id (dòng nguồn khi dồn kỳ) — chế độ demo thêm tiền tố.
+  refColumns: ["carried_from_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -1809,6 +1841,8 @@ export const RECONCILIATION_RUN_TABLE: TableMapping<ReconciliationRun> = {
 export const LOT_INPUT_TABLE: TableMapping<LotInput> = {
   table: "lot_inputs",
   localKey: "bsf.lot-inputs.v1",
+  // Khóa ngoại MỀM → id bản ghi lô (production_wips / packagings / material_imports) — chế độ demo thêm tiền tố.
+  refColumns: ["output_id", "input_id"],
   patchLegacy: (x) => ({ ...x, method: normalizeLotMethod<LotInput["method"]>(x.method) }),
   getKey: theoId,
   toRow: (x) => ({
@@ -1846,6 +1880,8 @@ export const LOT_INPUT_TABLE: TableMapping<LotInput> = {
 export const LABEL_PRINT_TABLE: TableMapping<LabelPrint> = {
   table: "label_prints",
   localKey: "bsf.label-prints.v1",
+  // Khóa ngoại MỀM → id bản ghi lô — chế độ demo thêm tiền tố.
+  refColumns: ["lot_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -1874,6 +1910,8 @@ export const LABEL_PRINT_TABLE: TableMapping<LabelPrint> = {
 export const LOT_DISPATCH_TABLE: TableMapping<LotDispatch> = {
   table: "lot_dispatches",
   localKey: "bsf.lot-dispatches.v1",
+  // Khóa ngoại MỀM → id bản ghi lô · id chứng từ ra (sales_items / export_items / domestic_sales) — chế độ demo thêm tiền tố.
+  refColumns: ["lot_id", "doc_id"],
   patchLegacy: (x) => ({ ...x, method: normalizeLotMethod<LotDispatch["method"]>(x.method) }),
   getKey: theoId,
   toRow: (x) => ({
@@ -1906,6 +1944,8 @@ export const LOT_DISPATCH_TABLE: TableMapping<LotDispatch> = {
 export const LOT_WAIVER_TABLE: TableMapping<LotWaiver> = {
   table: "lot_waivers",
   localKey: "bsf.lot-waivers.v1",
+  // Khóa ngoại MỀM → production_wips.id — chế độ demo thêm tiền tố.
+  refColumns: ["output_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,
@@ -2134,6 +2174,8 @@ function parseLines(v: unknown): ExportContractLine[] {
 export const EXPORT_CONTRACT_TABLE: TableMapping<ExportContract> = {
   table: "export_contracts",
   localKey: "bsf.export-contracts.v1",
+  // Khóa ngoại MỀM → customers.id — chế độ demo thêm tiền tố.
+  refColumns: ["customer_id"],
   getKey: theoId,
   toRow: (x) => ({
     id: x.id,

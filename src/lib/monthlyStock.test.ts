@@ -1,6 +1,15 @@
 import { describe, expect, test } from "vitest";
 import type { MonthlyStockLine } from "@/types";
-import { carryForwardIntoLedger, buildCarryForwardLines, deriveRow, idDon, propagateLotsForward, carryChainIds } from "./monthlyStock";
+import {
+  carryForwardIntoLedger,
+  buildCarryForwardLines,
+  deriveRow,
+  idDon,
+  propagateLotsForward,
+  carryChainIds,
+  followTableChange,
+  moveLinesToTable,
+} from "./monthlyStock";
 
 const row = (id: string, period: string, p: Partial<MonthlyStockLine> = {}): MonthlyStockLine => ({
   id,
@@ -165,5 +174,70 @@ describe("propagateLotsForward — đẩy tiếp ĐÚNG lô vừa ghi sang các 
     expect(twice.touched).toBe(0);
     expect(twice.lines).toEqual(once);
     expect(carryChainIds(once, "L")).toEqual([idDon("L")]);
+  });
+});
+
+describe("moveLinesToTable — Chuyển bảng dòng đã tick, chuỗi dồn kỳ đi theo", () => {
+  const BUY = "Nguyên liệu mua ngoài";
+  const OLD = "Nguyên liệu gửi đông";
+  // Lô X tháng 10, đã dồn sang tháng 11 và 12; lô Y cùng bảng cũ không bị chọn.
+  const ledger = () => [
+    row("X", "2026-10", { category: OLD, openKg: 30, openCtn: 0 }),
+    row(idDon("X"), "2026-11", { category: OLD, openKg: 30, openCtn: 0, outKg: 5, note: "giữ", carriedFromId: "X" }),
+    row(idDon(idDon("X")), "2026-12", { category: OLD, openKg: 25, openCtn: 0, carriedFromId: idDon("X") }),
+    row("Y", "2026-10", { category: OLD }),
+    row(idDon("Y"), "2026-11", { category: OLD, carriedFromId: "Y" }),
+  ];
+
+  test("đổi bảng ⇒ dòng chọn + mọi tháng sau đã mở theo sang; số kg, ghi chú, lô khác giữ nguyên", () => {
+    const before = ledger();
+    const r = moveLinesToTable(before, ["X"], { category: BUY });
+    expect(r).toMatchObject({ moved: 1, followed: 2 });
+    for (const id of ["X", idDon("X"), idDon(idDon("X"))]) expect(findLine(r.lines, id)?.category).toBe(BUY);
+    expect(findLine(r.lines, idDon("X"))).toMatchObject({ openKg: 30, outKg: 5, note: "giữ", warehouse: "Kho 1500 tấn" });
+    expect(findLine(r.lines, "Y")?.category).toBe(OLD);
+    expect(findLine(r.lines, idDon("Y"))?.category).toBe(OLD);
+    // Tổng kg từng tháng không đổi — chỉ đổi bảng hiển thị.
+    const kg = (ls: MonthlyStockLine[]) => ls.map((l) => deriveRow(l).closeKg);
+    expect(kg(r.lines)).toEqual(kg(before));
+  });
+
+  test("đổi kho, bỏ trống nhóm ⇒ giữ nhóm riêng từng dòng; dồn kỳ sau đó theo kho mới", () => {
+    const r = moveLinesToTable(ledger(), ["X", "Y"], { warehouse: "Kho 1000 tấn" });
+    expect(r).toMatchObject({ moved: 2, followed: 3 });
+    expect(r.lines.filter((l) => l.warehouse === "Kho 1000 tấn")).toHaveLength(5);
+    expect(r.lines.every((l) => l.category === OLD)).toBe(true);
+    // Dồn lại tháng 11 theo kho mới: dòng dồn đã có chỉ cập nhật tồn đầu, không đẻ dòng trùng ở kho cũ.
+    const again = carryForwardIntoLedger(r.lines, "2026-11", "Kho 1000 tấn");
+    expect(again.added).toBe(0);
+    expect(again.lines.filter((l) => l.period === "2026-11" && l.warehouse === "Kho 1500 tấn")).toHaveLength(0);
+  });
+
+  test("tháng sau người dùng đã tự dời sang bảng khác ⇒ giữ, và dừng chuỗi ở đó", () => {
+    const ls = ledger().map((l) => (l.id === idDon("X") ? { ...l, category: "Hàng tạm" } : l));
+    const r = moveLinesToTable(ls, ["X"], { category: BUY });
+    expect(r.followed).toBe(0);
+    expect(findLine(r.lines, idDon("X"))?.category).toBe("Hàng tạm");
+    expect(findLine(r.lines, idDon(idDon("X")))?.category).toBe(OLD);
+  });
+
+  test("đổi một trường thì chỉ trường đó đi theo; dòng tháng sau khác kho vẫn theo nhóm", () => {
+    const ls = ledger().map((l) => (l.id === idDon("X") ? { ...l, warehouse: "Kho 500 tấn" } : l));
+    const r = moveLinesToTable(ls, ["X"], { category: BUY, warehouse: "Kho 1000 tấn" });
+    expect(findLine(r.lines, idDon("X"))).toMatchObject({ category: BUY, warehouse: "Kho 500 tấn" });
+    expect(findLine(r.lines, idDon(idDon("X")))).toMatchObject({ category: BUY, warehouse: "Kho 1000 tấn" });
+  });
+
+  test("không đổi gì (cùng bảng, cùng kho, hay trống cả hai) ⇒ trả đúng mảng cũ", () => {
+    const ls = ledger();
+    expect(moveLinesToTable(ls, ["X"], { category: OLD, warehouse: "Kho 1500 tấn" })).toEqual({ lines: ls, moved: 0, followed: 0 });
+    expect(moveLinesToTable(ls, ["X"], {}).moved).toBe(0);
+    expect(followTableChange(ls, "X", { category: OLD, warehouse: "Kho 1500 tấn" }, { category: OLD, warehouse: "Kho 1500 tấn" }).lines).toBe(ls);
+  });
+
+  test("chuyển dòng tháng 11 ⇒ tháng 10 (đã qua) không đổi, tháng 12 theo", () => {
+    const r = moveLinesToTable(ledger(), [idDon("X")], { category: BUY });
+    expect(findLine(r.lines, "X")?.category).toBe(OLD);
+    expect(findLine(r.lines, idDon(idDon("X")))?.category).toBe(BUY);
   });
 });

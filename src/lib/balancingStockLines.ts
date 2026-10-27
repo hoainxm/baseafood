@@ -6,7 +6,14 @@
 import type { BalancingInputItem, MonthlyStockLine } from "@/types";
 import { MONTHLY_STOCK_CATEGORIES } from "@/types";
 import { BALANCING_STOCK_LINE_NAMES, getBalancingStockLineKind } from "@/lib/balancingGrid";
-import { carryForwardIntoLedger, deriveRow, getNextMonth, propagateLotsForward, type MonthlyStockRow } from "@/lib/monthlyStock";
+import {
+  carryForwardIntoLedger,
+  deriveRow,
+  followTableChange,
+  getNextMonth,
+  propagateLotsForward,
+  type MonthlyStockRow,
+} from "@/lib/monthlyStock";
 import { num, formatDateVN } from "@/lib/format";
 
 /**
@@ -445,6 +452,8 @@ export function syncMonthlyStockLedger(
           existing.note === row.note;
         if (same) continue;
         items = existing ? items.map((l) => (l.id === did ? row : l)) : [...items, row];
+        // Lô đổi bảng / kho ⇒ dòng dồn của nó ở các tháng sau đã mở đi theo.
+        if (existing) items = followTableChange(items, did, existing, row).lines;
         touchedLots.add(did);
         changed = true;
       }

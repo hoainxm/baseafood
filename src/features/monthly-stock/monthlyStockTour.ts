@@ -175,7 +175,8 @@ export function buildMonthlyStockTour(ctx: MonthlyStockTourContext): PageTour {
     title: "Chọn dòng, cộng tổng và tô màu",
     body:
       "Tick ô vuông đầu dòng (Shift + tick chọn cả khoảng, ô ở đầu bảng chọn cả nhóm) hoặc chọn Chọn tất cả. Thanh Đã chọn N dòng hiện sau các bảng, cộng tồn đầu, nhập, xuất, tồn cuối (kg) và tiền còn lại của đúng mấy dòng đó.\n" +
-      "Trên thanh: Tô màu (10 sắc × 5 mức), In đậm, Bỏ tô để đánh dấu dòng đã dò. Dấu tô lưu chung mọi máy, không đổi số và không theo sang tháng sau. Thêm In N dòng; Gửi kho ngoài và Xóa dòng đã chọn khi được cấp quyền.\n" +
+      "Trên thanh: Tô màu (10 sắc × 5 mức), In đậm, Bỏ tô để đánh dấu dòng đã dò. Dấu tô lưu chung mọi máy, không đổi số và không theo sang tháng sau. Thêm In N dòng; Chuyển bảng, Gửi kho ngoài và Xóa dòng đã chọn khi được cấp quyền.\n" +
+      "Chuyển bảng: đưa các dòng đang tick sang bảng (nhóm hàng) hoặc kho khác, số kg giữ nguyên. Tháng sau đã mở thì dòng dồn của các lô này đi theo; tháng trước không đổi.\n" +
       "Ẩn dòng trống (n): giấu các dòng có tồn đầu, nhập, xuất đều bằng 0; chọn lại để hiện. Mặc định hiện đủ.",
   });
 

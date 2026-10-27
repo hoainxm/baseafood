@@ -550,6 +550,83 @@ export const carryChainIds = (lines: MonthlyStockLine[], lotId: string): string[
   return ids;
 };
 
+/** Bảng một dòng đang nằm trong Sổ kho tháng: nhóm hàng (tên bảng) + kho của sổ. */
+export interface LedgerTable {
+  category: string;
+  warehouse: string;
+}
+
+/**
+ * Cho CHUỖI DỒN KỲ của một lô đi theo khi lô đổi bảng / đổi kho (2026-10-27).
+ *
+ * Vì sao: dồn kỳ chỉ cập nhật tồn đầu của dòng `carry|…` đã có, giữ nguyên nhóm + kho ⇒ dời
+ * lô tháng 10 sang bảng khác khi tháng 11 đã mở thì tháng 11 vẫn xếp lô ở bảng cũ (kho cũ).
+ *
+ * Đi theo `carry|<lô>`, `carry|carry|<lô>`… (tháng sau, tháng sau nữa). Mỗi dòng dồn chỉ đổi
+ * trường nào CÒN GIỐNG giá trị cũ của lô — dòng tháng sau người dùng đã tự dời đi chỗ khác thì
+ * giữ, và dừng chuỗi ở đó (từ đó về sau là quyết định riêng của tháng ấy). Không đụng số kg.
+ */
+export function followTableChange(
+  lines: MonthlyStockLine[],
+  lotId: string,
+  before: LedgerTable,
+  after: LedgerTable
+): { lines: MonthlyStockLine[]; followed: number } {
+  const categoryChanged = before.category !== after.category;
+  const warehouseChanged = before.warehouse !== after.warehouse;
+  if (!categoryChanged && !warehouseChanged) return { lines, followed: 0 };
+  const patch = new Map<string, LedgerTable>();
+  for (const id of carryChainIds(lines, lotId)) {
+    const l = lines.find((x) => x.id === id) as MonthlyStockLine;
+    const moveCategory = categoryChanged && l.category === before.category;
+    const moveWarehouse = warehouseChanged && l.warehouse === before.warehouse;
+    if (!moveCategory && !moveWarehouse) break;
+    patch.set(id, {
+      category: moveCategory ? after.category : l.category,
+      warehouse: moveWarehouse ? after.warehouse : l.warehouse,
+    });
+  }
+  if (!patch.size) return { lines, followed: 0 };
+  return {
+    lines: lines.map((l) => {
+      const p = patch.get(l.id);
+      return p ? { ...l, ...p } : l;
+    }),
+    followed: patch.size,
+  };
+}
+
+/**
+ * CHUYỂN BẢNG các dòng đang tick: đổi nhóm hàng và/hoặc kho, rồi cho chuỗi dồn kỳ ở các tháng
+ * sau đã mở đi theo (`followTableChange`). Bỏ trống một trường ⇒ giữ giá trị riêng của từng
+ * dòng. Không đổi số kg, vị trí, ghi chú ⇒ tổng tháng không đổi, chỉ đổi bảng hiển thị.
+ */
+export function moveLinesToTable(
+  lines: MonthlyStockLine[],
+  ids: Iterable<string>,
+  target: Partial<LedgerTable>
+): { lines: MonthlyStockLine[]; moved: number; followed: number } {
+  const category = (target.category ?? "").trim();
+  const warehouse = (target.warehouse ?? "").trim();
+  const wanted = new Set(ids);
+  const before = new Map<string, LedgerTable>();
+  let items = lines.map((l) => {
+    if (!wanted.has(l.id)) return l;
+    const next = { ...l, category: category || l.category, warehouse: warehouse || l.warehouse };
+    if (next.category === l.category && next.warehouse === l.warehouse) return l;
+    before.set(l.id, { category: l.category, warehouse: l.warehouse });
+    return next;
+  });
+  let followed = 0;
+  for (const [id, old] of before) {
+    const moved = items.find((l) => l.id === id) as MonthlyStockLine;
+    const r = followTableChange(items, id, old, { category: moved.category, warehouse: moved.warehouse });
+    items = r.lines;
+    followed += r.followed;
+  }
+  return { lines: items, moved: before.size, followed };
+}
+
 /**
  * ĐẨY TIẾP tồn cuối của ĐÚNG các lô vừa bị ghi sang các tháng sau ĐÃ MỞ (2026-10-15).
  *

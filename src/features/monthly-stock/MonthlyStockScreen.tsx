@@ -42,6 +42,8 @@ import {
   buildProductStockCard,
   isEmptyLine,
   applyLotAction,
+  moveLinesToTable,
+  followTableChange,
   type LotActionKind,
   type MonthlyStockRow,
   type CarryForwardDiff,
@@ -122,6 +124,7 @@ import {
   Library,
   ListChecks,
   MapPin,
+  Table2,
   History,
   Sigma,
   Sparkles,
@@ -552,6 +555,7 @@ export default function MonthlyStockScreen() {
       const l = lines.find((x) => x.id === f.id);
       return (
         !!l &&
+        l.category === f.category && l.warehouse === f.warehouse &&
         l.itemName === f.itemName && l.size === f.size && l.origin === f.origin && l.importDate === f.importDate &&
         l.storageLocation === f.storageLocation && l.kgPerCtn === f.kgPerCtn && l.unitPrice === f.unitPrice &&
         (l.openKg || null) === f.openKg && (l.inKg || null) === f.inKg && (l.outKg || null) === f.outKg
@@ -634,10 +638,17 @@ export default function MonthlyStockScreen() {
       note: prev?.note ?? "",
     };
     const { baseLines, carriedCount } = form.id ? { baseLines: lines, carriedCount: 0 } : baseLinesForWrite();
-    writeLines(form.id ? lines.map((l) => (l.id === row.id ? row : l)) : [...baseLines, row]);
+    let next = form.id ? lines.map((l) => (l.id === row.id ? row : l)) : [...baseLines, row];
+    // Sửa dòng mà đổi bảng / kho ⇒ dòng dồn của lô ở các tháng sau đã mở đi theo.
+    const followed = prev ? followTableChange(next, row.id, prev, row) : { lines: next, followed: 0 };
+    next = followed.lines;
+    writeLines(next);
     notifyCarried(carriedCount);
     formDraft.done();
-    notify.saved(form.id ? `Đã sửa dòng ${row.itemName}` : `Đã thêm dòng ${row.itemName}`);
+    notify.saved(
+      (form.id ? `Đã sửa dòng ${row.itemName}` : `Đã thêm dòng ${row.itemName}`) +
+        (followed.followed ? ` · ${followed.followed} dòng tháng sau đi theo` : "")
+    );
   };
 
   // ---------- Dồn kỳ ----------
@@ -762,6 +773,42 @@ export default function MonthlyStockScreen() {
     writeLines(lines.map((l) => (ids.has(l.id) ? { ...l, storageLocation: target } : l)));
     setAssignLocation(null);
     notify.saved(`Đã gửi ${ids.size} dòng tới ${target}`, () => writeLines(prevRows));
+  };
+
+  /** Bảng + kho sắp chuyển các dòng tick tới (trống = giữ của từng dòng). */
+  const [moveTarget, setMoveTarget] = useState<{ category: string; warehouse: string } | null>(null);
+  const [moveErrors, setMoveErrors] = useState<FieldError[]>([]);
+  const categoryOptions = (current = ""): ComboboxOption[] =>
+    [...new Set([...MONTHLY_STOCK_CATEGORIES, ...lines.map((l) => l.category), current].filter(Boolean))].map((c) => ({
+      value: c,
+      label: c,
+    }));
+  const openMove = () => {
+    setMoveTarget({ category: "", warehouse: "" });
+    setMoveErrors([]);
+  };
+  /** Chuyển bảng các dòng đang tick (một lần ghi, có Hoàn tác) — tháng sau đã mở đi theo. */
+  const moveSelectedToTable = () => {
+    if (!moveTarget) return;
+    const target = { category: moveTarget.category.trim(), warehouse: moveTarget.warehouse.trim() };
+    const ls: FieldError[] = [];
+    if (!target.category && !target.warehouse) ls.push({ field: "Bảng nhận", message: "Chọn bảng (nhóm hàng) hoặc kho cần chuyển tới" });
+    setMoveErrors(ls);
+    if (ls.length) return;
+    const result = moveLinesToTable(lines, selectedRows.map((r) => r.id), target);
+    if (!result.moved) {
+      notify.warning("Các dòng đã tick đã nằm sẵn ở bảng / kho này, không có gì để chuyển.");
+      return;
+    }
+    const prevRows = lines;
+    writeLines(result.lines);
+    setMoveTarget(null);
+    clearSelection();
+    const where = [target.category && `bảng ${target.category}`, target.warehouse].filter(Boolean).join(" · ");
+    notify.saved(
+      `Đã chuyển ${result.moved} dòng sang ${where}` + (result.followed ? ` · ${result.followed} dòng tháng sau đi theo` : ""),
+      () => writeLines(prevRows)
+    );
   };
 
   // ---------- Thao tác một dòng: lấy ra dùng · nhập thêm · chuyển vị trí ----------
@@ -1832,6 +1879,12 @@ export default function MonthlyStockScreen() {
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 {!isPreview && allowed.update && (
+                  <Button size="sm" variant="outline" onClick={openMove} title="Chuyển các dòng đang tick sang bảng (nhóm hàng) hoặc kho khác. Không đổi số kg; dòng dồn của các tháng sau đã mở đi theo.">
+                    <Table2 className="mr-2 h-4 w-4" />
+                    Chuyển bảng
+                  </Button>
+                )}
+                {!isPreview && allowed.update && (
                   <Button size="sm" variant="outline" onClick={() => setAssignLocation("")} title="Đánh dấu các dòng đang tick là GỬI ra kho ngoài (VD Kho Ánh Dương, HP). Chỉ ghi nơi để hàng, không đổi số kg.">
                     <MapPin className="mr-2 h-4 w-4" />
                     Gửi kho ngoài
@@ -1891,15 +1944,7 @@ export default function MonthlyStockScreen() {
                   required
                   value={form.category}
                   onChange={(v) => setForm((f) => (f ? { ...f, category: v } : f))}
-                  options={[
-                    ...new Set(
-                      [
-                        ...MONTHLY_STOCK_CATEGORIES,
-                        ...lines.map((l) => l.category),
-                        form.category,
-                      ].filter(Boolean)
-                    ),
-                  ].map((c) => ({ value: c, label: c }))}
+                  options={categoryOptions(form.category)}
                   onCreate={(t) => t}
                 />
                 <Combobox
@@ -2119,6 +2164,47 @@ export default function MonthlyStockScreen() {
             <Button onClick={assignLocationToSelected} title="Ghi vị trí vừa chọn cho tất cả dòng đang tick. Có nút Hoàn tác sau khi lưu.">
               <MapPin className="mr-1 h-4 w-4" />
               Gán vị trí
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog chuyển bảng cho dòng đang tick */}
+      <Dialog open={moveTarget !== null} onOpenChange={(o) => !o && setMoveTarget(null)}>
+        <DialogContent className="w-full sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Chuyển bảng · {selectedRows.length} dòng</DialogTitle>
+            <DialogDescription className="text-base">
+              Đưa các dòng đang tick sang bảng (nhóm hàng) hoặc kho khác của sổ. Số kg, vị trí, ghi chú giữ nguyên. Tháng sau đã mở
+              thì dòng dồn của các lô này đi theo; tháng trước không đổi.
+            </DialogDescription>
+          </DialogHeader>
+          {moveTarget !== null && (
+            <div className="space-y-4 py-2">
+              <ErrorSummary errors={moveErrors} />
+              <Combobox
+                label="Bảng nhận (nhóm hàng) — để trống thì giữ bảng của từng dòng"
+                value={moveTarget.category}
+                onChange={(v) => setMoveTarget((t) => (t ? { ...t, category: v } : t))}
+                options={categoryOptions(moveTarget.category)}
+                onCreate={(t) => t}
+              />
+              <Combobox
+                label="Kho nhận — để trống thì giữ kho của từng dòng"
+                value={moveTarget.warehouse}
+                onChange={(v) => setMoveTarget((t) => (t ? { ...t, warehouse: v } : t))}
+                options={SYSTEM_WAREHOUSES}
+                onCreate={(t) => t}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveTarget(null)}>
+              Hủy
+            </Button>
+            <Button variant="save" onClick={moveSelectedToTable} title="Ghi bảng / kho mới cho tất cả dòng đang tick và dòng dồn của chúng ở các tháng sau. Có nút Hoàn tác sau khi lưu.">
+              <Table2 className="mr-1 h-4 w-4" />
+              Chuyển {selectedRows.length} dòng
             </Button>
           </DialogFooter>
         </DialogContent>

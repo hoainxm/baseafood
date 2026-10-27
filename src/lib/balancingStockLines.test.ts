@@ -249,6 +249,17 @@ describe("syncMonthlyStockLedger — tháng sau ĐÃ MỞ thì tồn đầu đi 
     const back = syncMonthlyStockLedger(a.lines, [r], [], ctx).lines;
     expect(back.find((l) => l.id === "carry|L1")!.openKg).toBe(1000);
   });
+  test("lô gửi đông đổi bảng ở T10 khi T11 đã mở ⇒ dòng dồn T11 dời theo (2026-10-27)", () => {
+    const r = stockRow("g1", "gui", { "2026-10-02": -400 }, { stockLocation: warehouse, stockCategory: "Hàng tạm" });
+    const a = syncMonthlyStockLedger([lot("X", "2026-10"), lot("carry|X", "2026-11", { carriedFromId: "X" })], [], [r], ctx).lines;
+    const did = freezeDepositRowId("g1", "2026-10-02");
+    expect(a.find((l) => l.id === `carry|${did}`)).toMatchObject({ category: "Hàng tạm", openKg: 400 });
+    const r2 = { ...r, stockCategory: "Nguyên liệu nhập khẩu" };
+    const b = syncMonthlyStockLedger(a, [r], [r2], ctx).lines;
+    expect(b.find((l) => l.id === did)!.category).toBe("Nguyên liệu nhập khẩu");
+    expect(b.find((l) => l.id === `carry|${did}`)).toMatchObject({ category: "Nguyên liệu nhập khẩu", openKg: 400 });
+    expect(b.find((l) => l.id === "carry|X")!.category).toBe(lot("X", "2026-10").category); // lô khác không đụng
+  });
 });
 
 describe("syncMonthlyStockLedger — Gửi đông chọn NGUYÊN LIỆU gửi (2026-10-16)", () => {

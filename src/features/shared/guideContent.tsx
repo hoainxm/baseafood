@@ -515,6 +515,24 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
             <li>Kho chưa có trong danh sách thì gõ tên mới, hệ thống tự lưu vào danh mục.</li>
           </Y>
         </Section>
+        <Section title="Chuyển dòng sang bảng hoặc kho khác">
+          <Y>
+            <li>
+              Tick ô đầu các dòng → chọn <b>Chuyển bảng</b> trên thanh "Đã chọn" → chọn{" "}
+              <b>Bảng nhận</b> (nhóm hàng) và/hoặc <b>Kho nhận</b> → chọn <b>Chuyển N dòng</b>.
+            </li>
+            <li>
+              Ô nào để trống thì từng dòng giữ bảng / kho của mình. Số kg, vị trí, ghi chú{" "}
+              <b>không đổi</b>, nên tổng tháng không đổi — chỉ đổi dòng nằm ở bảng nào.
+            </li>
+            <li>
+              Tháng sau <b>đã mở</b> thì dòng dồn của các lô này cũng chuyển theo. Tháng trước không
+              đổi. Tháng sau đã có dòng bị dời đi chỗ khác thì giữ nguyên chỗ đó.
+            </li>
+            <li>Một dòng: chọn ✎ ở cuối dòng, đổi ô Nhóm hàng hoặc Kho rồi Lưu — tháng sau cũng đi theo.</li>
+            <li>Chuyển nhầm thì chọn Hoàn tác trên thông báo, hoặc nút Hoàn tác (Ctrl+Z) của sổ.</li>
+          </Y>
+        </Section>
         <Section title="Hàng mới về">
           <Y>
             <li>

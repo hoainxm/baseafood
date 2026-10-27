@@ -346,6 +346,10 @@ describe("Gửi đông vào BẢNG người dùng chọn (chốt 2026-10-16, b�
     expect(depositLotCategory({ stockCategory: LEGACY_FREEZE_DEPOSIT_CATEGORY }, { category: LEGACY_FREEZE_DEPOSIT_CATEGORY })).toBe(DEFAULT_DEPOSIT_CATEGORY);
     expect(depositLotCategory(undefined, { category: "Nguyên liệu nhập khẩu" })).toBe("Nguyên liệu nhập khẩu");
     expect(depositLotCategory({ stockCategory: "Hàng tạm" }, { category: "Nguyên liệu nhập khẩu" })).toBe("Hàng tạm");
+    // Ca thật 2026-10 (kỳ 01–05/10): dòng còn lưu bảng cũ, lô đã dời sang "mua ngoài" ⇒ nhãn ở
+    // Cân đối phải chỉ đúng bảng lô đang nằm (MaterialGrid dùng chung hàm này).
+    expect(depositLotCategory({ stockCategory: LEGACY_FREEZE_DEPOSIT_CATEGORY }, { category: DEFAULT_DEPOSIT_CATEGORY })).toBe(DEFAULT_DEPOSIT_CATEGORY);
+    expect(depositLotCategory({ stockCategory: LEGACY_FREEZE_DEPOSIT_CATEGORY }, { category: "" })).toBe(DEFAULT_DEPOSIT_CATEGORY);
   });
 });
 

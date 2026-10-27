@@ -40,7 +40,7 @@ import { TripPriceList } from "./TripPriceList";
 import { RowNoteCell } from "./RowNoteCell";
 import { DepositTargetDialog, type DepositTargetValue } from "./DepositTargetDialog";
 import {
-  DEFAULT_DEPOSIT_CATEGORY,
+  depositLotCategory,
   depositPriceOn,
   hasVaryingDepositPrices,
   setDepositPriceAllDays,
@@ -777,9 +777,14 @@ export function MaterialGrid({
   /** Tên NL gửi của dòng; chưa chọn ⇒ tên họ NL của kỳ (mặc định). */
   const depositMaterialName = (original: BalancingInputItem | undefined) =>
     original && original.name !== BALANCING_STOCK_LINE_NAMES["freeze-deposit"] ? original.name : periodFamily;
-  /** Bảng của Sổ kho tháng lô gửi vào: đã chọn ⇒ nhóm đó; dòng cũ ⇒ nhóm lô đã ghi; còn lại ⇒ mặc định. */
+  /**
+   * Bảng của Sổ kho tháng lô gửi vào — CÙNG luật với lúc ghi sổ (`depositLotCategory`): đã chọn ⇒
+   * nhóm đó; dòng cũ ⇒ nhóm lô đã ghi; còn lại ⇒ mặc định; không bao giờ là bảng cũ "Nguyên liệu
+   * gửi đông". Trước đây nhãn lấy thẳng `stockCategory` ⇒ dòng lưu bảng cũ hiện "→ Nguyên liệu gửi
+   * đông" trong khi lô đã nằm ở bảng mua ngoài — kế toán đi tìm bảng cũ thì không thấy số.
+   */
   const depositCategoryLabel = (rowId: string, original: BalancingInputItem | undefined) =>
-    original?.stockCategory || grid.depositLotCategory(rowId) || DEFAULT_DEPOSIT_CATEGORY;
+    depositLotCategory(original, { category: grid.depositLotCategory(rowId) });
   const [depositRowId, setDepositRowId] = useState<string | null>(null);
   const saveDepositTarget = (rowId: string, v: DepositTargetValue) => {
     if (

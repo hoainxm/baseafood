@@ -388,7 +388,7 @@ export function attentionDetail(a: AttentionRow, opts: { viewPrice: boolean; dev
   const d = opts.formatDate ?? ((iso: string) => iso);
   switch (a.kind) {
     case "overdue":
-      return `hạn ${d(a.deadline)} · ${[a.missingKg > 0 && `${n(a.missingKg)} kg`, a.missingContainers > 0 && `${a.missingContainers} cont`].filter(Boolean).join(" / ") || "chưa đủ"} chưa lên chuyến`;
+      return `hạn ${d(a.deadline)} · ${[a.missingKg > 0 && `${n(a.missingKg)} kg`, a.missingContainers > 0 && `${a.missingContainers} cont`].filter(Boolean).join(" / ") || "chưa đủ"} chưa ghi chuyến`;
     case "over-tolerance":
     case "under-tolerance":
       return `kg ${opts.deviationText(a.kgPct)}${opts.viewPrice ? ` · tiền ${opts.deviationText(a.amountPct)}` : ""}`;

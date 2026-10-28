@@ -10,12 +10,12 @@ Nghiệp vụ: [ba-spec 41 §0 v8](../app-map/41-export-planning.ba-spec.md). Mi
 |---|---|
 | `0075` (8 bảng `export_*`, `has_export_permission`, bucket `export-files`, vai trò `planner`) | ✅ đã có |
 | `0076` · `0077` · `0078` | ✅ đã có |
-| `0079` | ❌ **chưa chạy** |
+| `0079` | ✅ **đã chạy 2026-10-28** (chủ dự án) — kiểm sau chạy khớp §2.3: 3 trigger, 3 policy duyệt, 587 ô / 2 ô Duyệt, số thật không đổi |
 | Số thật (site `bsf1`) | 3 HĐ đang mở · 2 lượt duyệt kiểu cũ (BGĐ ký giấy, có file) · 3 chuyến · 51 file · 0 HĐ thanh toán L/C |
 | Tài khoản | 5 Nhân viên KH · **3 tài khoản đã gán sẵn** `planning-head` / `planning-deputy` |
 | Vai trò `planner` | **có dòng `app_roles`** (admin đã chỉnh ở /roles) ⇒ quyền đọc từ `role_permissions` (25 ô, không có Duyệt — đúng ý) |
 
-### ⚠️ Đang nửa vời — chạy 0079 sớm
+### (Đã xong) Trạng thái nửa vời trước khi chạy 0079
 
 Code v8 (commit `0c0603a`) đã lên Vercel, DB chưa có 0079 ⇒ hiện tại:
 - 3 tài khoản Trưởng / Phó phòng **chưa có quyền gì** (ma trận mặc định chưa có ô của họ) ⇒ vào Xuất khẩu thấy "Chưa được cấp quyền".

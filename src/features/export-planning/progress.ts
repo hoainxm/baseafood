@@ -12,11 +12,13 @@ import {
   STEP_NOS,
   STEP_TITLES,
   SUB_STEP_LABELS,
+  CONTRACT_ATTACHMENT_LABELS,
   containerIdentityOk,
   contractStepState,
   documentItems,
   effectiveRevision,
   itemState,
+  missingAttachmentKinds,
   requiredDocumentLabel,
   stepState,
   subStepState,
@@ -52,7 +54,10 @@ export function shipmentProgress(d: ExportData, s: ExportShipment, opts: Evidenc
 export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string[] {
   switch (n) {
     case 1:
-      return [effectiveRevision(d, s.contractId) ? "file hợp đồng đã ký" : "kết quả BGĐ duyệt"];
+      // Bước 1 = HĐ đã duyệt + đủ hồ sơ đính kèm (mig 0079).
+      return effectiveRevision(d, s.contractId)
+        ? missingAttachmentKinds(d, s.contractId).map((k) => `hồ sơ HĐ: ${CONTRACT_ATTACHMENT_LABELS[k]}`)
+        : ["Trưởng / Phó phòng duyệt HĐ"];
     case 2:
       return ["lệnh sản xuất"];
     case 3:

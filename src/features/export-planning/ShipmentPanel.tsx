@@ -17,6 +17,7 @@ import {
   containerIdentityOk,
   documentItems,
   filesOfItem,
+  effectiveRevision,
   filesOfStep,
   shipmentLateInfo,
   itemState,
@@ -270,9 +271,10 @@ export function ShipmentPanel({
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <section data-tour="shipment-card" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="grid min-w-0 gap-1">
-            <p className="font-semibold">{label || "Chuyến chưa có mã lô"}</p>
-            <div className="flex flex-wrap gap-1">
+          {/* basis-64 + cột minmax(0,1fr): tên chuyến / thẻ dài xuống dòng, không đẩy trang tràn ngang ở 360 px × 130 %. */}
+          <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-1">
+            <p className="font-semibold break-words">{label || "Chuyến chưa có mã lô"}</p>
+            <div className="flex min-w-0 flex-wrap gap-1 [&>*]:max-w-full [&>*]:whitespace-normal">
               {isCancelled ? (
                 <Tag variant="muted">Đã hủy: {shipment.cancelReason}</Tag>
               ) : progress.next === null ? (
@@ -336,8 +338,10 @@ export function ShipmentPanel({
       <StepBlock n={1} state={progress.steps[1]} summary={summaryOf(1)} isCurrent={progress.next === 1}>
         <p className="py-3 text-sm text-muted-foreground">
           {settled(progress.steps[1])
-            ? `Hợp đồng đã có bản BGĐ đồng ý${filesAvailable ? " kèm file ký" : ""}.`
-            : "Ghi kết quả BGĐ duyệt (và file ký) bằng nút ở đầu hồ sơ hợp đồng."}
+            ? `Hợp đồng đã được duyệt${filesAvailable ? " và đủ hồ sơ đính kèm" : ""}.`
+            : effectiveRevision(data, contract.id)
+              ? "Hợp đồng đã duyệt, còn thiếu hồ sơ đính kèm — đính kèm ở khối Hồ sơ đính kèm của hồ sơ hợp đồng."
+              : "Hợp đồng chờ Trưởng / Phó phòng Kế hoạch duyệt (nút Duyệt hợp đồng ở đầu hồ sơ)."}
         </p>
       </StepBlock>
 

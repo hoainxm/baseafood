@@ -396,7 +396,7 @@ export function ContractDossier({
           {menuItems.length > 0 && (
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" title="Các thao tác khác của hợp đồng: bản sửa, gia hạn, tiền cọc, chốt HĐ, hủy…">
+                <Button variant="outline" title="Các thao tác khác của hợp đồng: bản sửa, gia hạn, đính kèm, ghi thêm chuyến, tiền cọc, duyệt cuối, hủy…">
                   <MoreHorizontal className="mr-2 h-4 w-4" aria-hidden />
                   Thao tác khác
                 </Button>

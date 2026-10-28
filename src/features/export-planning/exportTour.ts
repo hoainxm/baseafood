@@ -217,11 +217,14 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           "• Thực xuất và tiền về: cộng từ Commercial Invoice của các chuyến.",
       }),
       dossier({
-        id: "shipment-list",
-        target: "shipment-list",
+        id: "contract-attachments",
+        target: "contract-attachments",
         optional: true,
-        title: "Danh sách chuyến",
-        body: "Hợp đồng có nhiều chuyến thì chọn chuyến cần xem ở đây. Mỗi dòng có thanh tiến độ và bước tiếp theo của chuyến đó.",
+        title: "Hồ sơ đính kèm",
+        body:
+          "Chặng Đính kèm của hợp đồng. Thẻ đầu khối ghi từng loại hồ sơ bắt buộc: Hợp đồng đã ký (luôn có), L/C (khi thanh toán bằng L/C) — \"đã có\" hoặc \"còn thiếu\".\n" +
+          "Nhân viên Kế hoạch chọn Đính kèm file, chọn loại hồ sơ rồi chọn một hay nhiều file. Proforma invoice và hồ sơ khác đính được nhưng không bắt buộc.\n" +
+          "Đủ hồ sơ bắt buộc thì hợp đồng chuyển Đang ghi chuyến và nút Ghi chuyến mới hiện. Gỡ file nhầm bằng nút thùng rác, có Hoàn tác.",
       }),
       dossier({
         id: "shipment-card",
@@ -229,6 +232,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         optional: true,
         title: "Thông tin và trạng thái chuyến",
         body:
+          "Hợp đồng có nhiều chuyến thì chọn chuyến ở danh sách phía trên; mỗi dòng có thanh tiến độ và bước tiếp theo của chuyến.\n" +
           "Thẻ chuyến ghi booking, ngày đóng cont, ETD và ETA, tàu, số container và seal, kg kế hoạch và kg thực xuất.\n" +
           "Thẻ trạng thái chuyến: Đang làm · xong k/5 bước bắt buộc (bước 1 đến 5; bước 6 không bắt buộc) · Đủ hồ sơ · Trễ hạn giao n ngày · Đã hủy.\n" +
           "Hàng 6 bước bên dưới: chọn một bước để chuyển nhanh tới phần đó.",
@@ -250,6 +254,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         body:
           "Mỗi mục có một thẻ trạng thái: Chưa làm · Đang làm · Xong · Không áp dụng.\n" +
           "Mục chỉ được đánh dấu Xong khi đủ giấy tờ:\n" +
+          "• Bước 1 Hợp đồng: tự Xong khi hợp đồng đã được duyệt và đủ hồ sơ đính kèm bắt buộc.\n" +
           "• Lệnh sản xuất: có file, hợp đồng đã duyệt và mọi dòng hàng đã nối danh mục.\n" +
           "• Bao bì: có file hoặc ghi chú.\n" +
           "• Sơ đồ container, Hình ảnh đóng cont: tự Xong khi có file.\n" +
@@ -291,10 +296,9 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         id: "contract-details",
         target: "contract-details",
         optional: true,
-        title: "Hồ sơ đính kèm, điều khoản, nhật ký",
+        title: "Điều khoản, dòng hàng, nhật ký",
         body:
           "Chọn tiêu đề của mỗi phần để mở hoặc gập.\n" +
-          "• Hồ sơ đính kèm: thẻ từng loại bắt buộc (đã có / còn thiếu) và danh sách file. Đủ hồ sơ mới ghi chuyến được.\n" +
           "• Điều khoản: Incoterm, cảng, thanh toán, hạn giao, chứng từ khách yêu cầu. Rê chuột vào nút ? hoặc chữ gạch chấm (ETD, L/C, B/L…) để xem nghĩa từ viết tắt.\n" +
           "• Dòng hàng: từng mặt hàng, số lượng, kg, giá. Nối mặt hàng để gắn dòng hàng với danh mục (cần trước khi Lệnh sản xuất xong).\n" +
           "• Các bản hợp đồng · duyệt · duyệt cuối: lịch sử bản sửa, các lần duyệt và duyệt cuối.\n" +

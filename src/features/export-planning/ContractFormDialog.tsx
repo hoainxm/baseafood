@@ -369,8 +369,8 @@ export function ContractFormDialog({
       title={title}
       description={
         head?.mode === "revise"
-          ? "Bản đang hiệu lực giữ nguyên và vẫn tra lại được. Bản sửa có hiệu lực khi ghi kết quả BGĐ đồng ý."
-          : "Ghi đúng như hợp đồng giấy. Lưu xong hợp đồng ở trạng thái chờ duyệt — ghi kết quả BGĐ ký ở bước sau."
+          ? "Bản đang hiệu lực giữ nguyên và vẫn tra lại được. Bản sửa có hiệu lực khi Trưởng / Phó phòng Kế hoạch duyệt đồng ý."
+          : "Ghi đúng như hợp đồng giấy. Lưu xong hợp đồng ở trạng thái Chờ duyệt — Trưởng / Phó phòng Kế hoạch duyệt, rồi đính kèm hồ sơ, rồi mới ghi chuyến."
       }
       icon={FileSignature}
       size="xl"

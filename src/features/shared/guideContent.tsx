@@ -753,6 +753,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         <Section title="Trạng thái mục trong bước">
           <Y>
             <li><b>Chưa làm</b> · <b>Đang làm</b> · <b>Xong</b> · <b>Không áp dụng</b> (phải ghi lý do).</li>
+            <li>Bước 1 <b>Hợp đồng</b> của chuyến tự <b>Xong</b> khi hợp đồng đã được duyệt và đủ hồ sơ đính kèm bắt buộc.</li>
             <li>
               Mục chỉ được đánh dấu <b>Xong</b> khi đủ giấy tờ: file, số chứng từ, ngày theo từng loại. Sơ đồ container và hình ảnh đóng cont tự Xong khi có file.
             </li>

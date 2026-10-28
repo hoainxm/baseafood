@@ -341,34 +341,43 @@ export function StepStepper({ steps, current, onSelect }: { steps: Record<StepNo
 export function ContractFlowBar({ state }: { state: ContractState }) {
   const current = contractFlowIndex(state);
   if (current < 0) return null;
+  const cur = CONTRACT_FLOW_STAGES[current];
   return (
-    <ol data-tour="contract-flow" className="flex min-w-0 gap-1" aria-label={`Quy trình hợp đồng — đang ở chặng ${CONTRACT_FLOW_STAGES[current].title}`}>
-      {CONTRACT_FLOW_STAGES.map((st, i) => {
-        const isDone = i < current || state === "closed";
-        // HĐ đã đóng: chặng cuối vẫn là "chặng đang ở" để điện thoại còn một nhãn (không chỉ dãy dấu tích).
-        const isCurrent = i === current;
-        const tone = isDone ? "bg-success" : isCurrent ? "bg-warning" : "bg-border";
-        const tip = `${i + 1}. ${st.title}${st.who ? ` — ${st.who}` : ""}: ${st.hint}`;
-        return (
-          <li key={st.state} className={`flex min-w-0 flex-col gap-2 ${isCurrent ? "flex-[2]" : "flex-1"} sm:min-w-24 sm:flex-1`}>
-            <span className={`h-1.5 rounded-full ${tone}`} aria-hidden />
-            <span
-              tabIndex={0}
-              title={tip}
-              aria-current={isCurrent ? "step" : undefined}
-              className={`flex min-w-0 items-center gap-2 px-1 text-sm leading-tight ${isCurrent ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-            >
-              {isDone ? <Check className="h-4 w-4 shrink-0 text-success" aria-hidden /> : <CircleDashed className="h-4 w-4 shrink-0" aria-hidden />}
-              {/* Điện thoại: chỉ chặng đang ở hiện nhãn — 5 nhãn không vừa 360 px. */}
-              <span className={`min-w-0 ${isCurrent ? "" : "hidden sm:inline"}`}>
-                {st.title}
-                {isCurrent && st.who ? <span className="block font-normal text-muted-foreground">{st.who}</span> : null}
+    <div data-tour="contract-flow" className="grid min-w-0 gap-2">
+      <ol className="flex min-w-0 gap-1" aria-label={`Quy trình hợp đồng — đang ở chặng ${cur.title}`}>
+        {CONTRACT_FLOW_STAGES.map((st, i) => {
+          const isDone = i < current || state === "closed";
+          // HĐ đã đóng: chặng cuối vẫn là "chặng đang ở" để còn nhãn (không chỉ dãy dấu tích).
+          const isCurrent = i === current;
+          const tone = isDone ? "bg-success" : isCurrent ? "bg-warning" : "bg-border";
+          const tip = `${i + 1}. ${st.title}${st.who ? ` — ${st.who}` : ""}: ${st.hint}`;
+          return (
+            <li key={st.state} className="flex min-w-0 flex-1 flex-col gap-2 sm:min-w-24">
+              <span className={`h-1.5 rounded-full ${tone}`} aria-hidden />
+              <span
+                tabIndex={0}
+                title={tip}
+                aria-current={isCurrent ? "step" : undefined}
+                className={`flex min-w-0 items-start gap-2 px-1 text-sm leading-tight ${isCurrent ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+              >
+                {isDone ? <Check className="h-4 w-4 shrink-0 text-success" aria-hidden /> : <CircleDashed className="h-4 w-4 shrink-0" aria-hidden />}
+                {/* Từ sm: nhãn dưới từng vạch. Điện thoại: 5 nhãn không vừa ⇒ chỉ icon, nhãn chặng đang ở xuống dòng riêng bên dưới. */}
+                <span className="hidden min-w-0 sm:inline">
+                  {st.title}
+                  {isCurrent && st.who ? <span className="block font-normal text-muted-foreground">{st.who}</span> : null}
+                </span>
               </span>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="text-sm sm:hidden">
+        <span className="font-semibold">
+          Chặng {current + 1}/{CONTRACT_FLOW_STAGES.length}: {cur.title}
+        </span>
+        {cur.who ? <span className="text-muted-foreground"> — {cur.who}</span> : null}
+      </p>
+    </div>
   );
 }
 

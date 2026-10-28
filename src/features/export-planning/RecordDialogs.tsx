@@ -582,7 +582,7 @@ export function ExtensionDialog({
         onClose();
       }}
       title={`Gia hạn giao hàng · HĐ ${form?.contractNo ?? ""}`}
-      description="Khách đã đồng ý kéo hạn (quy trình KH-R11). Không cần BGĐ duyệt lại; trễ hạn tính theo hạn mới."
+      description="Khách đã đồng ý kéo hạn (quy trình KH-R11). Không cần duyệt lại; trễ hạn tính theo hạn mới."
       icon={CalendarClock}
       size="md"
       hasRequiredFields

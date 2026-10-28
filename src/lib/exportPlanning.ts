@@ -739,12 +739,16 @@ export function requiredAttachmentKinds(terms: Pick<ExportContractTerms, "paymen
 }
 
 /**
- * HĐ duyệt theo quy trình CŨ (trước mig 0079: nhân viên ghi kết quả BGĐ ký giấy — lượt duyệt không
- * có `stage`). Với HĐ này file bản HĐ / bản ký scan đã là hợp đồng có chữ ký ⇒ tính thay "Hợp đồng đã ký".
+ * HĐ đã có hợp đồng ký theo quy trình CŨ (trước mig 0079: nhân viên ghi kết quả BGĐ ký giấy — lượt duyệt
+ * không có `stage`): một bản BẤT KỲ của HĐ được duyệt kiểu cũ và có file (bản HĐ hoặc bản ký scan).
+ * Xét mọi bản, không chỉ bản hiệu lực — bản sửa duyệt theo cách mới sau 0079 không làm HĐ cũ tụt về
+ * "Chờ đính kèm".
  */
-function isLegacyApproved(d: Pick<ExportData, "approvals">, rev: ExportContractRevision): boolean {
-  const last = approvalsOf(d, rev.id).at(-1);
-  return !!last && last.decision === "approved" && !last.stage;
+function hasLegacySignedContract(d: Pick<ExportData, "revisions" | "approvals">, contractId: string): boolean {
+  return revisionsOf(d, contractId).some((rev) => {
+    const xs = approvalsOf(d, rev.id).filter((a) => a.decision === "approved" && !a.stage);
+    return xs.length > 0 && (!!rev.filePath || xs.some((a) => !!a.filePath));
+  });
 }
 
 /**
@@ -759,7 +763,7 @@ export function missingAttachmentKinds(
   const eff = effectiveRevision(d, contractId);
   if (!eff || !opts.filesAvailable) return [];
   const have = new Set<string>(contractAttachments(d, contractId).map((f) => f.attachmentKind ?? ""));
-  if (isLegacyApproved(d, eff) && (eff.filePath || approvalsOf(d, eff.id).some((a) => a.decision === "approved" && a.filePath))) have.add("signed-contract");
+  if (hasLegacySignedContract(d, contractId)) have.add("signed-contract");
   return requiredAttachmentKinds(eff.terms).filter((k) => !have.has(k));
 }
 
@@ -986,13 +990,16 @@ export function finalReviewsOf(d: Pick<ExportData, "approvals">, contractId: str
 }
 
 /**
- * Duyệt cuối được khi HĐ còn mở, đã qua bước Đính kèm và có ít nhất một chuyến còn mở. HĐ chưa
+ * Duyệt cuối được khi HĐ còn mở, đã qua bước Đính kèm, có ít nhất một chuyến còn mở và KHÔNG còn bản
+ * sửa chờ duyệt. HĐ chưa
  * xuất đủ trong dung sai (đóng sớm: khách giảm lượng, phụ kiện…) ⇒ bắt lý do.
  */
 export function finalReviewGate(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): { ok: boolean; needsReason: boolean } {
   const st = contractState(d, contractId, opts);
   if (st !== "shipping" && st !== "final-review") return { ok: false, needsReason: false };
   if (!openShipmentsOf(d, contractId).length) return { ok: false, needsReason: false };
+  // Còn bản sửa chờ duyệt ⇒ duyệt bản sửa trước (đóng HĐ khi bản sửa còn treo là bỏ qua nó).
+  if (pendingRevision(d, contractId)) return { ok: false, needsReason: false };
   return { ok: true, needsReason: st !== "final-review" };
 }
 

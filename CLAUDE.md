@@ -35,7 +35,7 @@ supabase/migrations/     0001 … 0078 — trạng thái từng file: docs/app-m
 docs/                    README.md (bản đồ tài liệu, doc mới bỏ đâu) · app-map/ · ops/ · spec/ · trien-khai/
 ```
 
-**Migration CHƯA chạy trên DB thật** (ghi nhận tới 2026-10-28): `0073` (kế toán trưởng ghi tài liệu) · `0075` (Xuất khẩu — tạo bucket `export-files` TRƯỚC) · `0078` (gộp mặt hàng nhận `product_id` tiền tố demo — chạy TRƯỚC lệnh sửa dữ liệu demo §4c) · `0079` (Xuất khẩu duyệt mới + vai trò Trưởng / Phó phòng KH — chạy SAU 0075). Viết migration mới ⇒ rà [`03-database`](docs/app-map/03-database.md) + số migration trên origin trước khi đặt số. ⛔ Đừng chạy `0002`, `0003`, `0023`.
+**Migration CHƯA chạy trên DB thật** (kiểm chỉ-đọc 2026-10-28): chỉ `0079` (Xuất khẩu duyệt mới + vai trò Trưởng / Phó phòng KH) — runbook [`ops/export-v8-go-live.md`](docs/ops/export-v8-go-live.md). `0073`→`0078` đã có trên DB (0073 nằm trong ma trận 0075). Viết migration mới ⇒ rà [`03-database`](docs/app-map/03-database.md) + số migration trên origin trước khi đặt số. ⛔ Đừng chạy `0002`, `0003`, `0023`.
 
 Ranh giới import: [`01-app-structure.md`](docs/app-map/01-app-structure.md).
 

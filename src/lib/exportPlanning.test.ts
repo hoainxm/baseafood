@@ -332,6 +332,22 @@ describe("v8 · quy trình duyệt → đính kèm → ghi chuyến → duyệt 
     expect(contractState(closed, "c1")).toBe("closed");
     expect(finalReviewGate(closed, "c1").ok).toBe(false);
   });
+  it("AC-63: HĐ cũ (bản 0 duyệt kiểu cũ có file ký) + bản sửa duyệt theo cách mới ⇒ KHÔNG tụt về Chờ đính kèm", () => {
+    const d = data({
+      contracts: [contract("c1")],
+      revisions: [revision("r0", "c1", 0), revision("r1", "c1", 1, { filePath: "", fileName: "" })],
+      approvals: [approval("r0", "c1", "approved"), approveNew("r1", "c1")],
+    });
+    expect(effectiveRevision(d, "c1")?.id).toBe("r1");
+    expect(missingAttachmentKinds(d, "c1")).toEqual([]);
+    expect(contractState(d, "c1")).toBe("shipping");
+  });
+  it("AC-64: còn bản sửa chờ duyệt ⇒ chưa duyệt cuối được", () => {
+    const d0 = closedShipmentData({ cartons: 1900, netKg: 19000, amount: 172445 });
+    const d = { ...d0, revisions: [...d0.revisions, revision("r1", "c1", 1, { revisedOn: "2026-10-01" })] };
+    expect(contractState(d, "c1")).toBe("final-review");
+    expect(finalReviewGate(d, "c1").ok).toBe(false);
+  });
   it("AC-61: đóng sớm khi ngoài dung sai ⇒ duyệt cuối được nhưng bắt lý do; chưa có chuyến ⇒ chưa duyệt cuối", () => {
     const d = closedShipmentData({ cartons: 1500, netKg: 15000, amount: 140000 });
     expect(contractState(d, "c1")).toBe("shipping");

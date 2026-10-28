@@ -9,7 +9,8 @@
 --   1. export_contract_approvals.stage  ('' = lượt duyệt cũ — BGĐ ký giấy, nhân viên ghi lại ·
 --      'contract' = duyệt bản HĐ trên app · 'final' = duyệt cuối đóng HĐ).
 --   2. export_files.attachment_kind + step 'contract' = hồ sơ đính kèm cấp HĐ (bước Đính kèm).
---   3. Bảng MỚI export_activity_log — nhật ký thao tác của từng HĐ, CHỈ THÊM (không sửa / xóa).
+--   3. Bảng MỚI export_activity_log — nhật ký thao tác của từng HĐ, CHỈ THÊM: trigger giữ nguyên dòng cũ
+--      khi UPDATE (app ghi mọi bảng bằng upsert), người ghi + giờ ghi do máy chủ đặt, chỉ xóa được dòng demo.
 --   4. 🔴 Siết RLS export_contract_approvals: chỉ người có quyền export-plans:approve ghi / xóa lượt duyệt
 --      (trước: ai có create / update — Nhân viên KH tự ghi được kết quả duyệt).
 --   5. Trigger export_contracts: đổi status sang / khỏi 'closed' (đóng HĐ, mở lại) phải có quyền approve.
@@ -20,6 +21,8 @@
 --      trò mới + toàn bộ ô của 2 vai trò mới (= Nhân viên KH + approve). Không bớt ô nào của vai trò cũ.
 --
 -- ⚠️ Chạy SAU 0075 (cần bảng export_* + has_export_permission). 0075 chưa chạy ⇒ file này dừng ở bước 1.
+-- ⛔ Sau khi chạy file này ĐỪNG chạy lại 0073 / 0075: hai file đó xóa trọn default_role_permissions rồi chèn
+--    ma trận CŨ ⇒ Trưởng / Phó phòng KH mất quyền Duyệt. Lỡ chạy ⇒ chạy lại file này.
 -- KHÔNG khai 2 vai trò mới bằng dòng app_roles (giống `planner` — có dòng app_roles thì ma trận này bị bỏ qua).
 
 -- ---------- 1. Lượt duyệt: giai đoạn ----------
@@ -66,12 +69,75 @@ create policy export_activity_log_insert on public.export_activity_log
     or public.has_export_permission('export-plans.payments', 'create')
     or public.has_export_permission('export-plans.payments', 'update')
   );
--- KHÔNG có policy update / delete ⇒ RLS chặn; chặn thêm ở tầng quyền (như audit_log 0025).
+-- App ghi MỌI bảng bằng UPSERT (insert … on conflict do update) — Postgres đòi quyền UPDATE + policy update
+-- kể cả khi dòng mới. Nên cho update cùng điều kiện với insert, NHƯNG trigger BEFORE UPDATE trả lại dòng cũ
+-- ⇒ không gì sửa được nội dung (gửi lại khi mất mạng vẫn qua, không báo lỗi, không đổi gì).
 drop policy if exists export_activity_log_update on public.export_activity_log;
+create policy export_activity_log_update on public.export_activity_log
+  for update to authenticated
+  using (
+    public.has_export_permission('export-plans', 'create')
+    or public.has_export_permission('export-plans', 'update')
+    or public.has_export_permission('export-plans', 'approve')
+    or public.has_export_permission('export-plans.loading', 'create')
+    or public.has_export_permission('export-plans.payments', 'create')
+    or public.has_export_permission('export-plans.payments', 'update')
+  )
+  with check (
+    public.has_export_permission('export-plans', 'create')
+    or public.has_export_permission('export-plans', 'update')
+    or public.has_export_permission('export-plans', 'approve')
+    or public.has_export_permission('export-plans.loading', 'create')
+    or public.has_export_permission('export-plans.payments', 'create')
+    or public.has_export_permission('export-plans.payments', 'update')
+  );
+-- Xóa: CHỈ dòng của chế độ demo (nạp lại bộ demo thay cả danh sách). Nhật ký site thật không xóa được.
 drop policy if exists export_activity_log_delete on public.export_activity_log;
+create policy export_activity_log_delete on public.export_activity_log
+  for delete to authenticated
+  using (site_id = 'site-demo' and public.has_export_permission('export-plans', 'view'));
+
+-- Chống giả mạo: người ghi + giờ ghi do MÁY CHỦ đặt (họ tên trong user_profiles của tài khoản đang gọi,
+-- giờ máy chủ). Gọi không qua tài khoản (SQL editor, service) ⇒ giữ giá trị gửi lên.
+create or replace function public.export_activity_log_stamp()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text;
+begin
+  if (select auth.uid()) is not null then
+    select coalesce(nullif(btrim(up.full_name), ''), up.username) into v_name
+      from public.user_profiles up where up.id = (select auth.uid())::text;
+    new.actor := coalesce(nullif(v_name, ''), new.actor);
+    new.created_at := now();
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.export_activity_log_stamp() from public, anon;
+drop trigger if exists export_activity_log_stamp on public.export_activity_log;
+create trigger export_activity_log_stamp before insert on public.export_activity_log
+  for each row execute function public.export_activity_log_stamp();
+
+create or replace function public.export_activity_log_immutable()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  return old; -- chỉ thêm: mọi UPDATE (kể cả nhánh ON CONFLICT của upsert) giữ nguyên dòng cũ
+end;
+$$;
+revoke all on function public.export_activity_log_immutable() from public, anon;
+drop trigger if exists export_activity_log_no_edit on public.export_activity_log;
+create trigger export_activity_log_no_edit before update on public.export_activity_log
+  for each row execute function public.export_activity_log_immutable();
+
 revoke all on public.export_activity_log from anon;
-revoke update, delete on public.export_activity_log from authenticated;
-grant select, insert on public.export_activity_log to authenticated;
+grant select, insert, update, delete on public.export_activity_log to authenticated;
 
 -- ---------- 4. 🔴 Siết RLS lượt duyệt: chỉ quyền approve ----------
 drop policy if exists export_contract_approvals_insert on public.export_contract_approvals;
@@ -95,7 +161,12 @@ security definer
 set search_path = public
 as $$
 begin
-  if (tg_op = 'INSERT' and new.status = 'closed')
+  -- SQL editor / service (không qua tài khoản) không bị chặn — sửa dữ liệu bằng tay vẫn làm được.
+  if (select auth.uid()) is null then return new; end if;
+  -- Upsert của app chạy BEFORE INSERT cả khi dòng đã có (rồi mới rẽ sang UPDATE) ⇒ nhánh INSERT chỉ
+  -- tính HĐ MỚI THẬT; HĐ đã có thì nhánh UPDATE so status cũ ↔ mới.
+  if (tg_op = 'INSERT' and new.status = 'closed'
+      and not exists (select 1 from public.export_contracts c where c.id = new.id))
      or (tg_op = 'UPDATE' and (new.status = 'closed') is distinct from (old.status = 'closed')) then
     if not public.has_export_permission('export-plans', 'approve') then
       raise exception 'Chỉ Trưởng / Phó phòng Kế hoạch được đóng hoặc mở lại hợp đồng xuất khẩu (cần quyền Duyệt).'
@@ -762,7 +833,9 @@ insert into public.default_role_permissions (role_id, resource, action, scope) v
 --     with check (public.has_export_permission('export-plans', 'create') or public.has_export_permission('export-plans', 'update'));
 --   create policy export_contract_approvals_delete on public.export_contract_approvals for delete to authenticated
 --     using (public.has_export_permission('export-plans', 'delete'));
---   drop table if exists public.export_activity_log;
+--   drop table if exists public.export_activity_log;   -- kéo theo trigger export_activity_log_no_edit
+--   drop function if exists public.export_activity_log_immutable();
+--   drop function if exists public.export_activity_log_stamp();
 --   delete from public.default_role_permissions where role_id in ('planning-head', 'planning-deputy') or action = 'approve' and resource = 'export-plans';
 --   -- current_user_departments(): chạy lại khối hàm của 0075 (bỏ 2 nhánh mới).
 --   -- 🔴 chỉ khi chưa có hồ sơ đính kèm cấp HĐ / lượt duyệt mới:

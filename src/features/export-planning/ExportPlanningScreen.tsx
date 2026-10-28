@@ -773,7 +773,8 @@ export default function ExportPlanningScreen() {
           }}
           filesAvailable={filesAvailable}
           selectedShipmentId={dossier.selected?.id ?? ""}
-          canDelete={canDeleteContract(d, contract.id).ok}
+          // Xóa HĐ nháp kéo theo xóa lượt duyệt của nó — RLS 0079 chỉ cho người có quyền Duyệt xóa lượt duyệt.
+          canDelete={canDeleteContract(d, contract.id).ok && (can.approve || !d.approvals.some((a) => a.contractId === contract.id))}
           canCancel={canCancel(d, contract.id).ok}
           onBack={() => setParam({ contract: "", shipment: "" })}
           onSelectShipment={(sid) => setParam({ shipment: sid }, true)}

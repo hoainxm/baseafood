@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   canOnRow,
+  isPermissionLoading,
   rowInScope,
   scopeContextFor,
   LEGACY_ROLE_PERMISSIONS,
@@ -338,5 +339,22 @@ describe("phạm vi dữ liệu — Đợt 5", () => {
     expect(canOnRow(p, ctx, "wip", "delete", { workshop: "Khô" })).toBe(true);
     expect(canOnRow(p, ctx, "wip", "delete", { workshop: "Cá" })).toBe(false);
     expect(canOnRow(p, ctx, "imports", "view", {})).toBe(false); // không có quyền thì phạm vi không cứu
+  });
+});
+
+describe("isPermissionLoading — chờ quyền chốt rồi mới vẽ sidebar (lỗi nav chớp 2026-10-28)", () => {
+  const base = { requiresLogin: true, hasProfile: true, isAdmin: false };
+  it("còn một bảng quyền đang nạp ⇒ chờ (không vẽ nav theo ma trận mặc định)", () => {
+    expect(isPermissionLoading({ ...base, tableStatuses: ["loading", "ready", "ready"] })).toBe(true);
+    expect(isPermissionLoading({ ...base, tableStatuses: ["ready", "ready", "loading"] })).toBe(true);
+  });
+  it("mọi bảng xong hoặc lỗi mạng (dùng bản sao dưới máy) ⇒ hết chờ", () => {
+    expect(isPermissionLoading({ ...base, tableStatuses: ["ready", "ready", "ready"] })).toBe(false);
+    expect(isPermissionLoading({ ...base, tableStatuses: ["error", "ready", "error"] })).toBe(false);
+  });
+  it("admin / chạy không đăng nhập / chưa có hồ sơ ⇒ không chờ", () => {
+    expect(isPermissionLoading({ ...base, isAdmin: true, tableStatuses: ["loading"] })).toBe(false);
+    expect(isPermissionLoading({ ...base, requiresLogin: false, tableStatuses: ["loading"] })).toBe(false);
+    expect(isPermissionLoading({ ...base, hasProfile: false, tableStatuses: ["loading"] })).toBe(false);
   });
 });

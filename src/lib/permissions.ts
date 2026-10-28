@@ -566,6 +566,22 @@ export interface ResolveInput {
  * 4. chỉnh riêng: chặn > cho > vai trò; 5. có hành động bất kỳ ⇒ có `view`;
  * 6. có quyền bất kỳ ⇒ xem được "Việc của tôi" và mở được "Tài liệu công ty".
  */
+/**
+ * Quyền còn đang nạp ⇒ CHƯA vẽ khung / sidebar (lỗi 2026-10-28: nạp dở mà vẽ thì dùng tạm ma trận
+ * mặc định, vai trò đã chỉnh ở /roles hoặc người bị chặn riêng thấy mục nav thừa chớp lên rồi ẩn).
+ * Không đăng nhập máy chủ / chưa có hồ sơ / admin ⇒ không chờ. Bảng lỗi ("error") ⇒ hết chờ
+ * (dùng bản sao dưới máy).
+ */
+export function isPermissionLoading(input: {
+  requiresLogin: boolean;
+  hasProfile: boolean;
+  isAdmin: boolean;
+  tableStatuses: readonly ("loading" | "ready" | "error")[];
+}): boolean {
+  if (!input.requiresLogin || !input.hasProfile || input.isAdmin) return false;
+  return input.tableStatuses.some((st) => st === "loading");
+}
+
 export function resolvePermissions({
   roles,
   isAdmin,

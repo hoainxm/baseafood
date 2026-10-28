@@ -4,7 +4,7 @@
 // Description: Main Application Component & Router Setup
 // ============================================================
 // src/App.tsx
-import { lazy, Suspense, useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   HashRouter,
   Routes,
@@ -36,6 +36,7 @@ import {
   buildRolePermissions,
   buildUserOverrides,
   homeRoutesFromAppRoles,
+  isPermissionLoading,
   resolvePermissions,
   roleNames,
   scopeContextFor,
@@ -80,6 +81,9 @@ const LotScanScreen = lazy(() => import("@/features/qr")); // Quét/tra lô theo
 const ReconciliationScreen = lazy(() => import("@/features/reconciliation")); // Đối soát HĐĐT ⇄ phần mềm kế toán, route /reconciliation (cũ /doi-soat
 const KitPage = lazy(() => import("@/design-system/kit/KitPage"));
 
+/** Chờ bảng quyền tối đa bao lâu trước khi vẽ khung theo ma trận mặc định (mạng treo). */
+const PERMISSION_WAIT_MS = 8000;
+
 /**
  * Layout dùng chung: khung `AppShell` điều khiển bằng react-router. `id` mục nav
  * = path, nên bấm sidebar/bottom-tab là điều hướng. Nạp lại giao diện theo tài
@@ -122,8 +126,24 @@ function ShellLayout() {
   // "không quyền" và bị đá về trang chủ. Bảng rỗng ⇒ ma trận mặc định (Đợt 1).
   const [appRoles, , { status: appRoleStatus }] = useAppRoles();
   const [rolePermissionRows, , { status: rolePermissionStatus }] = useRolePermissions();
-  const [userPermissionRows] = useUserPermissions();
+  const [userPermissionRows, , { status: userPermissionStatus }] = useUserPermissions();
   const isMatrixLoaded = appRoleStatus !== "loading" && rolePermissionStatus !== "loading";
+  // Vẽ khung (sidebar) CHỈ khi quyền đã chốt: đang nạp dở mà vẽ thì dùng tạm ma trận mặc
+  // định ⇒ vai trò đã chỉnh ở /roles hoặc người bị chặn riêng thấy mục nav thừa chớp lên rồi
+  // mới ẩn (lỗi báo 2026-10-28). Admin không đọc ma trận ⇒ không phải chờ. Lỗi mạng ⇒ bảng
+  // về "error" (dùng bản sao dưới máy) ⇒ hết chờ; treo quá 8 giây ⇒ vẽ theo cách cũ.
+  const isPermissionPending = isPermissionLoading({
+    requiresLogin: auth.requiresLogin,
+    hasProfile: !!profile,
+    isAdmin: auth.isAdmin,
+    tableStatuses: [appRoleStatus, rolePermissionStatus, userPermissionStatus],
+  });
+  const [isPermissionWaitOver, setIsPermissionWaitOver] = useState(false);
+  useEffect(() => {
+    if (!isPermissionPending) return;
+    const t = window.setTimeout(() => setIsPermissionWaitOver(true), PERMISSION_WAIT_MS);
+    return () => window.clearTimeout(t);
+  }, [isPermissionPending]);
   const matrix = useMemo(
     () => (isMatrixLoaded ? buildRolePermissions(appRoles, rolePermissionRows) : undefined),
     [isMatrixLoaded, appRoles, rolePermissionRows]
@@ -167,6 +187,14 @@ function ShellLayout() {
   // bảng giao việc (một bảng nhỏ); danh sách đầy đủ (gồm việc máy phát hiện) tính ở màn.
   const [taskAssignments] = useTaskAssignments();
   const myOpenTasks = countMyOpenAssignments(taskAssignments, profile?.id ?? "local", todayIso());
+
+  if (isPermissionPending && !isPermissionWaitOver) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center p-6">
+        <ProcessingState text="Đang tải quyền truy cập…" />
+      </div>
+    );
+  }
 
   const roles = profile?.roles ?? [];
   const visible = visibleNavIds(permissions);

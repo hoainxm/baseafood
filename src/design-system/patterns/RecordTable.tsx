@@ -17,6 +17,7 @@ import { useTopScrollbar } from "./topScrollbar";
 import { useFloatingTableHead } from "./floatingTableHead";
 import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
 import { ariaSort, sortHint, useTableSort } from "./SortableHeader";
+import { AbbrHint } from "./AbbrHint";
 import { nodeText, SORT_LABELS, type SortKind } from "./tableSort";
 
 export interface RecordTableColumn<T> {
@@ -278,7 +279,10 @@ export function RecordTable<T>({
     <dl className="grid gap-x-8 gap-y-3 @3xl:grid-cols-2 @5xl:grid-cols-3">
       {column.map((c) => (
         <div key={c.key} className="min-w-0">
-          <dt className="text-sm text-muted-foreground">{c.header}</dt>
+          <dt className="flex items-center gap-1 text-sm text-muted-foreground">
+            {c.header}
+            <AbbrHint label={c.header} />
+          </dt>
           <dd className={cn("text-sm font-medium break-words", c.numeric && "tnum")}>
             {c.render(r)}
           </dd>
@@ -360,6 +364,8 @@ export function RecordTable<T>({
                           {c.header}
                         </span>
                       )}
+                      {/* Nút "?" chú thích từ viết tắt (ETD, B/L…) — đứng NGOÀI nút sắp xếp (không lồng nút). */}
+                      <AbbrHint label={c.header} className="mr-1" />
                       </div>
                     </TableHead>
                   ))}

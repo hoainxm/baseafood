@@ -1,10 +1,11 @@
 // ============================================================
 // Tên file: src/features/export-planning/useExportData.ts
-// Tên tiếng Việt: Gom 8 bảng Xuất khẩu thành một khối dữ liệu cho màn
-// Description: Loads the 8 export-planning tables (mig 0075) into one ExportData + writers
+// Tên tiếng Việt: Gom 9 bảng Xuất khẩu thành một khối dữ liệu cho màn
+// Description: Loads the 9 export-planning tables (mig 0075 + 0079 activity log) into one ExportData + writers
 // ============================================================
 import { useMemo } from "react";
 import {
+  useExportActivityStore,
   useExportContractApprovals,
   useExportContractRevisions,
   useExportContracts,
@@ -31,10 +32,11 @@ export function useExportData() {
   const [items, saveItems] = useExportStepItems();
   const [files, saveFiles] = useExportFiles();
   const [payments, savePayments] = useExportPayments();
+  const { activities, setActivities: saveActivities, canLog } = useExportActivityStore();
 
   const data: ExportData = useMemo(
-    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments }),
-    [contracts, revisions, approvals, extensions, shipments, items, files, payments],
+    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities }),
+    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities],
   );
 
   return {
@@ -49,6 +51,8 @@ export function useExportData() {
     saveItems: ro(saveItems),
     saveFiles: ro(saveFiles),
     savePayments: ro(savePayments),
+    saveActivities: ro(saveActivities),
+    canLog,
   };
 }
 

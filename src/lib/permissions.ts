@@ -128,7 +128,8 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   // `export-plans` = hợp đồng, bản sửa, duyệt giấy, gia hạn, chuyến, bước, file. `.loading` = người
   // đóng hàng chỉ THÊM ảnh / sơ đồ cont (không thấy giá). `.payments` = bước 6: gửi bộ chứng từ, tiền về.
   // Máy chủ chặn bằng RLS riêng của 0075 (has_export_permission) — không qua trigger 0065.
-  { id: "export-plans", label: "Kế hoạch · Xuất khẩu", group: "planning", navId: "planning-export", actions: [...CRUD, "export", "view-price"] },
+  // `approve` (mig 0079): duyệt hợp đồng + duyệt cuối đóng HĐ — Trưởng / Phó phòng Kế hoạch.
+  { id: "export-plans", label: "Kế hoạch · Xuất khẩu", group: "planning", navId: "planning-export", actions: [...CRUD, "approve", "export", "view-price"] },
   { id: "export-plans.loading", label: "Xuất khẩu · Ảnh & sơ đồ đóng cont", group: "planning", navId: "planning-export", actions: ["view", "create"] },
   { id: "export-plans.payments", label: "Xuất khẩu · Chứng từ gửi khách & tiền về", group: "planning", navId: "planning-export", actions: CRUD },
 
@@ -212,6 +213,8 @@ export const LEGACY_ROLE_PERMISSIONS: RolePermissionMatrix = {
   "vice-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
   // Vai trò mới (0075) — đường lùi khẩn vẫn giữ đúng module của Phòng Kế hoạch.
   planner: grantAll(byNav(["planning-export", "catalog"])),
+  "planning-head": grantAll(byNav(["planning-export", "catalog"])),
+  "planning-deputy": grantAll(byNav(["planning-export", "catalog"])),
 };
 
 type RoleSpec = Readonly<Record<string, readonly PermissionAction[]>>;
@@ -477,6 +480,16 @@ const PLANNER: RoleSpec = {
 };
 
 /**
+ * Trưởng / Phó phòng Kế hoạch (mig 0079, chủ dự án chốt 2026-10-28): mọi việc của Nhân viên Kế
+ * hoạch + DUYỆT — duyệt bản hợp đồng, duyệt cuối đóng HĐ, mở lại HĐ đã đóng. Nhân viên Kế hoạch
+ * không có `approve`: lập HĐ, đính kèm, ghi chuyến (RLS 0079 chặn ở máy chủ).
+ */
+const PLANNING_HEAD: RoleSpec = {
+  ...PLANNER,
+  "export-plans": [...(PLANNER["export-plans"] ?? []), "approve"],
+};
+
+/**
  * Phạm vi Đợt 5 (2026-10-15): quản đốc chỉ GHI / chốt / mở lại / duyệt dòng XƯỞNG MÌNH ở
  * các khâu có lưu xưởng; tổ trưởng chỉ sửa dòng MÌNH GHI ở /wip (bảng có cột người ghi).
  * Đóng gói / QC không lưu người ghi ⇒ tổ trưởng ở đó vẫn `all`. Phó QĐ, tổ trưởng không gắn
@@ -508,6 +521,8 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissionMatrix = {
   "manager-kho": grantsOf(MANAGER, MANAGER_SCOPES),
   "vice-manager": grantsOf(VICE_MANAGER),
   planner: grantsOf(PLANNER),
+  "planning-head": grantsOf(PLANNING_HEAD),
+  "planning-deputy": grantsOf(PLANNING_HEAD),
 };
 
 /* ---------- Tính quyền thực ---------- */

@@ -2,10 +2,11 @@
 
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
-last_verified: 2026-10-27
+last_verified: 2026-10-28
 <!-- re-verified: 2026-10-27 10:00 — §11 lệch doc: đối chiếu từng mục với code (MaterialNxtScreen, MaterialGrid, MaterialImportScreen, WipProductionScreen, DocumentDetailDialog, documents.buildDocumentWarnings + myTasks, SalesOrderScreen, QcChecklistScreen.reopen, BalancingScreen carry-over) — khớp mô tả §11 -->
 ttl_days: 90
 <!-- updated: 2026-10-22 (d) — v4: mở rộng ra MỌI trang nghiệp vụ (21 trang có route, trừ 5 trang quản trị miễn): NV5 + R13–R17 + AC-12…AC-16; quy tắc 18 CLAUDE.md; cổng `pageTourCoverage.test.ts` quét route ⇄ tour ⇄ hộp "?" ⇄ mốc data-tour; §9c kiểm kê theo trang. -->
+<!-- updated: 2026-10-28 — tour + hộp "?" Xuất khẩu theo quy trình v8 (ba-spec 41 §0): giới thiệu 4 chặng; trạng thái HĐ 6 nhãn (Chờ duyệt · Chờ đính kèm · Đang ghi chuyến · Chờ duyệt cuối · Đã đóng HĐ · Đã hủy) + điều kiện sang chặng sau + ai làm; bước MỚI "Thanh chặng của hợp đồng" (mốc `contract-flow`) ⇒ 22 bước (trần §8); bước "Việc tiếp theo" nói nút theo vai trò + thẻ chờ; bước cuối hồ sơ gộp Hồ sơ đính kèm · Điều khoản · Nhật ký + chú thích viết tắt. Hộp "?" thêm mục Nhật ký thao tác. Test AC-10 bỏ nhãn cũ "Đã chốt HĐ". -->
 <!-- updated: 2026-10-22 — lời tour Xuất khẩu theo nhãn v5 (ba-spec 41 v5): bước "Lịch xuất hàng, Hợp đồng và Báo cáo" nói thêm tab Báo cáo · "số PO của khách" thay "số đơn của khách" · thẻ "Trễ hạn giao n ngày" · "Đang làm · xong k/5 bước bắt buộc" · bước 6 "Gửi chứng từ · tiền về". Không đổi mốc `data-tour`, số bước giữ nguyên; test `exportTour.test.ts` xanh. -->
 <!-- re-verified: 2026-10-21 — v3: áp nhánh nội dung của skill ba-flow-logic (references/06): §9b kiểm kê 9 nhóm mục có nguồn, R10–R12, AC-10/11 test đọc hằng số nhãn của lib/exportPlanning. -->
 <!-- re-verified: 2026-10-21 — v2: nhãn "Hướng dẫn thao tác", 21 bước (thêm trạng thái HĐ · việc tiếp · cột Tiến độ · trạng thái mục và file), chạy thật trên preview demo 1366 px + 360 px × 100 / 130 %. -->
@@ -107,7 +108,7 @@ N/A — không cross. Tour chỉ ĐỌC và DẪN; không tạo bản ghi, khôn
 ## 8. Success metric
 | Nghiệp vụ | Metric | Ngưỡng đạt |
 |---|---|---|
-| NV1 | số bước tour Xuất khẩu (đủ quyền, có hồ sơ minh họa) | 12 ≤ n ≤ 22 (hiện 21) |
+| NV1 | số bước tour Xuất khẩu (đủ quyền, có hồ sơ minh họa) | 12 ≤ n ≤ 22 (hiện 22 — v8 thêm "Thanh chặng của hợp đồng") |
 | NV1 | bản ghi bị đổi sau một vòng tour | 0 |
 | NV2 | vị trí trang sau khi thoát (đường dẫn) | == lúc bắt đầu |
 | NV1 | khung lời tour ở điện thoại 360 px, chữ 130 % | nằm trọn trong màn (0 px tràn) |

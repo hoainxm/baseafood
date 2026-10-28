@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { InfoTip } from "./InfoTip";
+import { AbbrHint } from "./AbbrHint";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, Pencil, Plus, Trash2, X } from "lucide-react";
 
@@ -156,6 +157,7 @@ export function Combobox({
               </span>
             )}
           </Label>
+          <AbbrHint label={label} />
           {info && <InfoTip label={label}>{info}</InfoTip>}
         </div>
       )}

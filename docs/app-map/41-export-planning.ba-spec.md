@@ -1,10 +1,11 @@
 # 41 — ba-spec: Phòng Kế hoạch · Xuất khẩu — Đợt 1 (khung tháng × khách × hợp đồng × chuyến)
 
 > Load khi: xây hoặc sửa module Xuất khẩu của Phòng Kế hoạch đợt 1: hồ sơ hợp đồng (dòng hàng, bản sửa, gia hạn, file ký, kết quả duyệt giấy), chuyến (mã lô MSL, booking, cont, seal, ngày đóng/ETD), 6 bước dạng checklist tay kèm file, thực xuất lấy từ invoice, khép kín chuyến/hợp đồng theo dung sai, tiền về, vai trò Phòng Kế hoạch, mở rộng danh mục khách.
-covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql
-last_verified: 2026-10-22
+covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql, supabase/migrations/0079_export_approval_workflow.sql, src/lib/abbreviations.ts
+last_verified: 2026-10-28
 ttl_days: 90
-status: ba-spec v7 (2026-10-22 tối: **đọc Commercial Invoice** từ file Excel gốc / PDF xuất từ Excel — NV17 · R27; ĐÃ BUILD 2026-10-22, không migration) · v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Hoài Nam ↔ Lê Khiêm; ĐÃ BUILD 2026-10-22, `0077` ✅ chạy DB thật 2026-10-22) · v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+status: ba-spec v8 (2026-10-28: **quy trình duyệt mới** — Trưởng / Phó phòng KH duyệt → đính kèm → ghi chuyến → duyệt cuối đóng HĐ; vai trò `planning-head` / `planning-deputy`; nhật ký HĐ; chú thích viết tắt; ĐÃ BUILD, mig 0079 CHƯA chạy) · v7 (2026-10-22 tối: **đọc Commercial Invoice** từ file Excel gốc / PDF xuất từ Excel — NV17 · R27; ĐÃ BUILD 2026-10-22, không migration) · v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Hoài Nam ↔ Lê Khiêm; ĐÃ BUILD 2026-10-22, `0077` ✅ chạy DB thật 2026-10-22) · v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+<!-- re-verified: 2026-10-28 15:00 — v8: luồng duyệt cũ (NV4 ghi kết quả BGĐ ký giấy, approvers = director/vice-director ở ExportPlanningScreen, RLS approvals = export-plans create/update ở 0075, contractState pending/approved/closed) đối chiếu code TRƯỚC khi sửa — khớp doc; sau sửa: AC-56…AC-61 = test `exportPlanning.test.ts`, RLS 0079 thử PGlite (Nhân viên KH bị chặn duyệt / đóng / mở lại; Trưởng / Phó làm được; nhật ký không sửa / xóa); nối mặt hàng R16/R23: 4 lỗi sửa + test. -->
 <!-- re-verified: 2026-10-22 (c) — v7: R27 + AC-51…AC-55 = test `invoiceReader.test.ts` (18, oracle invoice 234/26 chép từng ô); thử tay preview demo (localStorage): file Excel → điền số / ngày / 3 số tổng, PDF có chữ ra cùng kết quả, bản scan 234/26 → câu "bản scan", ô đã có số khác → báo + "Dùng số trên invoice", nối 1 dòng → Lưu trích xuất 1 tên "Trích xuất từ Invoice 234/26" + Hoàn tác, Hủy không ghi; 360 px × 130 % không tràn. Chưa thử: tải file từ kho file thật (cần DB), file Excel gốc THẬT của Phòng KH (chưa có). -->
 <!-- re-verified: 2026-10-22 (b) — v6: R23 · R26 + AC-39/40/46/47 = test `customerProductNames.test.ts` (11) + `exportPlanning.test.ts`; AC-48 = `useCustomerProductNameStore.isAvailable` (thử tay chưa có DB chưa chạy 0077 — chưa làm); AC-49 thử tay preview demo: bộ demo 18 tên trích xuất, hộp Tên hàng, form HĐ điền tên + quy cách của khách, nối mặt hàng tự thêm 1 tên + toast; RLS 0077 thử PGlite. -->
 <!-- re-verified: 2026-10-22 — v5: R23–R25 + AC-39…AC-44 = test `exportPlanning.test.ts` (52) + `exportReports.test.ts` (15) + `repo.test.ts` (AC-41); AC-45 thử bằng hàm Excel (0 ô tiền) — phần màn hình cần tài khoản không quyền giá (chưa thử tay); tên thương mại + báo cáo + danh sách file thử tay preview demo 1366 px + 360 px × 100 / 130 %. -->
@@ -15,6 +16,42 @@ status: ba-spec v7 (2026-10-22 tối: **đọc Commercial Invoice** từ file Ex
 > **Giao diện:** design-spec [42](42-export-planning-ui.design-spec.md) (oracle giao diện — chỉnh UI đọc file đó).
 > **Mục đích:** oracle HÀNH VI cho đợt 1. Định nghĩa ai làm nghiệp vụ gì, vào gì ra gì, thế nào là đúng (AC). **Không** mô tả giao diện (việc của design-spec).
 > **Nguồn đã chốt:** kế hoạch [`spec/xuat-khau-phong-ke-hoach.md`](../spec/xuat-khau-phong-ke-hoach.md) (§9 chốt 11 câu 2026-10-20) · quy trình [`QTI-KH-01`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (luật KH-R1…R16) · phân quyền [`spec/role-permissions.md`](../spec/role-permissions.md) · tài liệu công ty [`40-documents.md`](40-documents.md) (khuôn file + RLS).
+
+
+## 0. v8 (2026-10-28) — quy trình duyệt mới · THẮNG mọi mục cũ trái với mục này
+
+Chủ dự án chốt 2026-10-28 (4 câu hỏi qua phiên Claude). Mục nào bên dưới còn nói "BGĐ ký giấy, nhân viên ghi lại", "HĐ chờ duyệt vẫn lên chuyến", "HĐ tự khép Đã xuất đủ" hay "Chốt HĐ" là **luật cũ**, đọc theo mục này.
+
+**Chặng của hợp đồng** (`ContractState`, `CONTRACT_FLOW_STAGES` ở `lib/exportPlanning.ts`):
+
+| Chặng | Trạng thái | Ai làm | Điều kiện sang chặng sau |
+|---|---|---|---|
+| 1 Duyệt HĐ | `pending` Chờ duyệt | **U6 Trưởng / Phó phòng KH** duyệt trên app (đồng ý / yêu cầu sửa / từ chối) | có bản `approved` |
+| 2 Đính kèm | `attaching` Chờ đính kèm | U1 Nhân viên KH | đủ hồ sơ bắt buộc: **hợp đồng đã ký** luôn có + **L/C** khi thanh toán L/C (`requiredAttachmentKinds`). Proforma / hồ sơ khác không bắt |
+| 3 Ghi chuyến | `shipping` Đang ghi chuyến | U1 | mọi chuyến đủ hồ sơ + thực xuất trong dung sai (luật `contractClosure` cũ) |
+| 4 Duyệt cuối | `final-review` Chờ duyệt cuối | U6 | đồng ý ⇒ `status = closed` |
+| Đóng | `closed` Đã đóng HĐ | — | U6 mở lại được (phải duyệt cuối lại) |
+
+**Luật v8:**
+- **R28 — Người duyệt.** Chỉ người có quyền `export-plans:approve` (vai trò **`planning-head` Trưởng phòng Kế hoạch**, **`planning-deputy` Phó phòng Kế hoạch**, admin) ghi lượt duyệt (bản HĐ lẫn duyệt cuối). Người duyệt = **tài khoản đang đăng nhập** (không chọn / gõ thay). Nhân viên KH (`planner`) KHÔNG có `approve`. Máy chủ chặn: RLS `export_contract_approvals` insert / update / delete = `approve` (mig 0079).
+- **R29 — Ghi chuyến sau cùng.** Ghi chuyến MỚI chỉ khi HĐ còn mở, **đã duyệt** và **đủ hồ sơ đính kèm** (`shipmentGate`). Chuyến đã có từ trước giữ nguyên (sửa / theo dõi bước được). Bước 1 của chuyến ("Hợp đồng") xong = có bản hiệu lực + đủ hồ sơ đính kèm (thay luật A4 "bản hiệu lực có file ký").
+- **R30 — HĐ duyệt theo luật cũ.** Lượt duyệt không có `stage` (BGĐ ký giấy, ghi trước 0079) ⇒ file bản HĐ / bản ký scan tính thay "Hợp đồng đã ký" — HĐ cũ không bị kẹt ở Chờ đính kèm vì thiếu file đó (L/C vẫn bắt). Lượt duyệt mới có `stage = contract`.
+- **R31 — Duyệt cuối.** Xuất đủ không còn tự đóng: HĐ chuyển **Chờ duyệt cuối**. Duyệt cuối = lượt duyệt `stage = final` gắn bản hiệu lực; **đồng ý** ⇒ `status closed` (+ lý do / ghi chú), **trả về** ⇒ ghi lý do, HĐ đứng nguyên chặng. Đóng sớm khi đang ghi chuyến (ngoài dung sai — khách giảm lượng, phụ kiện) = duyệt cuối **bắt lý do** (thay "Chốt HĐ" của nhân viên). Cần ≥ 1 chuyến còn mở. Máy chủ: trigger `export_contracts_enforce_close` — đổi status sang / khỏi `closed` phải có `approve`.
+- **R32 — Nhật ký hợp đồng.** Mọi lượt ghi trên màn (lập / sửa bản, duyệt, đính kèm / gỡ file, ghi / sửa / hủy / xóa chuyến, cập nhật mục bước, tiền về, hủy / đóng / mở lại HĐ, **Hoàn tác**) thêm một dòng vào bảng `export_activity_log`: ai · lúc nào · việc gì · chuyến nào. **Chỉ thêm** — RLS không cho sửa / xóa. Xem ở hồ sơ HĐ (khối "Nhật ký thao tác") — ai có `export-plans:view`. Máy chủ chưa chạy 0079 ⇒ không ghi (không kẹt hàng chờ), nghiệp vụ vẫn chạy. Nhật ký chung `audit_log` vẫn ghi diff như mọi bảng (admin xem ở /audit); bảng nhật ký HĐ không chép sang `audit_log`.
+- **R33 — Chú thích viết tắt.** Mọi nhãn ô nhập / tiêu đề cột / nhãn thông tin có từ viết tắt ngoại thương (ETD, ETA, L/C, TTR, B/L, C/O, H/C, HS, MSL, Incoterm, FOB, CFR, CIF, RF, HC, rvs, PL) tự có nút "?" — rê chuột xem nghĩa, chạm mở chú thích. Bảng chữ ở `lib/abbreviations.ts` (HĐ, BGĐ không gắn — ai cũng biết).
+
+**User registry v8:** thêm **U6 Trưởng / Phó phòng Kế hoạch** (`planning-head`, `planning-deputy`, phòng `planning`, trang chủ Xuất khẩu) = mọi quyền của U1 + `approve`. **U2 Ban giám đốc** không còn trong luồng duyệt (chỉ xem). U1 lập HĐ, đính kèm, ghi chuyến, cập nhật bước; không duyệt, không đóng / mở lại HĐ.
+
+**Nối mặt hàng (R16 / R23, rà 2026-10-28):** (a) nối ở bản hiệu lực ⇒ bản sửa CHỜ DUYỆT mới hơn nhận nối cho dòng cùng tên + size còn trống (`applyProductMapping`); (b) mở lại nháp cũ không xóa nối của dòng không có trong nháp; (c) bậc 2 "tên của khách" không nhận dòng tên ghi size KHÁC size của dòng HĐ; (d) bậc 3 "HĐ trước" bỏ dòng cùng tên khác size. Còn để sau: gợi ý chạy khi rời ô tên trước khi gõ size; nối sai đã trích xuất tên của khách không tự sửa; so size chưa bỏ khoảng trắng như invoice (`sizeKey`).
+
+**AC v8** (test `exportPlanning.test.ts` khối "v8"):
+- **AC-56** Duyệt mới xong ⇒ Chờ đính kèm; bước 1 chưa xong; chưa ghi chuyến được (file bản HĐ lúc lập không tính).
+- **AC-57** Chưa duyệt ⇒ không ghi chuyến được.
+- **AC-58** L/C ⇒ bắt cả HĐ đã ký lẫn L/C; đủ thì Đang ghi chuyến, ghi chuyến được, bước 1 xong.
+- **AC-59** Không nối máy chủ ⇒ không bắt file đính kèm.
+- **AC-60** Duyệt cuối không đổi bản hiệu lực; trả về ⇒ vẫn Chờ duyệt cuối; status closed ⇒ Đã đóng HĐ.
+- **AC-61** Ngoài dung sai ⇒ duyệt cuối được nhưng bắt lý do; chưa có chuyến ⇒ chưa duyệt cuối.
+- **AC-62** (manual, cần DB) Nhân viên KH ghi lượt duyệt / đóng / mở lại HĐ qua API ⇒ máy chủ từ chối; sửa nhật ký ⇒ từ chối. Đã thử trên PGlite.
 
 ---
 

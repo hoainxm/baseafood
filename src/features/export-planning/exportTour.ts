@@ -71,7 +71,8 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       id: "intro",
       title: "Giới thiệu trang Xuất khẩu",
       body:
-        "Trang Xuất khẩu theo dõi từng hợp đồng xuất khẩu và từng chuyến hàng (một container, một xe tải hoặc một lô đóng ghép) cho tới khi hợp đồng xuất đủ.\n" +
+        "Trang Xuất khẩu theo dõi từng hợp đồng xuất khẩu và từng chuyến hàng (một container, một xe tải hoặc một lô đóng ghép) cho tới khi đóng hợp đồng.\n" +
+        "Hợp đồng đi qua 4 chặng: Trưởng / Phó phòng Kế hoạch duyệt → Nhân viên Kế hoạch đính kèm hồ sơ → ghi chuyến → Trưởng / Phó phòng duyệt cuối rồi đóng hợp đồng.\n" +
         "Mỗi chuyến đi qua 6 bước: 1 Hợp đồng · 2 Lệnh sản xuất · 3 Bao bì · 4 Đóng cont · 5 Bộ chứng từ · 6 Gửi chứng từ · tiền về.\n" +
         "Trong lúc xem hướng dẫn, các nút trên trang tạm khóa và dữ liệu không thay đổi. Chọn Tiếp theo (phím →) để sang bước sau, Quay lại (phím ←) để xem lại, Esc để thoát.",
     }),
@@ -94,7 +95,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Lập hợp đồng",
         body:
           "Khi có hợp đồng giấy mới, chọn Lập hợp đồng và nhập đúng như bản giấy. Phiếu gồm 5 phần: 1 Hợp đồng · 2 Điều khoản và thanh toán · 3 Chứng từ khách yêu cầu · 4 Dòng hàng · 5 File và ghi chú.\n" +
-          "Sau khi lưu, hồ sơ hợp đồng mở ra ở trạng thái Chờ duyệt.",
+          "Sau khi lưu, hồ sơ hợp đồng mở ra ở trạng thái Chờ duyệt, chờ Trưởng hoặc Phó phòng Kế hoạch duyệt.",
       }),
     );
   }
@@ -124,7 +125,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         "• Chuyến trong kỳ: số chuyến và tổng kg kế hoạch.\n" +
         "• Chuyến đủ hồ sơ: chuyến đã xong bước 1 đến 5.\n" +
         "• Chuyến còn thiếu: chuyến chưa xong ít nhất một bước trong bước 1 đến 5.\n" +
-        "• Trễ hạn giao: chuyến có ngày on board (chưa có thì ETD) sau hạn giao của hợp đồng. Dòng phụ cho biết thêm số hợp đồng đã quá hạn mà chưa lên chuyến.",
+        "• Trễ hạn giao: chuyến có ngày on board (chưa có thì ETD) sau hạn giao của hợp đồng. Dòng phụ cho biết thêm số hợp đồng đã quá hạn mà chưa ghi chuyến.",
     }),
     plan({
       id: "shipment-table",
@@ -149,9 +150,9 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       id: "pending-contracts",
       target: "pending-contracts",
       optional: true,
-      title: "Hợp đồng chưa lên đủ chuyến",
+      title: "Hợp đồng chưa ghi đủ chuyến",
       body:
-        "Danh sách hợp đồng có hạn giao trong kỳ (hoặc đã quá hạn) nhưng chưa xếp đủ chuyến. Cột Còn thiếu ghi số kg hoặc số container chưa lên chuyến; thẻ Quá hạn cho biết hợp đồng đã quá hạn giao.",
+        "Danh sách hợp đồng có hạn giao trong kỳ (hoặc đã quá hạn) nhưng chưa xếp đủ chuyến. Cột Còn thiếu ghi số kg hoặc số container chưa ghi chuyến; thẻ Quá hạn cho biết hợp đồng đã quá hạn giao.",
     }),
   );
 
@@ -160,7 +161,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       id: "dossier-overview",
       title: "Hồ sơ hợp đồng",
       body:
-        "Khi đã có hợp đồng, chọn Mở để vào hồ sơ. Hồ sơ gồm: trạng thái hợp đồng (Chờ duyệt, Đã duyệt, Đã xuất đủ, Đã chốt HĐ, Đã hủy), việc tiếp theo (Ghi kết quả duyệt, rồi Lên chuyến) và 6 bước của từng chuyến.\n" +
+        "Khi đã có hợp đồng, chọn Mở để vào hồ sơ. Hồ sơ gồm: trạng thái hợp đồng (Chờ duyệt, Chờ đính kèm, Đang ghi chuyến, Chờ duyệt cuối, Đã đóng HĐ, Đã hủy), việc tiếp theo (Duyệt hợp đồng → Đính kèm hồ sơ → Ghi chuyến → Duyệt cuối) và 6 bước của từng chuyến.\n" +
         "Mỗi mục trong bước có trạng thái Chưa làm, Đang làm, Xong hoặc Không áp dụng. Mục chỉ được đánh dấu Xong khi đủ file và số chứng từ.",
     });
   } else {
@@ -178,12 +179,22 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Trạng thái hợp đồng",
         body:
           "Thẻ đầu tiên dưới số hợp đồng là trạng thái:\n" +
-          "• Chờ duyệt: đã lập, chưa ghi kết quả Ban Giám đốc ký duyệt.\n" +
-          "• Đã duyệt: có bản hợp đồng được duyệt, đang thực hiện.\n" +
-          "• Đã xuất đủ: mọi chuyến đủ hồ sơ và số thực xuất nằm trong dung sai cả kg lẫn tiền (hệ thống tự tính).\n" +
-          "• Đã chốt HĐ: đóng thủ công, kèm lý do chốt.\n" +
+          "• Chờ duyệt: đã lập, chờ Trưởng hoặc Phó phòng Kế hoạch duyệt.\n" +
+          "• Chờ đính kèm: đã duyệt, còn thiếu hồ sơ bắt buộc (thẻ Thiếu ghi rõ loại). Chưa ghi chuyến được.\n" +
+          "• Đang ghi chuyến: đủ hồ sơ, đang ghi và theo dõi các chuyến.\n" +
+          "• Chờ duyệt cuối: mọi chuyến đủ hồ sơ và số thực xuất nằm trong dung sai cả kg lẫn tiền (hệ thống tự tính), chờ Trưởng / Phó phòng xem lại.\n" +
+          "• Đã đóng HĐ: đã duyệt cuối, hoặc đóng sớm kèm lý do.\n" +
           "• Đã hủy: kèm lý do hủy.\n" +
-          "Thẻ cảnh báo đi kèm: Quá hạn giao · Còn … chưa lên chuyến · … dòng hàng chưa nối danh mục · Bản sửa chờ duyệt · Ngoài dung sai.",
+          "Thẻ cảnh báo đi kèm: Quá hạn giao · Còn … chưa ghi chuyến · … dòng hàng chưa nối danh mục · Bản sửa chờ duyệt · Ngoài dung sai · Duyệt cuối trả về.",
+      }),
+      dossier({
+        id: "contract-flow",
+        target: "contract-flow",
+        optional: true,
+        title: "Thanh chặng của hợp đồng",
+        body:
+          "Bốn chặng theo thứ tự: Duyệt HĐ · Đính kèm · Ghi chuyến · Duyệt cuối, cuối cùng là Đóng HĐ. Chặng xong có dấu tích xanh, chặng đang ở tô vàng và ghi ai làm.\n" +
+          "Duyệt HĐ, Duyệt cuối: Trưởng phòng hoặc Phó phòng Kế hoạch. Đính kèm, Ghi chuyến: Nhân viên Kế hoạch. Rê chuột (hoặc chạm) vào một chặng để xem cần làm gì.",
       }),
       dossier({
         id: "next-action",
@@ -191,8 +202,8 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         optional: true,
         title: "Việc tiếp theo",
         body:
-          "Nút chính là việc cần làm tiếp của hợp đồng: Ghi kết quả duyệt khi hợp đồng đang chờ duyệt, Lên chuyến khi đã duyệt mà chưa đủ chuyến. Không còn việc thì nút chính không hiện.\n" +
-          "Thao tác khác gồm các việc ít dùng: ghi bản sửa, gia hạn, lên chuyến, ghi tiền cọc, chốt hợp đồng, hủy, xóa.",
+          "Nút chính là việc cần làm tiếp của hợp đồng, theo chặng và theo vai trò: Duyệt hợp đồng · Đính kèm hồ sơ · Ghi chuyến · Duyệt cuối. Chặng không phải việc của bạn thì hiện thẻ chờ, ví dụ \"Chờ Trưởng / Phó phòng Kế hoạch duyệt hợp đồng\".\n" +
+          "Thao tác khác gồm các việc ít dùng: ghi bản sửa, gia hạn, đính kèm thêm, ghi thêm chuyến, ghi tiền cọc, duyệt cuối đóng sớm (kèm lý do), hủy, xóa.",
       }),
       dossier({
         id: "dossier-summary",
@@ -202,7 +213,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           "• Hạn giao: ghi \"đã gia hạn\" nếu hợp đồng được gia hạn.\n" +
           "• Tổng hợp đồng: kg và tiền theo bản đang hiệu lực.\n" +
           "• Dung sai: áp cho cả lượng và tiền.\n" +
-          "• Chuyến: số chuyến đã lên trên số container của hợp đồng.\n" +
+          "• Chuyến: số chuyến đã ghi trên số container của hợp đồng.\n" +
           "• Thực xuất và tiền về: cộng từ Commercial Invoice của các chuyến.",
       }),
       dossier({
@@ -280,12 +291,14 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         id: "contract-details",
         target: "contract-details",
         optional: true,
-        title: "Điều khoản, dòng hàng, các bản hợp đồng",
+        title: "Hồ sơ đính kèm, điều khoản, nhật ký",
         body:
           "Chọn tiêu đề của mỗi phần để mở hoặc gập.\n" +
-          "• Điều khoản: Incoterm, cảng, thanh toán, hạn giao, chứng từ khách yêu cầu.\n" +
+          "• Hồ sơ đính kèm: thẻ từng loại bắt buộc (đã có / còn thiếu) và danh sách file. Đủ hồ sơ mới ghi chuyến được.\n" +
+          "• Điều khoản: Incoterm, cảng, thanh toán, hạn giao, chứng từ khách yêu cầu. Rê chuột vào nút ? hoặc chữ gạch chấm (ETD, L/C, B/L…) để xem nghĩa từ viết tắt.\n" +
           "• Dòng hàng: từng mặt hàng, số lượng, kg, giá. Nối mặt hàng để gắn dòng hàng với danh mục (cần trước khi Lệnh sản xuất xong).\n" +
-          "• Các bản hợp đồng và kết quả duyệt: lịch sử bản sửa và các lần Ban Giám đốc duyệt.",
+          "• Các bản hợp đồng · duyệt · duyệt cuối: lịch sử bản sửa, các lần duyệt và duyệt cuối.\n" +
+          "• Nhật ký thao tác: ai làm gì, lúc nào trên hợp đồng — chỉ thêm, không sửa hay xóa được.",
       }),
     );
   }

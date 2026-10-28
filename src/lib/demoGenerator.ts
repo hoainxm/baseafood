@@ -59,6 +59,7 @@ import type {
   ExportDeadlineExtension,
   ExportFile,
   ExportPayment,
+  ExportActivity,
   CustomerProductName,
   ExportShipment,
   ExportStepItem,
@@ -127,6 +128,8 @@ export interface DemoBundle {
   exportStepItems: ExportStepItem[];
   exportFiles: ExportFile[];
   exportPayments: ExportPayment[];
+  /** Nhật ký hợp đồng (mig 0079) — bộ demo ghi các bước đã làm của HĐ mẫu. */
+  exportActivities: ExportActivity[];
   /** Tên hàng theo khách (mig 0077) — TRÍCH XUẤT từ dòng hàng đã nối của bộ HĐ demo (như app làm khi lưu HĐ). */
   customerProductNames: CustomerProductName[];
   labelPrints: LabelPrint[];
@@ -702,6 +705,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     exportStepItems: exportDemo.items,
     exportFiles: exportDemo.files,
     exportPayments: exportDemo.payments,
+    exportActivities: exportDemo.activities,
     customerProductNames: demoCustomerNames(exportDemo),
     labelPrints,
     qcChecklists,

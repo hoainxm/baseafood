@@ -6,7 +6,7 @@
 //              action) instead of nested cards. Buttons gated by export-plans / .loading / .payments.
 // ============================================================
 import type { ReactNode } from "react";
-import { Button, InlineConfirmDelete, Tag, formatNumber } from "@/design-system";
+import { Button, InlineConfirmDelete, Tag, formatNumber, AbbrHint } from "@/design-system";
 import { newId } from "@/lib/store";
 import {
   ITEM_STATE_LABELS,
@@ -480,7 +480,10 @@ export function ShipmentPanel({
 function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="grid min-w-0 content-start gap-0.5">
-      <dt className="text-muted-foreground">{label}</dt>
+      <dt className="flex items-center gap-1 text-muted-foreground">
+        {label}
+        <AbbrHint label={label} />
+      </dt>
       <dd className="tnum break-words font-medium">{value || "—"}</dd>
     </div>
   );

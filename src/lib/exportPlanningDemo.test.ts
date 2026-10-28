@@ -31,9 +31,10 @@ describe("bộ demo Xuất khẩu", () => {
     const st = Object.fromEntries(d.contracts.map((c) => [c.contractNo, contractState(d, c.id)]));
     expect(st).toEqual({
       "DM-01/2026": "closed",
-      "21.26/BSF-SCM.2026": "closed",
-      "02.26/BSF-SCM.2026": "approved",
-      "07.26/BSF-HTC.2026": "approved",
+      // Quy trình mig 0079: xuất đủ ⇒ chờ duyệt cuối; L/C chưa đính kèm ⇒ chờ đính kèm.
+      "21.26/BSF-SCM.2026": "final-review",
+      "02.26/BSF-SCM.2026": "shipping",
+      "07.26/BSF-HTC.2026": "attaching",
       "11.26/BSF-MTD.2026": "pending",
       "05.26/BSF-PC.2026": "cancelled",
       "99.26/BSF-LK.2026": "pending",

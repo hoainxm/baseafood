@@ -40,6 +40,11 @@ describe("Khớp tên của khách (R23 bậc 1–2)", () => {
     expect(productsByCustomerName(names, "scm", "Frozen boiled octopus")).toEqual({ tier: null, productIds: [] });
     expect(productsByCustomerName(names, "mat", "Frozen boiled octopus", "x")).toEqual({ tier: 2, productIds: ["p-55"] });
   });
+  it("bậc 2 không nhận tên ghi size KHÁC size của dòng (chỉ có tên 5-5.5 gr, dòng 6-7 gr ⇒ không gợi ý)", () => {
+    const only55 = [row({ productId: "p-55", sizeText: "5-5.5 gr/pc" })];
+    expect(productsByCustomerName(only55, "scm", "Frozen iwadako boiled cut", "6-7 gr/pc")).toEqual({ tier: null, productIds: [] });
+    expect(productsByCustomerName(only55, "scm", "Frozen iwadako boiled cut")).toEqual({ tier: 2, productIds: ["p-55"] });
+  });
 });
 
 describe("AC-47 — chặn trùng trong danh sách của một khách", () => {

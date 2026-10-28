@@ -6,11 +6,11 @@
 // ============================================================
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, FormDialog, ProcessingState, Tag, notify, type TagVariant } from "@/design-system";
-import { ITEM_STATE_LABELS, STEP_TITLES, type StepNo } from "@/lib/exportPlanning";
+import { CONTRACT_FLOW_STAGES, ITEM_STATE_LABELS, STEP_TITLES, contractFlowIndex, type ContractState, type StepNo } from "@/lib/exportPlanning";
 import { DEMO_PLACEHOLDER_PREFIX, EXPORT_FILE_ACCEPT, getExportFileUrl } from "@/lib/exportFileStorage";
 import { filePreviewKind } from "@/lib/documents";
 import { formatDateVN } from "@/lib/format";
-import type { ExportFile, ExportItemState } from "@/types";
+import type { ExportActivity, ExportFile, ExportItemState } from "@/types";
 import { Check, ChevronDown, CircleDashed, Download, ExternalLink, Eye, FileText, Image as ImageIcon, Minus, Paperclip, Trash2, X } from "lucide-react";
 
 const STATE_TAG: Record<ExportItemState, TagVariant> = {
@@ -331,6 +331,79 @@ export function StepStepper({ steps, current, onSelect }: { steps: Record<StepNo
         );
       })}
     </ol>
+  );
+}
+
+/**
+ * Thanh chặng quy trình hợp đồng (mig 0079): Duyệt HĐ → Đính kèm → Ghi chuyến → Duyệt cuối → Đóng HĐ.
+ * Chặng xong tô xanh, chặng đang ở tô vàng; rê / chạm vào chặng xem ai làm, làm gì.
+ */
+export function ContractFlowBar({ state }: { state: ContractState }) {
+  const current = contractFlowIndex(state);
+  if (current < 0) return null;
+  return (
+    <ol data-tour="contract-flow" className="flex min-w-0 gap-1" aria-label={`Quy trình hợp đồng — đang ở chặng ${CONTRACT_FLOW_STAGES[current].title}`}>
+      {CONTRACT_FLOW_STAGES.map((st, i) => {
+        const isDone = i < current || state === "closed";
+        // HĐ đã đóng: chặng cuối vẫn là "chặng đang ở" để điện thoại còn một nhãn (không chỉ dãy dấu tích).
+        const isCurrent = i === current;
+        const tone = isDone ? "bg-success" : isCurrent ? "bg-warning" : "bg-border";
+        const tip = `${i + 1}. ${st.title}${st.who ? ` — ${st.who}` : ""}: ${st.hint}`;
+        return (
+          <li key={st.state} className={`flex min-w-0 flex-col gap-2 ${isCurrent ? "flex-[2]" : "flex-1"} sm:min-w-24 sm:flex-1`}>
+            <span className={`h-1.5 rounded-full ${tone}`} aria-hidden />
+            <span
+              tabIndex={0}
+              title={tip}
+              aria-current={isCurrent ? "step" : undefined}
+              className={`flex min-w-0 items-center gap-2 px-1 text-sm leading-tight ${isCurrent ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+            >
+              {isDone ? <Check className="h-4 w-4 shrink-0 text-success" aria-hidden /> : <CircleDashed className="h-4 w-4 shrink-0" aria-hidden />}
+              {/* Điện thoại: chỉ chặng đang ở hiện nhãn — 5 nhãn không vừa 360 px. */}
+              <span className={`min-w-0 ${isCurrent ? "" : "hidden sm:inline"}`}>
+                {st.title}
+                {isCurrent && st.who ? <span className="block font-normal text-muted-foreground">{st.who}</span> : null}
+              </span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+const ACTIVITY_LIST_COLLAPSE_AFTER = 15;
+
+/** Nhật ký thao tác của hợp đồng — mới trước: giờ · người · việc (· chuyến). */
+export function ActivityList({ items, shipmentLabel }: { items: readonly ExportActivity[]; shipmentLabel: (shipmentId: string) => string }) {
+  const [showAll, setShowAll] = useState(false);
+  if (!items.length) return <p className="text-sm text-muted-foreground">Chưa có thao tác nào được ghi nhật ký (nhật ký bắt đầu ghi từ khi có quy trình duyệt mới).</p>;
+  const isLong = items.length > ACTIVITY_LIST_COLLAPSE_AFTER;
+  const shown = isLong && !showAll ? items.slice(0, ACTIVITY_LIST_COLLAPSE_AFTER) : items;
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
+      <ol className="grid min-w-0 grid-cols-[minmax(0,1fr)] divide-y divide-border rounded-lg border border-border">
+        {shown.map((a) => {
+          const at = a.createdAt ? new Date(a.createdAt) : null;
+          const when = at && !Number.isNaN(at.getTime()) ? `${formatDateVN(a.createdAt.slice(0, 10))} ${at.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}` : "";
+          const ship = a.shipmentId ? shipmentLabel(a.shipmentId) : "";
+          return (
+            <li key={a.id} className="grid min-w-0 gap-0.5 px-3 py-2">
+              <span className="break-words">{a.summary}</span>
+              <span className="tnum text-sm text-muted-foreground">{[when, a.actor, ship].filter(Boolean).join(" · ")}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {isLong && (
+        <div>
+          <Button size="sm" variant="ghost" onClick={() => setShowAll((v) => !v)} title={showAll ? `Chỉ hiện ${ACTIVITY_LIST_COLLAPSE_AFTER} dòng mới nhất.` : `Hiện đủ ${items.length} dòng nhật ký.`}>
+            <ChevronDown className={`mr-1 h-4 w-4 transition-transform ${showAll ? "rotate-180" : ""}`} aria-hidden />
+            {showAll ? "Thu gọn" : `Hiện tất cả ${items.length} dòng`}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 

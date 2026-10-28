@@ -23,6 +23,7 @@ import type {
   ExportContractTerms,
   ExportFile,
   ExportPayment,
+  ExportActivity,
   ExportShipment,
   ExportShipmentKind,
   ExportStepItem,
@@ -212,6 +213,7 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
     items: [] as ExportStepItem[],
     files: [] as ExportFile[],
     payments: [] as ExportPayment[],
+    activities: [] as ExportActivity[],
     extraCustomers: [] as Customer[],
   };
   if (!customers.length) return out;
@@ -571,6 +573,18 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
         }
       });
     });
+  }
+
+  // Nhật ký hợp đồng (mig 0079): bộ demo để lại dấu các bước đã làm — trang hồ sơ có nhật ký để xem thử.
+  for (const c of out.contracts) {
+    out.activities.push({ id: id("nk"), contractId: c.id, shipmentId: "", action: "create", summary: `Lập HĐ ${c.contractNo} (bản 0) — chờ duyệt`, actor: "Demo", createdAt: at(c.signedOn || today) });
+    for (const a of out.approvals.filter((x) => x.contractId === c.id)) {
+      const verb = a.decision === "approved" ? "đồng ý" : a.decision === "rejected" ? "từ chối" : "yêu cầu sửa";
+      out.activities.push({ id: id("nk"), contractId: c.id, shipmentId: "", action: a.decision === "approved" ? "approve" : a.decision === "rejected" ? "reject" : "return", summary: `Duyệt HĐ ${c.contractNo}: ${verb}${a.reason ? ` — ${a.reason}` : ""}`, actor: a.approverName, createdAt: a.createdAt });
+    }
+    for (const s of out.shipments.filter((x) => x.contractId === c.id))
+      out.activities.push({ id: id("nk"), contractId: c.id, shipmentId: s.id, action: "create", summary: `Ghi chuyến ${s.lotCode ? `lô ${s.lotCode}` : s.bookingNo || ""}`.trim(), actor: "Demo", createdAt: s.createdAt });
+    if (c.status === "closed") out.activities.push({ id: id("nk"), contractId: c.id, shipmentId: "", action: "close", summary: `Đóng HĐ ${c.contractNo}${c.closeReason ? ` — ${c.closeReason}` : ""}`, actor: APPROVER, createdAt: at(today) });
   }
 
   return out;

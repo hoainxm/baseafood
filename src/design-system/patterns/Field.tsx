@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Label } from "@/components/ui/label";
+import { AbbrHint } from "./AbbrHint";
 import { cn } from "@/lib/utils";
 import { FieldInputContext, type FieldInputProps } from "./fieldInput";
 
@@ -158,6 +159,7 @@ export function Field({
               </span>
             )}
           </Label>
+          <AbbrHint label={label} />
         </div>
       )}
 

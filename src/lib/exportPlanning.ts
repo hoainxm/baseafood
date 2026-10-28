@@ -11,7 +11,9 @@ import { formatDateVN } from "./format";
 import type {
   Customer,
   ExportContract,
+  ExportActivity,
   ExportContractApproval,
+  ExportContractAttachmentKind,
   ExportContractLine,
   ExportContractRevision,
   ExportContractTerms,
@@ -28,6 +30,15 @@ import type {
   CustomerProductName,
 } from "@/types";
 import { extractCustomerNames, nameKey, productsByCustomerName } from "./customerProductNames";
+
+/* ---------- Đính kèm hồ sơ HĐ (bước Đính kèm, mig 0079) ---------- */
+
+export const CONTRACT_ATTACHMENT_LABELS: Record<ExportContractAttachmentKind, string> = {
+  "signed-contract": "Hợp đồng đã ký",
+  lc: "L/C",
+  proforma: "Proforma invoice",
+  other: "Hồ sơ khác",
+};
 
 /* ---------- Danh sách cố định + nhãn ---------- */
 
@@ -93,17 +104,36 @@ export const ITEM_STATE_LABELS: Record<ExportItemState, string> = {
   "not-applicable": "Không áp dụng",
 };
 
-export type ContractState = "pending" | "approved" | "closed" | "cancelled";
+/**
+ * Quy trình hợp đồng (mig 0079, chủ dự án chốt 2026-10-28):
+ * Chờ duyệt → (Trưởng / Phó phòng KH duyệt) → Chờ đính kèm → (đủ hồ sơ) → Đang ghi chuyến →
+ * (xuất đủ trong dung sai) → Chờ duyệt cuối → (Trưởng / Phó duyệt cuối) → Đã đóng HĐ.
+ */
+export type ContractState = "pending" | "attaching" | "shipping" | "final-review" | "closed" | "cancelled";
 export const CONTRACT_STATE_LABELS: Record<ContractState, string> = {
   pending: "Chờ duyệt",
-  approved: "Đã duyệt",
-  closed: "Đã xuất đủ",
+  attaching: "Chờ đính kèm",
+  shipping: "Đang ghi chuyến",
+  "final-review": "Chờ duyệt cuối",
+  closed: "Đã đóng HĐ",
   cancelled: "Đã hủy",
 };
-/** Nhãn trạng thái HĐ cho người đọc: HĐ chốt bằng tay (lệch / có lý do) tách khỏi "Đã xuất đủ" tự tính. */
-export function contractStateLabel(state: ContractState, contract: Pick<ExportContract, "status">): string {
-  return state === "closed" && contract.status === "closed" ? "Đã chốt HĐ" : CONTRACT_STATE_LABELS[state];
+/** Nhãn trạng thái HĐ cho người đọc (giữ chữ ký hàm cũ cho các màn). */
+export function contractStateLabel(state: ContractState, _contract?: Pick<ExportContract, "status">): string {
+  return CONTRACT_STATE_LABELS[state];
 }
+
+/** HĐ còn đang chạy (chưa đóng / chưa hủy). */
+export const isLiveContractState = (st: ContractState) => st !== "closed" && st !== "cancelled";
+
+/** Các chặng của quy trình HĐ — thanh chặng ở hồ sơ HĐ, tour, hộp "?". */
+export const CONTRACT_FLOW_STAGES: readonly { state: Exclude<ContractState, "cancelled">; title: string; who: string; hint: string }[] = [
+  { state: "pending", title: "Duyệt HĐ", who: "Trưởng / Phó phòng KH", hint: "Nhân viên Kế hoạch lập HĐ; Trưởng hoặc Phó phòng Kế hoạch xem và duyệt bản hợp đồng." },
+  { state: "attaching", title: "Đính kèm", who: "Nhân viên Kế hoạch", hint: "Đính kèm đủ hồ sơ bắt buộc: hợp đồng đã ký, L/C (nếu thanh toán L/C). Đủ hồ sơ mới ghi chuyến được." },
+  { state: "shipping", title: "Ghi chuyến", who: "Nhân viên Kế hoạch", hint: "Ghi từng chuyến (container) và theo dõi các bước lệnh SX → chứng từ, tới khi xuất đủ hợp đồng." },
+  { state: "final-review", title: "Duyệt cuối", who: "Trưởng / Phó phòng KH", hint: "Xuất đủ trong dung sai ⇒ Trưởng hoặc Phó phòng Kế hoạch xem lại hồ sơ, đồng ý thì đóng HĐ; chưa ổn thì trả về kèm lý do." },
+  { state: "closed", title: "Đóng HĐ", who: "", hint: "Hợp đồng đã đóng. Mở lại được (Trưởng / Phó phòng) nếu cần sửa." },
+];
 
 /** "thừa 16,9%" / "thiếu 3,2%" — biết chiều để giao bù hay điều chỉnh invoice. */
 export function deviationText(pct: number): string {
@@ -113,9 +143,15 @@ export function deviationText(pct: number): string {
 
 export const APPROVAL_LABELS: Record<"pending" | "approved" | "needs-revision" | "rejected", string> = {
   pending: "Chờ duyệt",
-  approved: "BGĐ đồng ý",
-  "needs-revision": "BGĐ yêu cầu sửa",
-  rejected: "BGĐ từ chối",
+  approved: "Đồng ý",
+  "needs-revision": "Yêu cầu sửa",
+  rejected: "Từ chối",
+};
+
+/** Nhãn kết quả duyệt cuối (mig 0079). Duyệt cuối không có "từ chối" — trả về để sửa hồ sơ chuyến. */
+export const FINAL_REVIEW_LABELS: Record<"approved" | "needs-revision", string> = {
+  approved: "Đồng ý — đóng hợp đồng",
+  "needs-revision": "Trả về — sửa hồ sơ",
 };
 
 /** Đường dẫn giữ chỗ của bộ demo — không có file thật, chỉ tính là bằng chứng trong `site-demo` (R14). */
@@ -132,6 +168,8 @@ export interface ExportData {
   items: readonly ExportStepItem[];
   files: readonly ExportFile[];
   payments: readonly ExportPayment[];
+  /** Nhật ký thao tác của hợp đồng (mig 0079) — chỉ thêm. */
+  activities: readonly ExportActivity[];
 }
 
 export const EMPTY_EXPORT_DATA: ExportData = {
@@ -143,6 +181,7 @@ export const EMPTY_EXPORT_DATA: ExportData = {
   items: [],
   files: [],
   payments: [],
+  activities: [],
 };
 
 /** Tùy chọn chung: chạy không nối máy chủ thì không bắt file làm bằng chứng (như /documents). */
@@ -272,9 +311,10 @@ export function nextRevisionNo(d: Pick<ExportData, "revisions">, contractId: str
   return rs.length ? rs[rs.length - 1].revisionNo + 1 : 0;
 }
 
+/** Lượt duyệt BẢN hợp đồng (không gồm duyệt cuối — `stage: "final"`). */
 export function approvalsOf(d: Pick<ExportData, "approvals">, revisionId: string): ExportContractApproval[] {
   return d.approvals
-    .filter((a) => a.revisionId === revisionId)
+    .filter((a) => a.revisionId === revisionId && a.stage !== "final")
     .sort((a, b) => (a.decidedOn + a.createdAt).localeCompare(b.decidedOn + b.createdAt));
 }
 
@@ -603,9 +643,12 @@ export function suggestProductId(
   if (byCustomer.productIds.length > 1) return "";
   const customerOf = new Map(d.contracts.map((c) => [c.id, c.customerId]));
   let best: { productId: string; score: number; at: string } | null = null;
+  const lineSize = nameKey(ctx.size ?? "");
   for (const r of d.revisions) {
     for (const l of r.lines) {
       if (!l.productId || nameKey(l.description) !== key) continue;
+      // Cùng tên khác size ⇒ thường là mặt hàng khác (iwadako 5-5.5 gr ≠ 6-7 gr) — không lấy làm gợi ý.
+      if (lineSize && nameKey(l.size) && nameKey(l.size) !== lineSize) continue;
       const score = customerOf.get(r.contractId) === customerId ? 1 : 0;
       if (!best || score > best.score || (score === best.score && r.createdAt > best.at)) best = { productId: l.productId, score, at: r.createdAt };
     }
@@ -613,6 +656,29 @@ export function suggestProductId(
   if (best) return best.productId;
   const byTrade = productsByTradeName(description, products);
   return byTrade.length === 1 ? byTrade[0].id : "";
+}
+
+/**
+ * Ghi nối dòng hàng ↔ mặt hàng vào MỘT bản (thông tin nội bộ, không phải bản sửa HĐ):
+ * - Dòng không có trong `map` (nháp cũ mở lại sau khi bản đã đổi) GIỮ nối đang có — không xóa nhầm.
+ * - Các bản KHÁC còn chờ duyệt của cùng HĐ (bản số lớn hơn) nhận nối cho dòng cùng tên + size đang
+ *   TRỐNG — duyệt bản sửa xong không bị "chưa nối" lại. Dòng đã nối khác giữ nguyên.
+ */
+export function applyProductMapping(
+  revisions: readonly ExportContractRevision[],
+  revisionId: string,
+  map: Readonly<Record<string, string>>,
+): ExportContractRevision[] {
+  const target = revisions.find((r) => r.id === revisionId);
+  if (!target) return [...revisions];
+  const mapped = target.lines.map((l) => (l.id in map ? { ...l, productId: map[l.id] || undefined } : l));
+  const lineKey = (l: Pick<ExportContractLine, "description" | "size">) => `${nameKey(l.description)}|${nameKey(l.size)}`;
+  const byKey = new Map(mapped.filter((l) => l.productId).map((l) => [lineKey(l), l.productId as string]));
+  return revisions.map((r) => {
+    if (r.id === revisionId) return { ...r, lines: mapped };
+    if (r.contractId !== target.contractId || r.revisionNo <= target.revisionNo) return r;
+    return { ...r, lines: r.lines.map((l) => (l.productId || !byKey.has(lineKey(l)) ? l : { ...l, productId: byKey.get(lineKey(l)) })) };
+  });
 }
 
 /** Danh sách chọn mặt hàng cho một dòng: mục khớp tên của khách, rồi khớp tên mặc định, đứng đầu (R23). */
@@ -662,10 +728,45 @@ function aggregate(states: ExportItemState[]): ExportItemState {
   return states.some((s) => s !== "not-started") ? "in-progress" : "not-started";
 }
 
-/** Bước 1 theo HĐ: có bản hiệu lực VÀ bản đó có file ký (A4). */
+/** Hồ sơ đính kèm cấp HĐ (bước Đính kèm), cũ trước. */
+export function contractAttachments(d: Pick<ExportData, "files">, contractId: string): ExportFile[] {
+  return d.files.filter((f) => f.contractId === contractId && f.step === "contract").sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** Loại hồ sơ BẮT BUỘC theo điều khoản: hợp đồng đã ký luôn có; L/C khi thanh toán bằng L/C. */
+export function requiredAttachmentKinds(terms: Pick<ExportContractTerms, "paymentMethod">): ExportContractAttachmentKind[] {
+  return terms.paymentMethod === "lc" ? ["signed-contract", "lc"] : ["signed-contract"];
+}
+
+/**
+ * HĐ duyệt theo quy trình CŨ (trước mig 0079: nhân viên ghi kết quả BGĐ ký giấy — lượt duyệt không
+ * có `stage`). Với HĐ này file bản HĐ / bản ký scan đã là hợp đồng có chữ ký ⇒ tính thay "Hợp đồng đã ký".
+ */
+function isLegacyApproved(d: Pick<ExportData, "approvals">, rev: ExportContractRevision): boolean {
+  const last = approvalsOf(d, rev.id).at(-1);
+  return !!last && last.decision === "approved" && !last.stage;
+}
+
+/**
+ * Loại hồ sơ bắt buộc CÒN THIẾU của bản hiệu lực. Chưa có bản hiệu lực ⇒ chưa tới bước này (rỗng).
+ * Chạy không nối máy chủ ⇒ không tải được file ⇒ không bắt (như các bước khác).
+ */
+export function missingAttachmentKinds(
+  d: Pick<ExportData, "files" | "revisions" | "approvals">,
+  contractId: string,
+  opts: EvidenceOptions = WITH_FILES,
+): ExportContractAttachmentKind[] {
+  const eff = effectiveRevision(d, contractId);
+  if (!eff || !opts.filesAvailable) return [];
+  const have = new Set<string>(contractAttachments(d, contractId).map((f) => f.attachmentKind ?? ""));
+  if (isLegacyApproved(d, eff) && (eff.filePath || approvalsOf(d, eff.id).some((a) => a.decision === "approved" && a.filePath))) have.add("signed-contract");
+  return requiredAttachmentKinds(eff.terms).filter((k) => !have.has(k));
+}
+
+/** Bước 1 của chuyến theo HĐ: có bản hiệu lực VÀ đã đính kèm đủ hồ sơ bắt buộc (mig 0079; trước là "có file ký" — A4). */
 export function contractStepState(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): ExportItemState {
   const eff = effectiveRevision(d, contractId);
-  if (eff && (eff.filePath || !opts.filesAvailable)) return "done";
+  if (eff && !missingAttachmentKinds(d, contractId, opts).length) return "done";
   return latestRevision(d, contractId) ? "in-progress" : "not-started";
 }
 
@@ -838,11 +939,66 @@ export function contractClosure(d: ExportData, contractId: string, opts: Evidenc
   return { closed: true, ...base };
 }
 
+/** Trạng thái HĐ theo quy trình mig 0079 (xem `ContractState`). `contractClosure().closed` = đã xuất đủ / đã đóng. */
 export function contractState(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): ContractState {
   const c = d.contracts.find((x) => x.id === contractId);
   if (!c || c.status === "cancelled") return "cancelled";
-  if (contractClosure(d, contractId, opts).closed) return "closed";
-  return effectiveRevision(d, contractId) ? "approved" : "pending";
+  if (c.status === "closed") return "closed";
+  if (!effectiveRevision(d, contractId)) return "pending";
+  if (missingAttachmentKinds(d, contractId, opts).length) return "attaching";
+  return contractClosure(d, contractId, opts).closed ? "final-review" : "shipping";
+}
+
+/** Chặng hiện tại trên thanh quy trình (0 = Duyệt HĐ … 4 = Đóng HĐ); HĐ hủy ⇒ -1. */
+export function contractFlowIndex(state: ContractState): number {
+  return CONTRACT_FLOW_STAGES.findIndex((s) => s.state === state);
+}
+
+export type ShipmentGate =
+  | { ok: true }
+  | { ok: false; reason: "not-open" | "not-approved" | "attachments-missing"; missing: ExportContractAttachmentKind[] };
+
+/**
+ * Ghi chuyến mới (mig 0079): chỉ khi HĐ còn mở, ĐÃ DUYỆT và ĐÃ ĐÍNH KÈM ĐỦ hồ sơ bắt buộc.
+ * Chuyến ghi từ trước giữ nguyên (không chặn sửa / theo dõi bước).
+ */
+export function shipmentGate(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): ShipmentGate {
+  const c = d.contracts.find((x) => x.id === contractId);
+  if (!c || c.status !== "open") return { ok: false, reason: "not-open", missing: [] };
+  if (!effectiveRevision(d, contractId)) return { ok: false, reason: "not-approved", missing: [] };
+  const missing = missingAttachmentKinds(d, contractId, opts);
+  return missing.length ? { ok: false, reason: "attachments-missing", missing } : { ok: true };
+}
+
+/** Câu giải thích vì sao chưa ghi chuyến được — cho nút / thẻ / tour. */
+export function shipmentGateText(g: ShipmentGate): string {
+  if (g.ok) return "";
+  if (g.reason === "not-open") return "Hợp đồng đã đóng hoặc đã hủy.";
+  if (g.reason === "not-approved") return "Hợp đồng chưa được Trưởng / Phó phòng Kế hoạch duyệt.";
+  return `Còn thiếu hồ sơ đính kèm: ${g.missing.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}.`;
+}
+
+/** Các lượt duyệt cuối của HĐ, cũ trước. */
+export function finalReviewsOf(d: Pick<ExportData, "approvals">, contractId: string): ExportContractApproval[] {
+  return d.approvals
+    .filter((a) => a.contractId === contractId && a.stage === "final")
+    .sort((a, b) => (a.decidedOn + a.createdAt).localeCompare(b.decidedOn + b.createdAt));
+}
+
+/**
+ * Duyệt cuối được khi HĐ còn mở, đã qua bước Đính kèm và có ít nhất một chuyến còn mở. HĐ chưa
+ * xuất đủ trong dung sai (đóng sớm: khách giảm lượng, phụ kiện…) ⇒ bắt lý do.
+ */
+export function finalReviewGate(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): { ok: boolean; needsReason: boolean } {
+  const st = contractState(d, contractId, opts);
+  if (st !== "shipping" && st !== "final-review") return { ok: false, needsReason: false };
+  if (!openShipmentsOf(d, contractId).length) return { ok: false, needsReason: false };
+  return { ok: true, needsReason: st !== "final-review" };
+}
+
+/** Nhật ký thao tác của MỘT hợp đồng, MỚI trước. */
+export function activitiesOf(d: Pick<ExportData, "activities">, contractId: string): ExportActivity[] {
+  return d.activities.filter((a) => a.contractId === contractId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /* ---------- NV13: hủy / xóa ---------- */
@@ -1200,7 +1356,7 @@ export function buildMonthExcel(plan: MonthPlan, d: ExportData): { header: strin
     rows.push({ kind: "shipment", cells: l.cells });
   }
   if (plan.pendingContracts.length) {
-    rows.push({ kind: "section", cells: ["Hợp đồng chưa lên đủ chuyến"] });
+    rows.push({ kind: "section", cells: ["Hợp đồng chưa ghi đủ chuyến"] });
     for (const p of plan.pendingContracts) {
       const rev = workingRevision(d, p.contract.id);
       // HĐ đã có chuyến ⇒ ghi phần CÒN THIẾU (không phải cả HĐ), không ghi "Chờ booking".

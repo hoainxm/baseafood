@@ -51,8 +51,11 @@ import type {
   TaskAssignment,
   CompanyDocument,
   DocumentVersion,
+  ExportActivity,
+  ExportApprovalStage,
   ExportContract,
   ExportContractApproval,
+  ExportContractAttachmentKind,
   ExportContractLine,
   ExportContractRevision,
   ExportContractTerms,
@@ -2128,6 +2131,8 @@ const SHIPMENT_KIND_VALUES = new Set(["20RF", "40RF", "40HC-RF", "truck", "conso
 const STEP_VALUES = new Set(["production-order", "packaging", "loading-plan", "loading-photos", "customs-declaration", "export-order", "document"]);
 const ITEM_STATE_VALUES = new Set(["not-started", "in-progress", "done", "not-applicable"]);
 const DECISION_VALUES = new Set(["approved", "needs-revision", "rejected"]);
+const ATTACHMENT_KIND_VALUES = new Set(["signed-contract", "lc", "proforma", "other"]);
+const ACTIVITY_ACTION_VALUES = new Set(["create", "update", "delete", "approve", "return", "reject", "attach", "detach", "cancel", "restore", "close", "reopen", "undo"]);
 
 function parseTerms(v: unknown): ExportContractTerms {
   const t = (jsonOf(v) ?? {}) as Record<string, unknown>;
@@ -2243,6 +2248,8 @@ export const EXPORT_CONTRACT_APPROVAL_TABLE: TableMapping<ExportContractApproval
     id: x.id,
     contract_id: x.contractId,
     revision_id: x.revisionId,
+    // Cột của mig 0079 — chỉ gửi khi có, dòng cũ vẫn ghi được lên máy chủ chưa chạy 0079.
+    ...(x.stage ? { stage: x.stage } : {}),
     decision: x.decision,
     approver_name: x.approverName,
     decided_on: dateOrNull(x.decidedOn),
@@ -2255,6 +2262,7 @@ export const EXPORT_CONTRACT_APPROVAL_TABLE: TableMapping<ExportContractApproval
     id: s(r.id),
     contractId: s(r.contract_id),
     revisionId: s(r.revision_id),
+    ...(s(r.stage) === "contract" || s(r.stage) === "final" ? { stage: s(r.stage) as ExportApprovalStage } : {}),
     decision: (DECISION_VALUES.has(s(r.decision)) ? s(r.decision) : "needs-revision") as ExportContractApproval["decision"],
     approverName: s(r.approver_name),
     decidedOn: s(r.decided_on).slice(0, 10),
@@ -2397,6 +2405,8 @@ export const EXPORT_FILE_TABLE: TableMapping<ExportFile> = {
     shipment_id: x.shipmentId,
     step_item_id: x.stepItemId,
     step: x.step,
+    // Hồ sơ đính kèm cấp HĐ (mig 0079) — chỉ gửi với step "contract".
+    ...(x.step === "contract" ? { attachment_kind: x.attachmentKind ?? "" } : {}),
     path: x.path,
     file_name: x.fileName,
     layer_no: x.layerNo,
@@ -2408,7 +2418,8 @@ export const EXPORT_FILE_TABLE: TableMapping<ExportFile> = {
     contractId: s(r.contract_id),
     shipmentId: s(r.shipment_id),
     stepItemId: s(r.step_item_id),
-    step: (STEP_VALUES.has(s(r.step)) ? s(r.step) : "document") as ExportFile["step"],
+    step: (STEP_VALUES.has(s(r.step)) || s(r.step) === "contract" ? s(r.step) : "document") as ExportFile["step"],
+    ...(s(r.step) === "contract" ? { attachmentKind: (ATTACHMENT_KIND_VALUES.has(s(r.attachment_kind)) ? s(r.attachment_kind) : "other") as ExportContractAttachmentKind } : {}),
     path: s(r.path),
     fileName: s(r.file_name),
     layerNo: numOrNull(r.layer_no),
@@ -2450,6 +2461,32 @@ export const EXPORT_PAYMENT_TABLE: TableMapping<ExportPayment> = {
     filePath: s(r.file_path),
     fileName: s(r.file_name),
     recordedBy: s(r.recorded_by),
+    createdAt: s(r.created_at),
+  }),
+};
+
+/** Nhật ký thao tác hợp đồng xuất khẩu (mig 0079) — chỉ thêm; RLS không cho sửa / xóa. */
+export const EXPORT_ACTIVITY_TABLE: TableMapping<ExportActivity> = {
+  table: "export_activity_log",
+  localKey: "bsf.export-activity-log.v1",
+  getKey: theoId,
+  refColumns: ["contract_id", "shipment_id"],
+  toRow: (x) => ({
+    id: x.id,
+    contract_id: x.contractId,
+    shipment_id: x.shipmentId,
+    action: x.action,
+    summary: x.summary,
+    actor: x.actor,
+    created_at: x.createdAt || new Date().toISOString(),
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    shipmentId: s(r.shipment_id),
+    action: (ACTIVITY_ACTION_VALUES.has(s(r.action)) ? s(r.action) : "update") as ExportActivity["action"],
+    summary: s(r.summary),
+    actor: s(r.actor),
     createdAt: s(r.created_at),
   }),
 };
@@ -2529,6 +2566,7 @@ const TABLE_LABELS: Record<string, string> = {
   export_step_items: "Bước của chuyến xuất khẩu",
   export_files: "File hồ sơ xuất khẩu",
   export_payments: "Gửi chứng từ / tiền về",
+  export_activity_log: "Nhật ký hợp đồng xuất khẩu",
   customer_product_names: "Tên hàng theo khách",
   row_marks: "Tô màu dòng",
   app_roles: "Vai trò",
@@ -2581,6 +2619,8 @@ function logChanges<T>(mapping: TableMapping<T>, prev: T[], next: T[]): void {
   // Tô màu dòng chỉ là dấu trình bày (đã có marked_by/marked_at) — kế toán dò cả
   // trăm dòng một buổi, ghi nhật ký từng cú tô chỉ làm ngập /audit.
   if (mapping.table === "row_marks") return;
+  // Nhật ký hợp đồng xuất khẩu (mig 0079) đã LÀ nhật ký — chép sang audit_log chỉ nhân đôi.
+  if (mapping.table === "export_activity_log") return;
   const label = TABLE_LABELS[mapping.table] ?? mapping.table;
   const prevByKey = new Map(prev.map((x) => [mapping.getKey(x), x]));
   const nextMap = new Map(next.map((x) => [mapping.getKey(x), x]));

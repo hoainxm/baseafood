@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { CalendarDays, X } from "lucide-react";
 import { InfoTip } from "./InfoTip";
+import { AbbrHint } from "./AbbrHint";
 
 /* ---- Chuyển đổi ISO (yyyy-mm-dd, dùng để lưu) ↔ Date ---- */
 
@@ -91,6 +92,7 @@ function LabelBlock({
             </span>
           )}
         </Label>
+        <AbbrHint label={label} />
         {info && <InfoTip label={label}>{info}</InfoTip>}
       </div>
       {hint && <p className="text-sm text-muted-foreground">{hint}</p>}

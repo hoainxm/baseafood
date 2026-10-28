@@ -1,6 +1,6 @@
 // ============================================================
 // Tên file: src/features/export-planning/MonthView.tsx
-// Tên tiếng Việt: Xuất khẩu theo tháng — chuyến gom theo khách, 6 bước, HĐ chưa lên chuyến
+// Tên tiếng Việt: Xuất khẩu theo tháng — chuyến gom theo khách, 6 bước, HĐ chưa ghi chuyến
 // Description: Period plan (NV11): view by month / week / date range, customer filter (cards follow it),
 //              document-number search (shipments + contracts without shipments), 4 stat cards,
 //              shipments grouped by customer, pending contracts, Excel export.
@@ -36,6 +36,7 @@ import {
   weekPeriod,
   contractCoverage,
   contractStateLabel,
+  isLiveContractState,
   contractState,
   openShipmentsOf,
   type Period,
@@ -116,7 +117,7 @@ export function MonthView({
       numeric: true,
       icon: AlarmClock,
       color: plan.stats.lateShipments || plan.stats.overdueContractsWithoutShipment ? "danger" : "neutral",
-      subtext: plan.stats.overdueContractsWithoutShipment ? `+ ${plan.stats.overdueContractsWithoutShipment} HĐ quá hạn chưa lên chuyến` : "theo ngày on board / ETD",
+      subtext: plan.stats.overdueContractsWithoutShipment ? `+ ${plan.stats.overdueContractsWithoutShipment} HĐ quá hạn chưa ghi chuyến` : "theo ngày on board / ETD",
     },
   ];
 
@@ -228,9 +229,9 @@ export function MonthView({
       header: "Còn thiếu",
       render: (p) => (
         <div className="flex flex-wrap gap-1">
-          {!p.hasShipments ? <Tag variant="warning">Chưa lên chuyến</Tag> : (
+          {!p.hasShipments ? <Tag variant="warning">Chưa ghi chuyến</Tag> : (
             <Tag variant="warning">
-              {[p.coverage.missingKg > 0 && `${formatNumber(p.coverage.missingKg)} kg`, p.coverage.missingContainers > 0 && `${p.coverage.missingContainers} cont`].filter(Boolean).join(" / ")} chưa lên chuyến
+              {[p.coverage.missingKg > 0 && `${formatNumber(p.coverage.missingKg)} kg`, p.coverage.missingContainers > 0 && `${p.coverage.missingContainers} cont`].filter(Boolean).join(" / ")} chưa ghi chuyến
             </Tag>
           )}
           {p.overdue && <Tag variant="error">Quá hạn</Tag>}
@@ -252,8 +253,8 @@ export function MonthView({
         return (
           <div className="flex flex-wrap gap-1">
             <Tag variant="muted">{contractStateLabel(st, c)}</Tag>
-            {!contractCoverage(data, c.id).covered && <Tag variant="warning">Chưa lên chuyến</Tag>}
-            {(st === "pending" || st === "approved") && dl && dl < today && <Tag variant="error">Quá hạn giao</Tag>}
+            {!contractCoverage(data, c.id).covered && <Tag variant="warning">Chưa ghi chuyến</Tag>}
+            {isLiveContractState(st) && st !== "final-review" && dl && dl < today && <Tag variant="error">Quá hạn giao</Tag>}
           </div>
         );
       },
@@ -376,7 +377,7 @@ export function MonthView({
             <EmptyState
               icon={Container}
               title={`${period.label} chưa có chuyến nào${customerFilter ? " của khách này" : ""}`}
-              description="Lập hợp đồng rồi Lên chuyến — chuyến xếp theo ngày đóng cont (chưa có thì ETD, rồi tháng kế hoạch)."
+              description="Lập hợp đồng → duyệt → đính kèm hồ sơ rồi Ghi chuyến — chuyến xếp theo ngày đóng cont (chưa có thì ETD, rồi tháng kế hoạch)."
             />
           )}
           {groups.map((g, gi) => (
@@ -399,7 +400,7 @@ export function MonthView({
           ))}
           {pending.length > 0 && (
             <section data-tour="pending-contracts" className="grid gap-3">
-              <h3 className="font-semibold">Hợp đồng chưa lên đủ chuyến</h3>
+              <h3 className="font-semibold">Hợp đồng chưa ghi đủ chuyến</h3>
               <RecordTable
                 columns={pendingColumns}
                 rows={pending}

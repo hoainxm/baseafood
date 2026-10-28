@@ -43,6 +43,7 @@ export { ErrorSummary, type FieldError } from "./patterns/ErrorSummary";
 export { EmptyState } from "./patterns/EmptyState";
 export { ReadOnlyBadge } from "./patterns/ReadOnlyBadge";
 export { InfoTip } from "./patterns/InfoTip";
+export { Abbr, AbbrHint } from "./patterns/AbbrHint";
 export {
   FontSizeQuickPicker,
   DisplaySettingsPanel,

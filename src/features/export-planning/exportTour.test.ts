@@ -125,7 +125,6 @@ describe("buildExportTour", () => {
       .join("\n");
     const labels = [
       ...Object.values(CONTRACT_STATE_LABELS),
-      "Đã chốt HĐ",
       ...Object.values(ITEM_STATE_LABELS),
       ...STEP_TITLES,
       // Thẻ của chuyến (design-spec 42 · ba-spec 43 §9b).

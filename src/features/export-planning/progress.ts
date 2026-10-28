@@ -5,7 +5,9 @@
 //              per-step states, the first unsettled step and the human list of what is missing.
 // ============================================================
 // KHÔNG phải luật mới: chỉ đọc kết quả stepState / subStepState / itemState của lib (ba-spec 41).
+import type { TagVariant } from "@/design-system";
 import {
+  type ContractState,
   LOADING_STEPS,
   STEP_NOS,
   STEP_TITLES,
@@ -80,3 +82,14 @@ export function progressText(p: ShipmentProgress): string {
   const shown = p.missing.slice(0, 2).join(", ");
   return `${head} — còn ${shown}${p.missing.length > 2 ? ` và ${p.missing.length - 2} mục khác` : ""}`;
 }
+
+/** Màu thẻ trạng thái hợp đồng (quy trình mig 0079) — mọi màn dùng chung. */
+export const CONTRACT_STATE_TAG: Record<ContractState, TagVariant> = {
+  pending: "pending",
+  attaching: "warning",
+  shipping: "source",
+  "final-review": "pending",
+  closed: "done",
+  cancelled: "muted",
+};
+

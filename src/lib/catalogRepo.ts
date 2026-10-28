@@ -50,6 +50,7 @@ import {
   EXPORT_STEP_ITEM_TABLE,
   EXPORT_FILE_TABLE,
   EXPORT_PAYMENT_TABLE,
+  EXPORT_ACTIVITY_TABLE,
   CUSTOMER_PRODUCT_NAME_TABLE,
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
@@ -319,6 +320,16 @@ export const useExportShipments = () => useTable(EXPORT_SHIPMENT_TABLE);
 export const useExportStepItems = () => useTable(EXPORT_STEP_ITEM_TABLE);
 export const useExportFiles = () => useTable(EXPORT_FILE_TABLE);
 export const useExportPayments = () => useTable(EXPORT_PAYMENT_TABLE);
+/**
+ * Nhật ký thao tác hợp đồng xuất khẩu (mig 0079) — chỉ thêm. `canLog`: máy chủ chưa chạy 0079 ⇒
+ * không ghi (khỏi kẹt hàng chờ như bảng tên hàng theo khách), nghiệp vụ vẫn chạy.
+ */
+export const useExportActivities = () => useTable(EXPORT_ACTIVITY_TABLE);
+export function useExportActivityStore() {
+  const [activities, setActivities, meta] = useExportActivities();
+  const canLog = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
+  return { activities, setActivities, canLog };
+}
 /** Tên hàng theo khách (mig 0077) — dùng qua `useCustomerProductNameStore` để biết máy chủ đã có bảng chưa. */
 export const useCustomerProductNames = () => useTable(CUSTOMER_PRODUCT_NAME_TABLE);
 

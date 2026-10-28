@@ -14,7 +14,12 @@ import {
   canMarkDone,
   canMarkNotApplicable,
   cancelContract,
+  contractAttachments,
   contractClosure,
+  finalReviewGate,
+  finalReviewsOf,
+  missingAttachmentKinds,
+  shipmentGate,
   contractCoverage,
   contractState,
   contractTotals,
@@ -36,6 +41,7 @@ import {
   shiftPeriod,
   shipmentInPeriod,
   suggestProductId,
+  applyProductMapping,
   unmappedLines,
   weekPeriod,
   shipmentActuals,
@@ -235,11 +241,11 @@ describe("R3 · bản + duyệt gắn bản (AC-5, AC-7…AC-10)", () => {
     expect(stepState(d, shipment("s", "c1"), 1)).toBe("in-progress");
     expect(contractState(d, "c1")).toBe("pending");
   });
-  it("ghi BGĐ đồng ý bản 0 ⇒ bản hiệu lực = 0, bước 1 xong", () => {
+  it("HĐ duyệt theo quy trình cũ (BGĐ ký giấy, có file ký) ⇒ bản hiệu lực = 0, bước 1 xong, đang ghi chuyến", () => {
     const d = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], approvals: [approval("r0", "c1", "approved")] });
     expect(effectiveRevision(d, "c1")?.revisionNo).toBe(0);
     expect(stepState(d, shipment("s", "c1"), 1)).toBe("done");
-    expect(contractState(d, "c1")).toBe("approved");
+    expect(contractState(d, "c1")).toBe("shipping");
   });
   it("bản sửa chờ duyệt KHÔNG làm sập HĐ: bản 0 vẫn hiệu lực, chuyến đã khép vẫn khép", () => {
     const d0 = closedShipmentData({ cartons: 1900, netKg: 19000, amount: 172445 });
@@ -248,7 +254,8 @@ describe("R3 · bản + duyệt gắn bản (AC-5, AC-7…AC-10)", () => {
     expect(effectiveRevision(d, "c1")?.revisionNo).toBe(0);
     expect(effectiveRevision(d, "c1")?.lines[0].quantity).toBe(200);
     expect(isShipmentClosed(d, d.shipments[0])).toBe(true);
-    expect(contractState(d, "c1")).toBe("closed");
+    // Xuất đủ trong dung sai ⇒ chờ Trưởng / Phó phòng duyệt cuối (mig 0079), không tự đóng.
+    expect(contractState(d, "c1")).toBe("final-review");
   });
   it("bản sửa bị từ chối ⇒ bỏ bản sửa, bản 0 giữ hiệu lực, HĐ không bị hủy", () => {
     const d = data({
@@ -257,7 +264,7 @@ describe("R3 · bản + duyệt gắn bản (AC-5, AC-7…AC-10)", () => {
       approvals: [approval("r0", "c1", "approved"), approval("r1", "c1", "rejected", "2026-08-15", "giá sai")],
     });
     expect(effectiveRevision(d, "c1")?.revisionNo).toBe(0);
-    expect(contractState(d, "c1")).toBe("approved");
+    expect(contractState(d, "c1")).toBe("shipping");
   });
   it("bản sửa được duyệt ⇒ thành bản hiệu lực", () => {
     const d = data({
@@ -272,6 +279,65 @@ describe("R3 · bản + duyệt gắn bản (AC-5, AC-7…AC-10)", () => {
     const out = cancelContract(d, "c1", "khách đổi đơn");
     expect(out.contracts[0]).toMatchObject({ status: "cancelled", cancelReason: "khách đổi đơn" });
     expect(out.shipments[0]).toMatchObject({ status: "cancelled", cancelReason: "khách đổi đơn" });
+  });
+});
+
+describe("v8 · quy trình duyệt → đính kèm → ghi chuyến → duyệt cuối (mig 0079)", () => {
+  /** Lượt duyệt theo quy trình MỚI (Trưởng / Phó phòng duyệt trên app — có `stage`). */
+  const approveNew = (revisionId: string, contractId: string, stage: "contract" | "final" = "contract", decision: ExportContractApproval["decision"] = "approved", reason = "") => ({
+    ...approval(revisionId, contractId, decision, "2026-08-02", reason),
+    stage,
+    filePath: "",
+    fileName: "",
+  });
+  const attach = (kind: NonNullable<ExportFile["attachmentKind"]>): ExportFile => ({ ...file("", "contract"), attachmentKind: kind });
+
+  it("AC-56: duyệt mới xong ⇒ Chờ đính kèm; bước 1 chuyến chưa xong; chưa ghi chuyến được (file bản HĐ lúc lập KHÔNG tính)", () => {
+    const d = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], approvals: [approveNew("r0", "c1")] });
+    expect(contractState(d, "c1")).toBe("attaching");
+    expect(missingAttachmentKinds(d, "c1")).toEqual(["signed-contract"]);
+    expect(stepState(d, shipment("s", "c1"), 1)).toBe("in-progress");
+    expect(shipmentGate(d, "c1")).toMatchObject({ ok: false, reason: "attachments-missing" });
+  });
+  it("AC-57: chưa duyệt ⇒ không ghi chuyến được (lý do chưa duyệt)", () => {
+    const d = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)] });
+    expect(shipmentGate(d, "c1")).toMatchObject({ ok: false, reason: "not-approved" });
+  });
+  it("AC-58: thanh toán L/C ⇒ bắt cả HĐ đã ký lẫn L/C; đủ thì Đang ghi chuyến + ghi chuyến được", () => {
+    const r0 = revision("r0", "c1", 0, { terms: terms({ paymentMethod: "lc" }) });
+    const base = data({ contracts: [contract("c1")], revisions: [r0], approvals: [approveNew("r0", "c1")], files: [attach("signed-contract")] });
+    expect(missingAttachmentKinds(base, "c1")).toEqual(["lc"]);
+    expect(contractState(base, "c1")).toBe("attaching");
+    const d = { ...base, files: [...base.files, attach("lc"), attach("other")] };
+    expect(contractAttachments(d, "c1")).toHaveLength(3);
+    expect(missingAttachmentKinds(d, "c1")).toEqual([]);
+    expect(contractState(d, "c1")).toBe("shipping");
+    expect(shipmentGate(d, "c1").ok).toBe(true);
+    expect(stepState(d, shipment("s", "c1"), 1)).toBe("done");
+  });
+  it("AC-59: chạy không nối máy chủ ⇒ không bắt file đính kèm", () => {
+    const d = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], approvals: [approveNew("r0", "c1")] });
+    expect(missingAttachmentKinds(d, "c1", { filesAvailable: false })).toEqual([]);
+    expect(contractState(d, "c1", { filesAvailable: false })).toBe("shipping");
+  });
+  it("AC-60: duyệt cuối KHÔNG phải lượt duyệt bản — không đổi bản hiệu lực; đồng ý + status closed ⇒ Đã đóng HĐ", () => {
+    const d0 = closedShipmentData({ cartons: 1900, netKg: 19000, amount: 172445 });
+    expect(contractState(d0, "c1")).toBe("final-review");
+    expect(finalReviewGate(d0, "c1")).toEqual({ ok: true, needsReason: false });
+    const back = { ...d0, approvals: [...d0.approvals, approveNew("r0", "c1", "final", "needs-revision", "thiếu B/L gốc")] };
+    expect(effectiveRevision(back, "c1")?.id).toBe("r0");
+    expect(finalReviewsOf(back, "c1")).toHaveLength(1);
+    expect(contractState(back, "c1")).toBe("final-review");
+    const closed = { ...back, contracts: back.contracts.map((c) => ({ ...c, status: "closed" as const, closeReason: "Duyệt cuối" })) };
+    expect(contractState(closed, "c1")).toBe("closed");
+    expect(finalReviewGate(closed, "c1").ok).toBe(false);
+  });
+  it("AC-61: đóng sớm khi ngoài dung sai ⇒ duyệt cuối được nhưng bắt lý do; chưa có chuyến ⇒ chưa duyệt cuối", () => {
+    const d = closedShipmentData({ cartons: 1500, netKg: 15000, amount: 140000 });
+    expect(contractState(d, "c1")).toBe("shipping");
+    expect(finalReviewGate(d, "c1")).toEqual({ ok: true, needsReason: true });
+    const none = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], approvals: [approval("r0", "c1", "approved")] });
+    expect(finalReviewGate(none, "c1").ok).toBe(false);
   });
 });
 
@@ -581,6 +647,24 @@ describe("Dòng hàng nối danh mục mặt hàng (AC-31, AC-32)", () => {
     expect(suggestProductId(d, "  iwadako BLANCHED cut 2-3g ", "scm")).toBe("p-scm");
     expect(suggestProductId(d, "Iwadako blanched cut 2-3g", "khac")).toBe("p-kr");
     expect(suggestProductId(d, "Tên chưa từng nối", "scm")).toBe("");
+  });
+  it("HĐ trước cùng tên KHÁC size không làm gợi ý (iwadako 5-5.5 gr ≠ 6-7 gr)", () => {
+    const d = {
+      contracts: [contract("c1")],
+      revisions: [revision("r1", "c1", 0, { lines: [{ ...LINES_1826[0], size: "5-5.5 gr/pc", productId: "p-55" }] })],
+    };
+    expect(suggestProductId(d, LINES_1826[0].description, "scm", [], { size: "6-7 gr/pc" })).toBe("");
+    expect(suggestProductId(d, LINES_1826[0].description, "scm", [], { size: "5-5.5  gr/pc" })).toBe("p-55");
+    expect(suggestProductId(d, LINES_1826[0].description, "scm")).toBe("p-55");
+  });
+  it("applyProductMapping: dòng không có trong bản nháp giữ nối cũ; bản chờ duyệt nhận nối cho dòng cùng tên + size còn trống", () => {
+    const l0 = { ...LINES_1826[0], productId: "p-old" };
+    const l1 = { ...LINES_1826[1] };
+    const eff = revision("r0", "c1", 0, { lines: [l0, l1] });
+    const pend = revision("r1", "c1", 1, { lines: [{ ...l1, id: "x1" }, { ...l0, id: "x0", productId: "p-keep" }] });
+    const out = applyProductMapping([eff, pend], "r0", { [l1.id]: "p-new" });
+    expect(out[0].lines.map((l) => l.productId)).toEqual(["p-old", "p-new"]);
+    expect(out[1].lines.map((l) => l.productId)).toEqual(["p-new", "p-keep"]);
   });
 });
 

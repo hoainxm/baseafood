@@ -1,6 +1,6 @@
 // ============================================================
 // Tên file: src/features/export-planning/RecordDialogs.tsx
-// Tên tiếng Việt: Hộp ghi kết quả duyệt giấy · gia hạn · gửi chứng từ / tiền về · lý do hủy / đóng
+// Tên tiếng Việt: Hộp duyệt HĐ · duyệt cuối · đính kèm hồ sơ · gia hạn · gửi chứng từ / tiền về · lý do hủy / đóng
 // Description: Small record dialogs of the export dossier: paper approval of one revision,
 //              customer-confirmed deadline extension, step 6 entries, reason prompt.
 // ============================================================
@@ -10,7 +10,6 @@ import { useEffect, useState } from "react";
 import {
   Button,
   ChoiceGroup,
-  Combobox,
   DateField,
   ErrorSummary,
   Field,
@@ -25,10 +24,18 @@ import {
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
-import { APPROVAL_LABELS } from "@/lib/exportPlanning";
+import { APPROVAL_LABELS, CONTRACT_ATTACHMENT_LABELS, FINAL_REVIEW_LABELS } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile, type ExportFileArea } from "@/lib/exportFileStorage";
-import type { ExportApprovalDecision, ExportContractApproval, ExportDeadlineExtension, ExportPayment, ExportPaymentKind } from "@/types";
-import { CalendarClock, FileSignature, Save, Wallet } from "lucide-react";
+import type {
+  ExportApprovalDecision,
+  ExportContractApproval,
+  ExportContractAttachmentKind,
+  ExportDeadlineExtension,
+  ExportFile,
+  ExportPayment,
+  ExportPaymentKind,
+} from "@/types";
+import { CalendarClock, ClipboardCheck, FileSignature, Paperclip, Save, Wallet } from "lucide-react";
 import { FilePicker } from "./parts";
 
 /** Tải 0–1 file lên trước khi ghi dòng; lỗi ⇒ `{ error }`. */
@@ -37,7 +44,7 @@ async function uploadOne(file: File | undefined, contractId: string, area: Expor
   return uploadExportFile(exportFilePath(contractId, area, id, file.name), file);
 }
 
-/* ---------- Ghi kết quả BGĐ ký giấy (NV4) ---------- */
+/* ---------- Duyệt hợp đồng (NV4 — mig 0079: Trưởng / Phó phòng Kế hoạch duyệt trên app) ---------- */
 
 export interface ApprovalTarget {
   contractId: string;
@@ -46,124 +53,86 @@ export interface ApprovalTarget {
   revisionNo: number;
 }
 
-/** Người ký duyệt lấy từ tài khoản có vai trò Giám đốc / Phó giám đốc. */
-export interface Approver {
-  name: string;
-  role: "director" | "vice-director";
-}
-const APPROVER_ROLE_LABEL: Record<Approver["role"], string> = { director: "Giám đốc", "vice-director": "Phó giám đốc" };
-
 interface ApprovalForm {
   key: string;
-  /** PGĐ ký HĐ theo ủy quyền của Giám đốc ("" = chưa chọn). */
-  onBehalf: "" | "yes" | "no";
   contractId: string;
   revisionId: string;
   revisionNo: number;
   contractNo: string;
   decision: ExportApprovalDecision;
-  approverName: string;
   decidedOn: string;
   reason: string;
   initial: string;
 }
-const approvalSnap = (f: ApprovalForm) => JSON.stringify([f.decision, f.approverName, f.onBehalf, f.decidedOn, f.reason]);
+const approvalSnap = (f: ApprovalForm) => JSON.stringify([f.decision, f.decidedOn, f.reason]);
 
+/**
+ * Người duyệt = TÀI KHOẢN ĐANG ĐĂNG NHẬP (Trưởng / Phó phòng Kế hoạch — màn chỉ mở hộp cho người có
+ * quyền Duyệt, RLS 0079 chặn ở máy chủ). Không gõ / chọn người duyệt thay.
+ */
 export function ApprovalDialog({
   target,
-  approvers,
-  recordedBy,
+  approverName,
   onClose,
   onSave,
 }: {
   target: ApprovalTarget | null;
-  /** Rỗng (chưa có tài khoản BGĐ / chạy không nối máy chủ) ⇒ tạm gõ tên, có dòng nhắc. */
-  approvers: readonly Approver[];
-  recordedBy: string;
+  /** "Họ tên — Trưởng phòng Kế hoạch" của người đang đăng nhập. */
+  approverName: string;
   onClose: () => void;
   onSave: (a: ExportContractApproval) => boolean;
 }) {
   const today = todayIso();
   const [form, setForm] = useState<ApprovalForm | null>(null);
-  const [file, setFile] = useState<File[]>([]);
   const [errors, setErrors] = useState<FieldError[]>([]);
-  const [busy, setBusy] = useState(false);
   const draft = useDialogDraft({ form: "export-approval", value: form, setValue: setForm, isEmpty: (f) => approvalSnap(f) === f.initial });
 
   useEffect(() => {
     if (!target) return;
-    // Mặc định Giám đốc (người đại diện ký HĐ) khi hệ thống có đúng một tài khoản Giám đốc.
-    const directors = approvers.filter((a) => a.role === "director");
-    const f: ApprovalForm = { key: target.revisionId, ...target, decision: "approved", approverName: directors.length === 1 ? directors[0].name : "", onBehalf: "", decidedOn: today, reason: "", initial: "" };
+    const f: ApprovalForm = { key: target.revisionId, ...target, decision: "approved", decidedOn: today, reason: "", initial: "" };
     const fresh = { ...f, initial: approvalSnap(f) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
-    setFile([]);
     setErrors([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
 
   const set = <K extends keyof ApprovalForm>(k: K, v: ApprovalForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
-  const save = async () => {
-    if (!form || busy) return;
+  const save = () => {
+    if (!form) return;
     const errs: FieldError[] = [];
-    const picked = approvers.find((a) => a.name === form.approverName);
-    if (!form.approverName.trim()) errs.push({ field: "Người ký duyệt", message: approvers.length ? "Chọn người ký trong Ban Giám đốc" : "Ghi họ tên người ký duyệt (BGĐ)" });
-    else if (approvers.length && !picked) errs.push({ field: "Người ký duyệt", message: "Chọn người ký trong danh sách Ban Giám đốc" });
-    if (picked?.role === "vice-director" && form.decision === "approved" && form.onBehalf !== "yes")
-      errs.push({ field: "Ủy quyền", message: "Phó giám đốc ký hợp đồng phải có ủy quyền của Giám đốc — chọn \"Có\" nếu đã có giấy ủy quyền" });
     if (!form.decidedOn) errs.push({ field: "Ngày duyệt", message: "Chọn ngày duyệt" });
     if (form.decision !== "approved" && !form.reason.trim()) errs.push({ field: "Lý do", message: "Không đồng ý thì phải ghi lý do" });
-    const fe = file[0] ? checkExportFile(file[0]) : null;
-    if (fe) errs.push({ field: "File bản ký", message: fe });
     setErrors(errs);
     if (errs.length) return;
-    setBusy(true);
-    const id = newId();
-    let uploaded = "";
-    try {
-      const up = await uploadOne(file[0], form.contractId, "contract", id);
-      if (up && "error" in up) throw new Error(up.error);
-      if (up) uploaded = up.path;
-      const ok = onSave({
-        id,
-        contractId: form.contractId,
-        revisionId: form.revisionId,
-        decision: form.decision,
-        approverName: picked
-          ? `${picked.name} — ${APPROVER_ROLE_LABEL[picked.role]}${picked.role === "vice-director" && form.onBehalf === "yes" ? " (ký theo ủy quyền)" : ""}`
-          : form.approverName.trim(),
-        decidedOn: form.decidedOn,
-        reason: form.reason.trim(),
-        filePath: up?.path ?? "",
-        fileName: up?.fileName ?? "",
-        recordedBy,
-        createdAt: new Date().toISOString(),
-      });
-      if (!ok) {
-        if (uploaded) void removeExportFiles([uploaded]);
-        return;
-      }
-      draft.done();
-    } catch (e) {
-      if (uploaded) void removeExportFiles([uploaded]);
-      notify.error(e instanceof Error ? e.message : "Không tải được file lên máy chủ");
-    } finally {
-      setBusy(false);
-    }
+    const ok = onSave({
+      id: newId(),
+      contractId: form.contractId,
+      revisionId: form.revisionId,
+      stage: "contract",
+      decision: form.decision,
+      approverName,
+      decidedOn: form.decidedOn,
+      reason: form.reason.trim(),
+      filePath: "",
+      fileName: "",
+      recordedBy: approverName,
+      createdAt: new Date().toISOString(),
+    });
+    if (ok) draft.done();
   };
 
   return (
     <FormDialog
       open={!!form}
       onOpenChange={(o) => {
-        if (o || busy) return;
+        if (o) return;
         draft.dismiss();
         onClose();
       }}
-      title={`Ghi kết quả duyệt · HĐ ${form?.contractNo ?? ""} · bản ${form?.revisionNo ?? ""}`}
-      description="BGĐ ký trên giấy; ghi lại kết quả và đính bản scan. Bản bị từ chối: bản đầu ⇒ hủy hợp đồng; bản sửa ⇒ chỉ bỏ bản sửa."
+      title={`Duyệt hợp đồng · HĐ ${form?.contractNo ?? ""} · bản ${form?.revisionNo ?? ""}`}
+      description="Đồng ý ⇒ bản này có hiệu lực, chuyển sang bước Đính kèm. Từ chối bản đầu ⇒ hủy hợp đồng; từ chối bản sửa ⇒ chỉ bỏ bản sửa."
       icon={FileSignature}
       size="md"
       hasRequiredFields
@@ -172,16 +141,15 @@ export function ApprovalDialog({
           <Button
             variant="outline"
             onClick={() => {
-              if (busy) return;
               draft.cancel();
               onClose();
             }}
           >
             Hủy
           </Button>
-          <Button variant="save" onClick={() => void save()} title="Ghi kết quả duyệt của bản hợp đồng này.">
+          <Button variant="save" onClick={save} title="Ghi kết quả duyệt của bản hợp đồng này (tên bạn là người duyệt).">
             <Save className="mr-2 h-4 w-4" aria-hidden />
-            {busy ? "Đang tải file…" : "Lưu kết quả duyệt"}
+            Lưu kết quả duyệt
           </Button>
         </>
       }
@@ -198,51 +166,314 @@ export function ApprovalDialog({
             options={(["approved", "needs-revision", "rejected"] as const).map((v) => ({ value: v, label: APPROVAL_LABELS[v] }))}
             columns={3}
           />
-          {!approvers.length && (
-            <p role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
-              Chưa có tài khoản Giám đốc / Phó giám đốc trong hệ thống — admin gán vai trò ở màn Người dùng để chọn người ký từ danh sách. Tạm thời gõ đúng họ tên trên chữ ký.
-            </p>
-          )}
           <div className="grid gap-4 sm:grid-cols-2">
-            {approvers.length ? (
-              <Combobox
-                label="Người ký duyệt"
-                required
-                value={form.approverName}
-                onChange={(v) => set("approverName", v)}
-                options={approvers.map((a) => ({ value: a.name, label: a.name, subLabel: APPROVER_ROLE_LABEL[a.role] }))}
-                emptyText="Chưa có tài khoản Ban Giám đốc."
-              />
-            ) : (
-              <Field label="Người ký duyệt" required>
-                <Input value={form.approverName} onChange={(e) => set("approverName", e.target.value)} aria-required />
-              </Field>
-            )}
+            <Field label="Người duyệt" hint="Tài khoản đang đăng nhập.">
+              <Input value={approverName} readOnly />
+            </Field>
             <DateField label="Ngày duyệt" required value={form.decidedOn} onChange={(v) => set("decidedOn", v)} />
           </div>
-          {approvers.find((a) => a.name === form.approverName)?.role === "vice-director" && form.decision === "approved" && (
-            <ChoiceGroup
-              label="Ký theo ủy quyền của Giám đốc?"
-              required
-              value={form.onBehalf}
-              onChange={(v) => set("onBehalf", v as ApprovalForm["onBehalf"])}
-              options={[
-                { value: "yes", label: "Có — có giấy ủy quyền" },
-                { value: "no", label: "Không" },
-              ]}
-              columns={2}
-            />
-          )}
           {form.decision !== "approved" && (
             <Field label="Lý do" required>
               <Textarea rows={2} value={form.reason} onChange={(e) => set("reason", e.target.value)} aria-required />
             </Field>
           )}
-          {hasExportStorage && (
-            <Field label="Bản ký (scan)" hint="Hợp đồng có chữ ký BGĐ — bước 1 chỉ xong khi bản hiệu lực có file ký.">
-              <FilePicker files={file} onChange={setFile} multiple={false} />
+        </div>
+      )}
+    </FormDialog>
+  );
+}
+
+/* ---------- Duyệt cuối — đóng hợp đồng (mig 0079) ---------- */
+
+export interface FinalReviewTarget {
+  contractId: string;
+  contractNo: string;
+  /** Bản hiệu lực — lượt duyệt cuối gắn vào bản này. */
+  revisionId: string;
+  /** HĐ chưa xuất đủ trong dung sai (đóng sớm) ⇒ bắt lý do khi đồng ý. */
+  needsReason: boolean;
+  /** "Thực xuất 12.000 / 12.050 kg …" — cho người duyệt xem lại. */
+  summary: string;
+}
+
+interface FinalReviewForm {
+  key: string;
+  decision: "approved" | "needs-revision";
+  decidedOn: string;
+  reason: string;
+  initial: string;
+}
+const finalSnap = (f: FinalReviewForm) => JSON.stringify([f.decision, f.decidedOn, f.reason]);
+
+export function FinalReviewDialog({
+  target,
+  approverName,
+  onClose,
+  onSave,
+}: {
+  target: FinalReviewTarget | null;
+  approverName: string;
+  onClose: () => void;
+  onSave: (a: ExportContractApproval) => boolean;
+}) {
+  const today = todayIso();
+  const [form, setForm] = useState<FinalReviewForm | null>(null);
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const draft = useDialogDraft({ form: "export-final-review", value: form, setValue: setForm, isEmpty: (f) => finalSnap(f) === f.initial });
+
+  useEffect(() => {
+    if (!target) return;
+    const f: FinalReviewForm = { key: target.contractId, decision: "approved", decidedOn: today, reason: "", initial: "" };
+    const fresh = { ...f, initial: finalSnap(f) };
+    const kept = draft.takeKept();
+    setForm(kept && kept.key === fresh.key ? kept : fresh);
+    setErrors([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
+  }, [target]);
+
+  const set = <K extends keyof FinalReviewForm>(k: K, v: FinalReviewForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
+
+  const save = () => {
+    if (!form || !target) return;
+    const errs: FieldError[] = [];
+    if (!form.decidedOn) errs.push({ field: "Ngày duyệt", message: "Chọn ngày duyệt" });
+    if (form.decision === "needs-revision" && !form.reason.trim()) errs.push({ field: "Lý do", message: "Trả về thì phải ghi cần sửa gì" });
+    if (form.decision === "approved" && target.needsReason && !form.reason.trim())
+      errs.push({ field: "Lý do", message: "Hợp đồng chưa xuất đủ trong dung sai — ghi lý do đóng sớm (khách giảm lượng, phụ kiện…)" });
+    setErrors(errs);
+    if (errs.length) return;
+    const ok = onSave({
+      id: newId(),
+      contractId: target.contractId,
+      revisionId: target.revisionId,
+      stage: "final",
+      decision: form.decision,
+      approverName,
+      decidedOn: form.decidedOn,
+      reason: form.reason.trim(),
+      filePath: "",
+      fileName: "",
+      recordedBy: approverName,
+      createdAt: new Date().toISOString(),
+    });
+    if (ok) draft.done();
+  };
+
+  return (
+    <FormDialog
+      open={!!form}
+      onOpenChange={(o) => {
+        if (o) return;
+        draft.dismiss();
+        onClose();
+      }}
+      title={`Duyệt cuối · HĐ ${target?.contractNo ?? ""}`}
+      description="Xem lại hồ sơ các chuyến. Đồng ý ⇒ đóng hợp đồng. Chưa ổn ⇒ trả về kèm lý do, Nhân viên Kế hoạch sửa rồi chờ duyệt lại."
+      icon={ClipboardCheck}
+      size="md"
+      hasRequiredFields
+      footer={
+        <>
+          <Button
+            variant="outline"
+            onClick={() => {
+              draft.cancel();
+              onClose();
+            }}
+          >
+            Hủy
+          </Button>
+          <Button variant="save" onClick={save} title="Ghi kết quả duyệt cuối (tên bạn là người duyệt). Đồng ý thì hợp đồng đóng.">
+            <Save className="mr-2 h-4 w-4" aria-hidden />
+            Lưu kết quả duyệt cuối
+          </Button>
+        </>
+      }
+    >
+      <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
+      {form && target && (
+        <div className="grid gap-4 py-2">
+          <ErrorSummary errors={errors} />
+          <p role="status" className={`rounded-lg px-4 py-2 text-sm ${target.needsReason ? "bg-warning-surface" : "bg-muted"}`}>
+            {target.summary}
+          </p>
+          <ChoiceGroup
+            label="Kết quả"
+            required
+            value={form.decision}
+            onChange={(v) => set("decision", v as FinalReviewForm["decision"])}
+            options={(["approved", "needs-revision"] as const).map((v) => ({ value: v, label: FINAL_REVIEW_LABELS[v] }))}
+            columns={2}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Người duyệt" hint="Tài khoản đang đăng nhập.">
+              <Input value={approverName} readOnly />
+            </Field>
+            <DateField label="Ngày duyệt" required value={form.decidedOn} onChange={(v) => set("decidedOn", v)} />
+          </div>
+          {(form.decision === "needs-revision" || target.needsReason) && (
+            <Field label={form.decision === "needs-revision" ? "Cần sửa gì" : "Lý do đóng sớm"} required>
+              <Textarea rows={2} value={form.reason} onChange={(e) => set("reason", e.target.value)} aria-required />
             </Field>
           )}
+          {form.decision === "approved" && !target.needsReason && (
+            <Field label="Ghi chú (nếu có)">
+              <Textarea rows={2} value={form.reason} onChange={(e) => set("reason", e.target.value)} />
+            </Field>
+          )}
+        </div>
+      )}
+    </FormDialog>
+  );
+}
+
+/* ---------- Đính kèm hồ sơ hợp đồng (bước Đính kèm, mig 0079) ---------- */
+
+export interface AttachmentTarget {
+  contractId: string;
+  contractNo: string;
+  /** Loại hồ sơ bắt buộc còn thiếu — chọn sẵn loại đầu tiên. */
+  missing: ExportContractAttachmentKind[];
+}
+
+interface AttachmentForm {
+  key: string;
+  kind: ExportContractAttachmentKind;
+  caption: string;
+  initial: string;
+}
+const attachSnap = (f: AttachmentForm) => JSON.stringify([f.kind, f.caption]);
+
+export function AttachmentDialog({
+  target,
+  recordedBy,
+  onClose,
+  onSave,
+}: {
+  target: AttachmentTarget | null;
+  recordedBy: string;
+  onClose: () => void;
+  onSave: (rows: ExportFile[]) => boolean;
+}) {
+  const [form, setForm] = useState<AttachmentForm | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const [busy, setBusy] = useState(false);
+  const draft = useDialogDraft({ form: "export-contract-attachment", value: form, setValue: setForm, isEmpty: (f) => attachSnap(f) === f.initial });
+
+  useEffect(() => {
+    if (!target) return;
+    const f: AttachmentForm = { key: target.contractId, kind: target.missing[0] ?? "signed-contract", caption: "", initial: "" };
+    const fresh = { ...f, initial: attachSnap(f) };
+    const kept = draft.takeKept();
+    setForm(kept && kept.key === fresh.key ? kept : fresh);
+    setFiles([]);
+    setErrors([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
+  }, [target]);
+
+  const save = async () => {
+    if (!form || !target || busy) return;
+    const errs: FieldError[] = [];
+    if (!files.length) errs.push({ field: "File", message: "Chọn ít nhất một file" });
+    if (!hasExportStorage) errs.push({ field: "Máy chủ", message: "Đang chạy không nối máy chủ — chưa tải file lên được" });
+    for (const f of files) {
+      const fe = checkExportFile(f);
+      if (fe) errs.push({ field: f.name, message: fe });
+    }
+    setErrors(errs);
+    if (errs.length) return;
+    setBusy(true);
+    const done: string[] = [];
+    try {
+      const rows: ExportFile[] = [];
+      for (const f of files) {
+        const id = newId();
+        const up = await uploadOne(f, target.contractId, "contract", id);
+        if (up && "error" in up) throw new Error(up.error);
+        if (!up) continue;
+        done.push(up.path);
+        rows.push({
+          id,
+          contractId: target.contractId,
+          shipmentId: "",
+          stepItemId: "",
+          step: "contract",
+          attachmentKind: form.kind,
+          path: up.path,
+          fileName: up.fileName,
+          layerNo: null,
+          caption: [CONTRACT_ATTACHMENT_LABELS[form.kind], form.caption.trim()].filter(Boolean).join(" — "),
+          uploadedBy: recordedBy,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      if (!onSave(rows)) {
+        void removeExportFiles(done);
+        return;
+      }
+      draft.done();
+    } catch (e) {
+      void removeExportFiles(done);
+      notify.error(e instanceof Error ? e.message : "Không tải được file lên máy chủ");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <FormDialog
+      open={!!form}
+      onOpenChange={(o) => {
+        if (o || busy) return;
+        draft.dismiss();
+        onClose();
+      }}
+      title={`Đính kèm hồ sơ · HĐ ${target?.contractNo ?? ""}`}
+      description="Hồ sơ bắt buộc: hợp đồng đã ký (và L/C nếu thanh toán L/C). Đủ hồ sơ bắt buộc mới ghi chuyến được."
+      icon={Paperclip}
+      size="md"
+      hasRequiredFields
+      footer={
+        <>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (busy) return;
+              draft.cancel();
+              onClose();
+            }}
+          >
+            Hủy
+          </Button>
+          <Button variant="save" onClick={() => void save()} title="Tải file lên và gắn vào hồ sơ hợp đồng.">
+            <Save className="mr-2 h-4 w-4" aria-hidden />
+            {busy ? "Đang tải file…" : "Lưu file đính kèm"}
+          </Button>
+        </>
+      }
+    >
+      <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
+      {form && target && (
+        <div className="grid gap-4 py-2">
+          <ErrorSummary errors={errors} />
+          <ChoiceGroup
+            label="Loại hồ sơ"
+            required
+            value={form.kind}
+            onChange={(v) => setForm((f) => (f ? { ...f, kind: v as ExportContractAttachmentKind } : f))}
+            options={(Object.keys(CONTRACT_ATTACHMENT_LABELS) as ExportContractAttachmentKind[]).map((k) => ({
+              value: k,
+              label: `${CONTRACT_ATTACHMENT_LABELS[k]}${target.missing.includes(k) ? " (còn thiếu)" : ""}`,
+            }))}
+            columns={2}
+          />
+          <Field label="Ghi chú (nếu có)" hint="VD: bản ký hai bên ngày 12/10, L/C tu chỉnh lần 1.">
+            <Input value={form.caption} onChange={(e) => setForm((f) => (f ? { ...f, caption: e.target.value } : f))} />
+          </Field>
+          <Field label="File" required nestedInput>
+            <FilePicker files={files} onChange={setFiles} />
+          </Field>
         </div>
       )}
     </FormDialog>

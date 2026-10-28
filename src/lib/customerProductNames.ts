@@ -62,7 +62,9 @@ export function productsByCustomerName(
     const bySize = [...new Set(mine.filter((n) => nameKey(n.sizeText) === sizeKey).map((n) => n.productId))];
     if (bySize.length) return { tier: 1, productIds: bySize };
   }
-  const byName = [...new Set(mine.map((n) => n.productId))];
+  // Bậc 2 (khớp tên): dòng có size mà dòng tên của khách ghi size KHÁC ⇒ không phải mặt hàng đó
+  // (VD tên chỉ có size 5-5.5 gr, dòng HĐ size 6-7 gr) — chỉ nhận dòng tên không ghi size.
+  const byName = [...new Set(mine.filter((n) => !sizeKey || !nameKey(n.sizeText)).map((n) => n.productId))];
   return byName.length ? { tier: 2, productIds: byName } : { tier: null, productIds: [] };
 }
 

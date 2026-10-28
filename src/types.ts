@@ -27,7 +27,9 @@ export type Role =
   | "accountant"
   | "team-leader"
   | "warehouse-keeper"
-  | "planner";
+  | "planner"
+  | "planning-head"
+  | "planning-deputy";
 
 export const ROLES: { value: Role; label: string }[] = [
   { value: "admin", label: "Quản trị viên" },
@@ -42,6 +44,8 @@ export const ROLES: { value: Role; label: string }[] = [
   { value: "chief-accountant", label: "Kế toán trưởng" },
   { value: "accountant", label: "Kế toán" },
   { value: "planner", label: "Nhân viên Kế hoạch" },
+  { value: "planning-head", label: "Trưởng phòng Kế hoạch" },
+  { value: "planning-deputy", label: "Phó phòng Kế hoạch" },
 ];
 
 /**
@@ -1191,11 +1195,21 @@ export interface ExportContractRevision {
 
 export type ExportApprovalDecision = "approved" | "needs-revision" | "rejected";
 
-/** Một lần ghi kết quả BGĐ ký giấy cho MỘT bản (Q4). */
+/**
+ * Lượt duyệt (mig 0079): `contract` = duyệt MỘT bản hợp đồng (bản 0 / bản sửa); `final` = duyệt
+ * cuối sau khi ghi chuyến — đồng ý thì đóng HĐ. Dòng cũ không có cột ⇒ coi là `contract`.
+ */
+export type ExportApprovalStage = "contract" | "final";
+
+/**
+ * Một lần duyệt cho MỘT bản. Từ mig 0079 người duyệt là Trưởng / Phó phòng Kế hoạch duyệt
+ * trên app (dòng cũ: kết quả BGĐ ký giấy do nhân viên ghi lại — Q4).
+ */
 export interface ExportContractApproval {
   id: string;
   contractId: string;
   revisionId: string;
+  stage?: ExportApprovalStage;
   decision: ExportApprovalDecision;
   approverName: string;
   decidedOn: string;
@@ -1278,18 +1292,55 @@ export interface ExportStepItem {
   createdAt: string;
 }
 
-/** File / ảnh gắn bước của chuyến. Bước 4a/4b tự xong khi có file. */
+/** Loại hồ sơ đính kèm cấp HĐ (bước Đính kèm, mig 0079). */
+export type ExportContractAttachmentKind = "signed-contract" | "lc" | "proforma" | "other";
+
+/**
+ * File / ảnh gắn bước của chuyến. Bước 4a/4b tự xong khi có file. `step = "contract"` (mig 0079)
+ * = hồ sơ đính kèm cấp HĐ (không gắn chuyến), loại ở `attachmentKind`.
+ */
 export interface ExportFile {
   id: string;
   contractId: string;
   shipmentId: string;
   stepItemId: string;
-  step: ExportStep;
+  step: ExportStep | "contract";
+  attachmentKind?: ExportContractAttachmentKind | "";
   path: string;
   fileName: string;
   layerNo: number | null;
   caption: string;
   uploadedBy: string;
+  createdAt: string;
+}
+
+/** Loại thao tác trong nhật ký hợp đồng (mig 0079). */
+export type ExportActivityAction =
+  | "create"
+  | "update"
+  | "delete"
+  | "approve"
+  | "return"
+  | "reject"
+  | "attach"
+  | "detach"
+  | "cancel"
+  | "restore"
+  | "close"
+  | "reopen"
+  | "undo";
+
+/**
+ * Nhật ký thao tác của MỘT hợp đồng (mig 0079) — chỉ thêm, không sửa / xóa. Ai, lúc nào, làm gì,
+ * ở chuyến nào: để Trưởng / Phó phòng tra soát việc Nhân viên Kế hoạch đã làm.
+ */
+export interface ExportActivity {
+  id: string;
+  contractId: string;
+  shipmentId: string;
+  action: ExportActivityAction;
+  summary: string;
+  actor: string;
   createdAt: string;
 }
 

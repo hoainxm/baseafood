@@ -2,7 +2,7 @@
 
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
-last_verified: 2026-10-22
+last_verified: 2026-10-28
 ttl_days: 90
 <!-- updated: 2026-10-22 (c) — v7 (ba-spec 41 v7 NV17): khối "Đọc invoice" trong hộp mục Commercial Invoice (hộp cỡ xl), nút "Trích xuất từ chứng từ" quét thêm invoice. -->
 <!-- updated: 2026-10-22 (b) — v6 (ba-spec 41 v6): hộp "Tên hàng trên chứng từ" của một khách (danh mục Khách hàng + lối từ hồ sơ HĐ), form HĐ chọn mặt hàng điền 4 ô theo tên của khách, hộp Nối mặt hàng gợi ý theo tên + size của khách, ô danh mục đổi thành "Tên tiếng Anh mặc định". -->
@@ -160,7 +160,18 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 
 - 2026-10-22 (b) — **v6** (preview `baseafood-demo`, bộ demo mới 18 tên trích xuất): danh mục Khách hàng có "Tên hàng (n)" mỗi dòng; hộp Tên hàng của khách 9 tên (tên đậm · quy cách · mặt hàng xưởng · "Trích xuất từ HĐ …"), Thêm → Lưu trống ⇒ `ErrorSummary` 2 lỗi; form HĐ: chọn khách → ô mặt hàng có dòng phụ = tên của khách → chọn ⇒ tên + quy cách tự điền; hồ sơ HĐ có nút "Tên hàng của <khách>"; nối 1 dòng chưa nối ⇒ toast "… · thêm 1 tên hàng của khách" (Hoàn tác — chưa bấm thử); hộp Tên hàng 360 px × 130 % không tràn; console 0 lỗi của app.
 
+## v8 (2026-10-28) — quy trình duyệt mới (ba-spec 41 §0)
+
+- **Thanh chặng** `ContractFlowBar` (`parts.tsx`, mốc `contract-flow`) ngay dưới đầu hồ sơ: Duyệt HĐ · Đính kèm · Ghi chuyến · Duyệt cuối · Đóng HĐ — xong = tích xanh, đang ở = vàng + dòng "ai làm"; điện thoại chỉ chặng đang ở hiện nhãn (như `StepStepper`). Rê / focus chặng ⇒ `title` giải thích.
+- **Nút chính theo chặng + vai trò**: Duyệt hợp đồng (U6) → Đính kèm hồ sơ (U1) → Ghi chuyến (U1, chỉ khi `shipmentGate` ok) → Duyệt cuối (U6, `lock`). Chặng không phải việc của người xem ⇒ thẻ chờ "Chờ Trưởng / Phó phòng Kế hoạch duyệt…". "Chốt HĐ" bỏ; "Duyệt cuối · đóng HĐ" ở Thao tác khác cho đóng sớm (bắt lý do). Mở lại HĐ chỉ U6.
+- **Khối "Hồ sơ đính kèm"** (mốc `contract-attachments`, mở sẵn khi Chờ đính kèm): thẻ từng loại bắt buộc (đã có / còn thiếu) + nút Đính kèm file + `FileList` (Gỡ có Hoàn tác). Hộp `AttachmentDialog`: chọn loại (ChoiceGroup, đánh dấu "(còn thiếu)"), ghi chú, nhiều file; nháp `useDialogDraft`.
+- **Hộp Duyệt hợp đồng** (`ApprovalDialog` viết lại): bỏ chọn người ký BGĐ + ủy quyền + file scan; "Người duyệt" chỉ đọc = tài khoản đang đăng nhập. **Hộp Duyệt cuối** (`FinalReviewDialog`): khung tóm tắt thực xuất / dung sai (vàng khi đóng sớm), Đồng ý — đóng hợp đồng / Trả về — sửa hồ sơ, lý do bắt khi trả về hoặc đóng sớm.
+- **Khối "Nhật ký thao tác"** (mốc `contract-activity`, gập sẵn) cuối hồ sơ: `ActivityList` — mới trước, 15 dòng rồi "Hiện tất cả", mỗi dòng: việc · giờ · người · chuyến.
+- **Thẻ trạng thái HĐ** 6 nhãn (`CONTRACT_STATE_TAG` ở `progress.ts`): Chờ duyệt (pending) · Chờ đính kèm (warning) · Đang ghi chuyến (source) · Chờ duyệt cuối (pending) · Đã đóng HĐ (done) · Đã hủy (muted). Bộ lọc danh sách HĐ theo 6 nhãn + "Đang mở". Chữ "Lên chuyến" → **"Ghi chuyến"** mọi chỗ.
+- **Chú thích viết tắt**: nút "?" (`AbbrHint`) tự gắn cạnh nhãn `Field` / `DateField` / `Combobox` / `NumberField`, tiêu đề cột `RecordTable` (ngoài nút sắp xếp), nhãn thông tin hồ sơ / chuyến (`Info`, `Fact`); chữ trong câu dùng `Abbr`.
+
 ## History
+- v8 (2026-10-28): quy trình duyệt mới — thanh chặng, nút chính theo chặng + vai trò, khối Hồ sơ đính kèm, hộp Duyệt / Duyệt cuối / Đính kèm, khối Nhật ký thao tác, thẻ 6 trạng thái, chú thích viết tắt. Tour 22 bước (thêm "Thanh chặng của hợp đồng"). Chưa chạy thử tay trên preview ở bản ghi này — xem mục QA.
 - v7 (2026-10-22 tối): khối "Đọc invoice" trong hộp mục Commercial Invoice (hộp xl) — đọc file Excel / PDF xuất từ Excel, điền ô trống, báo ô lệch + "Dùng số trên invoice", so với HĐ, nối dòng → trích xuất tên khi Lưu; không nối máy chủ có ô chọn file chỉ để đọc. Nút "Trích xuất từ chứng từ" quét thêm invoice (đang chạy đổi chữ "Đang trích xuất…"; file bỏ qua báo tại chỗ).
 - v6.2 (2026-10-22): nút "Trích xuất từ chứng từ" trong hộp Tên hàng; chữ "tự học" đổi thành "trích xuất"; mô tả hộp viết lại (đối chiếu mặt hàng xưởng ⇄ tên, size, quy cách, mã HS của khách); hàng tên cột nổi của bảng trong hộp thoại dính đỉnh vùng cuộn (sửa lỗi lơ lửng giữa hộp).
 - v6.1 (2026-10-22): hộp Tên hàng trên chứng từ đổi từ thẻ chồng chữ sang bảng 5 cột thẳng hàng + ô tra, size / quy cách tách dòng theo ý, mã kế toán dưới mặt hàng.

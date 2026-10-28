@@ -22,6 +22,8 @@ export const HOME_BY_ROLE: Partial<Record<Role, string>> = {
   "manager-kho": "wip",
   "vice-manager": "wip",
   planner: "planning-export",
+  "planning-head": "planning-export",
+  "planning-deputy": "planning-export",
 };
 
 /**

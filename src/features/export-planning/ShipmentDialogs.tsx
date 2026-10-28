@@ -174,7 +174,7 @@ export function ShipmentFormDialog({
         draft.dismiss();
         onClose();
       }}
-      title={(form ? form.existingMeta : target?.existing) ? `Sửa chuyến · HĐ ${form?.contractNo ?? ""}` : `Lên chuyến · HĐ ${form?.contractNo ?? ""}`}
+      title={(form ? form.existingMeta : target?.existing) ? `Sửa chuyến · HĐ ${form?.contractNo ?? ""}` : `Ghi chuyến · HĐ ${form?.contractNo ?? ""}`}
       description="Một chuyến là một container. Chuyến hiện ở tháng của ngày đóng cont; chưa có thì theo ETD, rồi tới tháng kế hoạch."
       icon={Container}
       size="lg"

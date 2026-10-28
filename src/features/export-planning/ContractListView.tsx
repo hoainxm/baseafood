@@ -17,19 +17,24 @@ import {
   pendingRevision,
   workingRevision,
   type ContractState,
+  CONTRACT_STATE_LABELS,
+  isLiveContractState,
   type ExportData,
 } from "@/lib/exportPlanning";
 import { formatDateVN, formatMoney } from "@/lib/format";
 import type { Customer, ExportContract } from "@/types";
 import { Eye } from "lucide-react";
+import { CONTRACT_STATE_TAG } from "./progress";
 
-const STATE_TAG = { pending: "pending", approved: "source", closed: "done", cancelled: "muted" } as const;
 type Filter = "open" | ContractState | "all";
-const FILTERS = [
-  { value: "open", label: "Đang mở (chờ duyệt + đã duyệt)" },
-  { value: "pending", label: "Chờ duyệt" },
-  { value: "closed", label: "Đã xuất đủ · đã chốt" },
-  { value: "cancelled", label: "Đã hủy" },
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "open", label: "Đang mở (mọi chặng)" },
+  { value: "pending", label: CONTRACT_STATE_LABELS.pending },
+  { value: "attaching", label: CONTRACT_STATE_LABELS.attaching },
+  { value: "shipping", label: CONTRACT_STATE_LABELS.shipping },
+  { value: "final-review", label: CONTRACT_STATE_LABELS["final-review"] },
+  { value: "closed", label: CONTRACT_STATE_LABELS.closed },
+  { value: "cancelled", label: CONTRACT_STATE_LABELS.cancelled },
   { value: "all", label: "Tất cả" },
 ];
 
@@ -56,7 +61,7 @@ export function ContractListView({
   const rows = data.contracts
     .filter((c) => {
       const st = stateOf(c);
-      return filter === "all" || (filter === "open" ? st === "pending" || st === "approved" : st === filter);
+      return filter === "all" || (filter === "open" ? isLiveContractState(st) : st === filter);
     })
     .filter((c) => {
       const q = query.trim().toLowerCase();
@@ -110,10 +115,10 @@ export function ContractListView({
         const cl = contractClosure(data, c.id, opts);
         return (
           <div className="flex min-w-36 flex-wrap gap-1 whitespace-normal">
-            <Tag variant={STATE_TAG[st]}>{contractStateLabel(st, c)}</Tag>
+            <Tag variant={CONTRACT_STATE_TAG[st]}>{contractStateLabel(st, c)}</Tag>
             {pendingRevision(data, c.id) && st !== "pending" && <Tag variant="warning">Bản sửa chờ duyệt</Tag>}
-            {(st === "pending" || st === "approved") && !cov.covered && <Tag variant="warning">Chưa lên đủ chuyến</Tag>}
-            {(st === "pending" || st === "approved") && effectiveDeadline(data, c.id) < today && (!openShipmentsOf(data, c.id).length || !cov.covered) && <Tag variant="error">Quá hạn giao</Tag>}
+            {isLiveContractState(st) && st !== "final-review" && !cov.covered && <Tag variant="warning">Chưa ghi đủ chuyến</Tag>}
+            {isLiveContractState(st) && st !== "final-review" && effectiveDeadline(data, c.id) < today && (!openShipmentsOf(data, c.id).length || !cov.covered) && <Tag variant="error">Quá hạn giao</Tag>}
             {cl.reason === "out-of-tolerance" && <Tag variant="error">Ngoài dung sai: kg {deviationText(cl.kgDeviationPct)}</Tag>}
           </div>
         );

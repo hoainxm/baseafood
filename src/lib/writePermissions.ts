@@ -150,6 +150,7 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   export_step_items: null,
   export_files: null,
   export_payments: null,
+  export_activity_log: null,
   // Tên hàng theo khách (mig 0077) — RLS riêng: danh mục khách HOẶC Xuất khẩu (trích xuất khi lưu HĐ).
   customer_product_names: null,
 };

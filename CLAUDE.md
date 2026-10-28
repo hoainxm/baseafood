@@ -1,208 +1,161 @@
 # CLAUDE.md — Baseafood MES
 
-Cửa vào cho AI agent. File này = quy tắc + định tuyến. **Chi tiết nghiệp vụ nằm ở [`docs/app-map/`](docs/app-map/README.md) — đọc đúng file cần dùng, đừng đọc cả codebase.**
+Cửa vào cho AI agent: **quy tắc + định tuyến**. Chi tiết nghiệp vụ ở [`docs/app-map/`](docs/app-map/README.md) — đọc đúng file cần dùng, đừng đọc cả codebase. **Trạng thái dự án, backlog, định hướng các buổi họp:** [`docs/BAN-GIAO-tiep-theo.md`](docs/BAN-GIAO-tiep-theo.md) (đọc trước khi làm việc lớn). Bối cảnh công ty + đầu mối: [`docs/BAN-GIAO.md`](docs/BAN-GIAO.md).
 
-Hệ thống MES cho Xí nghiệp Baseafood BSF1 (Bà Rịa). **Repo mới, độc lập với SDFactory** (SDFactory chỉ là demo bán hàng — không kế thừa cấu trúc dữ liệu/phân quyền).
+MES cho Xí nghiệp Baseafood BSF1 (Bà Rịa). **Repo độc lập với SDFactory** (chỉ là demo bán hàng — không kế thừa dữ liệu/phân quyền). Nghiệp vụ trọng tâm: nguyên liệu theo vòng **gối đầu** (mua → sơ chế → cấp đông → tồn dự trữ → xả đông dùng kỳ sau) kéo theo tồn kho; đau nhất là tồn NL cuối kỳ sai do ghi tay ⇒ kế toán chốt số sai. Ba phân xưởng **Đông · Cá · Khô**. Người dùng: tổ trưởng/thủ kho + kế toán, trên **web** mọi cỡ màn — responsive gọn, mật độ web thường (phóng to 90–130% ở Cài đặt hiển thị). Luật UI: [`src/design-system/README.md`](src/design-system/README.md).
 
-**Nghiệp vụ trọng tâm:** quản lý nguyên liệu trong sản xuất theo vòng lặp gối đầu (mua → sơ chế → cấp đông → tồn dự trữ → xả đông tái dùng kỳ sau), kéo theo tồn kho. Đau nhất: tồn nguyên liệu cuối kỳ sai do ghi chép tay → kế toán chốt số sai. Ba phân xưởng: **Đông · Cá · Khô**.
-
-**Người dùng:** tổ trưởng/thủ kho + kế toán, thao tác trên **web** ở nhiều cỡ màn (điện thoại → desktop). Ưu tiên thiết kế: **responsive gọn, mật độ web thường, chạy khít mọi cỡ màn** (bỏ lối ép cỡ lớn cho người lớn tuổi/tablet — quyết định 2026-08-21). Người mắt kém vẫn có lối phóng to 90–130% ở Cài đặt hiển thị. Luật UI ở [`src/design-system/README.md`](src/design-system/README.md).
+> ⚠️ "Bán thành phẩm" (BTP/WIP, công đoạn SX) ≠ màn **Bán hàng** (bán TP cho khách). **Đơn đặt = xuất khẩu**; phí XK phòng kế hoạch tính riêng ⇒ Cân đối KHÔNG tính phí XK. Dữ liệu là **sổ sách thật của xưởng** — mất là không dựng lại được.
 
 ## Stack & lệnh
 
-React 19 · Vite 8 · TypeScript strict · Tailwind v4 · primitive shadcn (style `radix-nova`) · Supabase env-gated · oxlint. Alias `@/*` → `src/*`.
+React 19 · Vite 8 · TypeScript strict · Tailwind v4 · primitive shadcn (`radix-nova`) · Supabase env-gated · oxlint · vitest. Alias `@/*` → `src/*`.
 
 ```bash
-npm run dev      # :5173
-npm run build    # tsc -b && vite build — cổng kiểu, phải xanh
-npm run lint     # oxlint
+npm run dev           # :5173 — nhưng chạy preview bằng preview_start "baseafood-dev", KHÔNG bằng Bash
+npm run build         # tsc -b && vite build — phải xanh
+npm run lint          # oxlint
+npm test              # vitest — hàm thuần, *.test.ts cạnh file
+npm run naming:check  # chặn tên tiếng Việt MỚI
 ```
 
-**Test tự động (từ 2026-09-21):** `vitest` — ~190 test cho hàm thuần (`balancingCalc` · `inventory.computeWipStock/filterRetailSales/getAvailableKg` + trừ tồn theo lô gắn · `lotTraceability` + **kịch bản truy xuất đầu-cuối** `lotTraceability.e2e.test.ts` · `format` · `imports/importHelpers` gom chuyến/ghi bù · `production/wipHelpers` tách râu/bao tử · `lib/batter` bột đi kèm/lượng bột theo loại · `twoVersionReconciliation.resolveTaxSideSheets` chia bản thuế/tự tải · …); chạy `npm test`. **CI GitHub Actions** (`.github/workflows/ci.yml`) chạy lint + build + test mỗi push/PR. Màn hình vẫn thử tay trên preview — xem bảng bên dưới.
+CI (`.github/workflows/ci.yml`) chạy lint + build + test mỗi push. Màn hình thử tay trên preview.
 
 ## Cấu trúc
 
 ```
 src/
-├── App.tsx · main.tsx        điều hướng react-router-dom v7 (HashRouter) — ~17 route, khung ở features/shared/AppShell.tsx
-├── types.ts                  kiểu + BẤT BIẾN nghiệp vụ (laGhiBu, thanhTien)
-├── data/finished-goods.json      141 mã TK 1551 — chỉ là SEED
-├── lib/                      repo · catalogRepo · db · supabase · connectivity · balancingCalc · balancingGrid · periodUtils · inventory · inventoryMaterial · nxtExcel · auth · username · format · store · utils
-├── components/ui/            primitive shadcn — size mật độ web thường (token-driven)
-├── design-system/            tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
-└── features/                 THẬT: imports · production/WipProductionScreen (/wip) · packaging (/packaging) · warehouse · orders · sales · balancing · catalog · reports/NXT · auth · users
-                              export-planning (/planning-export "Xuất khẩu" — Phòng Kế hoạch: tháng × khách × hợp đồng × chuyến, 6 bước, khép kín)
-                              my-tasks (/my-tasks "Việc của tôi": việc cần làm + hạn + giao việc) · documents (/documents "Tài liệu công ty": quy trình/biểu mẫu/chứng nhận, lần ban hành, xem theo phòng ban) · dashboard (/dashboard "dòng chảy số liệu") · shared/CheDoDemo (CHẾ ĐỘ DEMO — admin bật, xem quy tắc 15). 5 màn DEMO dữ liệu mẫu ĐÃ GỠ 2026-10-12 (link cũ chuyển sang màn thật)
-supabase/migrations/          0001 … 0078 (⚠️ `0078` hàm gộp mặt hàng nhận `product_id` có tiền tố demo — CHƯA chạy, chạy TRƯỚC lệnh sửa dữ liệu demo §4c, xem [03-database](docs/app-map/03-database.md); `0077` tên hàng theo khách `customer_product_names` ✅ chạy 2026-10-22, xem [03-database](docs/app-map/03-database.md); `0076` tên thương mại mặt hàng `products.trade_name` ✅ chạy 2026-10-22, xem [03-database](docs/app-map/03-database.md); ⚠️ `0075` Xuất khẩu Phòng Kế hoạch — CHƯA chạy, tạo bucket `export-files` TRƯỚC, xem [41](docs/app-map/41-export-planning.ba-spec.md); `0074` ghi chú riêng từng loại ở Cân đối (`balancing_inputs.type_notes`) ✅ chạy 2026-10-20; ⚠️ `0073` kế toán trưởng ghi tài liệu — CHƯA chạy; `0072` tài liệu công ty + bucket `documents` ✅ chạy 2026-10-19; đã chạy trên DB thật tới 0070 — `0070` giao việc / màn Việc của tôi chạy 2026-10-19 (đã kiểm bảng + RLS + 22 ô ma trận); `0061`…`0069` (đại lý liên hệ/ngân hàng · phân quyền · chốt quyền ghi mode log · /wip ghi Sổ kho tháng · ghi chú dòng Cân đối · nhóm sổ kho của lô gửi đông · hàm gộp mặt hàng trùng tên) chạy 2026-10-15…16, xem [03-database](docs/app-map/03-database.md); `0059` giá trị enum + `0060` tên policy sang tiếng Anh (Đợt 5 đặt tên) chủ dự án chạy 2026-10-13; `0058` thêm site `site-demo` cho chế độ demo, chạy 2026-10-13; `0057` chặn người tự đăng ký đọc/ghi sổ + khóa cột vai trò chạy 2026-10-12; `0056` lô đi ra `lot_dispatches` + lý do chưa gắn lô `lot_waivers` chạy 2026-10-08 (đã kiểm bảng + RLS); `0055` tô màu dòng "đã dò" (`row_marks`, một bảng dùng chung mọi bảng) chạy 2026-10-06 (2 lần); `0054` sổ bán nội địa (`domestic_sales`) chạy 2026-10-06 (2 lần); `0053` lô/kho của 2 dòng kho cân đối (`balancing_inputs.stock_line_id`, `stock_location`) + `0052` cột Nợ cân đối (`balancing_outputs.debt_kg`) chạy 2026-10-06 (2 lần); `0051` bột tẩm chạy 2026-10-06 (2 lần, idempotent); rà cột 2026-10-02: `0040` chạy bù 2026-10-02; `0028` chạy bù 2026-10-02 (trước đó thiếu `production_locks.leftover_kg` ⇒ mọi lần chốt ngày SX bị từ chối), xem [03-database](docs/app-map/03-database.md); RIÊNG `0029` bảng `packagings` bị sót, chạy bù 2026-09-30 kèm RLS mẫu `0021` + trigger `0048` — xem [03-database](docs/app-map/03-database.md))
-docs/README.md                bản đồ tài liệu — doc nào ở đâu, doc mới bỏ đâu
-docs/app-map/                 bản đồ ngữ cảnh cho agent (đọc khi CODE)
-docs/ops/                     vận hành: cutover Supabase · deploy Vercel · env
-docs/spec/                    đặc tả/ADR trước khi build
-docs/trien-khai/              nghiệp vụ gốc (phân tích, 28 câu hỏi đã chốt, thiết kế flow)
+├── App.tsx · main.tsx   react-router v7 (HashRouter); khung features/shared/AppShell.tsx; nav cây CAY_NAV
+├── types.ts             kiểu + BẤT BIẾN nghiệp vụ (laGhiBu, thanhTien)
+├── data/finished-goods.json   141 mã TK 1551 — chỉ là SEED, chỉ chọn, đừng sửa
+├── lib/                 tầng dữ liệu (repo · catalogRepo · db · supabase · connectivity) + hàm thuần nghiệp vụ
+├── components/ui/       primitive shadcn (token-driven)
+├── design-system/       tokens.css · patterns/ · kit/ · index.ts (cửa import duy nhất)
+└── features/<khu>/      màn thật, mỗi khu một thư mục — route + nav: docs/app-map/02-pages-navigation.md
+supabase/migrations/     0001 … 0078 — trạng thái từng file: docs/app-map/03-database.md
+docs/                    README.md (bản đồ tài liệu, doc mới bỏ đâu) · app-map/ · ops/ · spec/ · trien-khai/
 ```
 
-Chi tiết + ranh giới import: [`01-app-structure.md`](docs/app-map/01-app-structure.md).
+**Migration CHƯA chạy trên DB thật** (ghi nhận tới 2026-10-27): `0073` (kế toán trưởng ghi tài liệu) · `0075` (Xuất khẩu — tạo bucket `export-files` TRƯỚC) · `0078` (gộp mặt hàng nhận `product_id` tiền tố demo — chạy TRƯỚC lệnh sửa dữ liệu demo §4c). Viết migration mới ⇒ rà [`03-database`](docs/app-map/03-database.md) + số migration trên origin trước khi đặt số. ⛔ Đừng chạy `0002`, `0003`, `0023`.
+
+Ranh giới import: [`01-app-structure.md`](docs/app-map/01-app-structure.md).
 
 ## Quy tắc code
 
+Mỗi quy tắc một dòng; mẫu + ngoại lệ + checklist ở link. *(máy chặn)* = pre-commit hoặc test CI bắt lỗi.
+
 1. TypeScript strict; function components.
-2. Mọi khối lượng là **kg**; số hiển thị locale **vi-VN** qua `lib/format.ts`, class `tnum` (tabular-nums).
-3. **`src/features/**` chỉ import từ `@/design-system`.** Cấm `@/components/ui/*` trực tiếp; cấm viết class cỡ chữ/mã màu tay — sửa `tokens.css` thay vì đè cục bộ. *(hook pre-commit chặn)*
-4. Mọi đọc/ghi dữ liệu qua hook trong `lib/catalogRepo.ts` → `lib/repo.ts`. **Không** gọi `localStorage` hay `supabase` từ màn hình.
-5. Nhãn luôn hiện (không dùng placeholder thay nhãn); vùng chạm **theo mật độ của design-system** — mặc định "gọn" 36px, "vừa" 40px, "Thoáng" 44px chọn ở Cài đặt hiển thị (đừng ép cứng 44px; riêng ô số `EditableGrid` ≥ 44px — [`README` §4 + §5b](src/design-system/README.md)); nút Lưu **không bao giờ** `disabled` (thiếu thì bắn `ErrorSummary`). **Mọi nút thao tác phải có `title` giải thích nút làm gì** khi rê chuột (trừ Hủy/Đóng) — luật + khuôn câu ở [`design-system/README.md` §9](src/design-system/README.md).
-6. Không xóa bản ghi nghiệp vụ theo kiểu lặng lẽ — dùng trạng thái; mọi xóa hiện tại qua `ConfirmDelete` + toast **Hoàn tác** (xoá DÒNG đang hiện trong lưới/bảng: `InlineConfirmDelete` — hỏi tại dòng, không lớp phủ, vẫn toast Hoàn tác; 2026-10-20).
-7. Danh mục thay nhập tự do: đại lý / loại NL / mặt hàng / khách hàng / kho lưu / bột tẩm chọn qua `Combobox` có **CẢ** tạo mới tại chỗ (`onCreate` — lưu ngay vào danh mục, trùng tên không phân hoa thường thì dùng lại bản có sẵn) **LẪN** bút chì sửa nhanh (`useQuickCatalogEdit` → `onEditItem` + `editLabel` + `canEdit` + `{editor.dialog}`, truyền **đúng rows/setRows của màn**) ở **MỌI** ô nhập liệu dùng danh mục — kể cả ô mới thêm về sau. Ngoại lệ: ô lọc; danh sách cố định không phải danh mục (phân xưởng, loài, kho hệ thống, vai trò, kỳ…); 141 mã TK 1551 (chỉ chọn); màn DEMO; ô nằm trong form danh mục chỉ cần `onCreate`. Luật + mẫu + checklist: [`design-system/README.md` § Ô chọn danh mục](src/design-system/README.md#ô-chọn-danh-mục-luôn-có-thêm-mới--bút-chì-sửa-nhanh).
-8. **Định danh kỹ thuật = tiếng Anh, chữ người dùng đọc = tiếng Việt có dấu** (chốt 2026-10-12, [`spec/quy-uoc-dat-ten.md`](docs/spec/quy-uoc-dat-ten.md)). Áp cho MỌI lớp: bảng/cột/hàm/policy DB (`snake_case`), giá trị enum lưu DB, biến/hàm/prop (`camelCase`), component/type (`PascalCase`), file, thư mục, route, `?tab=`, khóa localStorage, khóa `rowMarks`, CSS utility/`data-*` (`kebab-case`). **Cấm tiếng Việt không dấu cho mọi thứ MỚI** (`computeWipStock`, `SummaryTable`, `_nguoi_dung`, `/monthly-stock`) — kể cả khi file xung quanh còn tên cũ; tên cũ là nợ có kế hoạch dọn (spec §5), không phải mẫu. Thuật ngữ dịch theo **từ điển §2b** của spec, không tự dịch. Cấm tên có dấu (NFC/NFD trông giống hệt nhưng là 2 định danh). Migration cũ `0001…0057` giữ nguyên.
-9. Brand `#17529c` (từ `public/baseafood-logo.png`).
-10. `npx shadcn add` **không chạy được trên Windows** (CLI quét ngược thư mục cha, đụng junction bị khóa quyền) — lấy component thủ công theo `src/design-system/README.md`.
-11. 🔒 Không ghi project ref / URL / key vào bất kỳ file nào trong repo.
-12. **Mọi bảng nghiệp vụ tô màu dòng được** ("đánh dấu đã dò" kiểu Excel), **lưu chung CSDL** (bảng `row_marks`, mig `0055`) — kể cả bảng thêm về sau. **MỘT cách dùng:** tick ô vuông các dòng (Shift+tick chọn khoảng) → thanh "Đã chọn N dòng" → **Tô màu ▾** (10 sắc × 5 mức nhạt→đậm) · **In đậm** · **Bỏ tô** áp cho mọi dòng đang tick (bút tô / nút 🪣 từng dòng đã BỎ — người dùng thấy rối, đừng thêm lại cách thứ hai). `SummaryTable` / `RecordTable` / `EditableGrid` / `CatalogCrud` bật bằng MỘT prop `rowMarkKey="<khoá bảng>"`; màn có thanh "Đã chọn" riêng đặt `RowMarkActions` vào đó; bảng tự dựng dùng `useRowMarkTools` + `useRowSelection` + `RowMarkToolbar`. Khoá bảng ổn định (đổi = mất dấu); khoá dòng là **id bản ghi**, cấm chỉ số dòng; bảng dòng GỘP theo kỳ/bộ lọc (báo cáo) ghép kỳ + bộ lọc vào khoá bảng. Màn hình **không** gọi `useRowMarks()` (chỉ `RowMarkProvider` ở `ShellLayout`). Bảng màu canh bằng test `design-system/patterns/rowMarkSource.test.ts`. Ngoại lệ: bản in A4, màn DEMO, bảng nháp chưa lưu, bảng trong hộp thoại/xem trước, bảng tóm tắt nhỏ, kết quả đối soát HĐĐT. Luật + mẫu + checklist: [`design-system/README.md` § Tô màu dòng](src/design-system/README.md#tô-màu-dòng-đã-dò-kiểu-excel). Sổ dài kế toán dò từng dòng dùng `SummaryTable fullHeight` (xổ ra, không khung cuộn riêng) thay `stickyHeader`.
-13. **Thông báo theo mức độ thao tác** (README design-system luật 8): thao tác **trình bày** không đổi số (tô màu, in đậm, chọn, lọc, xuất Excel/In, cài đặt giao diện) **KHÔNG toast**; **ghi dữ liệu** → `notify.saved` (hàng loạt/ghi đè kèm Hoàn tác); **xóa/chốt/ghi đè** → xác nhận trước + toast Hoàn tác; lỗi/cảnh báo luôn báo. Thêm thao tác mới ⇒ tự xếp mức trước khi gắn `notify`.
-14. **Bảng tràn ngang có thanh cuộn ngang ở CẢ TRÊN lẫn DƯỚI** (đồng bộ, chỉ hiện khi tràn): `SummaryTable` / `RecordTable` / `EditableGrid` tự có; bảng tự dựng ở features bọc **`HorizontalScroll`** thay cho `<div className="overflow-x-auto">` (cấm tự viết `overflow-x-auto` cho bảng mới). Luật: [`design-system/README.md` § 5a](src/design-system/README.md).
-15. **Demo = chế độ riêng, không phải màn riêng** (build 2026-10-12, [`spec/che-do-demo.md`](docs/spec/che-do-demo.md)): admin bật ở Tổng quan ⇒ cả app (mọi màn THẬT) chạy `site_id='site-demo'` trong DB thật, bộ số sinh từ số thật (`lib/demoGenerator.ts`). **Cấm** thêm màn / bảng / số mẫu cứng vào app thật để trình diễn. Chức năng mới ghi bảng mới ⇒ cùng commit: thêm bảng vào `DemoBundle` + `DemoPackLoader` (features/shared/DemoMode.tsx) + dòng checklist §5 của spec. Tách số thật bằng 3 lớp ở `lib/demoMode.ts` — **đừng đi vòng**: khóa chính lên máy chủ có tiền tố `demo:` (`rowToServer`/`rowFromServer`) — cả cột khóa ngoại khai ở `TableMapping.refColumns` (thêm khóa ngoại mới ⇒ khai, test `khoaNgoaiDemo` quét migration), mọi đọc/ghi/**xóa** lọc `site_id`, bản sao + hàng chờ dùng `bsf-demo.*` (`modeLocalKey`). Code mới gọi Supabase/localStorage ngoài `repo.ts` ⇒ phải qua đúng 3 lớp này. Khi bật, dải "ĐANG XEM DỮ LIỆU DEMO" luôn hiện. Cấm chạy `docs/demo/seed_bt2da*.sql` lên DB thật.
-16. **Màu nút theo CHỨC NĂNG** (chốt 2026-10-14, [`README` § 8b](src/design-system/README.md)): chọn `variant` theo ý nghĩa nút, không tự tô màu — **`save`** xanh lá cho Lưu / ghi số vào sổ hay danh mục (Lưu, Lưu thay đổi, Tạo kỳ, Nạp, Xác nhận nhập kho…) · **`edit`** xanh dương cho Sửa / bút chì / Mở lại ngày-kỳ · **`danger`** đỏ viền cho nút mở hộp Xóa / Bỏ dòng (nút **xác nhận** xóa trong hộp hỏi dùng `destructive` đặc) · **`lock`** hổ phách cho Chốt ngày-kỳ · `default` xanh thương hiệu cho hành động chính khác (Thêm, mở form, Điền) · `outline`/`ghost` cho phụ (Hủy, In, Xuất). Áp cho **mọi nút mới**. Test `design-system/patterns/buttonIntentSource.test.ts` quét mọi `<Button>` (dò icon `Pencil`/`Trash2`/`Lock`/`LockOpen`/`Save` + chữ đầu nhãn Lưu/Sửa/Xóa/Chốt/Mở lại) — sai variant là CI đỏ.
-17. **Mọi form GHI dữ liệu tự lưu NHÁP** (chốt 2026-10-16, [`lib/formDraft.ts`](src/lib/formDraft.ts)): đang gõ mà chuyển trang, tải lại, đăng xuất rồi đăng nhập lại vẫn còn nguyên — áp cho MỌI trang nhập hiện có (Nhập hàng, Sản xuất `/wip`, Đóng gói, Bán hàng, Đơn đặt, QC, Cân đối — hộp kỳ, Sổ kho tháng, khai tồn đầu) **và mọi form mới về sau**. Cách làm: form trên trang ⇒ `useFormDraft({ form, ...useDraftAccount(), value, isEmpty, onRestore })`; form trong hộp thoại ⇒ `useDialogDraft({ form, value, setValue, isEmpty })` (đóng ngang = `dismiss()` GIỮ nháp, nút Hủy = `cancel()` bỏ hẳn, Lưu xong = `done()`, mở lại hộp gọi `takeKept()`). Vừa mở lại nháp ⇒ hiện `<DraftRestoredNotice>` (features/shared), **không toast**. Luật: nháp nằm dưới máy theo tài khoản (`bsf.draft.<form>.<user>`, demo tự sang `bsf-demo.*`), **không bao giờ tự ghi vào sổ** (người dùng vẫn bấm Lưu), phiếu về trống ⇒ nháp tự xoá; màn có "tự mở phiếu trống" phải đợi `isReady` của hook; KHÔNG lưu nháp cho mật khẩu. Ô lưới ghi thẳng vào sổ theo từng phím thì khỏi nháp; ô chữ lưu-khi-rời-ô phải tự lưu khi bị gỡ (mẫu `RowNoteCell`). Test `lib/formDraftCoverageSource.test.ts` quét mọi file features có nút `variant="save"`: phải dùng nháp hoặc nằm trong danh sách MIỄN kèm lý do — màn nhập mới quên nháp là CI đỏ.
+2. Mọi khối lượng là **kg**; số hiển thị locale **vi-VN** qua `lib/format.ts`, class `tnum`.
+3. **`src/features/**` chỉ import từ `@/design-system`.** Cấm `@/components/ui/*` trực tiếp; cấm class cỡ chữ/mã màu tay — sửa `tokens.css`. *(máy chặn)*
+4. Mọi đọc/ghi dữ liệu qua hook `lib/catalogRepo.ts` → `lib/repo.ts`. **Không** gọi `localStorage` / `supabase` từ màn hình. *(máy chặn)*
+5. Nhãn luôn hiện (không dùng placeholder thay nhãn); vùng chạm theo mật độ design-system (đừng ép cứng 44px; ô số `EditableGrid` ≥ 44px); nút Lưu **không bao giờ** `disabled` (thiếu ⇒ `ErrorSummary`); **mọi nút thao tác có `title`** (trừ Hủy/Đóng) — [README §4, §5b, §9](src/design-system/README.md).
+6. Không xóa bản ghi nghiệp vụ lặng lẽ — dùng trạng thái; xóa qua `ConfirmDelete` + toast **Hoàn tác** (xóa dòng trong lưới/bảng: `InlineConfirmDelete`).
+7. Ô dùng danh mục (đại lý, loại NL, mặt hàng, khách, kho lưu, bột tẩm…) = `Combobox` có **CẢ** `onCreate` **LẪN** bút chì sửa nhanh (`useQuickCatalogEdit`, truyền đúng rows/setRows của màn) — mọi ô, kể cả ô mới về sau — [README § Ô chọn danh mục](src/design-system/README.md#ô-chọn-danh-mục-luôn-có-thêm-mới--bút-chì-sửa-nhanh).
+8. **Định danh kỹ thuật = tiếng Anh, chữ người dùng đọc = tiếng Việt có dấu**, mọi lớp (DB, enum, biến, file, route, `?tab=`, khóa localStorage/`rowMarks`, CSS). Cấm tiếng Việt không dấu cho thứ MỚI (tên cũ là nợ, không phải mẫu); cấm tên có dấu; dịch theo từ điển §2b — [`spec/quy-uoc-dat-ten.md`](docs/spec/quy-uoc-dat-ten.md). *(máy chặn)*
+9. Brand `#17529c`.
+10. `npx shadcn add` không chạy được trên Windows — lấy component thủ công theo README design-system.
+11. 🔒 Không ghi project ref / URL / key vào bất kỳ file nào trong repo. *(máy chặn)*
+12. **Mọi bảng nghiệp vụ tô màu dòng được** (bảng `row_marks`), **MỘT cách duy nhất**: tick dòng → thanh "Đã chọn N dòng" → Tô màu / In đậm / Bỏ tô (đừng thêm cách thứ hai). Bảng chuẩn bật bằng `rowMarkKey`; khóa dòng = id bản ghi; màn không gọi `useRowMarks()`; sổ dài dùng `SummaryTable fullHeight` — [README § Tô màu dòng](src/design-system/README.md#tô-màu-dòng-đã-dò-kiểu-excel).
+13. **Thông báo theo mức**: trình bày (tô màu, lọc, xuất Excel/In, cài đặt) KHÔNG toast · ghi → `notify.saved` · xóa/chốt/ghi đè → xác nhận + toast Hoàn tác · lỗi luôn báo (README luật 8).
+14. **Bảng tràn ngang có thanh cuộn ngang cả trên lẫn dưới**: bảng chuẩn tự có; bảng tự dựng bọc `HorizontalScroll` (cấm tự viết `overflow-x-auto`) — [README §5a](src/design-system/README.md).
+15. **Demo = chế độ, không phải màn**: admin bật ⇒ cả app chạy `site_id='site-demo'`; cấm màn/bảng/số mẫu cứng để trình diễn. Bảng mới ⇒ cùng commit thêm vào `DemoBundle` + `DemoPackLoader` + checklist §5; khóa ngoại mới khai `TableMapping.refColumns`; code gọi Supabase/localStorage ngoài `repo.ts` phải qua 3 lớp của `lib/demoMode.ts`. Cấm chạy `docs/demo/seed_bt2da*.sql` lên DB thật — [`spec/che-do-demo.md`](docs/spec/che-do-demo.md). *(máy chặn khóa ngoại)*
+16. **Màu nút theo chức năng**: `save` Lưu/ghi sổ · `edit` Sửa/Mở lại · `danger` mở hộp Xóa (nút xác nhận xóa: `destructive`) · `lock` Chốt · `default` hành động chính khác · `outline`/`ghost` phụ — [README §8b](src/design-system/README.md). *(máy chặn)*
+17. **Mọi form ghi dữ liệu tự lưu NHÁP**: trên trang `useFormDraft`, trong hộp thoại `useDialogDraft`; mở lại nháp ⇒ `<DraftRestoredNotice>` (không toast); nháp không bao giờ tự ghi sổ; không lưu nháp mật khẩu — [`lib/formDraft.ts`](src/lib/formDraft.ts). *(máy chặn)*
+18. **Mọi trang nghiệp vụ có "Hướng dẫn thao tác" + hộp "?"**, cùng commit với trang: `features/<khu>/<trang>Tour.ts` (`tourSpec`, mốc `data-tour`) + hộp trong `PAGE_GUIDES`. Khu vực có trạng thái phải giải thích trạng thái, điều kiện xong, việc tiếp; tour không ghi — [`43-guided-tour`](docs/app-map/43-guided-tour.ba-spec.md) + [README § Hướng dẫn thao tác](src/design-system/README.md). *(máy chặn)*
+19. **Mọi bảng nghiệp vụ sắp được theo cột** (tăng → giảm → gốc; mỗi kiểu một cách xếp; ô trống cuối). Bảng chuẩn tự có — cột ô nhập/huy hiệu/trạng thái phải khai `sortValue` + `sortKind`; bảng tự dựng dùng `useTableSort` — [README § Sắp xếp cột](src/design-system/README.md#sắp-xếp-cột--bấm-tên-cột-mỗi-kiểu-dữ-liệu-một-cách-xếp-từ-2026-10-27). *(máy chặn)*
 
-18. **Mọi trang nghiệp vụ có "Hướng dẫn thao tác" + hộp "?"** (chốt 2026-10-22, [`43-guided-tour`](docs/app-map/43-guided-tour.ba-spec.md) R13–R17): trang có route ⇒ (a) file `features/<khu>/<trang>Tour.ts` dựng bước (`TourStep`, `@/lib/guidedTour`) + export `tourSpec: PageTourSpec` (`pageId` = đoạn đường dẫn), màn gọi `usePageTour(isLoading ? null : tour)` và gắn mốc `data-tour="<pageId>-<khu-vực>"`; (b) hộp "Hướng dẫn: <trang>" trong `PAGE_GUIDES` (`features/shared/guideContent.tsx` — trang mới viết ở `features/shared/guides/<trang>Guide.tsx` rồi nối vào). **Áp cho mọi trang đã có VÀ mọi trang mới về sau — cùng commit với trang.** Khuôn: bước 1 là lời giới thiệu giữa trang (trang làm gì, ai dùng, khâu nào của chuỗi nhập → sản xuất → kho → bán / xuất); các bước theo thứ tự công việc; **khu vực có trạng thái phải giải thích trạng thái, điều kiện "xong", cảnh báo, việc tiếp** (không chỉ "chỗ này là nút X"); bước chỉ nút ghi là tùy chọn theo quyền; tour KHÔNG ghi, không mở form; lời theo [`noi-dung-va-label.md`](src/design-system/noi-dung-va-label.md) ("chọn", không "bấm"; tiêu đề không chấm cuối; lời kết bằng dấu chấm); 3–22 bước. Đổi khu vực / nhãn trạng thái / nút chính của trang ⇒ sửa tour + hộp "?" cùng commit. Test `features/shared/pageTourCoverage.test.ts` quét route ⇄ tour ⇄ hộp "?" ⇄ mốc `data-tour` ⇄ văn phong — trang mới thiếu là CI đỏ (MIỄN: trang quản trị chỉ admin + `/kit`, kèm lý do). Luật + mẫu: [`design-system/README.md` § Hướng dẫn thao tác](src/design-system/README.md).
-19. **Mọi bảng nghiệp vụ sắp được theo cột** (chốt 2026-10-27, [`README` § Sắp xếp cột](src/design-system/README.md#sắp-xếp-cột--bấm-tên-cột-mỗi-kiểu-dữ-liệu-một-cách-xếp-từ-2026-10-27)): bấm tên cột ⇒ lần 1 tăng, lần 2 giảm, lần 3 về thứ tự gốc; **mỗi kiểu một cách xếp** — chữ A→Z theo tiếng Việt (số trong chữ so theo giá trị), số bé→lớn, ngày cũ→mới, trạng thái/mức theo thứ tự nghiệp vụ (`rank`); ô trống luôn cuối; thứ tự đứng yên khi sửa số trên bảng. Trình bày ⇒ không toast, không ghi. `SummaryTable` / `RecordTable` / `CatalogCrud` tự có cho mọi cột có tên — cột là ô nhập / huy hiệu / trạng thái **phải khai** `sortValue` (`getSortValue`) + `sortKind`; bảng tự dựng dùng `useTableSort` + `s.header(...)`. Bảng có dòng nhóm ⇒ sắp trong từng nhóm; dán khối / Shift+tick đi theo thứ tự ĐANG HIỆN. Ngoại lệ: bản in, `EditableGrid` Cân đối, nháp/dòng đang gõ, hộp thoại/xem trước, tóm tắt nhỏ, ma trận quyền. Test `design-system/patterns/tableSortCoverageSource.test.ts` quét bảng tự dựng ở features: phải `useTableSort` hoặc có lý do miễn — bảng mới quên sắp là CI đỏ.
+## Commit & deploy
 
-## Commit
-
-Conventional Commits, scope = **tên khu tiếng Anh trùng thư mục** (`imports`, `balancing`, `design-system`, `docs`… — đổi từ scope tiếng Việt không dấu ngày 2026-10-12, [`spec/quy-uoc-dat-ten.md`](docs/spec/quy-uoc-dat-ten.md) §6), mô tả tiếng Việt có dấu:
+Conventional Commits, scope = **tên khu tiếng Anh trùng thư mục** (`imports`, `balancing`, `design-system`, `docs`…), mô tả tiếng Việt có dấu, body giải thích **vì sao**. Kết bằng `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
 
 ```
 feat(imports): chuyến thật, ghi bù chờ hóa đơn, chốt ngày
-fix(sync): hàng chờ chống mất số liệu khi ghi máy chủ hụt
-docs(app-map): bổ sung invariant phế liệu
 ```
 
-Body giải thích **vì sao**, không liệt kê file đã sửa. Kết bằng `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
-
-### Workflow push & deploy — quy tắc chuẩn cho MỌI session (chốt với chủ dự án 2026-08-25)
-
-- **Làm thẳng trên `main`.** Commit/push **trực tiếp vào `main`**, **KHÔNG** tách nhánh feature, **KHÔNG** mở PR (trừ khi người dùng yêu cầu rõ). Nếu harness cấp sẵn một nhánh `claude/...` ở đầu session, **vẫn ưu tiên quy tắc này** — chủ dự án đã chốt làm trên `main`. Chỉ commit khi người dùng yêu cầu.
-- **Deploy = phải đẩy CẢ HAI repo.** Vercel build từ repo cá nhân **`hoainxm/baseafood`**; nguồn thật là **`sdvico/baseafood`**. Một commit **chỉ lên bản chạy khi có mặt ở cả hai**. **Giữ Vercel ở `hoainxm` — ĐỪNG tự đổi sang sdvico** (quyết định của chủ dự án).
-- **Phiên Claude trên web chỉ push được `sdvico`** — proxy chặn `hoainxm` (khác chủ sở hữu; `add_repo` cross-owner bị từ chối, `git push` thẳng bị 403). ⇒ Sau khi push `sdvico/main`, **tự mình không mirror được** sang `hoainxm`.
-- **Cách xử mỗi lần push:** push `sdvico/main` xong, **đưa người dùng lệnh mirror** để họ chạy ở máy local (máy họ có quyền cả hai repo). Nhắc **`pull` trước** kẻo "non-fast-forward":
+- **Làm thẳng trên `main`**: không tách nhánh, không mở PR (trừ khi được yêu cầu), kể cả khi harness cấp nhánh `claude/...`. Chỉ commit khi người dùng yêu cầu. Nhiều phiên chung thư mục ⇒ đừng rebase tại chỗ.
+- **Deploy = có mặt ở CẢ HAI repo**: nguồn thật `sdvico/baseafood`, Vercel build từ `hoainxm/baseafood` (giữ Vercel ở `hoainxm`, đừng tự đổi). Phiên web chỉ push được `sdvico` ⇒ push xong đưa người dùng lệnh mirror:
   ```bash
   git fetch origin main
   git push https://github.com/hoainxm/baseafood.git origin/main:main
   ```
-  (Máy local người dùng có `origin` 2 push URL, nên `git checkout main && git pull && git push` cũng đẩy **cả hai cùng lúc** — miễn là `pull` trước.)
-- **Muốn agent tự đẩy cả hai:** mở session với **cả `sdvico` lẫn `hoainxm` làm nguồn ban đầu**, rồi cấu hình `origin` 2 push URL và push một phát cả hai.
-- Cơ chế **nhắc tải lại khi có bản mới** (`version.json` + `UpdateBanner`): xem [`ops/deploy-vercel.md`](docs/ops/deploy-vercel.md).
+  Máy local người dùng có `origin` 2 push URL ⇒ `git pull && git push` đẩy cả hai. Nhắc tải lại bản mới: [`ops/deploy-vercel.md`](docs/ops/deploy-vercel.md).
 
 ## Risk tier — xác định TRƯỚC khi làm
 
 | Tier | Nghĩa | Cách xử |
 |---|---|---|
-| 🟢 **GREEN** | Hoàn tác được bằng `git` | Làm thẳng. Sửa component, màn hình, doc, thêm bộ lọc, đổi chữ hiển thị. |
-| 🟡 **YELLOW** | Hoàn tác được nhưng phải có chủ đích | Tự làm, **không hỏi**, nhưng phải kèm đường lùi. Migration chỉ-thêm-cột (viết sẵn câu `drop` để lùi); đổi hình dạng dữ liệu trong `repo.ts` (kèm `patchLegacy`); đổi `localKey`; đổi công thức `balancingCalc.ts`. |
-| 🔴 **RED** | Không quay đầu được / nổ ở production | **Một câu xác nhận rồi ĐỢI.** `drop` / `alter … drop` trên bảng đang có số liệu; chạy `0002` hoặc `0003`; đổi RLS; mở app ra ngoài mạng nội bộ; xóa hàng loạt bản ghi nghiệp vụ; `git push --force`; đụng `.env` / key. |
+| 🟢 GREEN | Hoàn tác được bằng `git` | Làm thẳng. Component, màn hình, doc, bộ lọc, chữ hiển thị. |
+| 🟡 YELLOW | Hoàn tác được nhưng phải có chủ đích | Tự làm, không hỏi, kèm đường lùi: migration chỉ-thêm-cột (viết sẵn `drop`); đổi hình dạng dữ liệu `repo.ts` (kèm `patchLegacy`); đổi `localKey`; đổi công thức `balancingCalc.ts`. |
+| 🔴 RED | Không quay đầu / nổ production | **Một câu xác nhận rồi ĐỢI.** `drop` trên bảng có số liệu; chạy `0002`/`0003`; đổi RLS; mở app ra ngoài mạng nội bộ; xóa hàng loạt bản ghi; `git push --force`; đụng `.env` / key. |
 
-Chưa rõ tier ⇒ coi là 🔴. Dữ liệu ở đây là **sổ sách thật của xưởng**, mất là không dựng lại được.
+Chưa rõ tier ⇒ coi là 🔴.
 
 ## Code đổi → doc phải update
 
+Sửa doc xong ⇒ cập nhật `last_verified:` trong frontmatter. Hook pre-commit cảnh báo khi code trong `covers:` của doc đổi mà doc đứng yên.
+
 | Đụng vào | Update doc |
 |---|---|
-| `features/MaterialImportScreen.tsx`, quy tắc chuyến / chốt ngày | [`30-nhap-hang.md`](docs/app-map/30-nhap-hang.md) |
-| `features/SalesScreen.tsx`, phiếu bán / quy cách / hút bán | [`33-ban-hang.md`](docs/app-map/33-ban-hang.md) |
-| `features/BalancingScreen.tsx`, `BalancingTable.tsx`, `lib/balancingCalc.ts`, `lib/balancingStockLines.ts` (2 dòng kho ghi Sổ kho tháng) | [`31-can-doi-ky.md`](docs/app-map/31-can-doi-ky.md) (+ [`36`](docs/app-map/36-so-kho-thang.md)) |
-| `features/CatalogScreen.tsx`, `FinishedGoodScreen.tsx`, `data/finished-goods.json` | [`32-danh-muc.md`](docs/app-map/32-danh-muc.md) |
-| `features/monthly-stock/**`, `lib/monthlyStock.ts`, `lib/monthlyStockExcel.ts` (sổ kho theo tháng, dồn kỳ, nhập Excel bảng kê) | [`36-so-kho-thang.md`](docs/app-map/36-so-kho-thang.md) |
-| `features/reconciliation/**`, `lib/einvoiceReconciliation.ts`, `lib/twoVersionReconciliation.ts`, `lib/reconciliation*.ts` (đối soát HĐĐT ⇄ sổ kế toán · so hai bản HĐĐT · kiểm cộng cột · lọc cùng MST cùng ngày — 4 kiểu chọn trên màn; xuất Excel giữ định dạng gốc + bám bố cục file mẫu) | [`37-doi-soat-hddt.md`](docs/app-map/37-doi-soat-hddt.md) |
-| `lib/lotTraceability.ts`, `features/qr/**`, `features/shared/{GanLoDauVao,QrScanner,LotLabelPrint,useTraceData}`, `production/SessionLotsSection.tsx`, `orders/ExportLotCheck.tsx`, bảng `lot_inputs` / `lot_dispatches` / `lot_waivers` (truy xuất lô bằng QR) | [`spec/qr-truy-xuat-lo.md`](docs/spec/qr-truy-xuat-lo.md) (+ [`34`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) nếu đổi luồng gắn lô ở SX/đóng gói) |
-| `supabase/migrations/**` | [`03-database.md`](docs/app-map/03-database.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi ánh xạ) |
-| `lib/repo.ts`, `db.ts`, `catalogRepo.ts`, `connectivity.ts` | [`04-tang-du-lieu.md`](docs/app-map/04-tang-du-lieu.md) |
-| `lib/demoMode.ts`, `lib/demoGenerator.ts`, `features/shared/DemoMode.tsx`, `0058` (chế độ demo) | [`spec/che-do-demo.md`](docs/spec/che-do-demo.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi tầng dữ liệu) |
-| `features/my-tasks/**`, `lib/myTasks.ts`, bảng `task_assignments` (Việc của tôi: hạn / quá hạn, giao việc, chuông header, link mở thẳng ngày `?date=&workshop=`) | [`39-my-tasks.md`](docs/app-map/39-my-tasks.md) (+ [`05`](docs/app-map/05-bao-mat-phan-quyen.md) nếu đổi quyền `my-tasks`) |
-| `features/documents/**`, `lib/documents.ts`, `lib/documentStorage.ts`, bảng `company_documents` / `document_versions`, cột `app_roles.department`, bucket `documents` (Tài liệu công ty: lần ban hành, xem theo phòng ban 3 lớp, hạn chứng nhận) | [`40-documents.md`](docs/app-map/40-documents.md) (+ [`spec/quan-ly-tai-lieu`](docs/spec/quan-ly-tai-lieu.md) nếu đổi luật DOC-R · [`05`](docs/app-map/05-bao-mat-phan-quyen.md) nếu đổi quyền / phòng ban) |
-| `features/export-planning/**`, `lib/exportPlanning.ts`, `lib/exportReports.ts` (tab Báo cáo), `lib/customerProductNames.ts` + `features/catalog/CustomerProductNamesDialog.tsx` + bảng `customer_product_names` (tên hàng theo khách), `lib/invoiceReader.ts` + `lib/invoiceFileReader.ts` (đọc Commercial Invoice từ file Excel / PDF xuất từ Excel), `lib/exportPlanningDemo.ts`, `lib/exportFileStorage.ts`, bảng `export_*`, bucket `export-files`, vai trò `planner` (Phòng Kế hoạch · Xuất khẩu: hợp đồng / bản / duyệt giấy / gia hạn / chuyến / 6 bước / tiền về, khép kín theo dung sai) | [`41-export-planning.ba-spec.md`](docs/app-map/41-export-planning.ba-spec.md) (+ [`42` design-spec](docs/app-map/42-export-planning-ui.design-spec.md) nếu đổi giao diện · [`spec/xuat-khau-phong-ke-hoach`](docs/spec/xuat-khau-phong-ke-hoach.md) nếu đổi kế hoạch đợt · [`05`](docs/app-map/05-bao-mat-phan-quyen.md) nếu đổi quyền) |
-| `lib/guidedTour.ts`, `design-system/patterns/{GuidedTour,GuideButton}.tsx`, `features/shared/PageTourProvider.tsx`, `features/*/…Tour.ts` + mốc `data-tour`, `features/shared/{guideContent.tsx,guides/**}` (Hướng dẫn thao tác — tour từng bước trên trang + hộp "?"; **thêm trang mới cũng thuộc dòng này** — quy tắc 18) | [`43-guided-tour.ba-spec.md`](docs/app-map/43-guided-tour.ba-spec.md) (+ design-spec của màn nếu đổi mốc / bước · [`README` § Hướng dẫn thao tác](src/design-system/README.md)) |
-| `features/dashboard/**`, `lib/dataFlow.ts`, biểu đồ `design-system/patterns/{ProportionBar,PipelineStages,TimeSeriesChart}` (Tổng quan dòng chảy số liệu) | [`spec/che-do-demo.md` §5b](docs/spec/che-do-demo.md) (+ README design-system nếu đổi pattern) |
-| `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation.md`](docs/app-map/02-pages-navigation.md) |
-| Thêm thư mục / đổi ranh giới import | [`01-app-structure.md`](docs/app-map/01-app-structure.md) |
-| `lib/auth.ts`, `lib/username.ts`, `LoginScreen.tsx`, `UserManagementScreen.tsx`, `0006`, `0003_siet_rls.sql`, `.env.example` | [`05-bao-mat-phan-quyen.md`](docs/app-map/05-bao-mat-phan-quyen.md) |
-| `index.html`, cấu hình build/deploy (`package.json`, `vite.config.ts`), env Supabase | [`ops/deploy-vercel.md`](docs/ops/deploy-vercel.md) |
-| `design-system/**`, `components/ui/**`, `tokens.css` | [`src/design-system/README.md`](src/design-system/README.md) — canonical, **không** nhân bản sang app-map |
-| Tô màu dòng: `design-system/patterns/{RowMarkToolbar.tsx,rowMarkSource.ts}`, `features/shared/RowMarkProvider.tsx`, `lib/rowMarks.ts`, bảng `row_marks`, prop `rowMarks` ở màn | [`README` § Tô màu dòng](src/design-system/README.md#tô-màu-dòng-đã-dò-kiểu-excel) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi tầng dữ liệu, app-map của màn nếu đổi khoá bảng) |
-
-Sửa doc xong ⇒ cập nhật `last_verified:` trong frontmatter. Hook pre-commit cảnh báo khi code trong `covers:` đổi mà doc đứng yên.
+| `features/imports/**`, chuyến / chốt ngày | [`30-nhap-hang`](docs/app-map/30-nhap-hang.md) |
+| `features/sales/**`, phiếu bán / quy cách | [`33-ban-hang`](docs/app-map/33-ban-hang.md) |
+| `features/balancing/**`, `lib/balancingCalc.ts`, `lib/balancingStockLines.ts` | [`31-can-doi-ky`](docs/app-map/31-can-doi-ky.md) (+ [`36`](docs/app-map/36-so-kho-thang.md)) |
+| `features/catalog/**`, `data/finished-goods.json` | [`32-danh-muc`](docs/app-map/32-danh-muc.md) |
+| `features/production/**`, `packaging`, `warehouse`, `orders` | [`34`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) · [`35`](docs/app-map/35-btp-ui.design-spec.md) |
+| `features/monthly-stock/**`, `lib/monthlyStock*.ts` | [`36-so-kho-thang`](docs/app-map/36-so-kho-thang.md) |
+| `features/reconciliation/**`, `lib/*Reconciliation.ts`, `lib/reconciliation*.ts` | [`37-doi-soat-hddt`](docs/app-map/37-doi-soat-hddt.md) |
+| Truy xuất lô: `lib/lotTraceability.ts`, `features/qr/**`, gắn lô ở SX/đóng gói/xuất, bảng `lot_*` | [`spec/qr-truy-xuat-lo`](docs/spec/qr-truy-xuat-lo.md) (+ [`34`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md)) |
+| `features/my-tasks/**`, `lib/myTasks.ts` | [`39-my-tasks`](docs/app-map/39-my-tasks.md) |
+| `features/documents/**`, `lib/documents*.ts`, phòng ban | [`40-documents`](docs/app-map/40-documents.md) (+ [`spec/quan-ly-tai-lieu`](docs/spec/quan-ly-tai-lieu.md)) |
+| `features/export-planning/**`, `lib/export*.ts`, `lib/customerProductNames.ts`, `lib/invoice*Reader.ts`, bảng `export_*`, vai trò `planner` | [`41`](docs/app-map/41-export-planning.ba-spec.md) (+ [`42`](docs/app-map/42-export-planning-ui.design-spec.md) nếu đổi giao diện) |
+| Tour + hộp "?": `lib/guidedTour.ts`, `features/*/…Tour.ts`, `features/shared/guide*` — **kể cả thêm trang mới** | [`43-guided-tour`](docs/app-map/43-guided-tour.ba-spec.md) |
+| `features/dashboard/**`, `lib/dataFlow.ts` | [`spec/che-do-demo` §5b](docs/spec/che-do-demo.md) |
+| `lib/demoMode.ts`, `lib/demoGenerator.ts`, `features/shared/DemoMode.tsx` | [`spec/che-do-demo`](docs/spec/che-do-demo.md) |
+| `supabase/migrations/**` | [`03-database`](docs/app-map/03-database.md) (+ [`04`](docs/app-map/04-tang-du-lieu.md) nếu đổi ánh xạ) |
+| `lib/repo.ts`, `db.ts`, `catalogRepo.ts`, `connectivity.ts` | [`04-tang-du-lieu`](docs/app-map/04-tang-du-lieu.md) |
+| Auth / quyền / RLS / `.env.example` | [`05-bao-mat-phan-quyen`](docs/app-map/05-bao-mat-phan-quyen.md) |
+| `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation`](docs/app-map/02-pages-navigation.md) |
+| Thêm thư mục / đổi ranh giới import | [`01-app-structure`](docs/app-map/01-app-structure.md) |
+| `index.html`, `package.json`, `vite.config.ts`, env | [`ops/deploy-vercel`](docs/ops/deploy-vercel.md) |
+| `design-system/**`, `components/ui/**`, `tokens.css`, tô màu dòng | [`src/design-system/README.md`](src/design-system/README.md) — canonical, không nhân bản |
 
 ## Code đổi → cổng kiểm bắt buộc
 
-Cổng là những cái này, **chạy thật, không suy đoán** (test mới viết cho hàm thuần; màn hình vẫn thử tay):
+Chạy thật, không suy đoán.
 
 | Đụng vào | Bắt buộc |
 |---|---|
-| Bất cứ file `.ts` / `.tsx` nào | `npm run build` + `npm run lint` + `npm test` + `npm run naming:check` (CI chạy đủ 4; pre-commit chặn tên tiếng Việt MỚI — [`spec/quy-uoc-dat-ten.md`](docs/spec/quy-uoc-dat-ten.md)) |
-| `lib/balancingCalc.ts`, `lib/inventory.ts`, `lib/lotTraceability.ts` (+ `lotTraceability.e2e.test.ts` kịch bản oracle), `lib/batter.ts`, `lib/balancingStockLines.ts`, `lib/domesticSales.ts`, `lib/salesTotals.ts` (tiền bán tách kênh USD / VND), `lib/rowMarks.ts` (+ `design-system/patterns/rowMarkSource.test.ts` khi đổi bảng màu), `lib/dailyShipments.ts`, `lib/dataFlow.ts` (bất biến cân bằng kg của sơ đồ dòng chảy · cảnh báo chuỗi + `dayPath`), `lib/myTasks.ts` (hạn / quá hạn / quyền + phạm vi của Việc của tôi), `lib/exportPlanning.ts` (Xuất khẩu: tổng HĐ hai cách đếm, bản hiệu lực, tháng của chuyến, bằng chứng bước, thực xuất, dung sai kg + tiền, khép kín — oracle HĐ 18.26 + lô 165), `lib/exportPlanningDemo.ts`, `lib/exportReports.ts` (báo cáo kỳ Xuất khẩu — oracle lô 165), `lib/customerProductNames.ts` (tên hàng theo khách: điền dòng, khớp tên + size, chặn trùng, trích xuất từ chứng từ không ghi đè), `lib/invoiceReader.ts` (đọc Commercial Invoice: dòng · tổng · ngày, nối mặt hàng, không ghi đè ô đã có — oracle invoice 234/26), `lib/documents.ts` (phòng ban, quyền xem, lần ban hành, hạn chứng nhận — đổi bảng phòng ban ⇒ migration mới cho hàm SQL `current_user_departments`), `lib/demoMode.ts` (tách số demo — khóa/site), `lib/demoGenerator.ts` (bộ sinh demo: bất biến trên nhiều hạt), `imports/importHelpers.ts`, `production/wipHelpers.ts`, `design-system/patterns/tableSort.ts` (sắp cột: đọc số/ngày, đoán kiểu, so — quy tắc 19) | **sửa test đi kèm** (`*.test.ts` cùng thư mục) — AC = test |
-| Trang mới / đổi khu vực, nhãn trạng thái, nút chính của trang (quy tắc 18) | Tour `<trang>Tour.ts` + `tourSpec` + mốc `data-tour` + hộp "?"; `pageTourCoverage.test.ts` xanh; có hằng số nhãn trạng thái ⇒ `<trang>Tour.test.ts` phủ nhãn; thử tay đi hết tour ở 360 px × 130 %: không tràn, dữ liệu không đổi |
-| Form ghi mới / sửa form ghi (quy tắc 17) | Dùng `useFormDraft` / `useDialogDraft`; thử tay: gõ dở → sang trang khác → quay lại còn nguyên → Lưu xong nháp biến mất; `formDraftCoverageSource.test.ts` xanh |
-| `lib/balancingCalc.ts` hay công thức | Mở một kỳ có số liệu, đối chiếu tay: định mức = NL÷TP; lãi/lỗ = giá trị xuất − giá thành |
-| `lib/repo.ts` / hàng chờ / `TableMapping` | Thử **cả hai chế độ** (có `.env` và không); ghi khi ngắt mạng rồi nối lại — dòng phải lên server, reload không nuốt dòng |
-| Chế độ demo (`lib/demoMode.ts`, đường ghi/xóa ở `repo.ts`) | Vòng kiểm nghiệm spec §4b: đếm dòng `site_id <> 'site-demo'` MỌI bảng trước/sau (bật demo → tạo bộ → thao tác → làm mới → thoát) phải bằng nhau từng bảng; khóa `bsf.*` + `.cho` dưới máy không đổi |
+| Bất cứ `.ts` / `.tsx` | `npm run build` + `lint` + `test` + `naming:check` |
+| Hàm thuần có `*.test.ts` cạnh nó (`balancingCalc`, `inventory`, `lotTraceability` + `.e2e`, `exportPlanning`, `demoMode`, `tableSort`…) | **Sửa test đi kèm** — AC = test |
+| Trang mới / đổi khu vực, nhãn trạng thái, nút chính (QT 18) | Tour + hộp "?" + mốc; `pageTourCoverage.test.ts` xanh; đi hết tour ở 360px × 130%: không tràn, dữ liệu không đổi |
+| Form ghi mới / sửa (QT 17) | Gõ dở → sang trang → quay lại còn nguyên → Lưu xong nháp biến mất |
+| `lib/balancingCalc.ts` | Mở kỳ có số, đối chiếu tay: định mức = NL÷TP; lãi/lỗ = giá trị xuất − giá thành |
+| `lib/repo.ts` / hàng chờ / `TableMapping` | Thử cả có `.env` lẫn không; ghi khi ngắt mạng rồi nối lại — dòng phải lên server, reload không nuốt dòng |
+| Chế độ demo | Vòng kiểm spec §4b: đếm dòng `site_id <> 'site-demo'` mọi bảng trước/sau phải bằng nhau; khóa `bsf.*` dưới máy không đổi |
 | Màn Nhập hàng | Ghi 1 chuyến 2 dòng → chốt ngày → ghi bù (phải bắt lý do) → mở lại; kiểm tổng ngày + cảnh báo lệch |
-| Màn Cân đối | Tạo kỳ → hút phế liệu → **xóa kỳ**: dòng phế liệu `nguon="Nhập hàng"` phải còn nguyên ở sổ nhập |
-| Đối soát HĐĐT — quy đổi ngoại tệ (`lib/einvoiceReconciliation.ts`) | ⚠️ Cổng thuế xuất tiền hóa đơn ngoại tệ **TÙY BẢN**: có bản để **nguyên tệ** (phải `×tỷ giá`), có bản **đã quy sẵn VND** (nhân nữa là đội gấp ~tỷ giá lần → tổng phình vài trăm tỉ thành vài chục **nghìn** tỉ). **KHÔNG mặc định nhân/không nhân** — engine tự dò qua đối chiếu sổ (`detectForeignCurrencyMode`). Đụng logic quy đổi ⇒ chạy engine trên file thật, kiểm **tổng khối A ≈ tổng cột tiền cộng thô** và hóa đơn ngoại tệ khớp sổ ở **số gốc**, không phải số ×tỷ giá |
-| Bất kỳ màn nghiệp vụ nào | Thu còn **360px** → giãn tới **desktop**: không cuộn ngang toàn trang, không đè chữ (bảng dài cuộn trong khung riêng). Thử thêm cỡ chữ **130%** vẫn không vỡ |
-| Migration | Chạy lại file **hai lần** trên DB thật vẫn không lỗi (idempotent). Tên file + mọi định danh tiếng Anh (CI chặn migration > `0057` tạo tên Việt) |
-
-Preview chạy qua `preview_start` với cấu hình `baseafood-dev` (`.claude/launch.json`) — **không** chạy dev server bằng Bash.
-
-**Đã làm (2026-09-21):** vitest cho `balancingCalc` + gom chuyến/ghi bù (`importHelpers`) + tồn kho + helper SX. Còn thiếu test: engine đối soát (`lib/*Reconciliation.ts`, `lib/reconciliation*.ts`) (oracle từ file thật), `inventoryMaterial.computeMaterialTotalStock`, `monthlyStock`. Thêm test khi đụng hàm thuần mới.
+| Màn Cân đối | Tạo kỳ → hút phế liệu → xóa kỳ: dòng phế liệu `nguon="Nhập hàng"` phải còn ở sổ nhập |
+| Đối soát HĐĐT, quy đổi ngoại tệ | Cổng thuế xuất tiền ngoại tệ TÙY BẢN (nguyên tệ hoặc đã quy VND) — KHÔNG mặc định nhân; engine tự dò (`detectForeignCurrencyMode`). Chạy trên file thật: tổng khối A ≈ tổng cột tiền thô, hóa đơn ngoại tệ khớp sổ ở số gốc |
+| Bất kỳ màn nghiệp vụ | 360px → desktop: không cuộn ngang toàn trang, không đè chữ; thử cỡ chữ 130% |
+| Migration | Chạy lại **hai lần** trên DB thật không lỗi; tên + định danh tiếng Anh |
 
 ## App-map — đọc file nào khi nào
 
-Index đầy đủ + bảng định tuyến theo task: [`docs/app-map/README.md`](docs/app-map/README.md).
+Index đầy đủ + định tuyến theo task: [`docs/app-map/README.md`](docs/app-map/README.md).
 
 | File | Load khi |
 |---|---|
-| [`01-app-structure`](docs/app-map/01-app-structure.md) | thêm file mới, không biết đặt đâu, import xuyên tầng |
-| [`02-pages-navigation`](docs/app-map/02-pages-navigation.md) | thêm màn, đổi điều hướng |
-| [`03-database`](docs/app-map/03-database.md) | thêm bảng/cột/migration, lỗi Postgres |
-| [`04-tang-du-lieu`](docs/app-map/04-tang-du-lieu.md) | đọc/ghi dữ liệu, "số liệu biến mất / không lên máy chủ" |
-| [`05-bao-mat-phan-quyen`](docs/app-map/05-bao-mat-phan-quyen.md) | 🔴 auth, RLS, key, mở app ra ngoài mạng nội bộ |
-| [`30-nhap-hang`](docs/app-map/30-nhap-hang.md) | chuyến, ngày giao / ngày ghi sổ, ghi bù, chốt ngày, phế liệu ngày |
-| [`33-ban-hang`](docs/app-map/33-ban-hang.md) | phiếu bán, dòng bán, quy cách, ghi bù, hút bán vào cân đối |
-| [`31-can-doi-ky`](docs/app-map/31-can-doi-ky.md) | kỳ, 3 khối, công thức, bảng in A4 |
+| [`01`](docs/app-map/01-app-structure.md) · [`02`](docs/app-map/02-pages-navigation.md) | thêm file/màn, không biết đặt đâu, đổi điều hướng |
+| [`03-database`](docs/app-map/03-database.md) · [`04-tang-du-lieu`](docs/app-map/04-tang-du-lieu.md) | bảng/cột/migration, lỗi Postgres; "số liệu biến mất / không lên máy chủ" |
+| [`05-bao-mat-phan-quyen`](docs/app-map/05-bao-mat-phan-quyen.md) | 🔴 auth, RLS, key, mở app ra ngoài |
+| [`30-nhap-hang`](docs/app-map/30-nhap-hang.md) | chuyến, ngày giao/ghi sổ, ghi bù, chốt ngày, phế liệu |
+| [`31-can-doi-ky`](docs/app-map/31-can-doi-ky.md) | kỳ, 3 khối, công thức, in A4, tồn kho NL |
 | [`32-danh-muc`](docs/app-map/32-danh-muc.md) | danh mục, 141 mã thành phẩm |
-| [`34-btp-san-xuat-kho`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) · [`35-btp-ui`](docs/app-map/35-btp-ui.design-spec.md) | sản xuất BTP/WIP, **đóng gói BTP→TP** (`/packaging`), kho dự trữ, đơn/xuất, vòng đông gửi↔xả đông |
-| [`36-so-kho-thang`](docs/app-map/36-so-kho-thang.md) | **Sổ kho theo THÁNG** (`/monthly-stock`): dồn tồn cuối kỳ → đầu kỳ sau, đủ cột kiện+kg, mọi đối tượng NL/BTP/TP |
-| [`37-doi-soat-hddt`](docs/app-map/37-doi-soat-hddt.md) | **Đối soát HĐĐT** (`/reconciliation`): hóa đơn cổng thuế ⇄ sổ kế toán; **xuất Excel phải GIỮ NGUYÊN định dạng file vào** |
-| [`39-my-tasks`](docs/app-map/39-my-tasks.md) | **Việc của tôi** (`/my-tasks`): việc cần làm từng người, hạn từng loại việc + quá hạn, giao việc (`task_assignments`, mig 0070), tự hết khi sổ sửa xong, chuông header, link mở thẳng ngày ở `/imports` `/wip` `/packaging` |
-| [`41-export-planning`](docs/app-map/41-export-planning.ba-spec.md) | **Phòng Kế hoạch · Xuất khẩu** (`/planning-export`): tháng × khách × hợp đồng × chuyến, 6 bước checklist + file, duyệt giấy gắn bản, gia hạn, thực xuất từ invoice, khép kín theo dung sai kg + tiền, người đóng hàng đính ảnh, vai trò `planner` (mig 0075) |
-| [`40-documents`](docs/app-map/40-documents.md) | **Tài liệu công ty** (`/documents`): quy trình · biểu mẫu · chứng nhận · hồ sơ năng lực, lần ban hành không ghi đè, file PDF/Word trên bucket `documents`, **xem theo phòng ban** (app · RLS · bucket), nhắc gia hạn ở Việc của tôi (mig 0072) |
-| [`spec/qr-truy-xuat-lo`](docs/spec/qr-truy-xuat-lo.md) | **Truy xuất theo lô bằng QR** (`/qr` hộ chiếu lô · gắn lô ở `/wip` + `/packaging`): chuẩn GS1/EPCIS/GDST/FSMA 204/TT 02-2024, mô hình 3 loại lô + bảng `lot_inputs`, lộ trình 3 đợt, câu còn treo |
-| [`spec/che-do-demo`](docs/spec/che-do-demo.md) | **Chế độ DEMO** bật/tắt (dữ liệu `bsf-demo.*`, bộ sinh từ số thật), gỡ màn DEMO, checklist chức năng phải demo được |
-| [`trien-khai/flow-end-to-end-2-bo-phan`](docs/trien-khai/flow-end-to-end-2-bo-phan.md) | nối luồng nhập→sản xuất→kho→bán, 2 giao diện bộ phận, daily-task (họp 2026-08-22) |
-
-Bản đồ tài liệu đầy đủ + luật "doc mới bỏ đâu": [`docs/README.md`](docs/README.md).
-Ngoài app-map: [`src/design-system/README.md`](src/design-system/README.md) (UI) · [`docs/ops/deploy-vercel.md`](docs/ops/deploy-vercel.md) (deploy) · [`docs/ops/supabase-setup.md`](docs/ops/supabase-setup.md) (cutover) · [`docs/trien-khai/`](docs/trien-khai/README.md) (nghiệp vụ gốc) · [`docs/BAN-GIAO.md`](docs/BAN-GIAO.md) (bối cảnh công ty, đầu mối, câu treo với xí nghiệp).
-
-## Trạng thái
-
-> 📋 **Việc còn lại + go-live (cập nhật 2026-08-25):** [`docs/BAN-GIAO-tiep-theo.md`](docs/BAN-GIAO-tiep-theo.md) — đọc file này trước khi làm tiếp. Đã lên main: cụm báo cáo khép vòng + NXT thành phẩm + nhật ký thao tác (audit) + đóng gói BTP→TP + bán lẻ trừ tồn + phân quyền 2 bộ phận. Quy tắc: commit/push thẳng `main`, không tách nhánh.
-
-> **Định hướng hiện hành — họp 2026-08-22:** số hóa TRỌN chuỗi nhập→sản xuất, tách **2 giao diện bộ phận** (nhập hàng / sản xuất) vận hành theo bước + daily-task, **cutover chạy realtime 01/09/2026** (baseline tồn 30/06, nhập báo cáo T7–T8). Cửa vào: [`trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md`](docs/trien-khai/hop-2026-08-22-so-hoa-flow-2-bo-phan.md).
-
-> **Bổ sung — họp 2026-09-02:** chốt số chạy realtime **từ tháng 9**; định hướng lớn cho vận hành: **một form nhập chuẩn + chụp ảnh phiếu tay → OCR** (giảm gõ tay ở xưởng), **định danh lô + QR** (trace nội bộ; SSCC nhà nước chừa ô trống làm sau), **giá & bình quân gia quyền theo ngày** (đang chốt PA), **QC chấm điểm + ảnh**, **khung nhân sự gắn từng khâu**. Cửa vào: [`trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md`](docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md).
-
-**Đã build (THẬT — nối dữ liệu):** **Truy xuất lô QR đợt 2b — khép vòng tới khách** (2026-10-08, mig `0056` ✅ đã chạy: gắn lô NL cho cả phiên ở `/wip`, **chốt ngày SX bắt gắn lô hoặc ghi lý do**, bán lẻ / bán nội địa gắn lô, sổ tồn **trừ đúng lô đã gắn** (còn lại FIFO), kiểm lô xuất có lưu + thay lô, hộ chiếu có Thu hồi (In + Excel) + tab **Theo giai đoạn** (kiểm QR 5 khâu, làm ngay tại chỗ), **lô NL = mỗi loại NL của chuyến** (mỗi tem một loại + kg, chốt 2026-10-08), số tem theo block — [spec §6d](docs/spec/qr-truy-xuat-lo.md)), **Cân đối: chuyến nhập ngay trong ô lưới** (2026-10-07: ô ngày "Nguyên liệu vào" có nút "n chuyến" → đại lý → chuyến → loại NL/kg/giá; dòng loại NL tách được thành dòng con theo đại lý, chỉ đọc — [31](docs/app-map/31-can-doi-ky.md)), **thanh cuộn ngang trên + dưới** cho mọi bảng tràn ngang (quy tắc 14), **tô màu dòng "đã dò"** (2026-10-06, `0055`: mọi bảng nghiệp vụ — tick dòng → thanh "Đã chọn N dòng" → Tô màu (10 sắc × 5 mức kiểu Excel) / In đậm / Bỏ tô, lưu chung bảng `row_marks`, không toast — quy tắc 12 · [README § Tô màu dòng](src/design-system/README.md#tô-màu-dòng-đã-dò-kiểu-excel)), **Sổ kho tháng xổ bảng ra** (2026-10-06: `SummaryTable fullHeight` — bỏ khung cuộn 70dvh, hàng tên cột nổi dính dưới header, thanh cuộn ngang dính đáy — [36](docs/app-map/36-so-kho-thang.md)), **bảng bớt khoảng trắng ngang** (2026-10-06: đệm ô theo mật độ `--cell-pad`, tên cột `SummaryTable` xuống dòng, Sổ kho tháng −22% bề ngang), **bán nội địa** (2026-10-06, `0054`: `/wip` ghi NL bán thẳng — loại NL · kg · giá · khách — vào sổ riêng `domestic_sales`, Cân đối khối 1 nút "Lấy bán nội địa từ SX" điền dòng giảm "Bán nội địa" theo ngày, sổ Tồn kho NL `/nxt-material` TRỪ bán nội địa — [31](docs/app-map/31-can-doi-ky.md) · [34](docs/app-map/34-btp-san-xuat-kho.ba-spec.md)), **bột tẩm theo loại** (2026-10-06, `0051`: danh mục "Bột tẩm" + bột đi kèm từng mặt hàng tẩm bột, `/wip` ghi kg từng loại bột — phụ gia, không cộng vào thành phẩm — [32](docs/app-map/32-danh-muc.md) · [34](docs/app-map/34-btp-san-xuat-kho.ba-spec.md)), nhập hàng (chuyến thật · 2 ngày + ghi bù · chốt ngày · phế liệu ngày · bộ lọc), **sản xuất BTP ngày `/wip`** (sản lượng theo ngày/xưởng/loại NL · chốt ngày SX · ghi bù), **kho dự trữ `/warehouse`** (duyệt BTP chờ→đã nhập · tồn), **đơn đặt `/orders`** (lệnh xuất FIFO từ tồn WIP), bán hàng (phiếu bán · quy cách · XK/NĐ · hút cân đối), cân đối + in A4 + chốt/chuyển kỳ, NXT + tồn NL, danh mục 5 tab, đăng nhập + vai trò `user_profiles` + màn Người dùng, **sổ kho theo tháng `/monthly-stock`** (dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, đủ cột kiện+kg cho NL/BTP/TP — [36-so-kho-thang](docs/app-map/36-so-kho-thang.md)), bộ giao diện responsive, tầng dữ liệu Supabase↔localStorage. Điều hướng **react-router v7 (HashRouter)**, ~20 route, **nav CÂY module-centric** (`CAY_NAV`, gập/mở + deep-link danh mục trong module).
-
-**Màn DEMO dữ liệu mẫu: ĐÃ GỠ hết (2026-10-12)** — `/production` → `/wip`, `/quality` → `/qc`, `/cold-storage` → `/warehouse`, `/traceability` → `/qr`, `/reports` → `/dashboard` (link cũ tự chuyển). Trình diễn dùng **chế độ demo** (quy tắc 15). `/dashboard` = "dòng chảy số liệu" (số thật, `lib/dataFlow.ts`).
-
-**Backlog (cập nhật 2026-08-22):**
-- ⚠️ Chạy đủ migration `0001…0026` trên DB thật; siết RLS `0021` **+ bổ sung `material_opening_stock`**; đổi mật khẩu admin (`0007` seed admin/admin) 🔴.
-- **Chỗ đứt gãy chuỗi** (chi tiết [`flow §3`](docs/trien-khai/flow-end-to-end-2-bo-phan.md)): (G1) ✅ **KHÉP VÒNG + HẾT CỘNG ĐÔI (hướng 1, chốt 2026-09-06)**: chốt ngày SX ghi "còn dở" **tách theo loại NL** (`production_locks.leftover_by_material`, mig `0038`), sổ `/nxt-material` lấy làm **đông gửi CHÍNH**: `dongGui = conDoSX>0 ? conDoSX : Chuyển-kỳ-âm` (không cộng cả hai). Kế toán khỏi khai Chuyển kỳ âm; dữ liệu cũ (carry âm) không hồi quy. /nxt-material gộp 1 cột "Đông gửi" (nhãn "(SX)"). ⚠️ Từ PA-a (chốt 2026-09-11) Đông gửi / Xả đông chỉ là **cột thông tin**, KHÔNG vào tồn: **tồn cuối NL = tồn đầu + nhập − xuất SX − bán nội địa** (`MaterialNxtScreen` + `inventoryMaterial.computeMaterialTotalStock`, [31 § Tồn kho NL](docs/app-map/31-can-doi-ky.md)); (G2) ✅ hết chồng: `cold-storage` hút tồn thật (`computeWipStock`) + nhãn nhiệt độ minh hoạ, `warehouse` canonical — còn: cảm biến thật; (G3) ✅ đóng gói BTP→TP đã build: màn `/packaging` (phiếu đóng gói BTP tiêu hao→TP ra + hao hụt, `0026`) + tồn TP suy (`computeFinishedGoodStock`); bán chọn nguồn Block thô (trừ BTP)/Đóng gói (trừ TP) — còn: tách kho TP theo nhiệt/vị trí; (G4) ✅ bán lẻ trừ tồn: dòng bán chọn **nguồn** (`RETAIL_WAREHOUSE` trừ BTP / `FG_WAREHOUSE` trừ TP đóng gói), trừ suy FIFO qua `computeWipStock(...,banLe)`/`computeFinishedGoodStock`, nhất quán warehouse/cold-storage/orders/packaging.
-- **2 giao diện bộ phận:** ✅ route-guard + trang chủ theo vai trò (`lib/nav-access.ts`) + banner nhắc daily-task (`/imports`,`/wip`) — còn: siết RLS theo vai trò ở server.
-- **Cutover 01/09 (mục tiêu tiên quyết):** baseline tồn 30/06 + nhập bù báo cáo T7–T8 → tồn đầu 01/09 đúng. Người dùng có **2 báo cáo** (tồn cuối T6 · báo cáo cuối T7/T8), **import khi có file thực tế** (cấu hình theo file, chưa build). Đọc [`ke-hoach-cutover §2b`](docs/trien-khai/ke-hoach-cutover-1-9-2026.md) trước khi làm import.
-- **Bộ quy cách × chế biến:** ✅ Chiều B kiểu chế biến (`processing_type`, `0024` + combobox danh mục) — còn: chuẩn hoá quy cách (Chiều C) ([`spec`](docs/spec/bo-quy-cach-che-bien-thanh-pham.md)).
-- Import file Excel + scan viết tay (**tay trước**, file/scan sau); chốt ngày bán + phiếu bán in A4; định mức NL→TP; báo cáo tháng 6 khối; ~~ẩn/gắn nhãn màn DEMO~~ (đã gỡ 2026-10-12, thay bằng chế độ demo). Test thực địa 5 người dùng ≥45 tuổi.
-- **Bổ sung họp 2026-09-02** (chi tiết [`hop-2026-09-02`](docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md)) — **ĐÃ BUILD đợt 1 (2026-09-05):** (4) ✅ **mã số KH/đại lý** (tái dùng cột `code`, combobox gõ số ra tên, kiểm trùng — không migration); (3) ✅ **mã lô nội bộ + ô SSCC** ở Nhập hàng (`0035`, cột `import_shipments.lot_code`/`sscc_code`); (5) ✅ **màn QC checklist chấm điểm** `/qc` (`0036`, bảng `qc_checklists`+`qc_locks`; chốt ngày + ghi bù) — **ảnh để sau** (chưa có Storage). **ĐÃ BUILD thêm (2026-09-08):** (1) ✅ **OCR chụp phiếu nhập → tự điền form** — nút "Nhận diện từ ảnh phiếu" ở `/imports`, OCR **client-side Tesseract** (`lib/ocr.ts` nạp động, không key/dịch vụ) tự điền NHÁP ngày·đại lý·dòng loại NL+kg (người soát lại), ảnh phiếu lưu Storage bucket `qc` (`0040` cột `import_shipments.scan_path`, `ImportSlipOcr.tsx`). Bộ nhận diện tách để nâng cấp cloud (Google Vision) sau. **CÒN CHỜ/ĐỂ SAU:** (2) ✅ **giá NL ở Cân đối: CHỐT theo TỪNG CHUYẾN, không bình quân** (2026-10-20 — tiền dòng = Σ kg × giá từng chuyến sổ nhập, `balancingCalc.ts` không đổi, xem [31](docs/app-map/31-can-doi-ky.md) (i)); (3b) ✅ **truy xuất lô bằng QR đợt 1 (2026-09-18)** — hộ chiếu lô `/qr` truy ngược/xuôi + cân bằng kg, gắn lô NL ở `/wip` và lô BTP ở `/packaging` (quét/gõ/chọn), QR là đường link, mig `0046_lot_inputs` ✅ đã chạy trên DB thật (2026-09-18) ([spec](docs/spec/qr-truy-xuat-lo.md)); còn đợt 2 (QR vị trí kho, FIFO theo lô, bán lẻ gắn lô) + đợt 3 (SSCC/GDST); (1b) OCR nâng độ chính xác chữ tay bằng cloud (chờ duyệt phí + key); form xưởng theo "tờ chị Trúc"; (6) 🅿️ lương/BHXH/nghỉ phép, điện thoại xưởng.
-- **Đợt 2 (2026-09-05):** ✅ **PWA + mobile-first + tắt zoom** (`public/manifest.webmanifest`+`public/sw.js` network-first chỉ ở PROD + icons + viewport `user-scalable=no` + `touch-action:manipulation`) — cài được như app, khóa pinch/double-tap; ✅ **NR-5 mã số mặt hàng** (kiểm trùng + combobox prefix "‹số›·‹tên›" ở Bán/SX/Đóng gói); ✅ **NR-4 người thao tác** (cột `production_wips.operator`, `0037`, gắn `useAuth().fullName`, cột "Người ghi" ở `/wip`); ✅ **NR-6 QR in+quét** (thêm dep `qrcode`+`html5-qrcode`; in tem QR mã lô ở Nhập hàng qua `LotLabelPrint`; màn `/qr` quét camera/gõ tay tra lô — quét camera cần test máy thật). **Còn:** NR-3 (spec tái cấu trúc DM thành phẩm — chờ danh sách kiểu chế biến) · NR-1 (biểu mẫu giấy — chờ tờ mẫu). Chi tiết [`hop-2026-09-02 §8`](docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md).
-- **Đợt 3 (2026-09-05):** ✅ **A1 nav cây module-centric** (`NHOM_NAV`→`CAY_NAV`, nhóm gập/mở nhớ theo máy, deep-link tra danh mục trong module `catalog?tab=…`, `CatalogScreen` đọc `useSearchParams` — MỘT nguồn danh mục; gate 2 bộ phận giữ nguyên); ✅ **A2 mobile-first** `/imports`+`/wip` (nút chính full-width lên đầu ở điện thoại; 360px+130% không cuộn ngang; vá dialog chốt còn-dở `flex-wrap`); ✅ **A3 khép vòng G1** (xem dòng G1 trên); ✅ **A4 báo cáo TP ngày** (`/wip` gom theo xưởng×người thao tác + nút "Gửi báo cáo lên hệ thống" ghi `audit_log` action `gui`, tách khỏi chốt ngày — không migration). Chi tiết [`hop-2026-09-02 §8 Đợt 3`](docs/trien-khai/hop-2026-09-02-form-nhap-trace-gia-qc.md).
-- Lưu ý giữ nguyên: **đơn đặt = xuất khẩu**, phí XK phòng kế hoạch tính riêng (đã trừ trong giá báo) ⇒ cân đối KHÔNG tính phí XK.
-
-> ⚠️ **Đừng nhầm thuật ngữ:** "bán thành phẩm" (WIP, công đoạn sản xuất, backlog trên) ≠ màn **Bán hàng** (bán thành phẩm RA cho khách, đã build — [33-ban-hang.md](docs/app-map/33-ban-hang.md)).
+| [`33-ban-hang`](docs/app-map/33-ban-hang.md) | phiếu bán, quy cách, hút bán vào cân đối |
+| [`34`](docs/app-map/34-btp-san-xuat-kho.ba-spec.md) · [`35`](docs/app-map/35-btp-ui.design-spec.md) | sản xuất `/wip`, đóng gói, kho dự trữ, đơn/xuất, vòng gửi đông ↔ xả đông |
+| [`36-so-kho-thang`](docs/app-map/36-so-kho-thang.md) | sổ kho theo tháng, dồn tồn, nhập Excel bảng kê |
+| [`37-doi-soat-hddt`](docs/app-map/37-doi-soat-hddt.md) | đối soát HĐĐT — xuất Excel giữ nguyên định dạng file vào |
+| [`39-my-tasks`](docs/app-map/39-my-tasks.md) | Việc của tôi, hạn, giao việc, chuông header |
+| [`40-documents`](docs/app-map/40-documents.md) | tài liệu công ty, lần ban hành, xem theo phòng ban |
+| [`41`](docs/app-map/41-export-planning.ba-spec.md) · [`42`](docs/app-map/42-export-planning-ui.design-spec.md) | Phòng Kế hoạch · Xuất khẩu |
+| [`43-guided-tour`](docs/app-map/43-guided-tour.ba-spec.md) | tour hướng dẫn + hộp "?" |
+| [`spec/qr-truy-xuat-lo`](docs/spec/qr-truy-xuat-lo.md) | truy xuất lô QR, gắn lô |
+| [`spec/che-do-demo`](docs/spec/che-do-demo.md) | chế độ demo, Tổng quan dòng chảy số liệu |
+| [`trien-khai/flow-end-to-end-2-bo-phan`](docs/trien-khai/flow-end-to-end-2-bo-phan.md) | nối luồng nhập → sản xuất → kho → bán, 2 giao diện bộ phận |

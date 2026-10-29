@@ -88,6 +88,9 @@ function translateError(msg: string): string {
     return "Tài khoản chưa kích hoạt — báo quản trị";
   if (/rate limit|too many/i.test(msg))
     return "Thử lại quá nhiều lần — chờ một lát rồi đăng nhập lại";
+  // Admin tạm ngưng (mig 0080: banned_until) — người nghỉ việc.
+  if (/banned/i.test(msg))
+    return "Tài khoản đang tạm ngưng — báo quản trị nếu cần dùng lại";
   return msg;
 }
 
@@ -96,6 +99,8 @@ function translateSignUpError(msg: string): string {
     return "Tên đăng nhập đã tồn tại";
   if (/password.*(6|short|weak)|weak.?password/i.test(msg))
     return "Mật khẩu quá ngắn (tối thiểu 6 ký tự)";
+  if (/different from the old|same_password/i.test(msg))
+    return "Mật khẩu mới phải khác mật khẩu đang dùng";
   if (/signups? (are )?disabled/i.test(msg))
     return "Máy chủ đang tắt đăng ký — bật Email provider trong Supabase";
   // GoTrue cố gửi mail xác nhận tới email tổng hợp (hòm thư ảo) → dội trần SMTP.
@@ -264,8 +269,13 @@ export function useAuth() {
             : translateError(check.error.message),
         };
       }
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+        data: { must_change_password: false },
+      });
       if (error) return { ok: false, error: translateSignUpError(error.message) };
+      // Máy khác đang đăng nhập tài khoản này (máy để quên, người khác biết mật khẩu cũ) ⇒ văng ra.
+      await supabase.auth.signOut({ scope: "others" });
       appendAuditEntries([
         { action: "change-password", entity: "auth", entityKey: emailToUsername(email), summary: "Đổi mật khẩu" },
       ]);
@@ -274,9 +284,40 @@ export function useAuth() {
     [session]
   );
 
-  const signOut = useCallback(async () => {
-    appendAuditEntries([{ action: "logout", entity: "auth", entityKey: "", summary: "Đăng xuất" }]);
-    await supabase?.auth.signOut();
+  /**
+   * Đặt mật khẩu riêng sau khi admin đặt mật khẩu tạm (cờ `must_change_password`,
+   * mig 0080). Không hỏi lại mật khẩu cũ: người dùng VỪA đăng nhập bằng mật khẩu tạm.
+   */
+  const setOwnPassword = useCallback(
+    async (newPassword: string): Promise<AuthResult> => {
+      if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
+      const email = session?.user.email;
+      if (!email) return { ok: false, error: "Chưa đăng nhập" };
+      if (newPassword.length < 6) return { ok: false, error: "Mật khẩu mới tối thiểu 6 ký tự" };
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+        data: { must_change_password: false },
+      });
+      if (error) return { ok: false, error: translateSignUpError(error.message) };
+      appendAuditEntries([
+        {
+          action: "change-password",
+          entity: "auth",
+          entityKey: emailToUsername(email),
+          summary: "Đặt mật khẩu riêng thay mật khẩu tạm admin đưa",
+        },
+      ]);
+      return { ok: true };
+    },
+    [session]
+  );
+
+  /** `everywhere` ⇒ đăng xuất cả các máy khác đang dùng tài khoản này (máy để quên ở xưởng). */
+  const signOut = useCallback(async (everywhere = false) => {
+    appendAuditEntries([
+      { action: "logout", entity: "auth", entityKey: "", summary: everywhere ? "Đăng xuất khỏi mọi máy" : "Đăng xuất" },
+    ]);
+    await supabase?.auth.signOut({ scope: everywhere ? "global" : "local" });
     setAuditOperator(null);
   }, []);
 
@@ -291,9 +332,12 @@ export function useAuth() {
     /** Có cần đăng nhập không (chỉ khi đã cấu hình Supabase). */
     requiresLogin: hasSupabase,
     isAdmin: rolesList(profile?.roles).includes("admin"),
+    /** Admin vừa đặt mật khẩu tạm (mig 0080) ⇒ App bắt đặt mật khẩu riêng trước khi vào. */
+    mustChangePassword: session?.user.user_metadata?.must_change_password === true,
     signIn,
     createAccount,
     changePassword,
+    setOwnPassword,
     signOut,
   };
 }
@@ -421,4 +465,113 @@ export function useOrphanAccounts(enabled: boolean) {
   }, []);
 
   return { accounts: isAvailable ? accounts : [], isAvailable, reload, relink, usage, remove };
+}
+
+/* ---------- Trạng thái + điều khiển tài khoản đăng nhập (mig 0080) — CHỈ admin ---------- */
+
+/** Mật khẩu tạm dễ đọc qua điện thoại / Zalo: 8 ký tự, bỏ chữ dễ nhầm (l, 1, o, 0, i). */
+export function generateTemporaryPassword(length = 8): string {
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join("");
+}
+
+export interface AccountStatus {
+  lastSignInAt: string;
+  /** Admin tạm ngưng (nghỉ việc) — không đăng nhập được, hồ sơ + lịch sử giữ nguyên. */
+  isDisabled: boolean;
+  /** Đang dùng mật khẩu tạm admin đặt — lần vào tới phải đặt mật khẩu riêng. */
+  mustChangePassword: boolean;
+}
+
+/** Máy chủ chưa chạy 0080 ⇒ hàm không có (PGRST202 / 42883). */
+function accountRpcError(error: { code?: string; message: string }): string {
+  if (error.code === "PGRST202" || error.code === "42883")
+    return "Máy chủ chưa chạy migration 0080 — báo chủ dự án";
+  return error.message;
+}
+
+/**
+ * Admin đặt lại mật khẩu, tạm ngưng / mở lại tài khoản người khác (hàm SQL tự kiểm
+ * `la_admin()`, chặn làm với chính mình). Chưa chạy 0080 / chạy localStorage ⇒
+ * `available = false`: màn ẩn cột Trạng thái; nút vẫn bấm được và báo rõ lý do.
+ * Nhật ký KHÔNG bao giờ kèm mật khẩu.
+ */
+export function useAccountAdmin(enabled: boolean) {
+  const [statuses, setStatuses] = useState<Record<string, AccountStatus>>({});
+  const [isAvailable, setAvailable] = useState(false);
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    if (!supabase || !enabled) return;
+    let isCancelled = false;
+    supabase.rpc("list_auth_account_status").then(({ data, error }) => {
+      if (isCancelled) return;
+      if (error) {
+        console.warn("[auth] Không đọc được trạng thái tài khoản (0080 chưa chạy?)", error);
+        setAvailable(false);
+        return;
+      }
+      const map: Record<string, AccountStatus> = {};
+      for (const r of (data ?? []) as Record<string, unknown>[]) {
+        map[s(r.id)] = {
+          lastSignInAt: s(r.last_sign_in_at),
+          isDisabled: Boolean(r.is_disabled),
+          mustChangePassword: Boolean(r.must_change_password),
+        };
+      }
+      setStatuses(map);
+      setAvailable(true);
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [enabled, version]);
+
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
+
+  const resetPassword = useCallback(
+    async (user: UserProfile, newPassword: string, requireChange: boolean): Promise<AuthResult> => {
+      if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
+      if (newPassword.length < 6) return { ok: false, error: "Mật khẩu tối thiểu 6 ký tự" };
+      const { error } = await supabase.rpc("admin_reset_user_password", {
+        p_user_id: user.id,
+        p_new_password: newPassword,
+        p_require_change: requireChange,
+      });
+      if (error) return { ok: false, error: accountRpcError(error) };
+      appendAuditEntries([
+        {
+          action: "reset-password",
+          entity: "auth",
+          entityKey: user.username || user.id,
+          summary: `Đặt lại mật khẩu cho @${user.username}${requireChange ? " (bắt đổi ở lần vào tới)" : ""} — đăng xuất mọi máy của người đó`,
+        },
+      ]);
+      setVersion((v) => v + 1);
+      return { ok: true };
+    },
+    []
+  );
+
+  const setDisabled = useCallback(async (user: UserProfile, disabled: boolean): Promise<AuthResult> => {
+    if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
+    const { error } = await supabase.rpc("admin_set_account_disabled", { p_user_id: user.id, p_disabled: disabled });
+    if (error) return { ok: false, error: accountRpcError(error) };
+    appendAuditEntries([
+      {
+        action: disabled ? "disable-account" : "enable-account",
+        entity: "auth",
+        entityKey: user.username || user.id,
+        summary: disabled
+          ? `Tạm ngưng tài khoản @${user.username} — đăng xuất mọi máy, hồ sơ + lịch sử giữ nguyên`
+          : `Mở lại tài khoản @${user.username}`,
+      },
+    ]);
+    setVersion((v) => v + 1);
+    return { ok: true };
+  }, []);
+
+  return { statuses: isAvailable ? statuses : {}, isAvailable, reload, resetPassword, setDisabled };
 }

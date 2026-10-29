@@ -509,6 +509,8 @@ export interface AppShellProps {
   notificationCount?: number;
   onOpenNotifications?: () => void;
   onLogout?: () => void;
+  /** Có ⇒ menu tài khoản có "Đăng xuất khỏi mọi máy". */
+  onLogoutEverywhere?: () => void;
   /** Tên đăng nhập hiện trong menu tài khoản. */
   username?: string;
   onChangePassword?: AccountMenuProps["onChangePassword"];
@@ -540,6 +542,7 @@ export default function AppShell({
   notificationCount,
   onOpenNotifications,
   onLogout: onSignOut,
+  onLogoutEverywhere,
   username,
   onChangePassword,
   onOpenAdmin,
@@ -771,6 +774,7 @@ export default function AppShell({
                 onChangePassword={onChangePassword}
                 onOpenAdmin={onOpenAdmin}
                 onSignOut={onSignOut}
+                onSignOutEverywhere={onLogoutEverywhere}
               />
             </div>
           </div>

@@ -6,13 +6,14 @@
 import { useState } from "react";
 import { Button, Card, Field, Input, Logo } from "@/design-system";
 import type { AuthResult } from "@/lib/auth";
-import { LogIn, TriangleAlert } from "lucide-react";
+import { Eye, EyeOff, KeyRound, LogIn, TriangleAlert } from "lucide-react";
 
 /**
  * Màn đăng nhập — che toàn app khi đã cấu hình Supabase mà chưa có phiên.
  * KHÔNG mở đăng ký tự do: tài khoản do admin tạo (màn Người dùng). Người dùng
- * chỉ gõ tên đăng nhập; app ghép đuôi `@bsf1.local` thành email tổng hợp cho
- * Supabase Auth (xem src/lib/auth.ts).
+ * chỉ gõ tên đăng nhập; app ghép đuôi `@bsf1.vn` thành email tổng hợp cho
+ * Supabase Auth (xem src/lib/auth.ts). Email tổng hợp không có hòm thư ⇒ quên mật khẩu
+ * KHÔNG gửi link qua email được: báo admin đặt mật khẩu tạm (màn Người dùng, mig 0080).
  */
 export default function LoginScreen({
   login: signIn,
@@ -23,6 +24,8 @@ export default function LoginScreen({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [isPasswordVisible, setPasswordVisible] = useState(false);
+  const [isForgotOpen, setForgotOpen] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,12 +71,27 @@ export default function LoginScreen({
           </Field>
 
           <Field label="Mật khẩu" required>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mật khẩu"
-            />
+            <div className="relative">
+              <Input
+                type={isPasswordVisible ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mật khẩu"
+                autoComplete="current-password"
+                className="pr-12"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+                onClick={() => setPasswordVisible((v) => !v)}
+                aria-label={isPasswordVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                title={isPasswordVisible ? "Ẩn mật khẩu đang gõ." : "Hiện mật khẩu đang gõ để kiểm gõ đúng chưa."}
+              >
+                {isPasswordVisible ? <EyeOff /> : <Eye />}
+              </Button>
+            </div>
           </Field>
 
           <Button
@@ -81,6 +99,30 @@ export default function LoginScreen({
             <LogIn />
             {isSending ? "Đang đăng nhập…" : "Đăng nhập"}
           </Button>
+
+          <div className="space-y-3 text-center">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setForgotOpen((v) => !v)}
+              aria-expanded={isForgotOpen}
+              title="Cách lấy lại quyền vào khi quên mật khẩu."
+            >
+              <KeyRound />
+              Quên mật khẩu?
+            </Button>
+            {isForgotOpen && (
+              <div className="rounded-lg bg-muted px-4 py-3 text-left text-base text-foreground">
+                <p>
+                  Báo <strong>quản trị (admin)</strong> qua Zalo hoặc gặp trực tiếp, kèm tên đăng nhập của bạn.
+                  Admin đặt mật khẩu tạm ở màn Người dùng rồi gửi lại cho bạn.
+                </p>
+                <p className="mt-2 text-muted-foreground">
+                  Đăng nhập bằng mật khẩu tạm, app sẽ bắt bạn đặt mật khẩu riêng trước khi vào làm việc.
+                </p>
+              </div>
+            )}
+          </div>
         </form>
       </Card>
     </div>

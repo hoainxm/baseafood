@@ -70,6 +70,9 @@ const ACTION_LABELS: Record<string, string> = {
   logout: "Đăng xuất",
   submit: "Gửi báo cáo",
   "change-password": "Đổi mật khẩu",
+  "reset-password": "Đặt lại mật khẩu",
+  "disable-account": "Tạm ngưng tài khoản",
+  "enable-account": "Mở lại tài khoản",
 };
 const ACTION_OPTIONS: ComboboxOption[] = [
   { value: "", label: "Tất cả thao tác" },
@@ -80,6 +83,9 @@ const ACTION_OPTIONS: ComboboxOption[] = [
   { value: "logout", label: "Đăng xuất" },
   { value: "submit", label: "Gửi báo cáo" },
   { value: "change-password", label: "Đổi mật khẩu" },
+  { value: "reset-password", label: "Đặt lại mật khẩu" },
+  { value: "disable-account", label: "Tạm ngưng tài khoản" },
+  { value: "enable-account", label: "Mở lại tài khoản" },
 ];
 
 function formatDate(iso: string): string {

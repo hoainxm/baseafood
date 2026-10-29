@@ -1,6 +1,7 @@
 > Load khi: sửa màn `/documents` "Tài liệu công ty", luật xem theo phòng ban, lần ban hành, file trên bucket `documents`, hạn chứng nhận ở Việc của tôi, cột `app_roles.department`.
 covers: src/features/documents/DocumentsScreen.tsx, src/features/documents/DocumentDetailDialog.tsx, src/features/documents/FilePreviewDialog.tsx, src/features/documents/openDocumentFile.ts, src/features/documents/DocumentFormDialog.tsx, src/features/documents/VersionFormDialog.tsx, src/features/documents/index.ts, src/lib/documents.ts, src/lib/documentStorage.ts, supabase/migrations/0072_company_documents.sql
-last_verified: 2026-10-27
+last_verified: 2026-10-29
+<!-- re-verified: 2026-10-29 09:00 — DEPARTMENTS (10 phòng) + SYSTEM_ROLE_DEPARTMENTS (planner / planning-head / planning-deputy → planning) + departmentsOfRoles (app_roles.department trước, rồi mặc định) khớp lib/documents.ts. Màn Người dùng (lib/userDirectory.ts) giờ cũng gom theo đúng nguồn này. -->
 <!-- re-verified: 2026-10-27 10:00 — nút Đính PDF đã ký / Đính file gốc nằm trong DocumentDetailDialog (không ở cột File). CHƯA sửa: luật giao việc gia hạn (spec DOC-R7 "phòng sở hữu" ≠ code buildDocumentWarnings: người xem được + quyền documents.update) — chờ chủ dự án chốt -->
 ttl_days: 90
 <!-- updated: 2026-10-20 (c) — vai trò hệ thống MỚI `planner` (Nhân viên Kế hoạch, mig 0075) thuộc phòng `planning`: `SYSTEM_ROLE_DEPARTMENTS` thêm `planner: ["planning"]` và 0075 viết lại `current_user_departments()` thêm nhánh planner (giữ mọi nhánh của 0072) ⇒ người phòng KH đọc được QTI-KH-01 + 8 biểu mẫu (trước chỉ admin + BGĐ). Phòng ban các vai trò khác không đổi (kiểm PGlite: kế toán 2 · tổ trưởng 3 · thủ kho 3). Xem 41-export-planning.ba-spec.md. -->

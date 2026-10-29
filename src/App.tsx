@@ -15,7 +15,7 @@ import {
   useLocation,
   useSearchParams,
 } from "react-router-dom";
-import LoginScreen from "@/features/auth";
+import LoginScreen, { SetOwnPasswordScreen } from "@/features/auth";
 import { NotFound } from "@/features/shared";
 import AppShell, { KIT_NAV } from "@/features/shared/AppShell";
 import { RowMarkProvider } from "@/features/shared/RowMarkProvider";
@@ -231,9 +231,8 @@ function ShellLayout() {
       shift="Ca A"
       notificationCount={hasNoAccess || !visible.has("my-tasks") ? undefined : myOpenTasks.open}
       onOpenNotifications={() => navigate("/my-tasks")}
-      onLogout={
-        auth.requiresLogin && auth.session ? auth.signOut : undefined
-      }
+      onLogout={auth.requiresLogin && auth.session ? () => void auth.signOut() : undefined}
+      onLogoutEverywhere={auth.requiresLogin && auth.session ? () => void auth.signOut(true) : undefined}
       username={profile?.username}
       onChangePassword={auth.requiresLogin && auth.session ? auth.changePassword : undefined}
       onOpenAdmin={auth.isAdmin ? () => navigate("/admin") : undefined}
@@ -308,6 +307,20 @@ export default function App() {
     );
   }
 
+  // Admin vừa đặt mật khẩu tạm (mig 0080, "Bắt đổi") ⇒ đặt mật khẩu riêng trước khi vào.
+  if (auth.requiresLogin && auth.mustChangePassword) {
+    return (
+      <>
+        <SetOwnPasswordScreen
+          displayName={auth.profile?.fullName || auth.profile?.username || "bạn"}
+          onSubmit={auth.setOwnPassword}
+          onSignOut={() => void auth.signOut()}
+        />
+        <Toaster />
+      </>
+    );
+  }
+
   return (
     <>
       <HashRouter>
@@ -365,7 +378,7 @@ export default function App() {
                     description="Người dùng và vai trò là tài khoản thật, không thuộc bộ demo. Thoát demo (nút trên dải vàng) để quản lý người dùng."
                   />
                 ) : auth.isAdmin ? (
-                  <UserManagementScreen createAccount={auth.createAccount} />
+                  <UserManagementScreen createAccount={auth.createAccount} currentUserId={auth.session?.user.id} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )

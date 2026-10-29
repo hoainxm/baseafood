@@ -10,12 +10,29 @@ import { rolesList } from "@/types";
 import { useAppRoles, useUserProfiles } from "@/lib/catalogRepo";
 import { listRoleOptions, roleNames } from "@/lib/permissions";
 import { fullNameToUsername, normalizeUsername } from "@/lib/username";
-import { useOrphanAccounts, type AccountUsage, type AuthResult, type OrphanAccount } from "@/lib/auth";
+import {
+  generateTemporaryPassword,
+  useAccountAdmin,
+  useOrphanAccounts,
+  type AccountStatus,
+  type AccountUsage,
+  type AuthResult,
+  type OrphanAccount,
+} from "@/lib/auth";
+import {
+  groupNameOfRole,
+  groupUsersByDepartment,
+  NO_DEPARTMENT_GROUP,
+  sortRolesByRank,
+  SYSTEM_ADMIN_GROUP,
+  UNASSIGNED_GROUP,
+} from "@/lib/userDirectory";
 import {
   Tag,
   toneByName,
   RequiredLegend,
   Button,
+  ChoiceGroup,
   Combobox,
   ConfirmAction,
   Dialog,
@@ -47,7 +64,14 @@ import {
   Users,
   X,
   Briefcase,
+  Building2,
+  Copy,
+  Dices,
   Calculator,
+  ClipboardList,
+  FlaskConical,
+  LockKeyhole,
+  UserCheck,
   Factory,
   Warehouse,
   ShieldCheck,
@@ -56,51 +80,19 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/**
- * Phòng ban & cấp bậc — gom vai trò theo bộ phận để danh sách người dùng trực
- * quan hơn (thay 1 list phẳng). Thứ tự trong `roles` = cấp bậc (cao → thấp).
- * ĐỂ CỤC BỘ ở màn này (KHÔNG nhét vào types.ts) — đây là cách TRÌNH BÀY, không
- * phải quy tắc phân quyền; phân quyền thật vẫn ở ROLES + lib/nav-access.ts.
- */
-const DEPARTMENTS: { id: string; name: string; icon: LucideIcon; roles: Role[] }[] = [
-  { id: "giam-doc", name: "Ban giám đốc", icon: Briefcase, roles: ["director", "vice-director"] },
-  { id: "ke-toan", name: "Phòng kế toán", icon: Calculator, roles: ["chief-accountant", "accountant"] },
-  {
-    id: "san-xuat",
-    name: "Phân xưởng sản xuất",
-    icon: Factory,
-    roles: ["manager-dong", "manager-ca", "manager-kho", "vice-manager", "team-leader"],
-  },
-  { id: "kho", name: "Kho & nhập hàng", icon: Warehouse, roles: ["warehouse-keeper"] },
-  { id: "he-thong", name: "Quản trị hệ thống", icon: ShieldCheck, roles: ["admin"] },
-];
-
-/** Tên phòng ban của một vai trò (dòng phụ trong dropdown chọn vai trò). Vai trò
- * admin tự tạo (màn Vai trò & quyền) ⇒ "Vai trò tự tạo". */
-function departmentOfRole(v: Role): string {
-  return DEPARTMENTS.find((pb) => pb.roles.includes(v))?.name ?? "Vai trò tự tạo";
-}
-
-/** Xếp một người vào 1 phòng ban theo vai trò cấp CAO NHẤT họ có (rank nhỏ = cao). */
-function rankDepartment(roles: Role[]): { idx: number; rank: number } {
-  for (let i = 0; i < DEPARTMENTS.length; i++) {
-    const hits = roles.map((r) => DEPARTMENTS[i].roles.indexOf(r)).filter((x) => x >= 0);
-    if (hits.length) return { idx: i, rank: Math.min(...hits) };
-  }
-  return { idx: DEPARTMENTS.length, rank: 0 }; // chưa gán vai trò
-}
-
-/** Sắp vai trò của một người theo cấp bậc (cao → thấp) để hiện chức vụ chính trước. */
-function sapTheoCap(roles: Role[]): Role[] {
-  const key = (r: Role) => {
-    for (let i = 0; i < DEPARTMENTS.length; i++) {
-      const j = DEPARTMENTS[i].roles.indexOf(r);
-      if (j >= 0) return i * 100 + j;
-    }
-    return 9999;
-  };
-  return [...roles].sort((a, b) => key(a) - key(b));
-}
+/** Biểu tượng từng nhóm — nhóm lấy từ `lib/userDirectory.ts` (một nguồn phòng ban, quy tắc ở đó). */
+const GROUP_ICONS: Record<string, LucideIcon> = {
+  board: Briefcase,
+  planning: ClipboardList,
+  accounting: Calculator,
+  production: Factory,
+  warehouse: Warehouse,
+  quality: FlaskConical,
+  "admin-hr": Building2,
+  [SYSTEM_ADMIN_GROUP.id]: ShieldCheck,
+  [NO_DEPARTMENT_GROUP.id]: KeyRound,
+  [UNASSIGNED_GROUP.id]: UserRound,
+};
 
 /**
  * Chọn NHIỀU vai trò: vai trò đã chọn hiện thành CHIP có nút ✕ để bỏ; thêm mới
@@ -120,7 +112,7 @@ function RolePicker({
   const options: ComboboxOption[] = remaining.map((r) => ({
     value: r.value,
     label: r.label,
-    subLabel: departmentOfRole(r.value as Role),
+    subLabel: groupNameOfRole(r.value, appRoles),
   }));
   return (
     <div className="space-y-3">
@@ -486,9 +478,151 @@ const EMPTY_CREATE: NewUserForm = {
 
 /** Màn quản lý người dùng — CHỈ admin. Đăng ký KHÔNG mở tự do: admin tạo tài
  * khoản ngay tại đây, và gán họ tên + vai trò. */
+/** Ô Trạng thái: tạm ngưng / chờ đổi mật khẩu tạm / lần đăng nhập cuối (mig 0080). */
+function AccountStatusCell({ status }: { status?: AccountStatus }) {
+  if (!status) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span className="flex flex-col items-start gap-1">
+      {status.isDisabled ? (
+        <Tag variant="error">Tạm ngưng</Tag>
+      ) : status.mustChangePassword ? (
+        <Tag variant="warning">Chờ đổi mật khẩu tạm</Tag>
+      ) : (
+        <Tag variant="done">Đang dùng</Tag>
+      )}
+      <span className="text-sm text-muted-foreground tnum">Đăng nhập: {formatSignIn(status.lastSignInAt)}</span>
+    </span>
+  );
+}
+
+const statusSortValue = (st?: AccountStatus) => (!st ? "" : st.isDisabled ? "3" : st.mustChangePassword ? "2" : "1");
+
+const REQUIRE_CHANGE_OPTIONS = [
+  { value: "yes", label: "Bắt đổi", description: "Lần vào tới người đó phải tự đặt mật khẩu riêng (nên chọn)." },
+  { value: "no", label: "Không bắt", description: "Dùng luôn mật khẩu này." },
+];
+
+/**
+ * Admin đặt lại mật khẩu cho người khác (mig 0080) — người dùng quên mật khẩu. Email đăng
+ * nhập là email tổng hợp (không có hòm thư) nên không gửi link qua email được. Mật khẩu
+ * hiện chữ thường để admin đọc / gửi cho người đó; KHÔNG lưu nháp, KHÔNG ghi nhật ký.
+ */
+function ResetPasswordDialog({
+  user,
+  onOpenChange,
+  onSubmit,
+}: {
+  user: UserProfile | null;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (user: UserProfile, password: string, requireChange: boolean) => Promise<AuthResult>;
+}) {
+  // Mỗi lần mở là một lần dựng mới (key theo người ở chỗ gọi) ⇒ mật khẩu tạm mới, không dính lần trước.
+  const [password, setPassword] = useState(() => generateTemporaryPassword());
+  const [requireChange, setRequireChange] = useState("yes");
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const [isSaving, setSaving] = useState(false);
+  const [isCopied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(password);
+      setCopied(true); // chép = thao tác trình bày ⇒ báo ngay trên nút, không toast (QT 13)
+    } catch {
+      notify.error("Máy không cho chép — đọc mật khẩu trên màn hình");
+    }
+  };
+
+  const submit = async () => {
+    if (!user || isSaving) return;
+    const ls: FieldError[] = [];
+    if (password.length < 6) ls.push({ field: "Mật khẩu mới", message: "Tối thiểu 6 ký tự" });
+    setErrors(ls);
+    if (ls.length) return;
+    setSaving(true);
+    const result = await onSubmit(user, password, requireChange === "yes");
+    setSaving(false);
+    if (!result.ok) {
+      setErrors([{ field: "Đặt lại mật khẩu", message: result.error ?? "Không đặt lại được" }]);
+      return;
+    }
+    notify.saved(`Đã đặt lại mật khẩu cho @${user.username} — gửi mật khẩu mới cho người đó`);
+    onOpenChange(false);
+  };
+
+  return (
+    <FormDialog
+      open={user !== null}
+      onOpenChange={onOpenChange}
+      title={`Đặt lại mật khẩu — ${user?.fullName || user?.username || ""}`}
+      description="Dùng khi người này quên mật khẩu. Mọi máy đang đăng nhập tài khoản này bị đăng xuất. Không hoàn tác được: mật khẩu cũ mất hẳn."
+      icon={LockKeyhole}
+      size="md"
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Hủy
+          </Button>
+          <Button
+            variant="save"
+            onClick={submit}
+            title="Ghi mật khẩu mới lên máy chủ và đăng xuất mọi máy của người này."
+          >
+            {isSaving ? "Đang đặt…" : "Đặt lại mật khẩu"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        <ErrorSummary errors={errors} />
+        <Field
+          label="Mật khẩu mới"
+          required
+          hint="Đã tạo sẵn ngẫu nhiên — sửa được. Tối thiểu 6 ký tự. Chép rồi gửi riêng cho người đó (Zalo / nói trực tiếp)."
+        >
+          <Input
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setCopied(false);
+            }}
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="font-mono"
+          />
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => {
+              setPassword(generateTemporaryPassword());
+              setCopied(false);
+            }} title="Tạo mật khẩu ngẫu nhiên khác.">
+            <Dices />
+            Tạo mật khẩu khác
+          </Button>
+          <Button variant="outline" size="sm" onClick={copy} title="Chép mật khẩu vào bộ nhớ tạm để dán vào tin nhắn.">
+            <Copy />
+            {isCopied ? "Đã chép" : "Chép mật khẩu"}
+          </Button>
+        </div>
+        <ChoiceGroup
+          label="Lần đăng nhập tới"
+          value={requireChange}
+          onChange={setRequireChange}
+          options={REQUIRE_CHANGE_OPTIONS}
+          columns={2}
+        />
+      </div>
+    </FormDialog>
+  );
+}
+
 export default function UserManagementScreen({
   createAccount,
+  currentUserId,
 }: {
+  /** Id tài khoản admin đang dùng — không tự tạm ngưng / tự đặt lại mật khẩu mình. */
+  currentUserId?: string;
   createAccount: (
     fullName: string,
     username: string,
@@ -501,6 +635,24 @@ export default function UserManagementScreen({
   const navigate = useNavigate();
   const roleLabel = (v: Role[]) => roleNames(v, appRoles);
   const orphans = useOrphanAccounts(true);
+  const accounts = useAccountAdmin(true);
+  const [resetFor, setResetFor] = useState<UserProfile | null>(null);
+  const [disableFor, setDisableFor] = useState<UserProfile | null>(null);
+
+  const setAccountDisabled = async (u: UserProfile, disabled: boolean) => {
+    const result = await accounts.setDisabled(u, disabled);
+    if (!result.ok) {
+      notify.error(`Không ${disabled ? "tạm ngưng" : "mở lại"} được: ${result.error ?? "lỗi máy chủ"}`);
+      return;
+    }
+    notify.saved(
+      disabled ? `Đã tạm ngưng @${u.username} — người đó không đăng nhập được nữa` : `Đã mở lại @${u.username}`,
+      async () => {
+        const back = await accounts.setDisabled(u, !disabled);
+        if (!back.ok) notify.error(`Không hoàn tác được: ${back.error ?? "lỗi máy chủ"}`);
+      }
+    );
+  };
   // Tạo hồ sơ cho tài khoản đăng nhập có sẵn (mồ côi) — khác "Tạo tài khoản" (đăng ký mới).
   const [profileFor, setProfileFor] = useState<{ account: OrphanAccount; form: UserProfile } | null>(null);
   const [profileErrors, setProfileErrors] = useState<FieldError[]>([]);
@@ -620,7 +772,7 @@ export default function UserManagementScreen({
       key: "vaiTro",
       header: "Chức vụ",
       render: (r) => {
-        const vt = sapTheoCap(rolesList(r.roles));
+        const vt = sortRolesByRank(rolesList(r.roles), appRoles);
         return vt.length ? (
           <span className="flex flex-wrap gap-1">
             {vt.map((v) => (
@@ -635,45 +787,28 @@ export default function UserManagementScreen({
       },
       getSortValue: (r) => roleLabel(r.roles),
     },
+    ...(accounts.isAvailable
+      ? [
+          {
+            key: "accountStatus",
+            header: "Trạng thái",
+            render: (r: UserProfile) => <AccountStatusCell status={accounts.statuses[r.id]} />,
+            getSortValue: (r: UserProfile) => statusSortValue(accounts.statuses[r.id]),
+            sortKind: "text" as const,
+          },
+        ]
+      : []),
   ];
 
-  // Gom người dùng theo phòng ban (+ sắp theo cấp bậc) để danh sách trực quan.
+  // Gom theo phòng ban, trong phòng Trưởng → Phó → Nhân viên (quy tắc ở lib/userDirectory.ts).
   const query = q.trim().toLowerCase();
   const filtered = query
     ? items.filter((u) => `${u.username} ${u.fullName} ${roleLabel(u.roles)}`.toLowerCase().includes(query))
     : items;
-  const userName = (u: UserProfile) => u.fullName || u.username || "";
-  const thung: { u: UserProfile; rank: number }[][] = DEPARTMENTS.map(() => []);
-  const unassigned: UserProfile[] = [];
-  const customOnly: UserProfile[] = []; // chỉ giữ vai trò tự tạo
-  for (const u of filtered) {
-    const { idx, rank } = rankDepartment(rolesList(u.roles));
-    if (idx < DEPARTMENTS.length) thung[idx].push({ u, rank });
-    else if (u.roles.length) customOnly.push(u);
-    else unassigned.push(u);
-  }
-  const visibleGroups = [
-    ...DEPARTMENTS.map((pb, i) => ({
-      id: pb.id,
-      name: pb.name,
-      icon: pb.icon,
-      users: thung[i]
-        .sort((a, b) => a.rank - b.rank || userName(a.u).localeCompare(userName(b.u), "vi"))
-        .map((x) => x.u),
-    })),
-    {
-      id: "custom",
-      name: "Vai trò tự tạo",
-      icon: KeyRound,
-      users: [...customOnly].sort((a, b) => userName(a).localeCompare(userName(b), "vi")),
-    },
-    {
-      id: "chua",
-      name: "Chưa phân công",
-      icon: UserRound,
-      users: [...unassigned].sort((a, b) => userName(a).localeCompare(userName(b), "vi")),
-    },
-  ].filter((n) => n.users.length > 0);
+  const visibleGroups = groupUsersByDepartment(
+    filtered.map((u) => ({ ...u, roles: rolesList(u.roles) })),
+    appRoles
+  ).map((g) => ({ ...g, icon: GROUP_ICONS[g.id] ?? Users }));
 
   return (
     <div className="space-y-6">
@@ -783,6 +918,39 @@ export default function UserManagementScreen({
                           <KeyRound />
                           Quyền
                         </Button>
+                        {r.id !== currentUserId && (
+                          <Button
+                            title="Người này quên mật khẩu: đặt mật khẩu tạm mới, đăng xuất mọi máy của họ."
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setResetFor(r)}
+                          >
+                            <LockKeyhole />
+                            Mật khẩu
+                          </Button>
+                        )}
+                        {r.id !== currentUserId &&
+                          (accounts.statuses[r.id]?.isDisabled ? (
+                            <Button
+                              title="Cho người này đăng nhập lại (vai trò, quyền giữ nguyên như trước khi tạm ngưng)."
+                              variant="edit"
+                              size="sm"
+                              onClick={() => setAccountDisabled(r, false)}
+                            >
+                              <UserCheck />
+                              Mở lại
+                            </Button>
+                          ) : (
+                            <Button
+                              title="Người nghỉ việc / tạm nghỉ: chặn đăng nhập, đăng xuất mọi máy. Hồ sơ và lịch sử ghi sổ giữ nguyên, mở lại được."
+                              variant="danger"
+                              size="sm"
+                              onClick={() => setDisableFor(r)}
+                            >
+                              <UserX />
+                              Tạm ngưng
+                            </Button>
+                          ))}
                       </span>
                     )}
                   />
@@ -869,6 +1037,23 @@ export default function UserManagementScreen({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ResetPasswordDialog key={resetFor?.id ?? "closed"} user={resetFor} onOpenChange={(o) => !o && setResetFor(null)} onSubmit={accounts.resetPassword} />
+
+      <ConfirmAction
+        open={disableFor !== null}
+        onOpenChange={(o) => !o && setDisableFor(null)}
+        title={`Tạm ngưng tài khoản ${disableFor?.fullName || disableFor?.username || ""}?`}
+        description="Người này không đăng nhập được nữa; máy đang mở bị đăng xuất (chậm nhất khoảng 1 giờ). Hồ sơ, vai trò và mọi số đã ghi giữ nguyên. Mở lại bất cứ lúc nào bằng nút Mở lại."
+        detail={disableFor ? `@${disableFor.username} · ${roleLabel(disableFor.roles) || "chưa gán vai trò"}` : undefined}
+        confirmLabel="Tạm ngưng"
+        cancelLabel="Thôi"
+        icon={UserX}
+        onConfirm={() => {
+          if (disableFor) void setAccountDisabled(disableFor, true);
+          setDisableFor(null);
+        }}
+      />
 
       <DeleteOrphansDialog
         key={deleteTargets ? deleteTargets.map((a) => a.id).join(",") : "closed"}

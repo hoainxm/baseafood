@@ -24,7 +24,7 @@ import {
   type FieldError,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
-import { ChevronDown, KeyRound, LogOut, Palette, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut, MonitorX, Palette, ShieldCheck, type LucideIcon } from "lucide-react";
 
 export interface AccountMenuProps {
   displayName: string;
@@ -37,6 +37,8 @@ export interface AccountMenuProps {
   /** Có ⇒ hiện "Quản trị hệ thống" (chỉ admin). */
   onOpenAdmin?: () => void;
   onSignOut?: () => void;
+  /** Có ⇒ hiện "Đăng xuất khỏi mọi máy" (máy để quên đăng nhập ở xưởng). */
+  onSignOutEverywhere?: () => void;
 }
 
 /** Hai chữ đầu của hai từ CUỐI tên ("Nguyễn Như Thanh Trúc" → "TT"). */
@@ -81,7 +83,7 @@ function MenuItem({
   );
 }
 
-type OpenDialog = "display" | "password" | "sign-out" | null;
+type OpenDialog = "display" | "password" | "sign-out" | "sign-out-everywhere" | null;
 
 export function AccountMenu({
   displayName,
@@ -91,6 +93,7 @@ export function AccountMenu({
   onChangePassword,
   onOpenAdmin,
   onSignOut,
+  onSignOutEverywhere,
 }: AccountMenuProps) {
   const [isMenuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<OpenDialog>(null);
@@ -172,6 +175,15 @@ export function AccountMenu({
                 tone="danger"
                 onClick={() => openDialog("sign-out")}
               />
+              {onSignOutEverywhere && (
+                <MenuItem
+                  icon={MonitorX}
+                  label="Đăng xuất khỏi mọi máy"
+                  title="Quên đăng xuất ở máy khác (máy xưởng, máy mượn)? Thoát tài khoản trên MỌI máy, kể cả máy này."
+                  tone="danger"
+                  onClick={() => openDialog("sign-out-everywhere")}
+                />
+              )}
             </>
           )}
         </PopoverContent>
@@ -200,6 +212,19 @@ export function AccountMenu({
           cancelLabel="Ở lại"
           icon={LogOut}
           onConfirm={onSignOut}
+        />
+      )}
+      {onSignOutEverywhere && (
+        <ConfirmAction
+          open={dialog === "sign-out-everywhere"}
+          onOpenChange={(o) => setDialog(o ? "sign-out-everywhere" : null)}
+          title="Đăng xuất khỏi mọi máy?"
+          description="Mọi máy đang đăng nhập tài khoản này bị thoát (máy khác chậm nhất khoảng 1 giờ). Số liệu đã ghi vẫn còn. Nghi lộ mật khẩu thì đổi mật khẩu luôn — đổi mật khẩu cũng tự đăng xuất các máy khác."
+          detail={`${displayName} · ${role}`}
+          confirmLabel="Đăng xuất mọi máy"
+          cancelLabel="Ở lại"
+          icon={MonitorX}
+          onConfirm={onSignOutEverywhere}
         />
       )}
     </>
@@ -267,7 +292,7 @@ function ChangePasswordDialog({
       open={open}
       onOpenChange={close}
       title="Đổi mật khẩu"
-      description="Nhập mật khẩu hiện tại rồi đặt mật khẩu mới. Lần đăng nhập sau dùng mật khẩu mới."
+      description="Nhập mật khẩu hiện tại rồi đặt mật khẩu mới. Lần đăng nhập sau dùng mật khẩu mới; các máy khác đang đăng nhập tài khoản này bị đăng xuất."
       icon={KeyRound}
       size="md"
       footer={

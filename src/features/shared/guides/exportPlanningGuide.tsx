@@ -23,7 +23,7 @@ export const EXPORT_GUIDE_ACTORS: readonly GuideActor[] = [
     id: "loader",
     name: "Người đóng hàng",
     note: "Thủ kho, Quản đốc, Phó quản đốc. Mở trang chỉ thấy chuyến sắp / vừa đóng cont.",
-    roles: ["warehouse-keeper", "manager-dong", "manager-ca", "manager-kho", "vice-manager"],
+    roles: ["warehouse-keeper", "frozen-workshop-manager", "fish-workshop-manager", "dried-workshop-manager", "vice-manager"],
   },
   { id: "accounting", name: "Kế toán", note: "Kế toán trưởng, Kế toán. Xem được hợp đồng và giá.", roles: ["chief-accountant", "accountant"] },
   { id: "board", name: "Ban giám đốc", note: "Xem hợp đồng, chuyến và giá.", roles: ["director", "vice-director"], viewOnly: true },

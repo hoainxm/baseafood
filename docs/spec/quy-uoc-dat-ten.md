@@ -41,7 +41,7 @@ Repo không chốt quy ước từ đầu. Hệ quả:
 
 **Từ viết tắt được phép** (thuật ngữ nghiệp vụ đã thành tên riêng): `nxt` (nhập-xuất-tồn), `wip` (BTP), `qc`, `qr`, `sscc`, `bsf1`. Ngoài danh sách này thì dịch ra (`hddt` → `einvoice`, `nl` → `material`, `tp` → `finishedGood`, `btp` → `wip`).
 
-**Tên riêng trong dữ liệu đã lưu** (giữ, không dịch): mã xưởng trong slug vai trò (`manager-dong`), mã TK 1551, giá trị hiển thị có dấu đã lưu sẵn (`"Đông"`, `"Nhập hàng"`). Enum MỚI thì lưu mã tiếng Anh và tra nhãn qua bảng `…_LABELS`, giống `STORAGE_KIND_LABELS`.
+**Tên riêng trong dữ liệu đã lưu** (giữ, không dịch): mã TK 1551, giá trị hiển thị có dấu đã lưu sẵn (`"Đông"`, `"Nhập hàng"`). Enum MỚI thì lưu mã tiếng Anh và tra nhãn qua bảng `…_LABELS`, giống `STORAGE_KIND_LABELS`.
 
 ### 2b. Từ điển thuật ngữ (một nguồn, cấm tự dịch khác đi)
 
@@ -124,7 +124,7 @@ Phân bố khai báo tên Việt theo khu: `lib` 1.129 · `design-system` 301 ·
 
 **Thứ tự bắt buộc:** 0 trước mọi thứ. 1–3 làm xen kẽ được. 4 sau 2 (vì đổi thư mục kéo theo `covers:`). 5 làm cuối, chỉ 5a + 5f (§6 Q1), mỗi mục một câu xác nhận RED riêng.
 
-**Không làm:** sửa migration cũ; đổi 141 mã TK 1551; đổi chữ hiển thị; đổi slug vai trò đang lưu (`manager-dong`…: tên riêng xưởng, đã có lớp chuẩn hóa).
+**Không làm:** sửa migration cũ; đổi 141 mã TK 1551; đổi chữ hiển thị; đổi slug vai trò đang lưu khi chưa có migration đổi khóa + lớp chuẩn hóa. **Ngoại lệ đã làm (2026-10-29, chủ dự án):** 3 quản đốc xưởng đổi theo NGHĨA xưởng — `manager-dong` → `frozen-workshop-manager`, `manager-ca` → `fish-workshop-manager`, `manager-kho` → `dried-workshop-manager` (mig 0087; slug cũ quy đổi ở `LEGACY_ROLE_MAP` + `normalize_role_slug`). Từ điển: xưởng Đông = `frozen`, Cá = `fish`, Khô = `dried` (khớp phòng ban `production-*`).
 
 ## 6. Quyết định đã chốt (2026-10-12)
 

@@ -47,9 +47,9 @@ export const SYSTEM_ROLE_DEPARTMENTS: Readonly<Partial<Record<Role, readonly Dep
   "chief-accountant": ["accounting"],
   accountant: ["accounting"],
   "warehouse-keeper": ["purchasing", "warehouse"],
-  "manager-dong": ["production-frozen"],
-  "manager-ca": ["production-fish"],
-  "manager-kho": ["production-dried"],
+  "frozen-workshop-manager": ["production-frozen"],
+  "fish-workshop-manager": ["production-fish"],
+  "dried-workshop-manager": ["production-dried"],
   "vice-manager": ["production-frozen", "production-fish", "production-dried"],
   "team-leader": ["production-frozen", "production-fish", "production-dried"],
   // Phòng Kế hoạch (mig 0075) — hàm SQL current_user_departments() lặp lại đúng dòng này.

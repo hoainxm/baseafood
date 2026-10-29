@@ -82,8 +82,8 @@ describe("việc theo quyền + phạm vi", () => {
 
   it("quản đốc xưởng Đông: chốt ngày SX xưởng mình, không xưởng Cá", () => {
     const ok = warning({ id: "ccs|2026-10-18|Đông", kind: "production-unlocked", path: "/wip" });
-    expect(canDoTask(ok, perms("manager-dong"), ctx("manager-dong"))).toBe(true);
-    expect(canDoTask(unlockedWipCa, perms("manager-dong"), ctx("manager-dong"))).toBe(false);
+    expect(canDoTask(ok, perms("frozen-workshop-manager"), ctx("frozen-workshop-manager"))).toBe(true);
+    expect(canDoTask(unlockedWipCa, perms("frozen-workshop-manager"), ctx("frozen-workshop-manager"))).toBe(false);
   });
 
   it("tổ trưởng: chỉ mẻ chưa gắn lô do CHÍNH MÌNH ghi", () => {

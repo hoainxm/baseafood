@@ -19,9 +19,9 @@ export type Role =
   | "admin"
   | "director"
   | "vice-director"
-  | "manager-dong"
-  | "manager-ca"
-  | "manager-kho"
+  | "frozen-workshop-manager"
+  | "fish-workshop-manager"
+  | "dried-workshop-manager"
   | "vice-manager"
   | "chief-accountant"
   | "accountant"
@@ -35,9 +35,9 @@ export const ROLES: { value: Role; label: string }[] = [
   { value: "admin", label: "Quản trị viên" },
   { value: "director", label: "Giám đốc" },
   { value: "vice-director", label: "Phó giám đốc" },
-  { value: "manager-dong", label: "Quản đốc xưởng Đông" },
-  { value: "manager-ca", label: "Quản đốc xưởng Cá" },
-  { value: "manager-kho", label: "Quản đốc xưởng Khô" },
+  { value: "frozen-workshop-manager", label: "Quản đốc xưởng Đông" },
+  { value: "fish-workshop-manager", label: "Quản đốc xưởng Cá" },
+  { value: "dried-workshop-manager", label: "Quản đốc xưởng Khô" },
   { value: "vice-manager", label: "Phó quản đốc" },
   { value: "team-leader", label: "Tổ trưởng sản xuất" },
   { value: "warehouse-keeper", label: "Thủ kho nhập hàng" },
@@ -57,9 +57,13 @@ export const ROLES: { value: Role; label: string }[] = [
 const LEGACY_ROLE_MAP: Record<string, Role> = {
   "giam-doc": "director",
   "pho-giam-doc": "vice-director",
-  "quan-doc-dong": "manager-dong",
-  "quan-doc-ca": "manager-ca",
-  "quan-doc-kho": "manager-kho",
+  "quan-doc-dong": "frozen-workshop-manager",
+  "quan-doc-ca": "fish-workshop-manager",
+  "quan-doc-kho": "dried-workshop-manager",
+  // slug quản đốc trước 0087 (2026-10-29) — "manager" + tên xưởng không dấu, đổi theo nghĩa xưởng
+  "manager-dong": "frozen-workshop-manager", // naming-ok: giá trị cũ đã lưu
+  "manager-ca": "fish-workshop-manager", // naming-ok
+  "manager-kho": "dried-workshop-manager", // naming-ok
   "pho-quan-doc": "vice-manager",
   "ke-toan": "accountant",
   "ke-toan-truong": "chief-accountant",

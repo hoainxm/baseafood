@@ -56,13 +56,13 @@ describe("resolvePermissions", () => {
   it("nhiều vai trò ⇒ HỢP quyền, phạm vi lấy rộng nhất", () => {
     const matrix: Partial<Record<Role, PermissionGrant[]>> = {
       "team-leader": [{ resource: "wip", action: "update", scope: "own" }],
-      "manager-dong": [
+      "frozen-workshop-manager": [
         { resource: "wip", action: "update", scope: "workshop" },
         { resource: "wip", action: "lock", scope: "workshop" },
       ],
       accountant: [{ resource: "balancing", action: "create", scope: "all" }],
     };
-    const p = resolveFor(["team-leader", "manager-dong", "accountant"], { rolePermissions: matrix });
+    const p = resolveFor(["team-leader", "frozen-workshop-manager", "accountant"], { rolePermissions: matrix });
     expect(scopeOf(p, "wip", "update")).toBe("workshop");
     expect(can(p, "wip", "lock")).toBe(true);
     expect(can(p, "balancing", "create")).toBe(true);
@@ -149,7 +149,7 @@ describe("ma trận ĐANG ÁP — Đợt 4 (spec §7 + 2 điều chỉnh chủ d
     const unlockers = new Set<string>();
     for (const [role, grants] of Object.entries(DEFAULT_ROLE_PERMISSIONS))
       for (const g of grants) if (g.action === "unlock") unlockers.add(role);
-    expect([...unlockers].sort()).toEqual(["chief-accountant", "manager-ca", "manager-dong", "manager-kho"]);
+    expect([...unlockers].sort()).toEqual(["chief-accountant", "dried-workshop-manager", "fish-workshop-manager", "frozen-workshop-manager"]);
   });
 
   it("kế toán KHÔNG xóa, KHÔNG mở lại; có Thêm/Sửa/Chốt ở Nhập hàng + SX TP (người nhập liệu)", () => {
@@ -162,7 +162,7 @@ describe("ma trận ĐANG ÁP — Đợt 4 (spec §7 + 2 điều chỉnh chủ d
   });
 
   it("bộ phận xưởng KHÔNG thấy giá ở đâu; thủ kho thấy giá nhập", () => {
-    for (const role of ["manager-dong", "manager-ca", "manager-kho", "vice-manager", "team-leader"] as const) {
+    for (const role of ["frozen-workshop-manager", "fish-workshop-manager", "dried-workshop-manager", "vice-manager", "team-leader"] as const) {
       const p = resolveFor([role]);
       for (const r of PERMISSION_RESOURCES) expect(can(p, r.id, "view-price"), `${role} ${r.id}`).toBe(false);
     }
@@ -179,7 +179,7 @@ describe("ma trận ĐANG ÁP — Đợt 4 (spec §7 + 2 điều chỉnh chủ d
   });
 
   it("phó GĐ kiêm quản đốc Đông (người thật) ⇒ HỢP: ghi được SX, chỉ xem sổ kế toán", () => {
-    const p = resolveFor(["vice-director", "manager-dong"]);
+    const p = resolveFor(["vice-director", "frozen-workshop-manager"]);
     expect(can(p, "wip", "unlock")).toBe(true);
     expect(can(p, "balancing", "update")).toBe(false);
     expect(can(p, "balancing", "view-price")).toBe(true);
@@ -310,7 +310,7 @@ describe("Đợt 2 — ma trận đọc từ DB (mig 0062)", () => {
 
 describe("phạm vi dữ liệu — Đợt 5", () => {
   it("ma trận: quản đốc GHI theo xưởng ở SX/Đóng gói/QC/Kho, XEM cả 3 xưởng; tổ trưởng ghi SX theo dòng mình", () => {
-    const m = resolveFor(["manager-ca"]);
+    const m = resolveFor(["fish-workshop-manager"]);
     for (const r of ["wip", "packaging", "qc"]) {
       expect(scopeOf(m, r, "view"), r).toBe("all");
       expect(scopeOf(m, r, "update"), r).toBe("workshop");
@@ -324,18 +324,18 @@ describe("phạm vi dữ liệu — Đợt 5", () => {
   });
 
   it("scopeContextFor: xưởng suy từ vai trò quản đốc; tên từ họ tên + tên đăng nhập", () => {
-    expect(scopeContextFor(["vice-director", "manager-dong"], " Hạnh ", "ttmhanh")).toEqual({ workshops: ["Đông"], identities: ["Hạnh", "ttmhanh"] });
+    expect(scopeContextFor(["vice-director", "frozen-workshop-manager"], " Hạnh ", "ttmhanh")).toEqual({ workshops: ["Đông"], identities: ["Hạnh", "ttmhanh"] });
     expect(scopeContextFor(["accountant"]).workshops).toEqual([]);
   });
 
   it("rowInScope / canOnRow: ngoài phạm vi ⇒ false; thiếu cột ⇒ theo quyền chung; own khi thêm luôn được", () => {
-    const ctx = scopeContextFor(["manager-kho"], "A", "a");
+    const ctx = scopeContextFor(["dried-workshop-manager"], "A", "a");
     expect(rowInScope("workshop", ctx, { workshop: "Khô" })).toBe(true);
     expect(rowInScope("workshop", ctx, { workshop: "Đông" })).toBe(false);
     expect(rowInScope("workshop", ctx, {})).toBe(true);
     expect(rowInScope("own", ctx, { operator: "B" })).toBe(false);
     expect(rowInScope("own", ctx, { operator: "B" }, "create")).toBe(true);
-    const p = resolveFor(["manager-kho"]);
+    const p = resolveFor(["dried-workshop-manager"]);
     expect(canOnRow(p, ctx, "wip", "delete", { workshop: "Khô" })).toBe(true);
     expect(canOnRow(p, ctx, "wip", "delete", { workshop: "Cá" })).toBe(false);
     expect(canOnRow(p, ctx, "imports", "view", {})).toBe(false); // không có quyền thì phạm vi không cứu
@@ -356,5 +356,19 @@ describe("isPermissionLoading — chờ quyền chốt rồi mới vẽ sidebar 
     expect(isPermissionLoading({ ...base, isAdmin: true, tableStatuses: ["loading"] })).toBe(false);
     expect(isPermissionLoading({ ...base, requiresLogin: false, tableStatuses: ["loading"] })).toBe(false);
     expect(isPermissionLoading({ ...base, hasProfile: false, tableStatuses: ["loading"] })).toBe(false);
+  });
+});
+
+describe("slug quản đốc xưởng (0087, 2026-10-29)", () => {
+  it("slug cũ (quan-doc-*, manager-*) quy về slug theo nghĩa xưởng; xưởng theo vai trò giữ Đông/Cá/Khô", async () => {
+    const { normalizeRole } = await import("@/types");
+    expect(["quan-doc-dong", "manager-dong", "manager-ca", "quan-doc-kho", "manager-kho"].map(normalizeRole)).toEqual([
+      "frozen-workshop-manager",
+      "frozen-workshop-manager",
+      "fish-workshop-manager",
+      "dried-workshop-manager",
+      "dried-workshop-manager",
+    ]);
+    expect(scopeContextFor(["frozen-workshop-manager", "fish-workshop-manager", "dried-workshop-manager"]).workshops).toEqual(["Đông", "Cá", "Khô"]);
   });
 });

@@ -215,9 +215,9 @@ export const LEGACY_ROLE_PERMISSIONS: RolePermissionMatrix = {
   accountant: FULL,
   "warehouse-keeper": grantAll(byNav(IMPORT_DEPARTMENT_NAV)),
   "team-leader": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
-  "manager-dong": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
-  "manager-ca": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
-  "manager-kho": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
+  "frozen-workshop-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
+  "fish-workshop-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
+  "dried-workshop-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
   "vice-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
   // Vai trò mới (0075) — đường lùi khẩn vẫn giữ đúng module của Phòng Kế hoạch.
   planner: grantAll(byNav(["planning-export", "planning-import", "catalog"])),
@@ -248,9 +248,9 @@ function grantsOf(spec: RoleSpec, scopes: Readonly<Partial<Record<string, Permis
 
 /** Quản đốc ⇄ xưởng. Vai trò khác không gắn xưởng (phó QĐ, tổ trưởng là vai trò chung). */
 export const WORKSHOP_BY_ROLE: Readonly<Partial<Record<Role, string>>> = {
-  "manager-dong": "Đông",
-  "manager-ca": "Cá",
-  "manager-kho": "Khô",
+  "frozen-workshop-manager": "Đông",
+  "fish-workshop-manager": "Cá",
+  "dried-workshop-manager": "Khô",
 };
 
 /** Người đang thao tác — để kiểm phạm vi `workshop` / `own` trên từng dòng. */
@@ -539,9 +539,9 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissionMatrix = {
   accountant: grantsOf(ACCOUNTANT),
   "warehouse-keeper": grantsOf(WAREHOUSE_KEEPER),
   "team-leader": grantsOf(TEAM_LEADER, TEAM_LEADER_SCOPES),
-  "manager-dong": grantsOf(MANAGER, MANAGER_SCOPES),
-  "manager-ca": grantsOf(MANAGER, MANAGER_SCOPES),
-  "manager-kho": grantsOf(MANAGER, MANAGER_SCOPES),
+  "frozen-workshop-manager": grantsOf(MANAGER, MANAGER_SCOPES),
+  "fish-workshop-manager": grantsOf(MANAGER, MANAGER_SCOPES),
+  "dried-workshop-manager": grantsOf(MANAGER, MANAGER_SCOPES),
   "vice-manager": grantsOf(VICE_MANAGER),
   planner: grantsOf(PLANNER),
   "planning-head": grantsOf(PLANNING_HEAD),

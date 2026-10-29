@@ -5,6 +5,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { normalizeRole } from "@/types";
 import { DEFAULT_ROLE_PERMISSIONS } from "./permissions";
 import { TABLE_WRITE_RULES, type RowChange } from "./writePermissions";
 
@@ -24,7 +25,11 @@ describe("máy chủ ⇄ app: cùng ma trận, cùng bảng, cùng luật", () =
     const sql = latestWith("insert into public.default_role_permissions");
     const block = sql.slice(sql.indexOf("insert into public.default_role_permissions"));
     const values = block.slice(0, block.indexOf(";"));
-    const fromSql = [...values.matchAll(/\('([^']+)', '([^']+)', '([^']+)', '([^']+)'\)/g)].map((m) => m.slice(1).join("|")).sort();
+    // Slug vai trò trong SQL đi qua `normalizeRole`: migration đổi khóa sau lần chèn ma trận cuối (0087:
+    // manager-dong → frozen-workshop-manager…) đổi `role_id` bằng UPDATE, không chèn lại ma trận.
+    const fromSql = [...values.matchAll(/\('([^']+)', '([^']+)', '([^']+)', '([^']+)'\)/g)]
+      .map((m) => [normalizeRole(m[1]), m[2], m[3], m[4]].join("|"))
+      .sort();
     const fromCode = Object.entries(DEFAULT_ROLE_PERMISSIONS)
       .flatMap(([role, grants]) => grants.map((g) => [role, g.resource, g.action, g.scope].join("|")))
       .sort();

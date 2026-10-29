@@ -40,7 +40,7 @@ describe("gom người dùng theo phòng ban", () => {
   it("thứ tự nhóm + nhiều vai trò ⇒ nhóm xếp trước thắng", () => {
     const groups = groupUsersByDepartment([
       user("kt", ["accountant"]),
-      user("pgd", ["manager-dong", "vice-director"]),
+      user("pgd", ["frozen-workshop-manager", "vice-director"]),
       user("ad", ["admin"]),
       user("trong", []),
     ]);
@@ -50,7 +50,7 @@ describe("gom người dùng theo phòng ban", () => {
       ["system-admin", ["ad"]],
       ["unassigned", ["trong"]],
     ]);
-    expect(sortRolesByRank(["manager-dong", "vice-director"])).toEqual(["vice-director", "manager-dong"]);
+    expect(sortRolesByRank(["frozen-workshop-manager", "vice-director"])).toEqual(["vice-director", "frozen-workshop-manager"]);
   });
 
   it("vai trò tự tạo: theo phòng đã chọn, cấp suy từ tên", () => {

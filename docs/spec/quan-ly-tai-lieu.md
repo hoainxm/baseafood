@@ -62,7 +62,7 @@ Trạng thái của **tài liệu** = trạng thái lần ban hành mới nhất
 - **Tài nguyên mới `documents`** trong `lib/permissions.ts` (mặc định cấm với mọi vai trò, trừ admin): `view` · `create` (tạo tài liệu, tải lần ban hành) · `update` · `delete` (chỉ Dự thảo) · `approve` (xem xét + phê duyệt trên app; ghi bản đã ký giấy) · `export`.
 - Đợt đầu **chỉ admin** có `create/update/delete/approve` (chốt câu 2). Mọi vai trò có `view` (phạm vi phòng vẫn áp — DOC-R5). Sau này admin tick thêm trong màn "Vai trò & quyền".
 - **Phòng ban của vai trò:**
-  - Vai trò hệ thống: bảng ánh xạ trong code, cùng kiểu `WORKSHOP_BY_ROLE`. Ví dụ `director`, `vice-director` → Ban giám đốc · `manager-dong` → Sản xuất Đông · `warehouse-keeper` → Thu mua · `accountant`, `chief-accountant` → Kế toán.
+  - Vai trò hệ thống: bảng ánh xạ trong code, cùng kiểu `WORKSHOP_BY_ROLE`. Ví dụ `director`, `vice-director` → Ban giám đốc · `frozen-workshop-manager` → Sản xuất Đông · `warehouse-keeper` → Thu mua · `accountant`, `chief-accountant` → Kế toán.
   - Vai trò admin tự tạo (mig `0062`): thêm **cột `department` có thể rỗng** vào `app_roles`. Ví dụ admin tạo vai trò "Phòng Kế hoạch", chọn phòng = Kế hoạch.
   - Một người nhiều vai trò ⇒ thuộc **hợp** các phòng.
 - ⚠️ **Ngoại lệ có chủ đích:** hiện mọi hành động ĐỌC có phạm vi `all` ([`role-permissions` §6](role-permissions.md)). `documents.view` là **tài nguyên đầu tiên lọc dòng khi ĐỌC**. Lọc ở **3 lớp**: danh sách trong app · RLS `SELECT` trên 2 bảng mới · policy `SELECT` trên bucket file. Thiếu lớp máy chủ thì gọi API thẳng vẫn đọc được tài liệu mật.

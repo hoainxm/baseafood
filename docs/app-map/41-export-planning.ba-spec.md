@@ -138,7 +138,7 @@ Chủ dự án chốt 2026-10-28 (4 câu hỏi qua phiên Claude). Mục nào b�
 | **U1 Nhân viên Kế hoạch** | `planner` — **vai trò hệ thống MỚI**, phòng ban `planning` (Q11) | lập hợp đồng, lên chuyến, theo dõi bước, gom chứng từ, điền số cont/seal | desktop văn phòng |
 | **U2 Ban giám đốc** | `director`, `vice-director` | ký duyệt hợp đồng và lệnh xuất **trên giấy** (Q4); trên app chỉ xem | desktop / điện thoại |
 | **U3 Kế toán** | `chief-accountant`, `accountant` | xem hợp đồng + giá; ghi **tiền về** (Q5) | desktop |
-| **U4 Người đóng hàng** | `warehouse-keeper`, `manager-dong`, `manager-ca`, `manager-kho`, `vice-manager` | chụp ảnh lớp hàng, seal, số cont lúc đóng; đính sơ đồ cont khi cần (Q7) | **điện thoại tại bãi đóng cont** |
+| **U4 Người đóng hàng** | `warehouse-keeper`, `frozen-workshop-manager`, `fish-workshop-manager`, `dried-workshop-manager`, `vice-manager` | chụp ảnh lớp hàng, seal, số cont lúc đóng; đính sơ đồ cont khi cần (Q7) | **điện thoại tại bãi đóng cont** |
 | **U5 Quản trị** | `admin` | gán người vào vai trò `planner`, chỉnh quyền | desktop |
 | **S1 Hệ thống** | — | tính tháng của chuyến, tổng hợp đồng, thực xuất, trạng thái bước, độ phủ chuyến, trễ hạn, khép kín | nền |
 
@@ -418,7 +418,7 @@ Chủ dự án chốt 2026-10-28 (4 câu hỏi qua phiên Claude). Mục nào b�
 | `director`, `vice-director` | view · export · view-price | view | view | (giữ như cũ) |
 | `chief-accountant` | view · export · view-price | view | view · create · update · delete | (giữ như cũ) |
 | `accountant` | view · export · view-price | view | view · create · update (KHÔNG xóa — luật chung "kế toán không xóa") | (giữ như cũ) |
-| `warehouse-keeper`, `manager-dong`, `manager-ca`, `manager-kho`, `vice-manager` | — | view · create | — | (giữ như cũ) |
+| `warehouse-keeper`, `frozen-workshop-manager`, `fish-workshop-manager`, `dried-workshop-manager`, `vice-manager` | — | view · create | — | (giữ như cũ) |
 | còn lại | — | — | — | (giữ như cũ) |
 
 `planner` thuộc phòng ban `planning`; trang chủ mặc định = Xuất khẩu. **Không** khai vai trò này bằng một dòng `app_roles` (vai trò có dòng `app_roles` thì máy chủ đọc `role_permissions` thay cho ma trận mặc định ⇒ `planner` mất hết quyền).

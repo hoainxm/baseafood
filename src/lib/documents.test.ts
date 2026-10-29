@@ -69,7 +69,7 @@ const ver = (p: Partial<DocumentVersion> = {}): DocumentVersion => ({
 describe("phòng ban của người dùng (DOC-R6)", () => {
   it("vai trò hệ thống → phòng mặc định; nhiều vai trò ⇒ hợp", () => {
     expect(departmentsOfRoles(["accountant"])).toEqual(["accounting"]);
-    expect(departmentsOfRoles(["manager-dong", "accountant"]).sort()).toEqual(["accounting", "production-frozen"]);
+    expect(departmentsOfRoles(["frozen-workshop-manager", "accountant"]).sort()).toEqual(["accounting", "production-frozen"]);
     expect(departmentsOfRoles(["team-leader"]).sort()).toEqual(["production-dried", "production-fish", "production-frozen"]);
     expect(departmentsOfRoles([])).toEqual([]);
   });

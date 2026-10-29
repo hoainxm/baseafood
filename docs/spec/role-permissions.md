@@ -97,7 +97,7 @@ Bất biến (kiểm bằng test):
 | Phạm vi | Nghĩa | Dùng cho |
 |---|---|---|
 | `all` | Mọi dòng | Mặc định |
-| `workshop` | Chỉ dòng của xưởng mình (Đông/Cá/Khô, suy từ vai trò `manager-dong`…) | `/wip`, `/packaging`, `/qc` |
+| `workshop` | Chỉ dòng của xưởng mình (Đông/Cá/Khô, suy từ vai trò `frozen-workshop-manager`…) | `/wip`, `/packaging`, `/qc` |
 | `own` | Chỉ dòng mình ghi (`production_wips.operator`…) | Tổ trưởng sửa/xóa dòng mình |
 
 Phạm vi gắn theo **ô quyền** (`role_permissions.scope`), không theo người. Ví dụ quản đốc Đông: `wip.view = all` (xem cả 3 xưởng để so) nhưng `wip.update = workshop`. Đợt đầu không bật phạm vi, mọi ô là `all`; cột vẫn có sẵn để khỏi đổi bảng về sau.
@@ -234,7 +234,7 @@ Hook nằm ở `lib/permissions.ts` + `features/shared/PermissionProvider.tsx` (
 ### Kết quả Đợt 5 (2026-10-15)
 
 - **Không migration:** cột phạm vi đã có — `workshop` ở `production_wips`, `production_locks`, `domestic_sales`, `packagings`, `qc_checklists`, `qc_locks`; `operator` (HỌ TÊN người ghi) ở `production_wips`, `domestic_sales`, `lot_*`. `packagings` / `qc_checklists` KHÔNG có người ghi.
-- `lib/permissions.ts`: `WORKSHOP_BY_ROLE` (manager-dong → Đông, manager-ca → Cá, manager-kho → Khô), `ScopeContext` + `scopeContextFor(roles, fullName, username)`, `rowInScope`, `canOnRow`; `grantsOf(spec, scopes)` — hành động ĐỌC (`view`/`export`/`view-price`) luôn `all`. Ma trận: **quản đốc** phạm vi `workshop` khi ghi ở `wip`, `packaging`, `qc`, `warehouse` (duyệt); **tổ trưởng** `own` khi sửa/xóa ở `wip`. Xem vẫn cả 3 xưởng (§10 câu 2).
+- `lib/permissions.ts`: `WORKSHOP_BY_ROLE` (frozen-workshop-manager → Đông, fish-workshop-manager → Cá, dried-workshop-manager → Khô), `ScopeContext` + `scopeContextFor(roles, fullName, username)`, `rowInScope`, `canOnRow`; `grantsOf(spec, scopes)` — hành động ĐỌC (`view`/`export`/`view-price`) luôn `all`. Ma trận: **quản đốc** phạm vi `workshop` khi ghi ở `wip`, `packaging`, `qc`, `warehouse` (duyệt); **tổ trưởng** `own` khi sửa/xóa ở `wip`. Xem vẫn cả 3 xưởng (§10 câu 2).
 - **Lớp 3** (`checkTableWrite(perms, table, changes, ctx)`): dòng TRƯỚC và SAU đều phải trong phạm vi (không "dời" dòng xưởng khác về xưởng mình); `own` khi thêm luôn được; **dòng thiếu cột hoặc cột rỗng (dữ liệu cũ) ⇒ theo quyền chung** — không chặn nhầm sổ cũ. Câu báo riêng "Dòng này ngoài phạm vi của bạn (xưởng X)…". `ShellLayout` dựng ctx từ hồ sơ.
 - **Lớp 2:** `useCanOnRow(resource)` (`features/shared/PermissionProvider.tsx`) → `canRow(action, row, kind?)`; gắn ở /wip, /packaging, /qc, /warehouse (ẩn Sửa/Bỏ/Gắn lô/Chốt/Mở lại/Duyệt ngoài phạm vi; form ghi của xưởng khác coi như chỉ xem).
 - **Chưa giới hạn được (ghi rõ):** phó QĐ và tổ trưởng là vai trò chung, không gắn xưởng ⇒ chưa giới hạn theo xưởng (cần gán xưởng cho từng người — để sau); tổ trưởng ở Đóng gói / QC vẫn `all` (bảng không lưu người ghi); "dòng của mình" so bằng HỌ TÊN ở cột người ghi — đổi họ tên trong hồ sơ thì dòng cũ coi như của người khác.

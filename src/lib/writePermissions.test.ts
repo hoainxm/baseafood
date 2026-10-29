@@ -104,8 +104,8 @@ describe("checkTableWrite", () => {
 });
 
 describe("phạm vi dòng — Đợt 5 (xưởng mình / dòng mình ghi)", () => {
-  const eastManager = perms(["manager-dong"]);
-  const eastCtx = scopeContextFor(["manager-dong"], "Lê Văn Đông", "lvdong");
+  const eastManager = perms(["frozen-workshop-manager"]);
+  const eastCtx = scopeContextFor(["frozen-workshop-manager"], "Lê Văn Đông", "lvdong");
   const leader = perms(["team-leader"]);
   const leaderCtx = scopeContextFor(["team-leader"], "Trần Thị Tổ", "tttto");
 
@@ -141,13 +141,13 @@ describe("phạm vi dòng — Đợt 5 (xưởng mình / dòng mình ghi)", () =
   it("vai trò phạm vi `all` (kế toán) và người kiêm nhiều vai trò lấy phạm vi RỘNG nhất", () => {
     const acc = perms(["accountant"]);
     expect(checkTableWrite(acc, "production_wips", [create({ workshop: "Khô" })], scopeContextFor(["accountant"]))).toBeNull();
-    const both = perms(["manager-dong", "accountant"]);
-    expect(checkTableWrite(both, "production_wips", [create({ workshop: "Cá" })], scopeContextFor(["manager-dong", "accountant"]))).toBeNull();
+    const both = perms(["frozen-workshop-manager", "accountant"]);
+    expect(checkTableWrite(both, "production_wips", [create({ workshop: "Cá" })], scopeContextFor(["frozen-workshop-manager", "accountant"]))).toBeNull();
   });
 
   it("phó GĐ kiêm quản đốc Đông (người thật): ghi SX xưởng Đông, không ghi xưởng Cá", () => {
-    const p = perms(["vice-director", "manager-dong"]);
-    const ctx = scopeContextFor(["vice-director", "manager-dong"], "Hạnh", "ttmhanh");
+    const p = perms(["vice-director", "frozen-workshop-manager"]);
+    const ctx = scopeContextFor(["vice-director", "frozen-workshop-manager"], "Hạnh", "ttmhanh");
     expect(checkTableWrite(p, "production_wips", [create({ workshop: "Đông" })], ctx)).toBeNull();
     expect(checkTableWrite(p, "production_wips", [create({ workshop: "Cá" })], ctx)).not.toBeNull();
   });

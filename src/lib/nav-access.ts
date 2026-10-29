@@ -17,9 +17,9 @@ import {
 export const HOME_BY_ROLE: Partial<Record<Role, string>> = {
   "warehouse-keeper": "imports",
   "team-leader": "wip",
-  "manager-dong": "wip",
-  "manager-ca": "wip",
-  "manager-kho": "wip",
+  "frozen-workshop-manager": "wip",
+  "fish-workshop-manager": "wip",
+  "dried-workshop-manager": "wip",
   "vice-manager": "wip",
   planner: "planning-export",
   "planning-head": "planning-export",

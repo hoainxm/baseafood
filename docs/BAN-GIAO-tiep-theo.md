@@ -49,7 +49,7 @@
 ## 3. Go-live — đưa vào chạy hằng ngày (người dùng làm, session hỗ trợ)
 1. **Deploy:** `git pull` → `git push` (remote 2 URL tự sync repo cá nhân → Vercel build). Kiểm Vercel xanh, Console không đỏ.
 2. **DB:** ✅ migration tới `0048` đã chạy (2026-09-22); anon bị chặn (kiểm chứng bằng client). Khi thêm migration mới: chạy rồi tick lại ở đây.
-3. **Tài khoản & vai trò:** admin tạo tài khoản thật + gán vai trò (thủ kho→`warehouse-keeper`; tổ trưởng/quản đốc→`team-leader`/`manager-dong|ca|kho`; kế toán→`accountant`; GĐ→`director`). Đổi mật khẩu admin. Xóa tài khoản test.
+3. **Tài khoản & vai trò:** admin tạo tài khoản thật + gán vai trò (thủ kho→`warehouse-keeper`; tổ trưởng/quản đốc→`team-leader`/`frozen-workshop-manager|ca|kho`; kế toán→`accountant`; GĐ→`director`). Đổi mật khẩu admin. Xóa tài khoản test.
 4. **Supabase Auth:** Site URL + Redirect URLs = domain Vercel; tắt "Confirm email".
 5. **Tồn đầu:** khai tồn đầu NL (màn Tồn kho NL) + tồn đầu TP (màn NXT thành phẩm) cho số dư trước khi số hoá.
 6. **Pilot:** chạy thử 1 ngày end-to-end (nhập → SX → duyệt kho → đóng gói → bán/đơn → đối chiếu 3 màn tồn khớp) trước khi nhân rộng (5 người ≥45 tuổi).

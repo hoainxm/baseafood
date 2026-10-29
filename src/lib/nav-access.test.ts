@@ -32,7 +32,7 @@ describe("allowedIds — tập màn theo vai trò (Đợt 4, ma trận spec §7 
     );
   });
   it("quản đốc: khâu sản xuất + tồn kho + báo cáo; không sổ kế toán", () => {
-    for (const r of ["manager-dong", "manager-ca", "manager-kho"] as const)
+    for (const r of ["frozen-workshop-manager", "fish-workshop-manager", "dried-workshop-manager"] as const)
       expect(sorted(allowedIds([r], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog", "documents", "my-tasks", "nxt", "nxt-material", "nxt-warehouse", "planning-export"].sort());
   });
   it("phó quản đốc: khâu sản xuất + báo cáo; tổ trưởng: chỉ khâu sản xuất", () => {
@@ -66,7 +66,7 @@ describe("allowedIds — tập màn theo vai trò (Đợt 4, ma trận spec §7 
   });
   it("giao việc: quản đốc / kế toán (trưởng) / phó QĐ được giao; thủ kho, tổ trưởng, giám đốc thì không", () => {
     const canAssign = (r: string) => resolvePermissions({ roles: [r as never], isAdmin: false }).grants.has("my-tasks:create");
-    for (const r of ["manager-dong", "chief-accountant", "accountant", "vice-manager"]) expect(canAssign(r), r).toBe(true);
+    for (const r of ["frozen-workshop-manager", "chief-accountant", "accountant", "vice-manager"]) expect(canAssign(r), r).toBe(true);
     for (const r of ["warehouse-keeper", "team-leader", "director"]) expect(canAssign(r), r).toBe(false);
   });
 });

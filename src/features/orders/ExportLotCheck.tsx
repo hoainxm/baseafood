@@ -35,6 +35,7 @@ import {
   notify,
 } from "@/design-system";
 import { ArrowLeftRight, Camera, CameraOff, Search } from "lucide-react";
+import { recordName } from "@/lib/personName";
 
 interface OrderLot {
   wipId: string;
@@ -71,7 +72,7 @@ export function ExportLotCheck({
   const [typedCode, setTypedCode] = useState("");
   const [lotDispatches, saveLotDispatches] = useLotDispatches();
   const { profile } = useAuth();
-  const recordedBy = profile?.fullName || profile?.username || "";
+  const recordedBy = recordName(profile);
   /** Đề nghị thay lô đang chờ xác nhận. */
   const [proposal, setProposal] = useState<{ current: OrderLot; replacement: LotNode } | null>(null);
 

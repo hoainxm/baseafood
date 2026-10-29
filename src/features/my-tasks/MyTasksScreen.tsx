@@ -45,6 +45,7 @@ import { buildDocumentWarnings, documentViewerFor } from "@/lib/documents";
 import { hasDocumentStorage } from "@/lib/documentStorage";
 import { TASKS_START_DATE, buildMyTasks, findResolvedAssignments, type MyTaskItem, type TaskUrgency } from "@/lib/myTasks";
 import { formatDateVN } from "@/lib/format";
+import { callName, recordName } from "@/lib/personName";
 import type { TaskAssignment } from "@/types";
 import { AlarmClock, ArrowRight, CalendarCheck, CheckCircle2, ClipboardList, Pencil, Send, UserPlus, Users, XCircle } from "lucide-react";
 import { AssignTaskDialog, type AssignTarget } from "./AssignTaskDialog";
@@ -91,7 +92,9 @@ export default function MyTasksScreen() {
   const canAssign = useCan("my-tasks");
   // Chạy không đăng nhập (chỉ máy này) ⇒ một "người dùng" cố định của máy.
   const userId = profile?.id ?? "local";
-  const userName = profile?.fullName || profile?.username || "Máy này";
+  // Người giao việc ghi sổ bằng họ tên (ba-spec 47 R1); lời chào gọi bằng tên gọi (R2).
+  const userName = recordName(profile, "Máy này");
+  const greetName = callName(profile, "Máy này");
 
   // ---- Nạp sổ (giống Tổng quan — cùng bộ tính cảnh báo) ----
   const { traceData, isReady: isTraceReady } = useTraceData();
@@ -318,7 +321,7 @@ export default function MyTasksScreen() {
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="max-w-3xl text-base text-muted-foreground">
-          Việc cần làm của <b className="text-foreground">{userName}</b>: việc được giao, và việc máy tự phát hiện mà bạn có quyền làm (ngày chưa
+          Việc cần làm của <b className="text-foreground">{greetName}</b>: việc được giao, và việc máy tự phát hiện mà bạn có quyền làm (ngày chưa
           chốt, BTP chờ duyệt, chưa gắn lô, kỳ chưa chốt…). Sổ sửa xong thì việc tự hết. Tính từ {formatDateVN(TASKS_START_DATE)}.
         </p>
         {canAssign.create && (

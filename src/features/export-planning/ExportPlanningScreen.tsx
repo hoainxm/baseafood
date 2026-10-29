@@ -84,6 +84,7 @@ import {
 import { useExportData } from "./useExportData";
 import { buildExportTour, pickTourContract } from "./exportTour";
 import { usePageTour, usePageTourControl } from "@/features/shared/PageTourProvider";
+import { recordName } from "@/lib/personName";
 
 /** Hai tab luôn nằm cạnh nhau, chữ được xuống dòng: điện thoại 360 px / chữ 130 % không tràn, không đè nút Lập hợp đồng. */
 // Điện thoại: chữ được xuống dòng trong ô tab; từ sm trở lên KHÔNG gãy dòng (nhãn v5 m).
@@ -99,7 +100,7 @@ const KIND_FROM_TEXT = (t: string): ExportShipmentKind => {
 export default function ExportPlanningScreen() {
   const today = todayIso();
   const { profile } = useAuth();
-  const recordedBy = profile?.fullName || profile?.username || "Máy này";
+  const recordedBy = recordName(profile, "Máy này");
   const can = useCan("export-plans");
   const loadingCan = useCan("export-plans.loading");
   const paymentsCan = useCan("export-plans.payments");

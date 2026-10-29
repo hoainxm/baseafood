@@ -56,6 +56,7 @@ import { DEPARTMENTS, departmentLabel, departmentsOfRoles } from "@/lib/document
 import type { AppRole, Role, RolePermission, UserPermission, UserProfile } from "@/types";
 import { Check, Copy, KeyRound, Minus, Plus, RotateCcw, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { personLabel, recordName } from "@/lib/personName";
 
 /** Câu giải thích từng hành động — hiện khi rê tiêu đề cột (README §9). */
 const ACTION_HINTS: Record<PermissionAction, string> = {
@@ -436,7 +437,7 @@ function RolesTab({ selectedId, onSelect }: { selectedId: string | null; onSelec
           <div className="min-w-0">
             <h2 className="text-xl font-semibold text-foreground">{option.isSystem ? option.label : current.name || "(chưa đặt tên)"}</h2>
             <p className="text-sm text-muted-foreground">
-              {holders.length ? `Người giữ: ${holders.map((u) => u.fullName || u.username).join(", ")}` : "Chưa ai giữ vai trò này."}
+              {holders.length ? `Người giữ: ${holders.map((u) => personLabel(u)).join(", ")}` : "Chưa ai giữ vai trò này."}
             </p>
           </div>
           {roleId !== "admin" && (
@@ -634,8 +635,8 @@ function UsersTab({ selectedId, onSelect }: { selectedId: string | null; onSelec
   const user: UserProfile | undefined = users.find((u) => u.id === selectedId);
 
   const userOptions: ComboboxOption[] = [...users]
-    .sort((a, b) => (a.fullName || a.username).localeCompare(b.fullName || b.username, "vi"))
-    .map((u) => ({ value: u.id, label: u.fullName || u.username, subLabel: `@${u.username} · ${roleNames(u.roles, appRoles)}` }));
+    .sort((a, b) => recordName(a).localeCompare(recordName(b), "vi"))
+    .map((u) => ({ value: u.id, label: personLabel(u), subLabel: `@${u.username} · ${roleNames(u.roles, appRoles)}` }));
 
   const saved = useMemo(() => (user ? buildUserOverrides(user.id, rows) : []), [user, rows]);
   const savedMap = useMemo(() => new Map(saved.map((o) => [permissionKey(o.resource, o.action), o.effect])), [saved]);
@@ -680,7 +681,7 @@ function UsersTab({ selectedId, onSelect }: { selectedId: string | null; onSelec
     }));
     writeRows([...rows.filter((r) => r.userId !== user.id), ...mine]);
     setDraft(null);
-    notify.saved(`Đã lưu quyền riêng của ${user.fullName || user.username}`, () => writeRows(prev));
+    notify.saved(`Đã lưu quyền riêng của ${personLabel(user)}`, () => writeRows(prev));
   };
 
   return (

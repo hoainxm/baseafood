@@ -45,11 +45,24 @@ export function normalizeUsername(v: string): string {
   return stripAccents(v).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-/** username → email tổng hợp để đưa vào Supabase Auth. Gõ "nnt.truc" ⇒ vào `nnttruc`
- *  (cùng luật chuẩn hoá). Gõ nguyên email (có @) thì giữ nguyên. */
+/**
+ * Kiểm tên gõ ở màn đăng nhập: null = hợp lệ, chuỗi = lỗi hiện cho người dùng.
+ * Chốt 2026-10-29: KHÔNG tự bỏ dấu chấm lúc đăng nhập nữa — gõ `nnt.truc` từng âm thầm
+ * vào `nnttruc`, người dùng tưởng tài khoản đã xóa vẫn đăng nhập được. Chữ hoa + khoảng
+ * trắng hai đầu vẫn cho (không đổi nghĩa tên). Gõ nguyên email (có @) thì không kiểm.
+ */
+export function loginUsernameError(input: string): string | null {
+  const u = input.trim().toLowerCase();
+  if (u.includes("@") || /^[a-z0-9]+$/.test(u)) return null;
+  return "Sai tên đăng nhập — tên đăng nhập chỉ gồm chữ thường không dấu và số, không có dấu chấm hay khoảng trắng";
+}
+
+/** username → email tổng hợp để đưa vào Supabase Auth. KHÔNG chuẩn hoá (gõ "nnt.truc" ⇒
+ *  `nnt.truc@…`, không vào `nnttruc`) — màn đăng nhập chặn trước bằng `loginUsernameError`.
+ *  Gõ nguyên email (có @) thì giữ nguyên. */
 export function usernameToEmail(username: string): string {
   const u = username.trim().toLowerCase();
-  return u.includes("@") ? u : `${normalizeUsername(u)}${EMAIL_SUFFIX}`;
+  return u.includes("@") ? u : `${u}${EMAIL_SUFFIX}`;
 }
 
 /** email tổng hợp → username (phần trước @). */

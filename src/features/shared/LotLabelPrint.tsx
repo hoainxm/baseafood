@@ -19,6 +19,7 @@ import { useLabelPrints, usePackagings, useWipProductions } from "@/lib/catalogR
 import { useAuth } from "@/lib/auth";
 import { newId } from "@/lib/store";
 import { useTraceData } from "./useTraceData";
+import { recordName } from "@/lib/personName";
 
 const laLo = (n: LotNode) => n.kind === "S" || n.kind === "W" || n.kind === "P";
 
@@ -60,7 +61,7 @@ export function LotQrLabels({ node, nuts, onClose }: { node?: LotNode; nuts?: Lo
   const [soIn, saveLabelPrints] = useLabelPrints();
   const { profile } = useAuth();
   const recordPrintCount = (copies: number[]) => {
-    const newPrints = buildLabelPrintRecords(items, profile?.fullName || profile?.username || "", new Date().toISOString(), newId, (n) => copies[items.indexOf(n)] ?? 1);
+    const newPrints = buildLabelPrintRecords(items, recordName(profile), new Date().toISOString(), newId, (n) => copies[items.indexOf(n)] ?? 1);
     if (newPrints.length) saveLabelPrints([...soIn, ...newPrints]);
   };
 

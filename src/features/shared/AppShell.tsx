@@ -516,6 +516,8 @@ export interface AppShellProps {
   /** Tên đăng nhập hiện trong menu tài khoản. */
   username?: string;
   onChangePassword?: AccountMenuProps["onChangePassword"];
+  /** Có ⇒ menu tài khoản có "Đặt tên gọi" (ba-spec 47). */
+  nicknameEditor?: AccountMenuProps["nicknameEditor"];
   /** Có ⇒ menu tài khoản có lối vào khu quản trị (admin). */
   onOpenAdmin?: () => void;
   /** Danh sách nav (đã lọc theo quyền). Mặc định KIT_NAV. */
@@ -547,6 +549,7 @@ export default function AppShell({
   onLogoutEverywhere,
   username,
   onChangePassword,
+  nicknameEditor,
   onOpenAdmin,
   items = KIT_NAV,
   headerActions,
@@ -774,6 +777,7 @@ export default function AppShell({
                 role={role}
                 account={account}
                 onChangePassword={onChangePassword}
+                nicknameEditor={nicknameEditor}
                 onOpenAdmin={onOpenAdmin}
                 onSignOut={onSignOut}
                 onSignOutEverywhere={onLogoutEverywhere}

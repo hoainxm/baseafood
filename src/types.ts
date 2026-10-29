@@ -101,7 +101,12 @@ export function roleLabel(arr: Role[] | string | null | undefined): string {
 
 export interface UserProfile {
   id: string; // = auth.users.id
+  /** Họ tên thật — GHI SỔ, nhật ký, chứng từ, phạm vi `own` luôn dùng cột này (ba-spec 47 R1, R4). */
   fullName: string;
+  /** Tên gọi (nickname) — CHỈ để gọi / nhận diện người (ba-spec 47 R2, R3); '' = không có.
+   *  `undefined` = máy chủ chưa chạy 0086 (chưa có cột) ⇒ không gửi, ẩn ô nhập. Tên hiện:
+   *  `lib/personName.ts`, đừng đọc trực tiếp ở màn ghi. */
+  displayName?: string;
   username: string;
   roles: Role[]; // multiple roles; [] = unassigned
 }

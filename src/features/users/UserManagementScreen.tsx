@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AppRole, UserProfile, Role } from "@/types";
 import { rolesList } from "@/types";
-import { useAppRoles, useUserProfiles } from "@/lib/catalogRepo";
+import { isServerConnected, useAppRoles, useUserProfiles } from "@/lib/catalogRepo";
+import { DISPLAY_NAME_MAX, checkDisplayName, isDisplayNameAvailable, personSearchText } from "@/lib/personName";
 import { listRoleOptions, roleNames } from "@/lib/permissions";
 import { fullNameToUsername, normalizeUsername } from "@/lib/username";
 import {
@@ -704,7 +705,10 @@ export default function UserManagementScreen({
   };
   const isLoading = status === "loading" && items.length === 0;
   const [editing, setEditing] = useState<UserProfile | null>(null);
+  const [editErrors, setEditErrors] = useState<FieldError[]>([]);
   const [q, setQ] = useState("");
+  // Tên gọi (ba-spec 47): máy chủ chưa chạy 0086 ⇒ ẩn ô, không gửi cột.
+  const hasDisplayName = isDisplayNameAvailable(items, isServerConnected);
 
   const [creating, setCreating] = useState<NewUserForm | null>(null);
   const [createErrors, setCreateErrors] = useState<FieldError[]>([]);
@@ -712,8 +716,19 @@ export default function UserManagementScreen({
 
   const save = () => {
     if (!editing) return;
-    write(items.map((n) => (n.id === editing.id ? editing : n)));
-    notify.saved(`Đã lưu người dùng ${editing.username || editing.id}`);
+    let next = editing;
+    if (hasDisplayName) {
+      // R5: kiểm tên gọi với người khác; bằng chính họ tên ⇒ lưu rỗng. Họ tên không đổi theo.
+      const checked = checkDisplayName(editing.displayName ?? "", editing, items.filter((u) => u.id !== editing.id));
+      if (checked.error !== undefined) {
+        setEditErrors([{ field: "Tên gọi", message: checked.error }]);
+        return;
+      }
+      next = { ...editing, displayName: checked.value };
+    }
+    setEditErrors([]);
+    write(items.map((n) => (n.id === next.id ? next : n)));
+    notify.saved(`Đã lưu người dùng ${next.username || next.id}`);
     setEditing(null);
   };
 
@@ -764,8 +779,16 @@ export default function UserManagementScreen({
     {
       key: "hoTen",
       header: "Họ tên",
+      // Họ tên thật trước, tên gọi (ba-spec 47 R3) bên dưới — admin luôn thấy cả hai.
       render: (r) =>
-        r.fullName || <span className="text-muted-foreground">Chưa đặt</span>,
+        r.fullName ? (
+          <>
+            {r.fullName}
+            {r.displayName && <span className="block text-sm text-muted-foreground">Tên gọi: {r.displayName}</span>}
+          </>
+        ) : (
+          <span className="text-muted-foreground">Chưa đặt</span>
+        ),
       getSortValue: (r) => r.fullName,
     },
     {
@@ -803,7 +826,7 @@ export default function UserManagementScreen({
   // Gom theo phòng ban, trong phòng Trưởng → Phó → Nhân viên (quy tắc ở lib/userDirectory.ts).
   const query = q.trim().toLowerCase();
   const filtered = query
-    ? items.filter((u) => `${u.username} ${u.fullName} ${roleLabel(u.roles)}`.toLowerCase().includes(query))
+    ? items.filter((u) => `${personSearchText(u)} ${roleLabel(u.roles)}`.toLowerCase().includes(query))
     : items;
   const visibleGroups = groupUsersByDepartment(
     filtered.map((u) => ({ ...u, roles: rolesList(u.roles) })),
@@ -1119,7 +1142,10 @@ export default function UserManagementScreen({
       <Dialog
         open={editing !== null}
         onOpenChange={(o) => {
-          if (!o) setEditing(null);
+          if (!o) {
+            setEditing(null);
+            setEditErrors([]);
+          }
         }}
       >
         <DialogContent className="w-full sm:max-w-2xl">
@@ -1131,6 +1157,7 @@ export default function UserManagementScreen({
 
           {editing && (
             <div className="space-y-6 py-2">
+              <ErrorSummary errors={editErrors} />
               <Field label="Họ tên">
                 <Input
                   value={editing.fullName}
@@ -1140,6 +1167,18 @@ export default function UserManagementScreen({
                   placeholder="Họ tên đầy đủ"
                 />
               </Field>
+              {hasDisplayName && (
+                <Field
+                  label="Tên gọi"
+                  hint={`Tên gọi chỉ để gọi người, tối đa ${DISPLAY_NAME_MAX} ký tự; sổ sách, nhật ký, chứng từ vẫn ghi họ tên. Để trống = gọi bằng họ tên.`}
+                >
+                  <Input
+                    value={editing.displayName ?? ""}
+                    maxLength={DISPLAY_NAME_MAX + 10}
+                    onChange={(e) => setEditing((d) => (d ? { ...d, displayName: e.target.value } : d))}
+                  />
+                </Field>
+              )}
               <Field
                 label="Vai trò"
                 hint="Chọn từ danh sách để thêm; bấm ✕ trên vai trò để bỏ. Bỏ hết = Chưa gán."
@@ -1154,7 +1193,14 @@ export default function UserManagementScreen({
           )}
 
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setEditing(null)}>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => {
+                setEditing(null);
+                setEditErrors([]);
+              }}
+            >
               Hủy
             </Button>
             <Button variant="save"

@@ -14,7 +14,6 @@ const ROOT = new URL("../", import.meta.url).pathname; // src/
 const EXEMPT: Record<string, string> = {
   "features/admin/RolePermissionsScreen.tsx": "quản trị phân quyền, không phải sổ nghiệp vụ",
   "features/users/UserManagementScreen.tsx": "quản trị tài khoản có mật khẩu — không lưu nháp xuống máy",
-  "features/shared/AccountMenu.tsx": "đổi mật khẩu — KHÔNG được lưu mật khẩu xuống máy",
   "features/auth/SetOwnPasswordScreen.tsx": "đặt mật khẩu riêng sau khi admin đặt lại — KHÔNG lưu mật khẩu xuống máy",
   "features/balancing/MaterialGrid.tsx": "lưới ghi thẳng vào sổ theo từng phím; nút Lưu ở đây là ghi lại sổ kho",
   "features/balancing/gridDialogs.tsx": "hộp chọn tên dòng / dòng nhập — chọn một bước, không có số gõ dở",

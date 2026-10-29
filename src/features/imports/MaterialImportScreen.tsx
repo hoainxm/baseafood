@@ -125,11 +125,12 @@ import {
   type ImportLine,
   type ShipmentGroup,
 } from "./importHelpers";
+import { recordName } from "@/lib/personName";
 
 export default function MaterialImportScreen() {
   // Người đang đăng nhập → gắn làm "người ghi" của chuyến khi lưu.
   const { profile } = useAuth();
-  const operator = profile?.fullName || profile?.username || "";
+  const operator = recordName(profile);
   // Phân quyền lớp 2 (spec role-permissions §5): nút không có quyền thì ẩn hẳn.
   const allowed = useCan("imports");
   const canViewPrice = allowed["view-price"];

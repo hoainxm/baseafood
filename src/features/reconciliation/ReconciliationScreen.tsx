@@ -81,6 +81,7 @@ import {
   FolderOpen,
   History,
 } from "lucide-react";
+import { recordName } from "@/lib/personName";
 
 type Workbook = Awaited<ReturnType<typeof readWorkbook>>;
 const LEDGER_TAB = "__phan-mem__";
@@ -814,7 +815,7 @@ export default function ReconciliationScreen() {
       id,
       userId: nd?.id ?? "",
       ownerUsername: nd?.username ?? "",
-      ownerName: nd?.fullName || nd?.username || "",
+      ownerName: recordName(nd),
       title: savedRunName.trim() || displayName || "Bản đối soát",
       period: inferPeriod(displayName),
       status,

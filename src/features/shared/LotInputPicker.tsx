@@ -33,6 +33,7 @@ import { Button, EmptyState, Field, FormDialog, Input, Tag, NumberField, CloseBu
 import { Camera, CameraOff, Link2, Plus, Trash2 } from "lucide-react";
 import { QrScanner } from "./QrScanner";
 import { useTraceData } from "./useTraceData";
+import { recordName } from "@/lib/personName";
 
 const METHOD_NAMES: Record<LotInput["method"] | LotDispatch["method"], string> = { scan: "quét", typed: "gõ", picked: "chọn", fifo: "máy chọn" };
 
@@ -249,7 +250,7 @@ function LotInputDialog({
 /** Họ tên người đang đăng nhập — ghi vào mối nối (KDE "Ai"). */
 function useRecorder() {
   const { profile } = useAuth();
-  return profile?.fullName || profile?.username || "";
+  return recordName(profile);
 }
 
 export function LotInputPicker({

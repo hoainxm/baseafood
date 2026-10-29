@@ -139,6 +139,7 @@ import {
 import { duplicateProductNameKeys, normalizeProductName } from "@/lib/productMerge";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useFormDraft } from "@/lib/formDraft";
+import { recordName } from "@/lib/personName";
 
 const KEY_WIP_REPORT = "bsf.wip-report-sent.v1";
 /** Nhớ phân xưởng gần nhất THEO MÁY (device pref, không phải số liệu) để lần
@@ -166,7 +167,7 @@ export default function WipProductionScreen() {
 
   // Người thao tác = tài khoản đang đăng nhập — gắn vào dòng khi lưu để lưu vết ai gửi.
   const { profile } = useAuth();
-  const operator = profile?.fullName || profile?.username || "";
+  const operator = recordName(profile);
 
   /** Phân quyền lớp 2 (spec role-permissions §5): ẩn nút không có quyền. Gắn lô /
    *  bán nội địa / bột tẩm là thêm-sửa trên "wip"; Gửi báo cáo + In tem = export. */

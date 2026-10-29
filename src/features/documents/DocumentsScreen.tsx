@@ -65,6 +65,7 @@ import { FilePreviewDialog, type PreviewFile } from "./FilePreviewDialog";
 import { VersionFormDialog } from "./VersionFormDialog";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildDocumentsTour } from "./documentsTour";
+import { recordName } from "@/lib/personName";
 
 const STATE_TAGS: Record<DocumentState, TagVariant> = {
   active: "done",
@@ -417,7 +418,7 @@ export default function DocumentsScreen() {
       <VersionFormDialog
         document={versionDoc}
         versions={versions}
-        recordedByName={profile?.fullName || profile?.username || "Máy này"}
+        recordedByName={recordName(profile, "Máy này")}
         onClose={() => setVersionDoc(null)}
         onSave={saveVersion}
       />

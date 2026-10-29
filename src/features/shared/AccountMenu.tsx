@@ -24,7 +24,10 @@ import {
   type FieldError,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
-import { ChevronDown, KeyRound, LogOut, MonitorX, Palette, ShieldCheck, type LucideIcon } from "lucide-react";
+import { BadgeCheck, ChevronDown, KeyRound, LogOut, MonitorX, Palette, ShieldCheck, type LucideIcon } from "lucide-react";
+import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { useDialogDraft } from "@/lib/formDraft";
+import { DISPLAY_NAME_MAX } from "@/lib/personName";
 
 export interface AccountMenuProps {
   displayName: string;
@@ -34,6 +37,15 @@ export interface AccountMenuProps {
   account?: string;
   /** Có ⇒ hiện "Đổi mật khẩu" (chỉ khi đăng nhập máy chủ). */
   onChangePassword?: (currentPassword: string, newPassword: string) => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Có ⇒ hiện "Đặt tên gọi" (đăng nhập máy chủ + máy chủ đã chạy 0086). Tên gọi chỉ để gọi người;
+   * sổ, nhật ký, chứng từ vẫn đứng họ tên `fullName` (ba-spec 47).
+   */
+  nicknameEditor?: {
+    current: string;
+    fullName: string;
+    onSave: (displayName: string) => Promise<{ ok: boolean; error?: string }>;
+  };
   /** Có ⇒ hiện "Quản trị hệ thống" (chỉ admin). */
   onOpenAdmin?: () => void;
   onSignOut?: () => void;
@@ -91,6 +103,7 @@ export function AccountMenu({
   role,
   account,
   onChangePassword,
+  nicknameEditor,
   onOpenAdmin,
   onSignOut,
   onSignOutEverywhere,
@@ -100,6 +113,20 @@ export function AccountMenu({
   const openDialog = (d: OpenDialog) => {
     setMenuOpen(false);
     setDialog(d);
+  };
+  // Tên gọi: phiếu mở = khác null (mẫu nháp hộp thoại, quy tắc 17).
+  const [nicknameForm, setNicknameForm] = useState<NicknameForm | null>(null);
+  const nicknameDraft = useDialogDraft({
+    form: "account-display-name",
+    value: nicknameForm,
+    setValue: setNicknameForm,
+    isEmpty: (f) => f.value.trim() === f.initial,
+  });
+  const openNickname = () => {
+    if (!nicknameEditor) return;
+    setMenuOpen(false);
+    const current = nicknameEditor.current;
+    setNicknameForm(nicknameDraft.takeKept() ?? { value: current, initial: current });
   };
 
   return (
@@ -146,6 +173,14 @@ export function AccountMenu({
             title="Đổi cỡ chữ, mật độ và bề rộng nội dung — nhớ riêng cho tài khoản của bạn."
             onClick={() => openDialog("display")}
           />
+          {nicknameEditor && (
+            <MenuItem
+              icon={BadgeCheck}
+              label="Đặt tên gọi"
+              title="Đặt tên mọi người gọi bạn trên hệ thống (vd. biệt danh). Sổ sách, nhật ký, chứng từ vẫn ghi họ tên thật."
+              onClick={openNickname}
+            />
+          )}
           {onChangePassword && (
             <MenuItem
               icon={KeyRound}
@@ -194,6 +229,14 @@ export function AccountMenu({
         open={dialog === "display"}
         onOpenChange={(o) => setDialog(o ? "display" : null)}
       />
+      {nicknameEditor && (
+        <NicknameDialog
+          form={nicknameForm}
+          setForm={setNicknameForm}
+          draft={nicknameDraft}
+          editor={nicknameEditor}
+        />
+      )}
       {onChangePassword && (
         <ChangePasswordDialog
           open={dialog === "password"}
@@ -311,6 +354,88 @@ function ChangePasswordDialog({
         {field("Mật khẩu hiện tại", current, setCurrent, undefined, "current-password")}
         {field("Mật khẩu mới", next, setNext, "Tối thiểu 6 ký tự.", "new-password")}
         {field("Nhập lại mật khẩu mới", confirm, setConfirm, undefined, "new-password")}
+      </div>
+    </FormDialog>
+  );
+}
+
+interface NicknameForm {
+  value: string;
+  /** Tên gọi đang lưu lúc mở — so để biết đã gõ gì chưa (nháp). */
+  initial: string;
+}
+
+function NicknameDialog({
+  form,
+  setForm,
+  draft,
+  editor,
+}: {
+  form: NicknameForm | null;
+  setForm: (f: NicknameForm | null) => void;
+  draft: ReturnType<typeof useDialogDraft<NicknameForm>>;
+  editor: NonNullable<AccountMenuProps["nicknameEditor"]>;
+}) {
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const [isSaving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!form || isSaving) return;
+    setSaving(true);
+    const result = await editor.onSave(form.value);
+    setSaving(false);
+    if (!result.ok) {
+      setErrors([{ field: "Tên gọi", message: result.error ?? "Không lưu được tên gọi" }]);
+      return;
+    }
+    setErrors([]);
+    notify.saved(form.value.trim() ? `Đã đặt tên gọi “${form.value.trim()}”` : "Đã bỏ tên gọi — mọi người gọi bạn bằng họ tên");
+    draft.done();
+  };
+
+  return (
+    <FormDialog
+      open={!!form}
+      onOpenChange={(o) => {
+        if (o) return;
+        setErrors([]);
+        draft.dismiss();
+      }}
+      title="Đặt tên gọi"
+      description="Tên gọi hiện ở lời chào, menu tài khoản và cạnh họ tên của bạn khi người khác chọn người. Sổ sách, nhật ký, chứng từ, chữ ký vẫn ghi họ tên thật; quyền sửa số của bạn không đổi. Để trống = gọi bằng họ tên."
+      icon={BadgeCheck}
+      size="md"
+      footer={
+        <>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setErrors([]);
+              draft.cancel();
+            }}
+          >
+            Hủy
+          </Button>
+          <Button variant="save" onClick={submit} title="Lưu tên gọi của bạn. Họ tên thật và số đã ghi không đổi.">
+            {isSaving ? "Đang lưu…" : "Lưu tên gọi"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
+        <ErrorSummary errors={errors} />
+        <Field label="Họ tên (ghi sổ, không đổi ở đây)">
+          <Input value={editor.fullName} readOnly />
+        </Field>
+        <Field label="Tên gọi" hint={`Tối đa ${DISPLAY_NAME_MAX} ký tự; không trùng tên của người khác.`}>
+          <Input
+            value={form?.value ?? ""}
+            maxLength={DISPLAY_NAME_MAX + 10}
+            onChange={(e) => form && setForm({ ...form, value: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+          />
+        </Field>
       </div>
     </FormDialog>
   );

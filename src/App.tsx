@@ -26,7 +26,7 @@ import { Toaster, applyDisplaySettings, ProcessingState, EmptyState, notify } fr
 import { KeyRound, ShieldOff, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { setAuditOperator } from "@/lib/audit";
-import { useAppRoles, useRolePermissions, useTaskAssignments, useUserPermissions } from "@/lib/catalogRepo";
+import { useAppRoles, useRolePermissions, useTaskAssignments, useUserPermissions, useUserProfiles } from "@/lib/catalogRepo";
 import { countMyOpenAssignments } from "@/lib/myTasks";
 import { todayIso } from "@/design-system";
 import { homeFor } from "@/lib/nav-access";
@@ -48,6 +48,8 @@ import { setWriteGuard } from "@/lib/repo";
 import { checkTableWrite } from "@/lib/writePermissions";
 import { DemoModeBanner, DemoModeHeaderButton, DemoPackLoader } from "@/features/shared/DemoMode";
 import { LEGACY_PATHS, normalizeCatalogTab } from "@/lib/legacyUrls";
+import { callName, checkDisplayName } from "@/lib/personName";
+import { emailToUsername } from "@/lib/username";
 
 // Việc của tôi — việc cần làm, hạn, giao việc
 const MyTasksScreen = lazy(() => import("@/features/my-tasks"));
@@ -187,6 +189,20 @@ function ShellLayout() {
   // Số việc đang được giao cho tôi — chuông header + số trên mục "Việc của tôi". CHỈ đọc
   // bảng giao việc (một bảng nhỏ); danh sách đầy đủ (gồm việc máy phát hiện) tính ở màn.
   const [taskAssignments] = useTaskAssignments();
+  // Tên gọi (ba-spec 47): chỉ khi đăng nhập máy chủ và máy chủ đã có cột (hồ sơ đọc về có trường).
+  const [userProfiles] = useUserProfiles();
+  const nicknameEditor =
+    auth.requiresLogin && auth.session && profile && profile.displayName !== undefined
+      ? {
+          current: profile.displayName,
+          fullName: profile.fullName,
+          onSave: async (input: string) => {
+            const checked = checkDisplayName(input, profile, userProfiles.filter((u) => u.id !== profile.id));
+            if (checked.error !== undefined) return { ok: false, error: checked.error };
+            return auth.setOwnDisplayName(checked.value);
+          },
+        }
+      : undefined;
   const myOpenTasks = countMyOpenAssignments(taskAssignments, profile?.id ?? "local", todayIso());
 
   if (isPermissionPending && !isPermissionWaitOver) {
@@ -235,7 +251,7 @@ function ShellLayout() {
           : null
       }
       displayName={
-        auth.profile?.fullName || auth.profile?.username || "Người dùng"
+        callName(auth.profile, "Người dùng")
       }
       role={roleNames(auth.profile?.roles ?? [], appRoles)}
       shift="Ca A"
@@ -243,8 +259,10 @@ function ShellLayout() {
       onOpenNotifications={() => navigate("/my-tasks")}
       onLogout={auth.requiresLogin && auth.session ? () => void auth.signOut() : undefined}
       onLogoutEverywhere={auth.requiresLogin && auth.session ? () => void auth.signOut(true) : undefined}
-      username={profile?.username}
+      // Menu tài khoản hiện TÊN ĐĂNG NHẬP thật (email Auth) — có thể khác tên định danh nhật ký của hồ sơ.
+      username={auth.session?.user.email ? emailToUsername(auth.session.user.email) : profile?.username}
       onChangePassword={auth.requiresLogin && auth.session ? auth.changePassword : undefined}
+      nicknameEditor={nicknameEditor}
       onOpenAdmin={auth.isAdmin ? () => navigate("/admin") : undefined}
       items={hasNoAccess ? [] : items}
       // Chế độ demo: admin bật (hoặc máy không đăng nhập — sandbox); đang demo thì ai cũng thấy để thoát.
@@ -322,7 +340,7 @@ export default function App() {
     return (
       <>
         <SetOwnPasswordScreen
-          displayName={auth.profile?.fullName || auth.profile?.username || "bạn"}
+          displayName={callName(auth.profile, "bạn")}
           onSubmit={auth.setOwnPassword}
           onSignOut={() => void auth.signOut()}
         />

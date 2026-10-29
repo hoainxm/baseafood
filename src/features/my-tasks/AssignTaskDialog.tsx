@@ -28,6 +28,7 @@ import { canDoTask, defaultDueDate, type MyTaskItem } from "@/lib/myTasks";
 import { resolvePermissions, roleNames, scopeContextFor } from "@/lib/permissions";
 import type { TaskAssignment, UserProfile, Workshop } from "@/types";
 import { Save, Send } from "lucide-react";
+import { personLabel, recordName } from "@/lib/personName";
 
 export type AssignTarget =
   | { kind: "system"; task: MyTaskItem }
@@ -176,7 +177,7 @@ export function AssignTaskDialog({
   }, [profiles, currentUser]);
   const options: ComboboxOption[] = people.map((p) => ({
     value: p.id,
-    label: `${p.fullName || p.username}${p.id === currentUser.id ? " (tôi)" : ""}`,
+    label: `${personLabel(p)}${p.id === currentUser.id ? " (tôi)" : ""}`,
     subLabel: [p.username && `@${p.username}`, p.roles.length ? roleNames(p.roles, []) : ""].filter(Boolean).join(" · "),
   }));
 
@@ -223,7 +224,7 @@ export function AssignTaskDialog({
       taskDate: form.taskDate,
       dueDate: form.dueDate,
       assigneeId: form.assigneeId,
-      assigneeName: person?.fullName || person?.username || "",
+      assigneeName: recordName(person),
       assignedById: currentUser.id,
       assignedByName: currentUser.name,
       status: "open",

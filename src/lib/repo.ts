@@ -694,12 +694,15 @@ export const USER_PROFILE_TABLE: TableMapping<UserProfile> = {
   toRow: (x) => ({
     id: x.id,
     full_name: x.fullName,
+    // display_name (mig 0086): chỉ gửi khi hồ sơ có trường (máy chủ chưa có cột ⇒ không kẹt hàng chờ).
+    ...(x.displayName !== undefined ? { display_name: x.displayName } : {}),
     username: x.username,
     roles: rolesToCsv(x.roles), // mảng → CSV (cột text)
   }),
   fromRow: (r) => ({
     id: s(r.id),
     fullName: s(r.full_name),
+    ...("display_name" in r ? { displayName: s(r.display_name) } : {}),
     username: s(r.username),
     roles: rolesFromCsv(s(r.roles)), // CSV → mảng
   }),

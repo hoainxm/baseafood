@@ -83,6 +83,7 @@ import { PeriodLockDialog } from "./gridDialogs";
 import BalancingTable from "./BalancingTable";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildBalancingTour, pickTourPeriod } from "./balancingTour";
+import { recordName } from "@/lib/personName";
 
 /** Chuỗi ngày để in trên bảng, sinh từ khoảng ngày đã chọn. */
 function describeRange(fromDate?: string, toDate?: string): string {
@@ -317,7 +318,7 @@ export default function BalancingScreen() {
     return (
       <PeriodDetail
         period={sel}
-        editorName={profile?.fullName || profile?.username || ""}
+        editorName={recordName(profile)}
         onBack={() => setSelId(null)}
         onChangePeriod={(patch) =>
           persistPeriods(periods.map((k) => (k.id === sel.id ? { ...k, ...patch } : k)))

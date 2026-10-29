@@ -9,7 +9,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase, hasSupabase, SITE_ID_THAT as SITE_ID, createTempClient } from "@/lib/supabase";
 import type { UserProfile, Role } from "@/types";
 import { rolesFromCsv, rolesToCsv, rolesList } from "@/types";
-import { emailToUsername, normalizeUsername, usernameToEmail } from "@/lib/username";
+import { emailToUsername, loginUsernameError, normalizeUsername, usernameToEmail } from "@/lib/username";
 import { setAuditOperator, appendAuditEntries } from "@/lib/audit";
 
 /**
@@ -25,10 +25,21 @@ import { setAuditOperator, appendAuditEntries } from "@/lib/audit";
 
 const s = (v: unknown) => (v == null ? "" : String(v));
 
+/**
+ * Tên ghi NHẬT KÝ của một tài khoản Auth: metadata `username` (đặt lúc tạo tài khoản) ⇒ phần trước @
+ * của email. KHÔNG lấy thẳng từ email: đổi tên đăng nhập = đổi email Auth, còn metadata + hồ sơ giữ
+ * tên cũ để nhật ký, phạm vi `own` không tách đôi (docs/app-map/05 § Đổi tên đăng nhập).
+ */
+function auditUsernameOf(user: { email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined): string {
+  if (!user) return "";
+  return s(user.user_metadata?.username).trim() || emailToUsername(user.email ?? "");
+}
+
 function profileFromRow(r: Record<string, unknown>): UserProfile {
   return {
     id: s(r.id),
     fullName: s(r.full_name),
+    ...("display_name" in r ? { displayName: s(r.display_name) } : {}),
     username: s(r.username),
     roles: rolesFromCsv(s(r.roles)),
   };
@@ -175,14 +186,21 @@ export function useAuth() {
       if (!supabase) return { ok: false, error: "Chưa cấu hình máy chủ" };
       if (!username.trim() || !password)
         return { ok: false, error: "Nhập tên đăng nhập và mật khẩu" };
-      const { error } = await supabase.auth.signInWithPassword({
+      const usernameError = loginUsernameError(username);
+      if (usernameError) return { ok: false, error: usernameError };
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: usernameToEmail(username),
         password,
       });
       if (error) return { ok: false, error: translateError(error.message) };
-      const u = normalizeUsername(username);
+      // Nhật ký ghi tên ĐỊNH DANH (metadata `username`), không phải chữ vừa gõ: tên đăng nhập
+      // (email Auth) đổi được mà lịch sử vẫn một tên — vd. đăng nhập `alley`, nhật ký `nnttruc`.
+      const u = auditUsernameOf(data.user) || normalizeUsername(username);
+      const typed = normalizeUsername(username);
       setAuditOperator({ username: u });
-      appendAuditEntries([{ action: "login", entity: "auth", entityKey: u, summary: `Đăng nhập: ${u}` }]);
+      appendAuditEntries([
+        { action: "login", entity: "auth", entityKey: u, summary: typed === u ? `Đăng nhập: ${u}` : `Đăng nhập: ${u} (tên đăng nhập ${typed})` },
+      ]);
       return { ok: true };
     },
     []
@@ -277,7 +295,7 @@ export function useAuth() {
       // Máy khác đang đăng nhập tài khoản này (máy để quên, người khác biết mật khẩu cũ) ⇒ văng ra.
       await supabase.auth.signOut({ scope: "others" });
       appendAuditEntries([
-        { action: "change-password", entity: "auth", entityKey: emailToUsername(email), summary: "Đổi mật khẩu" },
+        { action: "change-password", entity: "auth", entityKey: auditUsernameOf(session?.user), summary: "Đổi mật khẩu" },
       ]);
       return { ok: true };
     },
@@ -303,13 +321,44 @@ export function useAuth() {
         {
           action: "change-password",
           entity: "auth",
-          entityKey: emailToUsername(email),
+          entityKey: auditUsernameOf(session?.user),
           summary: "Đặt mật khẩu riêng thay mật khẩu tạm admin đưa",
         },
       ]);
       return { ok: true };
     },
     [session]
+  );
+
+  /**
+   * Tự đặt tên gọi (nickname) của mình — ba-spec 47 NV1. Người thường không sửa được
+   * `user_profiles` (RLS 0057 chỉ admin) ⇒ qua hàm máy chủ `set_own_display_name` (0086), hàm chỉ
+   * ghi cột tên gọi của chính mình + kiểm lại R5. Kiểm bỏ dấu với người khác: App làm trước khi gọi.
+   * Họ tên, sổ, phân quyền không đổi.
+   */
+  const setOwnDisplayName = useCallback(
+    async (displayName: string): Promise<AuthResult> => {
+      if (!supabase || !profile) return { ok: false, error: "Chưa đăng nhập máy chủ" };
+      const before = profile.displayName ?? "";
+      const { data, error } = await supabase.rpc("set_own_display_name", { p_display_name: displayName });
+      if (error) {
+        if (error.code === "PGRST202" || error.code === "42883")
+          return { ok: false, error: "Máy chủ chưa chạy migration 0086 — báo chủ dự án" };
+        return { ok: false, error: error.message || "Không lưu được tên gọi" };
+      }
+      const saved = typeof data === "string" ? data : displayName.trim();
+      setProfile((p) => (p ? { ...p, displayName: saved } : p));
+      appendAuditEntries([
+        {
+          action: "update",
+          entity: "user_profiles",
+          entityKey: profile.id,
+          summary: `Đổi tên gọi của @${profile.username}: "${before}" → "${saved}"`,
+        },
+      ]);
+      return { ok: true };
+    },
+    [profile]
   );
 
   /** `everywhere` ⇒ đăng xuất cả các máy khác đang dùng tài khoản này (máy để quên ở xưởng). */
@@ -338,6 +387,7 @@ export function useAuth() {
     createAccount,
     changePassword,
     setOwnPassword,
+    setOwnDisplayName,
     signOut,
   };
 }

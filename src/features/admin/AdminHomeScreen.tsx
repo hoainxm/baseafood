@@ -35,6 +35,7 @@ import {
 } from "@/lib/permissions";
 import type { Role } from "@/types";
 import { ArrowRight, History, KeyRound, ShieldAlert, ShieldCheck, Users, UserX, type LucideIcon } from "lucide-react";
+import { personLabel } from "@/lib/personName";
 
 interface AdminLink {
   to: string;
@@ -187,7 +188,7 @@ export default function AdminHomeScreen() {
                     {r.screens}/{SCREEN_COUNT}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {r.holders.length ? r.holders.map((u) => u.fullName || u.username).join(", ") : "—"}
+                    {r.holders.length ? r.holders.map((u) => personLabel(u)).join(", ") : "—"}
                   </TableCell>
                 </TableRow>
               ))}

@@ -128,7 +128,7 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   // `export-plans` = hợp đồng, bản sửa, duyệt giấy, gia hạn, chuyến, bước, file. `.loading` = người
   // đóng hàng chỉ THÊM ảnh / sơ đồ cont (không thấy giá). `.payments` = bước 6: gửi bộ chứng từ, tiền về.
   // Máy chủ chặn bằng RLS riêng của 0075 (has_export_permission) — không qua trigger 0065.
-  // `approve` (mig 0079): duyệt hợp đồng + duyệt cuối đóng HĐ — Trưởng / Phó phòng Kế hoạch.
+  // `approve` (mig 0079): duyệt cuối đóng HĐ + mở lại HĐ — Trưởng / Phó phòng Kế hoạch (bỏ bước duyệt HĐ lúc lập 2026-10-29).
   { id: "export-plans", label: "Kế hoạch · Xuất khẩu", group: "planning", navId: "planning-export", actions: [...CRUD, "approve", "export", "view-price"] },
   { id: "export-plans.loading", label: "Xuất khẩu · Ảnh & sơ đồ đóng cont", group: "planning", navId: "planning-export", actions: ["view", "create"] },
   { id: "export-plans.payments", label: "Xuất khẩu · Chứng từ gửi khách & tiền về", group: "planning", navId: "planning-export", actions: CRUD },

@@ -2560,7 +2560,7 @@ const TABLE_LABELS: Record<string, string> = {
   document_versions: "Lần ban hành tài liệu",
   export_contracts: "Hợp đồng xuất khẩu",
   export_contract_revisions: "Bản hợp đồng xuất khẩu",
-  export_contract_approvals: "Kết quả duyệt hợp đồng",
+  export_contract_approvals: "Kết quả duyệt cuối hợp đồng",
   export_deadline_extensions: "Gia hạn giao hàng",
   export_shipments: "Chuyến xuất khẩu",
   export_step_items: "Bước của chuyến xuất khẩu",

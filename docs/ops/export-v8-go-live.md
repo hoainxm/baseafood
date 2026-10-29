@@ -66,6 +66,10 @@ Ai làm: chủ dự án, Supabase Dashboard → **SQL Editor** của project Bas
 - ⚠️ **Đừng tạo / chỉnh vai trò `planning-head`, `planning-deputy` ở /roles** nếu không cần: chỉnh là tạo dòng `app_roles` ⇒ vai trò đó bỏ ma trận mặc định, đọc ô đã tick — quên tick "Duyệt" ở "Kế hoạch · Xuất khẩu" là mất quyền duyệt.
 - `planner` đã có dòng `app_roles` ⇒ không tự nhận ô mới nào từ 0079 (đúng: Nhân viên KH không được Duyệt). Muốn Nhân viên KH xem nhật ký: đã có `export-plans:view` — đủ.
 
+## 3b. v9 (2026-10-29) — bỏ bước duyệt HĐ (chỉ đổi code, KHÔNG migration)
+
+Chủ dự án bỏ bước duyệt HĐ lúc lập, chỉ giữ duyệt cuối ([ba-spec 41 §0a](../app-map/41-export-planning.ba-spec.md)). DB giữ nguyên 0079: lượt duyệt giờ chỉ còn duyệt cuối (vẫn cần `approve`). Deploy code là xong — HĐ đang "Chờ duyệt" tự thành "Chờ đính kèm", lượt duyệt cũ giữ làm lịch sử. Bảng thử dưới: bước 1–2 đọc theo v9 — Nhân viên KH lập HĐ ⇒ thấy ngay **Chờ đính kèm** + nút Đính kèm hồ sơ; Trưởng / Phó không còn nút Duyệt hợp đồng.
+
 ## 4. Thử tay sau khi chạy (trên site thật, ~10 phút, dùng HĐ thật đang chờ duyệt)
 
 | # | Ai | Làm | Kỳ vọng |

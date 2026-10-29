@@ -2,7 +2,8 @@
 
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
-last_verified: 2026-10-28
+last_verified: 2026-10-29
+<!-- re-verified: 2026-10-29 10:30 — §9b Xuất khẩu: 3 dòng Hợp đồng (trạng thái · cảnh báo · việc tiếp) đối chiếu CONTRACT_STATE_LABELS / CONTRACT_FLOW_STAGES / ContractDossier sau v9 (bỏ duyệt HĐ); tour exportTour.ts + hộp ? planning-export sửa cùng. -->
 <!-- re-verified: 2026-10-27 10:00 — §11 lệch doc: đối chiếu từng mục với code (MaterialNxtScreen, MaterialGrid, MaterialImportScreen, WipProductionScreen, DocumentDetailDialog, documents.buildDocumentWarnings + myTasks, SalesOrderScreen, QcChecklistScreen.reopen, BalancingScreen carry-over) — khớp mô tả §11 -->
 ttl_days: 90
 <!-- updated: 2026-10-22 (d) — v4: mở rộng ra MỌI trang nghiệp vụ (21 trang có route, trừ 5 trang quản trị miễn): NV5 + R13–R17 + AC-12…AC-16; quy tắc 18 CLAUDE.md; cổng `pageTourCoverage.test.ts` quét route ⇄ tour ⇄ hộp "?" ⇄ mốc data-tour; §9c kiểm kê theo trang. -->
@@ -146,9 +147,9 @@ Mỗi dòng: người đọc gặp gì · lời phải nói gì · nguồn. Văn
 | Kỳ xem | Tháng · Tuần · Ngày | chuyến xếp vào kỳ theo ngày đóng ?? ETD ?? tháng kế hoạch | 41 R1, R18 | `period` |
 | Bốn chỉ số | Chuyến trong kỳ · đủ hồ sơ · còn thiếu · trễ hạn giao | nghĩa từng số; trễ hạn = on board (hoặc ETD) sau hạn giao | 41 NV11, R15 | `stats` |
 | Thanh tiến độ | màu từng khúc = Xong · Đang làm · Chưa làm · Không áp dụng; "Bước tiếp" / "Đủ hồ sơ"; thẻ Trễ hạn, Chờ booking | đọc khúc, đọc dòng bước tiếp, nghĩa 2 thẻ | `ITEM_STATE_LABELS` · design-spec 42 | `shipment-progress` |
-| Hợp đồng · trạng thái | Chờ duyệt · Đã duyệt · Đã xuất đủ · Đã chốt HĐ · Đã hủy | nghĩa từng trạng thái; Đã xuất đủ = mọi chuyến đủ hồ sơ + thực xuất trong dung sai cả kg lẫn tiền | `CONTRACT_STATE_LABELS`, `contractStateLabel` · 41 R3, NV12, R7 | `contract-status` |
-| Hợp đồng · cảnh báo | Quá hạn giao · Còn … chưa lên chuyến · dòng hàng chưa nối danh mục · Bản sửa chờ duyệt · Ngoài dung sai | tên từng thẻ | 41 R15, R16, R3, R7 | `contract-status` |
-| Hợp đồng · việc tiếp | Ghi kết quả duyệt → Lên chuyến; Thao tác khác | khi nào hiện việc nào; việc ít dùng nằm ở Thao tác khác | 41 NV4, NV7, NV5, NV6, NV13 | `next-action` |
+| Hợp đồng · trạng thái | Chờ đính kèm · Đang ghi chuyến · Chờ duyệt cuối · Đã đóng HĐ · Đã hủy (v9 2026-10-29: bỏ Chờ duyệt) | nghĩa từng trạng thái; Chờ đính kèm = vừa lập hoặc thiếu hồ sơ bắt buộc; Chờ duyệt cuối = mọi chuyến đủ hồ sơ + thực xuất trong dung sai cả kg lẫn tiền | `CONTRACT_STATE_LABELS`, `CONTRACT_FLOW_STAGES` · 41 §0a R34–R36, R31 | `contract-status`, `contract-flow` |
+| Hợp đồng · cảnh báo | Quá hạn giao · Còn … chưa ghi chuyến · dòng hàng chưa nối danh mục · Thiếu … · Ngoài dung sai · Duyệt cuối trả về | tên từng thẻ | 41 R15, R16, R7, R31 | `contract-status` |
+| Hợp đồng · việc tiếp | Đính kèm hồ sơ → Ghi chuyến → Duyệt cuối; thẻ chờ theo vai trò; Thao tác khác | khi nào hiện việc nào, ai làm; việc ít dùng (sửa HĐ khi chưa có chuyến, ghi bản sửa, gia hạn…) ở Thao tác khác | 41 §0a, NV7, NV5, NV6, NV13 | `next-action` |
 | Chuyến · trạng thái | Đang làm · k/5 bước · Đủ hồ sơ · Trễ hạn giao · Đã hủy | nghĩa từng thẻ | 41 NV12, R15 | `shipment-card` |
 | Mục · trạng thái + điều kiện "Xong" | Chưa làm · Đang làm · Xong · Không áp dụng; điều kiện file / số / chữ ký từng loại; Dùng chung | đủ vế điều kiện theo bảng NV8 (Lệnh SX cần file + HĐ đã duyệt + dòng hàng đã nối; Tờ khai cần số + file; Lệnh xuất cần file có chữ ký BGĐ; chứng từ cần số + ngày + file, công ty tự cấp không bắt số; 4a/4b tự xong khi có file); Không áp dụng phải có lý do | `ITEM_STATE_LABELS` · 41 bảng NV8, R4, R5, R16, R20 | `item-status` |
 | Tiền về | Ghi gửi chứng từ · Ghi tiền về · "Tiền về x / y" | số phải thu = tiền trên Commercial Invoice; bước 6 không tính vào đủ hồ sơ | 41 NV10, R7, H5 | `payments` |

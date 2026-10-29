@@ -362,7 +362,7 @@ export function StepItemDialog({
       const items = tgt.isNew ? [...data.items, it] : data.items.map((x) => (x.id === it.id ? it : x));
       const check = canMarkDone(it, { ...data, items, files: [...data.files, ...pending] }, { filesAvailable });
       if (!check.ok) {
-        if (check.reason === "contract-not-approved") errs.push({ field: "Trạng thái", message: "Hợp đồng chưa được Trưởng / Phó phòng Kế hoạch duyệt — lệnh sản xuất chỉ xong sau khi duyệt (KH-R8)" });
+        if (check.reason === "contract-not-approved") errs.push({ field: "Trạng thái", message: "Hợp đồng chưa có bản hiệu lực (mọi bản đã bị từ chối) — ghi bản sửa trước khi xong lệnh sản xuất (KH-R8)" });
         else if (check.reason === "lines-unmapped")
           errs.push({ field: "Dòng hàng", message: "Còn dòng hàng của hợp đồng chưa nối mặt hàng danh mục — bấm \"Nối mặt hàng\" ở khối Dòng hàng của hồ sơ HĐ" });
         else if (check.reason === "shared-source-not-done") errs.push({ field: "Dùng chung", message: "Mục được dùng chung chưa xong ở chuyến kia" });

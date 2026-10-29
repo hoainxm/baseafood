@@ -105,13 +105,12 @@ export const ITEM_STATE_LABELS: Record<ExportItemState, string> = {
 };
 
 /**
- * Quy trình hợp đồng (mig 0079, chủ dự án chốt 2026-10-28):
- * Chờ duyệt → (Trưởng / Phó phòng KH duyệt) → Chờ đính kèm → (đủ hồ sơ) → Đang ghi chuyến →
- * (xuất đủ trong dung sai) → Chờ duyệt cuối → (Trưởng / Phó duyệt cuối) → Đã đóng HĐ.
+ * Quy trình hợp đồng (chủ dự án chốt 2026-10-29 — bỏ bước duyệt HĐ đầu, chỉ còn duyệt cuối):
+ * Lập HĐ → Chờ đính kèm → (đủ hồ sơ) → Đang ghi chuyến → (xuất đủ trong dung sai) → Chờ duyệt cuối →
+ * (Trưởng / Phó phòng KH duyệt cuối) → Đã đóng HĐ.
  */
-export type ContractState = "pending" | "attaching" | "shipping" | "final-review" | "closed" | "cancelled";
+export type ContractState = "attaching" | "shipping" | "final-review" | "closed" | "cancelled";
 export const CONTRACT_STATE_LABELS: Record<ContractState, string> = {
-  pending: "Chờ duyệt",
   attaching: "Chờ đính kèm",
   shipping: "Đang ghi chuyến",
   "final-review": "Chờ duyệt cuối",
@@ -128,8 +127,7 @@ export const isLiveContractState = (st: ContractState) => st !== "closed" && st 
 
 /** Các chặng của quy trình HĐ — thanh chặng ở hồ sơ HĐ, tour, hộp "?". */
 export const CONTRACT_FLOW_STAGES: readonly { state: Exclude<ContractState, "cancelled">; title: string; who: string; hint: string }[] = [
-  { state: "pending", title: "Duyệt HĐ", who: "Trưởng / Phó phòng KH", hint: "Nhân viên Kế hoạch lập HĐ; Trưởng hoặc Phó phòng Kế hoạch xem và duyệt bản hợp đồng." },
-  { state: "attaching", title: "Đính kèm", who: "Nhân viên Kế hoạch", hint: "Đính kèm đủ hồ sơ bắt buộc: hợp đồng đã ký, L/C (nếu thanh toán L/C). Đủ hồ sơ mới ghi chuyến được." },
+  { state: "attaching", title: "Đính kèm", who: "Nhân viên Kế hoạch", hint: "Lập HĐ xong là vào bước này. Đính kèm đủ hồ sơ bắt buộc: hợp đồng đã ký, L/C (nếu thanh toán L/C). Đủ hồ sơ mới ghi chuyến được." },
   { state: "shipping", title: "Ghi chuyến", who: "Nhân viên Kế hoạch", hint: "Ghi từng chuyến (container) và theo dõi các bước lệnh SX → chứng từ, tới khi xuất đủ hợp đồng." },
   { state: "final-review", title: "Duyệt cuối", who: "Trưởng / Phó phòng KH", hint: "Xuất đủ trong dung sai ⇒ Trưởng hoặc Phó phòng Kế hoạch xem lại hồ sơ, đồng ý thì đóng HĐ; chưa ổn thì trả về kèm lý do." },
   { state: "closed", title: "Đóng HĐ", who: "", hint: "Hợp đồng đã đóng. Mở lại được (Trưởng / Phó phòng) nếu cần sửa." },
@@ -311,7 +309,11 @@ export function nextRevisionNo(d: Pick<ExportData, "revisions">, contractId: str
   return rs.length ? rs[rs.length - 1].revisionNo + 1 : 0;
 }
 
-/** Lượt duyệt BẢN hợp đồng (không gồm duyệt cuối — `stage: "final"`). */
+/**
+ * Lượt duyệt BẢN hợp đồng (không gồm duyệt cuối — `stage: "final"`). Từ 2026-10-29 không còn bước duyệt
+ * bản: chỉ còn lượt ghi CŨ (BGĐ ký giấy trước 0079, hoặc duyệt HĐ 28–29/10) — để xem lịch sử, và
+ * "từ chối" cũ vẫn loại bản đó khỏi hiệu lực.
+ */
 export function approvalsOf(d: Pick<ExportData, "approvals">, revisionId: string): ExportContractApproval[] {
   return d.approvals
     .filter((a) => a.revisionId === revisionId && a.stage !== "final")
@@ -338,27 +340,22 @@ export function revisionApprovalLabelState(
   return last.decision === "needs-revision" && rev.createdAt > last.createdAt ? "pending" : last.decision;
 }
 
-/** Bản hiệu lực = bản `approved` có số bản lớn nhất. */
+/**
+ * Bản hiệu lực = bản MỚI NHẤT (ghi là có hiệu lực ngay — bỏ bước duyệt HĐ 2026-10-29), trừ bản từng bị
+ * từ chối theo cách cũ. Mọi bản sửa được Trưởng / Phó phòng xem lại một lần ở bước duyệt cuối.
+ */
 export function effectiveRevision(d: Pick<ExportData, "revisions" | "approvals">, contractId: string): ExportContractRevision | null {
-  const rs = revisionsOf(d, contractId).filter((r) => approvalState(d, r.id) === "approved");
+  const rs = revisionsOf(d, contractId).filter((r) => approvalState(d, r.id) !== "rejected");
   return rs.length ? rs[rs.length - 1] : null;
 }
 
-/** Bản mới nhất (có thể đang chờ duyệt). */
+/** Bản mới nhất (kể cả bản bị từ chối theo cách cũ). */
 export function latestRevision(d: Pick<ExportData, "revisions">, contractId: string): ExportContractRevision | null {
   const rs = revisionsOf(d, contractId);
   return rs.length ? rs[rs.length - 1] : null;
 }
 
-/** Bản sửa đang chờ / bị yêu cầu sửa (mới hơn bản hiệu lực). Bản bị từ chối thì bỏ qua. */
-export function pendingRevision(d: Pick<ExportData, "revisions" | "approvals">, contractId: string): ExportContractRevision | null {
-  const eff = effectiveRevision(d, contractId);
-  const latest = latestRevision(d, contractId);
-  if (!latest || (eff && latest.revisionNo <= eff.revisionNo)) return null;
-  return approvalState(d, latest.id) === "rejected" ? null : latest;
-}
-
-/** Bản dùng để tính: bản hiệu lực; chưa có thì bản mới nhất (HĐ chờ duyệt vẫn lên chuyến kế hoạch — A3). */
+/** Bản dùng để tính: bản hiệu lực; chưa có (mọi bản bị từ chối kiểu cũ) thì bản mới nhất. */
 export function workingRevision(d: Pick<ExportData, "revisions" | "approvals">, contractId: string): ExportContractRevision | null {
   return effectiveRevision(d, contractId) ?? latestRevision(d, contractId);
 }
@@ -661,8 +658,8 @@ export function suggestProductId(
 /**
  * Ghi nối dòng hàng ↔ mặt hàng vào MỘT bản (thông tin nội bộ, không phải bản sửa HĐ):
  * - Dòng không có trong `map` (nháp cũ mở lại sau khi bản đã đổi) GIỮ nối đang có — không xóa nhầm.
- * - Các bản KHÁC còn chờ duyệt của cùng HĐ (bản số lớn hơn) nhận nối cho dòng cùng tên + size đang
- *   TRỐNG — duyệt bản sửa xong không bị "chưa nối" lại. Dòng đã nối khác giữ nguyên.
+ * - Các bản MỚI HƠN của cùng HĐ (bản số lớn hơn) nhận nối cho dòng cùng tên + size đang TRỐNG — bản sửa
+ *   không bị "chưa nối" lại. Dòng đã nối khác giữ nguyên.
  */
 export function applyProductMapping(
   revisions: readonly ExportContractRevision[],
@@ -943,33 +940,32 @@ export function contractClosure(d: ExportData, contractId: string, opts: Evidenc
   return { closed: true, ...base };
 }
 
-/** Trạng thái HĐ theo quy trình mig 0079 (xem `ContractState`). `contractClosure().closed` = đã xuất đủ / đã đóng. */
+/** Trạng thái HĐ (xem `ContractState`). `contractClosure().closed` = đã xuất đủ / đã đóng. */
 export function contractState(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): ContractState {
   const c = d.contracts.find((x) => x.id === contractId);
   if (!c || c.status === "cancelled") return "cancelled";
   if (c.status === "closed") return "closed";
-  if (!effectiveRevision(d, contractId)) return "pending";
-  if (missingAttachmentKinds(d, contractId, opts).length) return "attaching";
+  if (!effectiveRevision(d, contractId) || missingAttachmentKinds(d, contractId, opts).length) return "attaching";
   return contractClosure(d, contractId, opts).closed ? "final-review" : "shipping";
 }
 
-/** Chặng hiện tại trên thanh quy trình (0 = Duyệt HĐ … 4 = Đóng HĐ); HĐ hủy ⇒ -1. */
+/** Chặng hiện tại trên thanh quy trình (0 = Đính kèm … 3 = Đóng HĐ); HĐ hủy ⇒ -1. */
 export function contractFlowIndex(state: ContractState): number {
   return CONTRACT_FLOW_STAGES.findIndex((s) => s.state === state);
 }
 
 export type ShipmentGate =
   | { ok: true }
-  | { ok: false; reason: "not-open" | "not-approved" | "attachments-missing"; missing: ExportContractAttachmentKind[] };
+  | { ok: false; reason: "not-open" | "no-revision" | "attachments-missing"; missing: ExportContractAttachmentKind[] };
 
 /**
- * Ghi chuyến mới (mig 0079): chỉ khi HĐ còn mở, ĐÃ DUYỆT và ĐÃ ĐÍNH KÈM ĐỦ hồ sơ bắt buộc.
+ * Ghi chuyến mới: chỉ khi HĐ còn mở và ĐÃ ĐÍNH KÈM ĐỦ hồ sơ bắt buộc (không còn bước duyệt HĐ — 2026-10-29).
  * Chuyến ghi từ trước giữ nguyên (không chặn sửa / theo dõi bước).
  */
 export function shipmentGate(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): ShipmentGate {
   const c = d.contracts.find((x) => x.id === contractId);
   if (!c || c.status !== "open") return { ok: false, reason: "not-open", missing: [] };
-  if (!effectiveRevision(d, contractId)) return { ok: false, reason: "not-approved", missing: [] };
+  if (!effectiveRevision(d, contractId)) return { ok: false, reason: "no-revision", missing: [] };
   const missing = missingAttachmentKinds(d, contractId, opts);
   return missing.length ? { ok: false, reason: "attachments-missing", missing } : { ok: true };
 }
@@ -978,7 +974,7 @@ export function shipmentGate(d: ExportData, contractId: string, opts: EvidenceOp
 export function shipmentGateText(g: ShipmentGate): string {
   if (g.ok) return "";
   if (g.reason === "not-open") return "Hợp đồng đã đóng hoặc đã hủy.";
-  if (g.reason === "not-approved") return "Hợp đồng chưa được Trưởng / Phó phòng Kế hoạch duyệt.";
+  if (g.reason === "no-revision") return "Hợp đồng chưa có bản hiệu lực (mọi bản đã bị từ chối) — ghi bản sửa.";
   return `Còn thiếu hồ sơ đính kèm: ${g.missing.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}.`;
 }
 
@@ -990,16 +986,13 @@ export function finalReviewsOf(d: Pick<ExportData, "approvals">, contractId: str
 }
 
 /**
- * Duyệt cuối được khi HĐ còn mở, đã qua bước Đính kèm, có ít nhất một chuyến còn mở và KHÔNG còn bản
- * sửa chờ duyệt. HĐ chưa
- * xuất đủ trong dung sai (đóng sớm: khách giảm lượng, phụ kiện…) ⇒ bắt lý do.
+ * Duyệt cuối được khi HĐ còn mở, đã qua bước Đính kèm và có ít nhất một chuyến còn mở. HĐ chưa xuất đủ
+ * trong dung sai (đóng sớm: khách giảm lượng, phụ kiện…) ⇒ bắt lý do.
  */
 export function finalReviewGate(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): { ok: boolean; needsReason: boolean } {
   const st = contractState(d, contractId, opts);
   if (st !== "shipping" && st !== "final-review") return { ok: false, needsReason: false };
   if (!openShipmentsOf(d, contractId).length) return { ok: false, needsReason: false };
-  // Còn bản sửa chờ duyệt ⇒ duyệt bản sửa trước (đóng HĐ khi bản sửa còn treo là bỏ qua nó).
-  if (pendingRevision(d, contractId)) return { ok: false, needsReason: false };
   return { ok: true, needsReason: st !== "final-review" };
 }
 

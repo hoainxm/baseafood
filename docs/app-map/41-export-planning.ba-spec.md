@@ -2,9 +2,10 @@
 
 > Load khi: xây hoặc sửa module Xuất khẩu của Phòng Kế hoạch đợt 1: hồ sơ hợp đồng (dòng hàng, bản sửa, gia hạn, file ký, kết quả duyệt giấy), chuyến (mã lô MSL, booking, cont, seal, ngày đóng/ETD), 6 bước dạng checklist tay kèm file, thực xuất lấy từ invoice, khép kín chuyến/hợp đồng theo dung sai, tiền về, vai trò Phòng Kế hoạch, mở rộng danh mục khách.
 covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql, supabase/migrations/0079_export_approval_workflow.sql, src/lib/abbreviations.ts
-last_verified: 2026-10-28
+last_verified: 2026-10-29
 ttl_days: 90
-status: ba-spec v8 (2026-10-28: **quy trình duyệt mới** — Trưởng / Phó phòng KH duyệt → đính kèm → ghi chuyến → duyệt cuối đóng HĐ; vai trò `planning-head` / `planning-deputy`; nhật ký HĐ; chú thích viết tắt; ĐÃ BUILD, mig 0079 CHƯA chạy) · v7 (2026-10-22 tối: **đọc Commercial Invoice** từ file Excel gốc / PDF xuất từ Excel — NV17 · R27; ĐÃ BUILD 2026-10-22, không migration) · v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Hoài Nam ↔ Lê Khiêm; ĐÃ BUILD 2026-10-22, `0077` ✅ chạy DB thật 2026-10-22) · v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+status: ba-spec v9 (2026-10-29: **bỏ bước duyệt HĐ**, chỉ còn duyệt cuối — §0a) · v8 (2026-10-28: **quy trình duyệt mới** — Trưởng / Phó phòng KH duyệt → đính kèm → ghi chuyến → duyệt cuối đóng HĐ; vai trò `planning-head` / `planning-deputy`; nhật ký HĐ; chú thích viết tắt; ĐÃ BUILD, mig 0079 CHƯA chạy) · v7 (2026-10-22 tối: **đọc Commercial Invoice** từ file Excel gốc / PDF xuất từ Excel — NV17 · R27; ĐÃ BUILD 2026-10-22, không migration) · v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Hoài Nam ↔ Lê Khiêm; ĐÃ BUILD 2026-10-22, `0077` ✅ chạy DB thật 2026-10-22) · v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+<!-- re-verified: 2026-10-29 10:30 — v9: ContractState/CONTRACT_FLOW_STAGES/effectiveRevision/shipmentGate/finalReviewGate ở lib/exportPlanning.ts đối chiếu code sau sửa; AC-57/64/65/66/67 = test exportPlanning.test.ts + exportPlanningDemo.test.ts xanh. -->
 <!-- re-verified: 2026-10-28 15:00 — v8: luồng duyệt cũ (NV4 ghi kết quả BGĐ ký giấy, approvers = director/vice-director ở ExportPlanningScreen, RLS approvals = export-plans create/update ở 0075, contractState pending/approved/closed) đối chiếu code TRƯỚC khi sửa — khớp doc; sau sửa: AC-56…AC-61 = test `exportPlanning.test.ts`, RLS 0079 thử PGlite (Nhân viên KH bị chặn duyệt / đóng / mở lại; Trưởng / Phó làm được; nhật ký không sửa / xóa); nối mặt hàng R16/R23: 4 lỗi sửa + test. -->
 <!-- re-verified: 2026-10-22 (c) — v7: R27 + AC-51…AC-55 = test `invoiceReader.test.ts` (18, oracle invoice 234/26 chép từng ô); thử tay preview demo (localStorage): file Excel → điền số / ngày / 3 số tổng, PDF có chữ ra cùng kết quả, bản scan 234/26 → câu "bản scan", ô đã có số khác → báo + "Dùng số trên invoice", nối 1 dòng → Lưu trích xuất 1 tên "Trích xuất từ Invoice 234/26" + Hoàn tác, Hủy không ghi; 360 px × 130 % không tràn. Chưa thử: tải file từ kho file thật (cần DB), file Excel gốc THẬT của Phòng KH (chưa có). -->
 <!-- re-verified: 2026-10-22 (b) — v6: R23 · R26 + AC-39/40/46/47 = test `customerProductNames.test.ts` (11) + `exportPlanning.test.ts`; AC-48 = `useCustomerProductNameStore.isAvailable` (thử tay chưa có DB chưa chạy 0077 — chưa làm); AC-49 thử tay preview demo: bộ demo 18 tên trích xuất, hộp Tên hàng, form HĐ điền tên + quy cách của khách, nối mặt hàng tự thêm 1 tên + toast; RLS 0077 thử PGlite. -->
@@ -18,7 +19,42 @@ status: ba-spec v8 (2026-10-28: **quy trình duyệt mới** — Trưởng / Ph�
 > **Nguồn đã chốt:** kế hoạch [`spec/xuat-khau-phong-ke-hoach.md`](../spec/xuat-khau-phong-ke-hoach.md) (§9 chốt 11 câu 2026-10-20) · quy trình [`QTI-KH-01`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (luật KH-R1…R16) · phân quyền [`spec/role-permissions.md`](../spec/role-permissions.md) · tài liệu công ty [`40-documents.md`](40-documents.md) (khuôn file + RLS).
 
 
-## 0. v8 (2026-10-28) — quy trình duyệt mới · THẮNG mọi mục cũ trái với mục này
+## 0a. v9 (2026-10-29) — BỎ bước duyệt hợp đồng, chỉ còn duyệt cuối · THẮNG §0 v8 và mọi mục cũ
+
+Chủ dự án yêu cầu 2026-10-29: "bỏ bước duyệt hợp đồng, chỉ giữ lại bước duyệt chốt cuối cùng". Chỉ đổi code — **không migration**: cột `stage`, RLS lượt duyệt và trigger đóng HĐ của 0079 giữ nguyên (lượt duyệt giờ chỉ còn duyệt cuối, vẫn cần `approve`).
+
+**Chặng mới** (`ContractState` bỏ `pending`; `CONTRACT_FLOW_STAGES` còn 4 mục):
+
+| Chặng | Trạng thái | Ai làm | Điều kiện sang chặng sau |
+|---|---|---|---|
+| 1 Đính kèm | `attaching` Chờ đính kèm | U1 Nhân viên KH (lập HĐ xong là vào đây) | đủ hồ sơ bắt buộc (HĐ đã ký + L/C khi thanh toán L/C) |
+| 2 Ghi chuyến | `shipping` Đang ghi chuyến | U1 | mọi chuyến đủ hồ sơ + thực xuất trong dung sai |
+| 3 Duyệt cuối | `final-review` Chờ duyệt cuối | **U6 Trưởng / Phó phòng KH** — lần duyệt DUY NHẤT | đồng ý ⇒ `status = closed` |
+| Đóng | `closed` Đã đóng HĐ | — | U6 mở lại được |
+
+**Luật v9:**
+- **R34 — Bản hiệu lực = bản mới nhất.** Ghi là có hiệu lực ngay (`effectiveRevision` = bản mới nhất KHÔNG bị từ chối theo cách cũ). Không còn "bản chờ duyệt", không còn `pendingRevision`. Ghi bản sửa ⇒ chuyến còn mở nhận ngay mục chứng từ bản mới yêu cầu (R6 — trước chạy lúc duyệt). Thay R3 / R28 phần "duyệt bản", R31 phần "còn bản sửa chờ duyệt ⇒ chưa duyệt cuối".
+- **R35 — Sửa thẳng hay ghi bản sửa.** HĐ **chưa có chuyến** ⇒ "Sửa hợp đồng" sửa thẳng bản đang dùng (gõ nhầm lúc lập). Có chuyến rồi ⇒ chỉ "Ghi bản sửa" (bản mới, bản cũ giữ để tra). Duyệt cuối xem lại cả các bản sửa.
+- **R36 — Dữ liệu cũ.** Lượt duyệt bản đã ghi (BGĐ ký giấy trước 0079, `stage = contract` 28–29/10) giữ nguyên làm lịch sử, hiện ở "Các bản hợp đồng". "Từ chối" cũ vẫn loại bản đó khỏi hiệu lực; mọi bản bị từ chối ⇒ không có bản hiệu lực ⇒ chưa ghi chuyến / chưa xong lệnh SX (`no-revision`, `contract-not-approved`). R30 (file ký kiểu cũ thay "HĐ đã ký") giữ nguyên. HĐ đang "Chờ duyệt" trên DB thật tự thành "Chờ đính kèm" — không cần UPDATE.
+- R28 rút lại: `approve` = duyệt cuối + mở lại HĐ. R29: ghi chuyến MỚI khi HĐ còn mở và đủ hồ sơ đính kèm (bỏ "đã duyệt").
+
+**Cross-user handoff v9:** chỉ còn MỘT bàn giao U1 → U6 (HĐ sang Chờ duyệt cuối, hoặc U1 xin đóng sớm) và U6 → U1 khi trả về. Bàn giao U1 → U6 lúc lập HĐ **bỏ**.
+
+**Flow optimization log v9:** cân 3 biến thể — (a) bỏ hẳn duyệt HĐ, bản sửa có hiệu lực ngay *(chọn — đúng yêu cầu, ít bước nhất, duyệt cuối vẫn soát toàn bộ)*; (b) bỏ duyệt bản 0 nhưng giữ duyệt bản sửa *(loại — người dùng nói "chỉ giữ duyệt cuối")*; (c) bản sửa chờ tới duyệt cuối mới có hiệu lực *(loại — chuyến đang chạy phải theo điều khoản mới ngay, để treo tới cuối HĐ là sai chứng từ)*.
+
+**Assumptions v9:** (1) bản sửa có hiệu lực ngay (biến thể a); (2) sửa thẳng chỉ khi chưa có chuyến; (3) không đổi RLS / không migration — Nhân viên KH vẫn không ghi được lượt duyệt nào ở máy chủ.
+
+**AC v9** (test `exportPlanning.test.ts` + `exportPlanningDemo.test.ts`):
+- **AC-65** · Test: unit · HĐ mới lập (chỉ bản 0, không lượt duyệt) ⇒ `effectiveRevision` = bản 0, `contractState == "attaching"`, thiếu đúng `["signed-contract"]`.
+- **AC-66** · Test: unit · Ghi bản sửa 1 ⇒ `effectiveRevision.revisionNo == 1` ngay, chuyến đã khép vẫn khép, HĐ có file ký kiểu cũ không tụt về `attaching`.
+- **AC-57 (v9)** · Test: unit · Chưa đính kèm HĐ đã ký ⇒ `shipmentGate.reason == "attachments-missing"`; mọi bản bị từ chối kiểu cũ ⇒ `reason == "no-revision"`.
+- **AC-64 (v9)** · Test: unit · Bản sửa mới không chặn duyệt cuối: `finalReviewGate == { ok: true, needsReason: false }`.
+- **AC-67** · Test: unit (demo) · Bộ demo: HĐ "mới lập" và "quá hạn chưa lên chuyến" ở `attaching` (0 HĐ ở trạng thái chờ duyệt).
+- AC-56 (v8) **bỏ**; AC-5, AC-7, AC-9 (luồng duyệt bản) đọc theo R34.
+
+---
+
+## 0. v8 (2026-10-28) — quy trình duyệt mới · ⚠️ phần "Duyệt HĐ" đã bỏ ở §0a v9
 
 Chủ dự án chốt 2026-10-28 (4 câu hỏi qua phiên Claude). Mục nào bên dưới còn nói "BGĐ ký giấy, nhân viên ghi lại", "HĐ chờ duyệt vẫn lên chuyến", "HĐ tự khép Đã xuất đủ" hay "Chốt HĐ" là **luật cũ**, đọc theo mục này.
 

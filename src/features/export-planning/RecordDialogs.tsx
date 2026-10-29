@@ -1,6 +1,6 @@
 // ============================================================
 // Tên file: src/features/export-planning/RecordDialogs.tsx
-// Tên tiếng Việt: Hộp duyệt HĐ · duyệt cuối · đính kèm hồ sơ · gia hạn · gửi chứng từ / tiền về · lý do hủy / đóng
+// Tên tiếng Việt: Hộp duyệt cuối · đính kèm hồ sơ · gia hạn · gửi chứng từ / tiền về · lý do hủy / đóng
 // Description: Small record dialogs of the export dossier: paper approval of one revision,
 //              customer-confirmed deadline extension, step 6 entries, reason prompt.
 // ============================================================
@@ -24,10 +24,9 @@ import {
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
-import { APPROVAL_LABELS, CONTRACT_ATTACHMENT_LABELS, FINAL_REVIEW_LABELS } from "@/lib/exportPlanning";
+import { CONTRACT_ATTACHMENT_LABELS, FINAL_REVIEW_LABELS } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile, type ExportFileArea } from "@/lib/exportFileStorage";
 import type {
-  ExportApprovalDecision,
   ExportContractApproval,
   ExportContractAttachmentKind,
   ExportDeadlineExtension,
@@ -35,7 +34,7 @@ import type {
   ExportPayment,
   ExportPaymentKind,
 } from "@/types";
-import { CalendarClock, ClipboardCheck, FileSignature, Paperclip, Save, Wallet } from "lucide-react";
+import { CalendarClock, ClipboardCheck, Paperclip, Save, Wallet } from "lucide-react";
 import { FilePicker } from "./parts";
 
 /** Tải 0–1 file lên trước khi ghi dòng; lỗi ⇒ `{ error }`. */
@@ -43,147 +42,6 @@ async function uploadOne(file: File | undefined, contractId: string, area: Expor
   if (!file || !hasExportStorage) return null;
   return uploadExportFile(exportFilePath(contractId, area, id, file.name), file);
 }
-
-/* ---------- Duyệt hợp đồng (NV4 — mig 0079: Trưởng / Phó phòng Kế hoạch duyệt trên app) ---------- */
-
-export interface ApprovalTarget {
-  contractId: string;
-  contractNo: string;
-  revisionId: string;
-  revisionNo: number;
-}
-
-interface ApprovalForm {
-  key: string;
-  contractId: string;
-  revisionId: string;
-  revisionNo: number;
-  contractNo: string;
-  decision: ExportApprovalDecision;
-  decidedOn: string;
-  reason: string;
-  initial: string;
-}
-const approvalSnap = (f: ApprovalForm) => JSON.stringify([f.decision, f.decidedOn, f.reason]);
-
-/**
- * Người duyệt = TÀI KHOẢN ĐANG ĐĂNG NHẬP (Trưởng / Phó phòng Kế hoạch — màn chỉ mở hộp cho người có
- * quyền Duyệt, RLS 0079 chặn ở máy chủ). Không gõ / chọn người duyệt thay.
- */
-export function ApprovalDialog({
-  target,
-  approverName,
-  onClose,
-  onSave,
-}: {
-  target: ApprovalTarget | null;
-  /** "Họ tên — Trưởng phòng Kế hoạch" của người đang đăng nhập. */
-  approverName: string;
-  onClose: () => void;
-  onSave: (a: ExportContractApproval) => boolean;
-}) {
-  const today = todayIso();
-  const [form, setForm] = useState<ApprovalForm | null>(null);
-  const [errors, setErrors] = useState<FieldError[]>([]);
-  const draft = useDialogDraft({ form: "export-approval", value: form, setValue: setForm, isEmpty: (f) => approvalSnap(f) === f.initial });
-
-  useEffect(() => {
-    if (!target) return;
-    const f: ApprovalForm = { key: target.revisionId, ...target, decision: "approved", decidedOn: today, reason: "", initial: "" };
-    const fresh = { ...f, initial: approvalSnap(f) };
-    const kept = draft.takeKept();
-    setForm(kept && kept.key === fresh.key ? kept : fresh);
-    setErrors([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
-  }, [target]);
-
-  const set = <K extends keyof ApprovalForm>(k: K, v: ApprovalForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
-
-  const save = () => {
-    if (!form) return;
-    const errs: FieldError[] = [];
-    if (!form.decidedOn) errs.push({ field: "Ngày duyệt", message: "Chọn ngày duyệt" });
-    if (form.decision !== "approved" && !form.reason.trim()) errs.push({ field: "Lý do", message: "Không đồng ý thì phải ghi lý do" });
-    setErrors(errs);
-    if (errs.length) return;
-    const ok = onSave({
-      id: newId(),
-      contractId: form.contractId,
-      revisionId: form.revisionId,
-      stage: "contract",
-      decision: form.decision,
-      approverName,
-      decidedOn: form.decidedOn,
-      reason: form.reason.trim(),
-      filePath: "",
-      fileName: "",
-      recordedBy: approverName,
-      createdAt: new Date().toISOString(),
-    });
-    if (ok) draft.done();
-  };
-
-  return (
-    <FormDialog
-      open={!!form}
-      onOpenChange={(o) => {
-        if (o) return;
-        draft.dismiss();
-        onClose();
-      }}
-      title={`Duyệt hợp đồng · HĐ ${form?.contractNo ?? ""} · bản ${form?.revisionNo ?? ""}`}
-      description="Đồng ý ⇒ bản này có hiệu lực, chuyển sang bước Đính kèm. Từ chối bản đầu ⇒ hủy hợp đồng; từ chối bản sửa ⇒ chỉ bỏ bản sửa."
-      icon={FileSignature}
-      size="md"
-      hasRequiredFields
-      footer={
-        <>
-          <Button
-            variant="outline"
-            onClick={() => {
-              draft.cancel();
-              onClose();
-            }}
-          >
-            Hủy
-          </Button>
-          <Button variant="save" onClick={save} title="Ghi kết quả duyệt của bản hợp đồng này (tên bạn là người duyệt).">
-            <Save className="mr-2 h-4 w-4" aria-hidden />
-            Lưu kết quả duyệt
-          </Button>
-        </>
-      }
-    >
-      <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
-      {form && (
-        <div className="grid gap-4 py-2">
-          <ErrorSummary errors={errors} />
-          <ChoiceGroup
-            label="Kết quả"
-            required
-            value={form.decision}
-            onChange={(v) => set("decision", v as ExportApprovalDecision)}
-            options={(["approved", "needs-revision", "rejected"] as const).map((v) => ({ value: v, label: APPROVAL_LABELS[v] }))}
-            columns={3}
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Người duyệt" hint="Tài khoản đang đăng nhập.">
-              <Input value={approverName} readOnly />
-            </Field>
-            <DateField label="Ngày duyệt" required value={form.decidedOn} onChange={(v) => set("decidedOn", v)} />
-          </div>
-          {form.decision !== "approved" && (
-            <Field label="Lý do" required>
-              <Textarea rows={2} value={form.reason} onChange={(e) => set("reason", e.target.value)} aria-required />
-            </Field>
-          )}
-        </div>
-      )}
-    </FormDialog>
-  );
-}
-
-/* ---------- Duyệt cuối — đóng hợp đồng (mig 0079) ---------- */
 
 export interface FinalReviewTarget {
   contractId: string;
@@ -268,7 +126,7 @@ export function FinalReviewDialog({
         onClose();
       }}
       title={`Duyệt cuối · HĐ ${target?.contractNo ?? ""}`}
-      description="Xem lại hồ sơ các chuyến. Đồng ý ⇒ đóng hợp đồng. Chưa ổn ⇒ trả về kèm lý do, Nhân viên Kế hoạch sửa rồi chờ duyệt lại."
+      description="Xem lại hồ sơ các chuyến. Đồng ý ⇒ đóng hợp đồng. Chưa ổn ⇒ trả về kèm lý do, Nhân viên Kế hoạch sửa rồi chờ duyệt cuối lại."
       icon={ClipboardCheck}
       size="md"
       hasRequiredFields

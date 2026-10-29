@@ -712,16 +712,13 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
   },
   "planning-export": {
     title: "Xuất khẩu",
-    description: "Theo dõi hợp đồng xuất khẩu qua 4 chặng: duyệt HĐ → đính kèm hồ sơ → ghi chuyến → duyệt cuối, rồi đóng HĐ.",
+    description: "Theo dõi hợp đồng xuất khẩu qua 3 chặng: đính kèm hồ sơ → ghi chuyến → duyệt cuối, rồi đóng HĐ.",
     content: (
       <>
         <Section title="Trình tự công việc">
           <Step>
             <li>
-              <b>Nhân viên Kế hoạch</b> chọn <b>Lập hợp đồng</b>, nhập đúng như bản giấy. Hợp đồng ở trạng thái <b>Chờ duyệt</b>.
-            </li>
-            <li>
-              <b>Trưởng phòng</b> hoặc <b>Phó phòng Kế hoạch</b> mở hồ sơ, chọn <b>Duyệt hợp đồng</b>. Đồng ý thì hợp đồng chuyển <b>Chờ đính kèm</b>. Nhân viên Kế hoạch không duyệt được.
+              <b>Nhân viên Kế hoạch</b> chọn <b>Lập hợp đồng</b>, nhập đúng như bản giấy. Lưu xong hợp đồng ở trạng thái <b>Chờ đính kèm</b> — không có bước duyệt hợp đồng lúc lập.
             </li>
             <li>
               Nhân viên Kế hoạch chọn <b>Đính kèm hồ sơ</b>: bắt buộc hợp đồng đã ký, thêm L/C nếu thanh toán L/C. Đủ hồ sơ thì hợp đồng chuyển <b>Đang ghi chuyến</b>.
@@ -730,14 +727,13 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
               Chọn <b>Ghi chuyến</b> cho từng container (hoặc xe tải, lô đóng ghép). Với mỗi chuyến, cập nhật bước 2 đến 5: Lệnh sản xuất · Bao bì · Đóng cont · Bộ chứng từ. Bước 6 ghi ngày gửi chứng từ và tiền về.
             </li>
             <li>
-              Mọi chuyến đủ hồ sơ và số thực xuất trong dung sai thì hợp đồng chuyển <b>Chờ duyệt cuối</b>. Trưởng hoặc Phó phòng chọn <b>Duyệt cuối</b>: đồng ý thì <b>Đã đóng HĐ</b>, chưa ổn thì trả về kèm lý do.
+              Mọi chuyến đủ hồ sơ và số thực xuất trong dung sai thì hợp đồng chuyển <b>Chờ duyệt cuối</b>. Trưởng hoặc Phó phòng chọn <b>Duyệt cuối</b>: xem lại cả hợp đồng (kể cả các bản sửa) lẫn hồ sơ chuyến; đồng ý thì <b>Đã đóng HĐ</b>, chưa ổn thì trả về kèm lý do. Đây là lần duyệt duy nhất, Nhân viên Kế hoạch không duyệt được.
             </li>
           </Step>
         </Section>
         <Section title="Trạng thái hợp đồng">
           <Y>
-            <li><b>Chờ duyệt</b>: đã lập, chờ Trưởng / Phó phòng Kế hoạch duyệt.</li>
-            <li><b>Chờ đính kèm</b>: đã duyệt, còn thiếu hồ sơ bắt buộc (thẻ <b>Thiếu</b> ghi rõ loại). Chưa ghi chuyến được.</li>
+            <li><b>Chờ đính kèm</b>: vừa lập, hoặc còn thiếu hồ sơ bắt buộc (thẻ <b>Thiếu</b> ghi rõ loại). Chưa ghi chuyến được.</li>
             <li><b>Đang ghi chuyến</b>: đủ hồ sơ, đang ghi và theo dõi các chuyến.</li>
             <li><b>Chờ duyệt cuối</b>: đã xuất đủ trong dung sai cả kg lẫn tiền, chờ Trưởng / Phó phòng xem lại.</li>
             <li><b>Đã đóng HĐ</b>: đã duyệt cuối (hoặc đóng sớm có lý do). Trưởng / Phó phòng mở lại được.</li>
@@ -746,14 +742,14 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
         </Section>
         <Section title="Nhật ký thao tác">
           <Y>
-            <li>Cuối hồ sơ có phần <b>Nhật ký thao tác</b>: ai làm gì, lúc nào (lập, duyệt, đính kèm, ghi chuyến, cập nhật bước, hoàn tác). Nhật ký chỉ thêm, không sửa hay xóa được.</li>
+            <li>Cuối hồ sơ có phần <b>Nhật ký thao tác</b>: ai làm gì, lúc nào (lập, sửa, đính kèm, ghi chuyến, cập nhật bước, duyệt cuối, hoàn tác). Nhật ký chỉ thêm, không sửa hay xóa được.</li>
             <li>Rê chuột (hoặc chạm) vào nút <b>?</b> cạnh nhãn, hoặc chữ gạch chấm như <b>ETD</b>, <b>L/C</b>, <b>B/L</b> để xem nghĩa từ viết tắt.</li>
           </Y>
         </Section>
         <Section title="Trạng thái mục trong bước">
           <Y>
             <li><b>Chưa làm</b> · <b>Đang làm</b> · <b>Xong</b> · <b>Không áp dụng</b> (phải ghi lý do).</li>
-            <li>Bước 1 <b>Hợp đồng</b> của chuyến tự <b>Xong</b> khi hợp đồng đã được duyệt và đủ hồ sơ đính kèm bắt buộc.</li>
+            <li>Bước 1 <b>Hợp đồng</b> của chuyến tự <b>Xong</b> khi hợp đồng đủ hồ sơ đính kèm bắt buộc.</li>
             <li>
               Mục chỉ được đánh dấu <b>Xong</b> khi đủ giấy tờ: file, số chứng từ, ngày theo từng loại. Sơ đồ container và hình ảnh đóng cont tự Xong khi có file.
             </li>

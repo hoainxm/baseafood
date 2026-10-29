@@ -335,7 +335,7 @@ export function StepStepper({ steps, current, onSelect }: { steps: Record<StepNo
 }
 
 /**
- * Thanh chặng quy trình hợp đồng (mig 0079): Duyệt HĐ → Đính kèm → Ghi chuyến → Duyệt cuối → Đóng HĐ.
+ * Thanh chặng quy trình hợp đồng (2026-10-29): Đính kèm → Ghi chuyến → Duyệt cuối → Đóng HĐ.
  * Chặng xong tô xanh, chặng đang ở tô vàng; rê / chạm vào chặng xem ai làm, làm gì.
  */
 export function ContractFlowBar({ state }: { state: ContractState }) {
@@ -361,7 +361,7 @@ export function ContractFlowBar({ state }: { state: ContractState }) {
                 className={`flex min-w-0 items-start gap-2 px-1 text-sm leading-tight ${isCurrent ? "font-semibold text-foreground" : "text-muted-foreground"}`}
               >
                 {isDone ? <Check className="h-4 w-4 shrink-0 text-success" aria-hidden /> : <CircleDashed className="h-4 w-4 shrink-0" aria-hidden />}
-                {/* Từ sm: nhãn dưới từng vạch. Điện thoại: 5 nhãn không vừa ⇒ chỉ icon, nhãn chặng đang ở xuống dòng riêng bên dưới. */}
+                {/* Từ sm: nhãn dưới từng vạch. Điện thoại: 4 nhãn không vừa ⇒ chỉ icon, nhãn chặng đang ở xuống dòng riêng bên dưới. */}
                 <span className="hidden min-w-0 sm:inline">
                   {st.title}
                   {isCurrent && st.who ? <span className="block font-normal text-muted-foreground">{st.who}</span> : null}

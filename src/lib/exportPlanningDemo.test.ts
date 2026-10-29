@@ -31,13 +31,13 @@ describe("bộ demo Xuất khẩu", () => {
     const st = Object.fromEntries(d.contracts.map((c) => [c.contractNo, contractState(d, c.id)]));
     expect(st).toEqual({
       "DM-01/2026": "closed",
-      // Quy trình mig 0079: xuất đủ ⇒ chờ duyệt cuối; L/C chưa đính kèm ⇒ chờ đính kèm.
+      // Xuất đủ ⇒ chờ duyệt cuối; L/C chưa đính kèm ⇒ chờ đính kèm; mới lập (không còn duyệt HĐ) ⇒ chờ đính kèm HĐ đã ký.
       "21.26/BSF-SCM.2026": "final-review",
       "02.26/BSF-SCM.2026": "shipping",
       "07.26/BSF-HTC.2026": "attaching",
-      "11.26/BSF-MTD.2026": "pending",
+      "11.26/BSF-MTD.2026": "attaching",
       "05.26/BSF-PC.2026": "cancelled",
-      "99.26/BSF-LK.2026": "pending",
+      "99.26/BSF-LK.2026": "attaching",
     });
     const byNo = (no: string) => d.contracts.find((c) => c.contractNo === no)!;
     // 1. Không gói ⇒ ca 1 dùng số tự đặt (không số của khách trong mã nguồn); đủ hồ sơ, ngoài dung sai ⇒ chốt TAY
@@ -150,9 +150,9 @@ describe("bộ demo Xuất khẩu từ GÓI (số + file thật trong kho file r
     expect(d.extraCustomers.map((c) => c.name)).toEqual(["Khách Mới"]);
     // đã đóng > 20 ngày ⇒ đủ hồ sơ + có tiền về
     expect(isShipmentClosed(d, both[0])).toBe(true);
-    // sắp đóng (> 15 ngày) ⇒ HĐ chờ duyệt
+    // sắp đóng (> 15 ngày) ⇒ chưa có HĐ đã ký ⇒ chờ đính kèm
     const far = d.shipments.find((s) => s.goodsSummary === "Cá saba")!;
-    expect(contractState(d, far.contractId)).toBe("pending");
+    expect(contractState(d, far.contractId)).toBe("attaching");
     // dòng con gộp thành dòng hàng thứ 2
     const truck = d.shipments.find((s) => s.kind === "truck")!;
     expect(effectiveRevision(d, truck.contractId)!.lines).toHaveLength(2);

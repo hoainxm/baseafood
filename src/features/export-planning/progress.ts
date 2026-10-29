@@ -54,10 +54,10 @@ export function shipmentProgress(d: ExportData, s: ExportShipment, opts: Evidenc
 export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string[] {
   switch (n) {
     case 1:
-      // Bước 1 = HĐ đã duyệt + đủ hồ sơ đính kèm (mig 0079).
+      // Bước 1 = HĐ có bản hiệu lực + đủ hồ sơ đính kèm (không còn bước duyệt HĐ — 2026-10-29).
       return effectiveRevision(d, s.contractId)
         ? missingAttachmentKinds(d, s.contractId).map((k) => `hồ sơ HĐ: ${CONTRACT_ATTACHMENT_LABELS[k]}`)
-        : ["Trưởng / Phó phòng duyệt HĐ"];
+        : ["bản hợp đồng có hiệu lực"];
     case 2:
       return ["lệnh sản xuất"];
     case 3:
@@ -88,9 +88,8 @@ export function progressText(p: ShipmentProgress): string {
   return `${head} — còn ${shown}${p.missing.length > 2 ? ` và ${p.missing.length - 2} mục khác` : ""}`;
 }
 
-/** Màu thẻ trạng thái hợp đồng (quy trình mig 0079) — mọi màn dùng chung. */
+/** Màu thẻ trạng thái hợp đồng — mọi màn dùng chung. */
 export const CONTRACT_STATE_TAG: Record<ContractState, TagVariant> = {
-  pending: "pending",
   attaching: "warning",
   shipping: "source",
   "final-review": "pending",

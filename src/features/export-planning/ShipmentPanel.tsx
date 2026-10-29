@@ -338,10 +338,10 @@ export function ShipmentPanel({
       <StepBlock n={1} state={progress.steps[1]} summary={summaryOf(1)} isCurrent={progress.next === 1}>
         <p className="py-3 text-sm text-muted-foreground">
           {settled(progress.steps[1])
-            ? `Hợp đồng đã được duyệt${filesAvailable ? " và đủ hồ sơ đính kèm" : ""}.`
+            ? `Hợp đồng có bản hiệu lực${filesAvailable ? " và đủ hồ sơ đính kèm" : ""}.`
             : effectiveRevision(data, contract.id)
-              ? "Hợp đồng đã duyệt, còn thiếu hồ sơ đính kèm — đính kèm ở khối Hồ sơ đính kèm của hồ sơ hợp đồng."
-              : "Hợp đồng chờ Trưởng / Phó phòng Kế hoạch duyệt (nút Duyệt hợp đồng ở đầu hồ sơ)."}
+              ? "Còn thiếu hồ sơ đính kèm của hợp đồng — đính kèm ở khối Hồ sơ đính kèm của hồ sơ hợp đồng."
+              : "Hợp đồng chưa có bản hiệu lực (mọi bản đã bị từ chối) — ghi bản sửa ở đầu hồ sơ."}
         </p>
       </StepBlock>
 

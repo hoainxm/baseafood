@@ -2,7 +2,7 @@
 
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
-last_verified: 2026-10-28
+last_verified: 2026-10-29
 ttl_days: 90
 <!-- updated: 2026-10-22 (c) — v7 (ba-spec 41 v7 NV17): khối "Đọc invoice" trong hộp mục Commercial Invoice (hộp cỡ xl), nút "Trích xuất từ chứng từ" quét thêm invoice. -->
 <!-- updated: 2026-10-22 (b) — v6 (ba-spec 41 v6): hộp "Tên hàng trên chứng từ" của một khách (danh mục Khách hàng + lối từ hồ sơ HĐ), form HĐ chọn mặt hàng điền 4 ô theo tên của khách, hộp Nối mặt hàng gợi ý theo tên + size của khách, ô danh mục đổi thành "Tên tiếng Anh mặc định". -->
@@ -160,6 +160,15 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 
 - 2026-10-22 (b) — **v6** (preview `baseafood-demo`, bộ demo mới 18 tên trích xuất): danh mục Khách hàng có "Tên hàng (n)" mỗi dòng; hộp Tên hàng của khách 9 tên (tên đậm · quy cách · mặt hàng xưởng · "Trích xuất từ HĐ …"), Thêm → Lưu trống ⇒ `ErrorSummary` 2 lỗi; form HĐ: chọn khách → ô mặt hàng có dòng phụ = tên của khách → chọn ⇒ tên + quy cách tự điền; hồ sơ HĐ có nút "Tên hàng của <khách>"; nối 1 dòng chưa nối ⇒ toast "… · thêm 1 tên hàng của khách" (Hoàn tác — chưa bấm thử); hộp Tên hàng 360 px × 130 % không tràn; console 0 lỗi của app.
 
+## v9 (2026-10-29) — bỏ bước duyệt HĐ (ba-spec 41 §0a) · THẮNG v8 ở các điểm dưới
+
+- **Thanh chặng** còn 4 mục: Đính kèm · Ghi chuyến · Duyệt cuối · Đóng HĐ (điện thoại "Chặng n/4").
+- **Nút chính**: Đính kèm hồ sơ (U1) → Ghi chuyến (U1) → Duyệt cuối (U6). Nút / hộp "Duyệt hợp đồng" (`ApprovalDialog`) **gỡ**. Thẻ chờ chỉ còn "Chờ Nhân viên Kế hoạch đính kèm hồ sơ" và "Chờ Trưởng / Phó phòng Kế hoạch duyệt cuối để đóng hợp đồng".
+- **Thao tác khác**: "Sửa hợp đồng" (`edit`, chỉ khi HĐ chưa có chuyến — sửa thẳng bản đang dùng) thay "Sửa bản chờ duyệt"; "Ghi bản sửa" luôn có (bản mới có hiệu lực ngay).
+- **Thẻ trạng thái HĐ** còn 5 nhãn (bỏ "Chờ duyệt"); bộ lọc danh sách HĐ bỏ "Chờ duyệt"; thẻ cảnh báo "Bản sửa chờ duyệt" bỏ.
+- Khối "Các bản hợp đồng · duyệt cuối": thẻ kết quả duyệt bản chỉ hiện ở bản có lượt duyệt CŨ; bản đang dùng có thẻ "Đang hiệu lực". Khối gập sẵn.
+- Toast lập HĐ: "Đã lập HĐ … — việc tiếp: đính kèm hợp đồng đã ký".
+
 ## v8 (2026-10-28) — quy trình duyệt mới (ba-spec 41 §0)
 
 - **Thanh chặng** `ContractFlowBar` (`parts.tsx`, mốc `contract-flow`) ngay dưới đầu hồ sơ: Duyệt HĐ · Đính kèm · Ghi chuyến · Duyệt cuối · Đóng HĐ — xong = tích xanh, đang ở = vàng + dòng "ai làm". Điện thoại: chỉ vạch + icon, nhãn chặng đang ở xuống MỘT dòng riêng "Chặng 3/5: Ghi chuyến — Nhân viên Kế hoạch" (audit 2026-10-28: nhãn trong cột bị bóp một chữ / dòng ở 130 %). Rê / focus chặng ⇒ `title` giải thích.
@@ -171,6 +180,7 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 - **Chú thích viết tắt**: nút "?" (`AbbrHint`) tự gắn cạnh nhãn `Field` / `DateField` / `Combobox` / `NumberField`, tiêu đề cột `RecordTable` (ngoài nút sắp xếp), nhãn thông tin hồ sơ / chuyến (`Info`, `Fact`); chữ trong câu dùng `Abbr`.
 
 ## History
+- v9 (2026-10-29): bỏ bước duyệt HĐ — thanh chặng 4 mục, gỡ hộp Duyệt hợp đồng, Sửa hợp đồng khi chưa có chuyến, thẻ 5 trạng thái.
 - v8.1 (2026-10-28, audit sau 0079): thanh chặng điện thoại một dòng nhãn riêng; đầu khung chuyến (tên + thẻ trạng thái) xuống dòng — trước tràn ngang 390–452 px ở 360 px × 130 % (lỗi có sẵn); chữ cũ "BGĐ đồng ý / file ký / chốt HĐ / lên chuyến" ở bước 1, hộp lập HĐ, lỗi lệnh SX, gia hạn, nối mặt hàng, Thao tác khác, báo cáo đổi theo quy trình v8.
 - v8 (2026-10-28): quy trình duyệt mới — thanh chặng, nút chính theo chặng + vai trò, khối Hồ sơ đính kèm, hộp Duyệt / Duyệt cuối / Đính kèm, khối Nhật ký thao tác, thẻ 6 trạng thái, chú thích viết tắt. Tour 22 bước (thêm "Thanh chặng của hợp đồng"). Chưa chạy thử tay trên preview ở bản ghi này — xem mục QA.
 - v7 (2026-10-22 tối): khối "Đọc invoice" trong hộp mục Commercial Invoice (hộp xl) — đọc file Excel / PDF xuất từ Excel, điền ô trống, báo ô lệch + "Dùng số trên invoice", so với HĐ, nối dòng → trích xuất tên khi Lưu; không nối máy chủ có ô chọn file chỉ để đọc. Nút "Trích xuất từ chứng từ" quét thêm invoice (đang chạy đổi chữ "Đang trích xuất…"; file bỏ qua báo tại chỗ).

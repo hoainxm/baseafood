@@ -14,7 +14,6 @@ import {
   contractTotals,
   effectiveDeadline,
   openShipmentsOf,
-  pendingRevision,
   workingRevision,
   type ContractState,
   CONTRACT_STATE_LABELS,
@@ -29,7 +28,6 @@ import { CONTRACT_STATE_TAG } from "./progress";
 type Filter = "open" | ContractState | "all";
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "open", label: "Đang mở (mọi chặng)" },
-  { value: "pending", label: CONTRACT_STATE_LABELS.pending },
   { value: "attaching", label: CONTRACT_STATE_LABELS.attaching },
   { value: "shipping", label: CONTRACT_STATE_LABELS.shipping },
   { value: "final-review", label: CONTRACT_STATE_LABELS["final-review"] },
@@ -116,7 +114,6 @@ export function ContractListView({
         return (
           <div className="flex min-w-36 flex-wrap gap-1 whitespace-normal">
             <Tag variant={CONTRACT_STATE_TAG[st]}>{contractStateLabel(st, c)}</Tag>
-            {pendingRevision(data, c.id) && st !== "pending" && <Tag variant="warning">Bản sửa chờ duyệt</Tag>}
             {isLiveContractState(st) && st !== "final-review" && !cov.covered && <Tag variant="warning">Chưa ghi đủ chuyến</Tag>}
             {isLiveContractState(st) && st !== "final-review" && effectiveDeadline(data, c.id) < today && (!openShipmentsOf(data, c.id).length || !cov.covered) && <Tag variant="error">Quá hạn giao</Tag>}
             {cl.reason === "out-of-tolerance" && <Tag variant="error">Ngoài dung sai: kg {deviationText(cl.kgDeviationPct)}</Tag>}

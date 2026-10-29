@@ -1,6 +1,6 @@
 // ============================================================
 // Tên file: src/features/export-planning/ContractFormDialog.tsx
-// Tên tiếng Việt: Hộp lập hợp đồng / sửa bản chờ duyệt / ghi bản sửa (rvs, phụ kiện, tu chỉnh L/C)
+// Tên tiếng Việt: Hộp lập hợp đồng / sửa hợp đồng / ghi bản sửa (rvs, phụ kiện, tu chỉnh L/C)
 // Description: Contract dossier form: header, payment + L/C, tolerance, deadline, required
 //              documents, product lines (carton / bundle), signed file. Draft-saved (rule 17).
 // ============================================================
@@ -70,7 +70,7 @@ interface ContractForm {
   changeSummary: string;
   terms: ExportContractTerms;
   lines: ExportContractLine[];
-  /** File ký đang có (sửa bản chờ duyệt) — giữ nếu không chọn file mới. */
+  /** File ký đang có (sửa hợp đồng) — giữ nếu không chọn file mới. */
   filePath: string;
   fileName: string;
   initial: string;
@@ -353,7 +353,7 @@ export function ContractFormDialog({
     head?.mode === "revise"
       ? `Ghi bản sửa ${head.revisionNo} · HĐ ${head.contractNo}`
       : head?.mode === "edit"
-        ? `Sửa bản ${head.revisionNo} đang chờ duyệt · HĐ ${head.contractNo}`
+        ? `Sửa hợp đồng · bản ${head.revisionNo} · HĐ ${head.contractNo}`
         : "Lập hợp đồng xuất khẩu";
   const currency = form?.terms.currency || "USD";
   const setDocs = (docs: ExportContractTerms["requiredDocuments"]) => setTerm("requiredDocuments", docs);
@@ -369,8 +369,8 @@ export function ContractFormDialog({
       title={title}
       description={
         head?.mode === "revise"
-          ? "Bản đang hiệu lực giữ nguyên và vẫn tra lại được. Bản sửa có hiệu lực khi Trưởng / Phó phòng Kế hoạch duyệt đồng ý."
-          : "Ghi đúng như hợp đồng giấy. Lưu xong hợp đồng ở trạng thái Chờ duyệt — Trưởng / Phó phòng Kế hoạch duyệt, rồi đính kèm hồ sơ, rồi mới ghi chuyến."
+          ? "Bản sửa có hiệu lực ngay khi lưu; bản cũ giữ lại để tra. Trưởng / Phó phòng Kế hoạch xem lại mọi bản sửa ở bước duyệt cuối."
+          : "Ghi đúng như hợp đồng giấy. Lưu xong hợp đồng ở trạng thái Chờ đính kèm — đính kèm hợp đồng đã ký (và L/C nếu thanh toán L/C) rồi mới ghi chuyến."
       }
       icon={FileSignature}
       size="xl"

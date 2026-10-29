@@ -40,11 +40,9 @@ import {
   contractTotals,
   effectiveRevision,
   isShipmentClosed,
-  latestRevision,
   missingDocumentItems,
   nextRevisionNo,
   openShipmentsOf,
-  pendingRevision,
   shipmentMonth,
   termsOf,
   workingRevision,
@@ -62,13 +60,11 @@ import { buildExportReport, buildReportExcel, parseReportPeriod, type ReportPeri
 import { ProductMappingDialog, type ProductMappingTarget } from "./ProductMappingDialog";
 import { ExportFilePreview, type PreviewTarget } from "./parts";
 import {
-  ApprovalDialog,
   AttachmentDialog,
   ExtensionDialog,
   FinalReviewDialog,
   PaymentDialog,
   ReasonDialog,
-  type ApprovalTarget,
   type AttachmentTarget,
   type FinalReviewTarget,
   type ExtensionTarget,
@@ -161,7 +157,6 @@ export default function ExportPlanningScreen() {
 
   // ---- Hộp ----
   const [contractForm, setContractForm] = useState<ContractFormTarget | null>(null);
-  const [approvalTarget, setApprovalTarget] = useState<ApprovalTarget | null>(null);
   const [finalTarget, setFinalTarget] = useState<FinalReviewTarget | null>(null);
   const [attachTarget, setAttachTarget] = useState<AttachmentTarget | null>(null);
   const [extensionTarget, setExtensionTarget] = useState<ExtensionTarget | null>(null);
@@ -236,63 +231,33 @@ export default function ExportPlanningScreen() {
       return false;
     }
     const learned = learnNames(p.contract.customerId, p.revision.lines, p.contract.contractNo);
+    // Bản vừa ghi có hiệu lực ngay (không còn bước duyệt HĐ) ⇒ chuyến còn mở nhận thêm mục chứng từ bản mới yêu cầu (R6).
+    const prevI = d.items;
+    const added = p.mode === "create" ? [] : syncDocumentItems(p.contract.id, prevI, { ...d, contracts: nextC, revisions: nextR });
+    if (added.length) store.saveItems([...prevI, ...added]);
     const what =
       p.mode === "create"
-        ? `Lập HĐ ${p.contract.contractNo} (bản 0) — chờ duyệt`
+        ? `Lập HĐ ${p.contract.contractNo} (bản 0)`
         : p.mode === "revise"
-          ? `Ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo} — chờ duyệt`
-          : `Sửa bản chờ duyệt ${p.revision.revisionNo} của HĐ ${p.contract.contractNo}`;
+          ? `Ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo} — có hiệu lực ngay`
+          : `Sửa bản ${p.revision.revisionNo} của HĐ ${p.contract.contractNo}`;
     track(p.contract.id, "", p.mode === "create" ? "create" : "update", what);
     notify.saved(
-      (p.mode === "create" ? `Đã lập HĐ ${p.contract.contractNo} — chờ Trưởng / Phó phòng Kế hoạch duyệt` : p.mode === "revise" ? `Đã ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo}` : `Đã lưu bản chờ duyệt của HĐ ${p.contract.contractNo}`) +
+      (p.mode === "create"
+        ? `Đã lập HĐ ${p.contract.contractNo} — việc tiếp: đính kèm hợp đồng đã ký`
+        : p.mode === "revise"
+          ? `Đã ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo} — có hiệu lực ngay`
+          : `Đã lưu sửa HĐ ${p.contract.contractNo}`) +
         learnedText(learned.count),
       undoTracked(p.contract.id, "", what, () => {
         store.saveContracts(prevC);
         store.saveRevisions(prevR);
+        if (added.length) store.saveItems(prevI);
         learned.undo();
       }),
     );
     setContractForm(null);
     if (p.mode === "create") setParam({ contract: p.contract.id, shipment: "" });
-    return true;
-  };
-
-  const saveApproval = (a: Parameters<React.ComponentProps<typeof ApprovalDialog>["onSave"]>[0]): boolean => {
-    const prevA = d.approvals;
-    const prevC = d.contracts;
-    const prevS = d.shipments;
-    const prevI = d.items;
-    const nextA = [...prevA, a];
-    if (!store.saveApprovals(nextA)) return false;
-    const after = { ...d, approvals: nextA };
-    const c = d.contracts.find((x) => x.id === a.contractId);
-    const rev = d.revisions.find((r) => r.id === a.revisionId);
-    let message = `Đã ghi kết quả duyệt HĐ ${c?.contractNo ?? ""}`;
-    if (a.decision === "approved" && effectiveRevision(after, a.contractId)?.id === a.revisionId) {
-      const add = syncDocumentItems(a.contractId, prevI, after);
-      if (add.length) store.saveItems([...prevI, ...add]);
-      const missing = missingAttachmentKinds(after, a.contractId, opts);
-      message = `HĐ ${c?.contractNo ?? ""}: đã duyệt — bản này có hiệu lực${missing.length ? `. Việc tiếp: đính kèm ${missing.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}` : ""}`;
-    }
-    if (a.decision === "rejected" && !effectiveRevision(after, a.contractId)) {
-      // Bản đầu bị từ chối ⇒ hủy HĐ + các chuyến còn mở (AC-8). Bản sửa bị từ chối ⇒ chỉ bỏ bản sửa.
-      const out = cancelContract(d, a.contractId, a.reason);
-      store.saveContracts(out.contracts);
-      store.saveShipments(out.shipments);
-      message = `HĐ ${c?.contractNo ?? ""} bị từ chối — đã hủy hợp đồng và các chuyến còn mở`;
-    }
-    const what = `Duyệt bản ${rev?.revisionNo ?? ""} HĐ ${c?.contractNo ?? ""}: ${a.decision === "approved" ? "đồng ý" : a.decision === "rejected" ? "từ chối" : "yêu cầu sửa"}${a.reason ? ` — ${a.reason}` : ""}`;
-    track(a.contractId, "", a.decision === "approved" ? "approve" : a.decision === "rejected" ? "reject" : "return", what);
-    notify.saved(
-      message,
-      undoTracked(a.contractId, "", what, () => {
-        store.saveApprovals(prevA);
-        store.saveContracts(prevC);
-        store.saveShipments(prevS);
-        store.saveItems(prevI);
-      }),
-    );
-    setApprovalTarget(null);
     return true;
   };
 
@@ -478,7 +443,7 @@ export default function ExportPlanningScreen() {
   /** Nối dòng hàng ↔ mặt hàng: ghi thẳng vào bản đang dùng (thông tin nội bộ, không phải bản sửa HĐ). */
   const saveProductMapping = (revisionId: string, map: Record<string, string>): boolean => {
     const prev = d.revisions;
-    // Bản chờ duyệt mới hơn nhận nối cho dòng cùng tên + size còn trống; nháp cũ không xóa nối dòng mới.
+    // Bản mới hơn nhận nối cho dòng cùng tên + size còn trống; nối ở bản cũ không xóa nối dòng mới.
     const next = applyProductMapping(prev, revisionId, map);
     if (!store.saveRevisions(next)) return false;
     const n = Object.values(map).filter(Boolean).length;
@@ -699,7 +664,7 @@ export default function ExportPlanningScreen() {
                 </Button>
               )}
               {can.create && (
-                <Button data-tour="create-contract" onClick={() => setContractForm({ mode: "create" })} title="Lập hồ sơ hợp đồng xuất khẩu mới: khách, số HĐ, điều khoản, dòng hàng. Lập xong chờ Trưởng / Phó phòng Kế hoạch duyệt.">
+                <Button data-tour="create-contract" onClick={() => setContractForm({ mode: "create" })} title="Lập hồ sơ hợp đồng xuất khẩu mới: khách, số HĐ, điều khoản, dòng hàng. Lập xong đính kèm hợp đồng đã ký rồi ghi chuyến.">
                   <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
                   Lập hợp đồng
                 </Button>
@@ -778,17 +743,13 @@ export default function ExportPlanningScreen() {
           canCancel={canCancel(d, contract.id).ok}
           onBack={() => setParam({ contract: "", shipment: "" })}
           onSelectShipment={(sid) => setParam({ shipment: sid }, true)}
-          onEditPending={() => {
-            const r = pendingRevision(d, contract.id) ?? latestRevision(d, contract.id);
+          onEditContract={() => {
+            const r = workingRevision(d, contract.id);
             if (r) setContractForm({ mode: "edit", contract, revision: r });
           }}
           onRevise={() => {
             const base = effectiveRevision(d, contract.id);
             if (base) setContractForm({ mode: "revise", contract, base, revisionNo: nextRevisionNo(d, contract.id) });
-          }}
-          onApprove={() => {
-            const r = pendingRevision(d, contract.id) ?? (!effectiveRevision(d, contract.id) ? latestRevision(d, contract.id) : null);
-            if (r) setApprovalTarget({ contractId: contract.id, contractNo: contract.contractNo, revisionId: r.id, revisionNo: r.revisionNo });
           }}
           onExtend={() => setExtensionTarget({ contractId: contract.id, contractNo: contract.contractNo, currentDeadline: termsOf(d, contract.id).latestShipmentDate })}
           onAddShipment={() => setShipmentTarget({ contractId: contract.id, contractNo: contract.contractNo, defaults: shipmentDefaults(contract) })}
@@ -880,7 +841,6 @@ export default function ExportPlanningScreen() {
         onClose={() => setContractForm(null)}
         onSave={saveContract}
       />
-      <ApprovalDialog target={approvalTarget} approverName={approverName} onClose={() => setApprovalTarget(null)} onSave={saveApproval} />
       <FinalReviewDialog target={finalTarget} approverName={approverName} onClose={() => setFinalTarget(null)} onSave={saveFinalReview} />
       <AttachmentDialog target={attachTarget} recordedBy={recordedBy} onClose={() => setAttachTarget(null)} onSave={saveAttachments} />
       <ExtensionDialog target={extensionTarget} recordedBy={recordedBy} onClose={() => setExtensionTarget(null)} onSave={saveExtension} />

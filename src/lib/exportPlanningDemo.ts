@@ -200,7 +200,8 @@ export function abbreviation(name: string): string {
  *  2. Lô 181 (LSX 17.09) · đủ hồ sơ trong dung sai ⇒ **Đã xuất đủ** · bản sửa 1 bị BGĐ từ chối.
  *  3. 2 cont theo LXH 02.01 · cont 40 + 20 cùng booking, cont 20 **dùng chung** Lệnh SX / bao bì.
  *  4. CIF · L/C · cọc 30 % · **xe tải** + **đóng ghép** · trễ hạn · 1 dòng **chưa nối** danh mục.
- *  5. **Quá hạn chưa lên chuyến** (chờ duyệt).  6. Bản 0 bị **từ chối** ⇒ hủy cả chuyến.  7. Mới lập, **chờ duyệt**.
+ *  5. **Quá hạn chưa lên chuyến** (chưa đính kèm HĐ đã ký).  6. Bản 0 bị **từ chối** ⇒ hủy cả chuyến.  7. Mới lập, **chờ đính kèm**.
+ * Lượt duyệt bản trong bộ demo là lịch sử kiểu CŨ (BGĐ ký giấy) — từ 2026-10-29 không còn bước duyệt HĐ.
  */
 export function buildExportDemo(customers: readonly Customer[], today: string, options: ExportDemoOptions = {}): ExportDemoSet {
   const { products = [], pack = null, originalNames = [], anonymize = false, priceFactor = 1 } = options;
@@ -482,7 +483,7 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
     pay(c, "", "payment", T(-35), price(71604), "L/C — cọc 30%");
   }
 
-  /* ---- 5. Quá hạn chưa lên chuyến (chờ duyệt) ---- */
+  /* ---- 5. Quá hạn chưa lên chuyến (chưa đính kèm HĐ đã ký) ---- */
   contract("11.26/BSF-MTD.2026", kh(3), T(-60), T(-30), 1, [line(id("dong"), "Boiled octopus cut 700-1000", 900, 10, price(8.95))], { pod: "Osaka, Japan", tolerance: 5, note: "Quá hạn giao mà chưa lên chuyến" });
 
   /* ---- 6. BGĐ từ chối bản 0 ⇒ hủy HĐ và chuyến kế hoạch ---- */
@@ -577,7 +578,7 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
 
   // Nhật ký hợp đồng (mig 0079): bộ demo để lại dấu các bước đã làm — trang hồ sơ có nhật ký để xem thử.
   for (const c of out.contracts) {
-    out.activities.push({ id: id("nk"), contractId: c.id, shipmentId: "", action: "create", summary: `Lập HĐ ${c.contractNo} (bản 0) — chờ duyệt`, actor: "Demo", createdAt: at(c.signedOn || today) });
+    out.activities.push({ id: id("nk"), contractId: c.id, shipmentId: "", action: "create", summary: `Lập HĐ ${c.contractNo} (bản 0)`, actor: "Demo", createdAt: at(c.signedOn || today) });
     for (const a of out.approvals.filter((x) => x.contractId === c.id)) {
       const verb = a.decision === "approved" ? "đồng ý" : a.decision === "rejected" ? "từ chối" : "yêu cầu sửa";
       out.activities.push({ id: id("nk"), contractId: c.id, shipmentId: "", action: a.decision === "approved" ? "approve" : a.decision === "rejected" ? "reject" : "return", summary: `Duyệt HĐ ${c.contractNo}: ${verb}${a.reason ? ` — ${a.reason}` : ""}`, actor: a.approverName, createdAt: a.createdAt });

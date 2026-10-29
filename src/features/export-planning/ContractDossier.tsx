@@ -45,7 +45,6 @@ import {
   lineAmount,
   lineCartons,
   lineKg,
-  pendingRevision,
   requiredDocumentLabel,
   revisionsOf,
   shipmentKindLabel,
@@ -64,7 +63,6 @@ import {
   History,
   Paperclip,
   Languages,
-  FileSignature,
   Link2,
   LockOpen,
   MoreHorizontal,
@@ -80,7 +78,7 @@ export interface DossierCan {
   create: boolean;
   update: boolean;
   delete: boolean;
-  /** Duyệt HĐ / duyệt cuối / mở lại HĐ — Trưởng, Phó phòng Kế hoạch (mig 0079). */
+  /** Duyệt cuối / mở lại HĐ — Trưởng, Phó phòng Kế hoạch (mig 0079). */
   approve: boolean;
   viewPrice: boolean;
   paymentsWrite: boolean;
@@ -98,9 +96,8 @@ export function ContractDossier({
   canCancel,
   onBack,
   onSelectShipment,
-  onEditPending,
+  onEditContract,
   onRevise,
-  onApprove,
   onExtend,
   onAddShipment,
   onCancelContract,
@@ -129,9 +126,8 @@ export function ContractDossier({
   canCancel: boolean;
   onBack: () => void;
   onSelectShipment: (id: string) => void;
-  onEditPending: () => void;
+  onEditContract: () => void;
   onRevise: () => void;
-  onApprove: () => void;
   onExtend: () => void;
   onAddShipment: () => void;
   onCancelContract: () => void;
@@ -159,7 +155,6 @@ export function ContractDossier({
 }) {
   const opts = { filesAvailable };
   const eff = effectiveRevision(data, contract.id);
-  const pending = pendingRevision(data, contract.id);
   const working = workingRevision(data, contract.id);
   const terms = working?.terms;
   const totals = working ? contractTotals(working.lines) : null;
@@ -173,7 +168,6 @@ export function ContractDossier({
   const isOpen = contract.status === "open";
   const currency = terms?.currency || "USD";
   const pay = contractPaymentSummary(data, contract.id);
-  const needsApproval = !!pending || (!eff && !!working);
   const unmapped = working ? unmappedLines(working.lines).length : 0;
   const productName = (id: string | undefined) => {
     const p = id ? products.find((x) => x.id === id) : undefined;
@@ -224,14 +218,12 @@ export function ContractDossier({
   };
 
   /**
-   * Việc làm tiếp của HĐ — MỘT nút chính (design-spec 42), theo quy trình mig 0079:
-   * duyệt HĐ → đính kèm → ghi chuyến → duyệt cuối. Người không có quyền làm chặng hiện tại thấy câu chờ.
+   * Việc làm tiếp của HĐ — MỘT nút chính (design-spec 42): đính kèm → ghi chuyến → duyệt cuối (không còn
+   * bước duyệt HĐ — 2026-10-29). Người không có quyền làm chặng hiện tại thấy câu chờ.
    */
-  const primary: "approve" | "attach" | "ship" | "final" | null = !isOpen
+  const primary: "attach" | "ship" | "final" | null = !isOpen
     ? null
-    : needsApproval && can.approve
-      ? "approve"
-      : state === "attaching" && can.update
+    : state === "attaching" && can.update
         ? "attach"
         : state === "final-review" && can.approve
           ? "final"
@@ -241,9 +233,7 @@ export function ContractDossier({
   /** Câu chờ khi chặng hiện tại không phải việc của người đang xem. */
   const waitingText = !isOpen
     ? ""
-    : needsApproval && !can.approve
-      ? "Chờ Trưởng / Phó phòng Kế hoạch duyệt hợp đồng"
-      : state === "attaching" && !can.update
+    : state === "attaching" && !can.update
         ? "Chờ Nhân viên Kế hoạch đính kèm hồ sơ"
         : state === "final-review" && !can.approve
           ? "Chờ Trưởng / Phó phòng Kế hoạch duyệt cuối để đóng hợp đồng"
@@ -252,13 +242,6 @@ export function ContractDossier({
   const menuItems: { key: string; node: React.ReactNode }[] = [];
   const menuBtn = (key: string, node: React.ReactNode) => menuItems.push({ key, node });
   if (isOpen) {
-    if (can.approve && needsApproval && primary !== "approve")
-      menuBtn("approve", (
-        <Button variant="ghost" className="w-full justify-start" onClick={onApprove} title="Duyệt bản hợp đồng đang chờ: đồng ý / yêu cầu sửa / từ chối.">
-          <FileSignature className="mr-2 h-4 w-4" aria-hidden />
-          Duyệt hợp đồng
-        </Button>
-      ));
     if (can.update && eff && primary !== "attach")
       menuBtn("attach", (
         <Button variant="ghost" className="w-full justify-start" onClick={onAttach} title="Đính kèm hồ sơ của hợp đồng: hợp đồng đã ký, L/C, proforma, hồ sơ khác.">
@@ -266,16 +249,17 @@ export function ContractDossier({
           Đính kèm hồ sơ
         </Button>
       ));
-    if (can.update && (pending || !eff))
+    // Chưa có chuyến nào dựa vào HĐ ⇒ sửa thẳng bản đang dùng (gõ nhầm lúc lập). Có chuyến rồi ⇒ ghi bản sửa để giữ dấu.
+    if (can.update && working && !shipments.length)
       menuBtn("edit", (
-        <Button variant="edit" className="w-full justify-start" onClick={onEditPending} title="Sửa bản đang chờ duyệt (chưa có hiệu lực nên sửa thẳng).">
+        <Button variant="edit" className="w-full justify-start" onClick={onEditContract} title="Sửa thẳng bản hợp đồng đang dùng — được khi hợp đồng chưa có chuyến nào.">
           <Pencil className="mr-2 h-4 w-4" aria-hidden />
-          Sửa bản chờ duyệt
+          Sửa hợp đồng
         </Button>
       ));
-    if (can.update && eff && !pending)
+    if (can.update && eff)
       menuBtn("revise", (
-        <Button variant="ghost" className="w-full justify-start" onClick={onRevise} title="Ghi bản sửa (rvs / phụ kiện / tu chỉnh L/C) — bản đang hiệu lực giữ nguyên tới khi bản sửa được duyệt.">
+        <Button variant="ghost" className="w-full justify-start" onClick={onRevise} title="Ghi bản sửa (rvs / phụ kiện / tu chỉnh L/C) — bản mới có hiệu lực ngay khi lưu, bản cũ giữ lại để tra.">
           <FilePen className="mr-2 h-4 w-4" aria-hidden />
           Ghi bản sửa
         </Button>
@@ -349,7 +333,6 @@ export function ContractDossier({
             {isOpen && lastFinal?.decision === "needs-revision" && <Tag variant="warning">Duyệt cuối trả về: {lastFinal.reason}</Tag>}
             {isOverdue && <Tag variant="error">Quá hạn giao {formatDateVN(deadline)}</Tag>}
             {isOpen && unmapped > 0 && <Tag variant="warning">{unmapped} dòng hàng chưa nối danh mục</Tag>}
-            {pending && eff && <Tag variant="warning">Bản sửa {pending.revisionNo} chờ duyệt</Tag>}
             {isOpen && !coverage.covered && (
               <Tag variant="warning">
                 Còn {coverage.missingKg > 0 ? `${formatNumber(coverage.missingKg)} kg` : ""}
@@ -368,12 +351,6 @@ export function ContractDossier({
           </div>
         </div>
         <div data-tour="next-action" className="flex flex-wrap items-center gap-2">
-          {primary === "approve" && (
-            <Button onClick={onApprove} title="Việc tiếp: duyệt bản hợp đồng đang chờ (đồng ý / yêu cầu sửa / từ chối).">
-              <FileSignature className="mr-2 h-4 w-4" aria-hidden />
-              Duyệt hợp đồng
-            </Button>
-          )}
           {primary === "attach" && (
             <Button onClick={onAttach} title={`Việc tiếp: đính kèm hồ sơ còn thiếu — ${missingKinds.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}. Đủ hồ sơ mới ghi chuyến được.`}>
               <Paperclip className="mr-2 h-4 w-4" aria-hidden />
@@ -520,7 +497,7 @@ export function ContractDossier({
       {terms && totals && (
         <CollapsibleSection
           tourTarget="contract-details"
-          title={`Điều khoản ${eff ? `· bản ${eff.revisionNo} đang hiệu lực` : "· chờ duyệt"}`}
+          title={`Điều khoản ${eff ? `· bản ${eff.revisionNo} đang hiệu lực` : "· chưa có bản hiệu lực"}`}
           summary={[terms.incoterm, terms.portOfDischarge, PAYMENT_METHODS.find((p) => p.value === terms.paymentMethod)?.label].filter(Boolean).join(" · ")}
           defaultOpen={termsFirst}
         >
@@ -590,18 +567,19 @@ export function ContractDossier({
       )}
 
       <CollapsibleSection
-        title="Các bản hợp đồng · duyệt · duyệt cuối"
+        title="Các bản hợp đồng · duyệt cuối"
         summary={`${revisions.length} bản${extensions.length ? ` · ${extensions.length} lần gia hạn` : ""}`}
-        defaultOpen={needsApproval}
+        defaultOpen={false}
       >
         {[...revisions].reverse().map((r) => {
-          const st = revisionApprovalLabelState(data, r);
+          // Lượt duyệt bản chỉ còn ở dữ liệu CŨ (trước 2026-10-29) — hiện thẻ khi có, không thì thôi.
+          const st = approvalsOf(data, r.id).length ? revisionApprovalLabelState(data, r) : null;
           return (
             <div key={r.id} className="grid gap-2 border-b border-border pb-3 text-sm last:border-b-0 last:pb-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold">Bản {r.revisionNo}</span>
                 <span className="text-muted-foreground">{formatDateVN(r.revisedOn)}</span>
-                <Tag variant={st === "approved" ? "done" : st === "rejected" ? "error" : "pending"}>{APPROVAL_LABELS[st]}</Tag>
+                {st && <Tag variant={st === "approved" ? "done" : st === "rejected" ? "error" : "muted"}>{APPROVAL_LABELS[st]}</Tag>}
                 {eff?.id === r.id && <Tag variant="source">Đang hiệu lực</Tag>}
               </div>
               {r.changeSummary && <p>{r.changeSummary}</p>}

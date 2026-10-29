@@ -54,7 +54,7 @@ export const SYSTEM_ROLE_DEPARTMENTS: Readonly<Partial<Record<Role, readonly Dep
   "team-leader": ["production-frozen", "production-fish", "production-dried"],
   // Phòng Kế hoạch (mig 0075) — hàm SQL current_user_departments() lặp lại đúng dòng này.
   planner: ["planning"],
-  // Trưởng / Phó phòng Kế hoạch (mig 0079) — duyệt hợp đồng xuất khẩu.
+  // Trưởng / Phó phòng Kế hoạch (mig 0079) — duyệt cuối hợp đồng xuất khẩu.
   "planning-head": ["planning"],
   "planning-deputy": ["planning"],
 };

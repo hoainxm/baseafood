@@ -3,6 +3,7 @@
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
 last_verified: 2026-10-29
+<!-- updated: 2026-10-29 (f) — v5 HỘP "?" DẠNG QUY TRÌNH (chủ dự án: "nhiều chữ, nên tách các bước, minh họa trực quan, nêu phân quyền"): Xuất khẩu + Nhập khẩu viết lại bằng khối `guides/flowGuide.ts` (dữ liệu: bước · quyền cần · nhóm làm · trạng thái) + `guides/FlowGuideBlocks.tsx` (Việc của bạn · Quy trình có số · chuỗi trạng thái · Ai làm gì · mẫu thanh tiến độ); hộp "?" Xuất khẩu tách ra `guides/exportPlanningGuide.tsx`; `App.tsx` bọc nội dung hộp trong `PermissionProvider`; `GuideButton` nút bắt đầu xuống dòng ở màn hẹp. R18–R21, AC-17…AC-20 (`guides/flowGuide.test.ts` đối chiếu nhóm làm ⇄ ma trận quyền thật). Tour 2 trang KHÔNG đổi. -->
 <!-- updated: 2026-10-29 (e) — tour Nhập khẩu: bước Lập hợp đồng thêm câu chọn Mặt hàng (danh mục) + gợi ý; bước Dòng hàng kể nhãn "Chưa nối" và luật chưa nối thì chưa đóng HĐ; bước Thực nhập nói đóng cần đã nối. Hộp "?" thêm mục "Nối dòng hàng với mặt hàng danh mục" (ba-spec 45 R20–R22). -->
 <!-- updated: 2026-10-29 (d) — tour Danh mục thêm bước tab "NCC nhập khẩu" (CATALOG_TAB_LABELS, câu chung "các tab danh mục trừ Thành phẩm"); tour + hộp "?" Nhập khẩu đổi chữ đối tác sang danh mục NCC nhập khẩu (ba-spec 45 v2). pageTourCoverage + catalogTour.test xanh. -->
 <!-- updated: 2026-10-29 (c) — trang MỚI `/planning-import`: `features/import-planning/importTour.ts` (11 bước, kể trạng thái lô Thiếu chứng từ → Chờ thực nhập → Đủ hồ sơ, điều kiện xong chứng từ, đóng HĐ thiếu phải có lý do) + hộp "?" `features/shared/guides/importPlanningGuide.tsx`; pageTourCoverage xanh. -->
@@ -120,6 +121,8 @@ N/A — không cross. Tour chỉ ĐỌC và DẪN; không tạo bản ghi, khôn
 | NV1 | khung lời tour ở điện thoại 360 px, chữ 130 % | nằm trọn trong màn (0 px tràn) |
 | NV5 | trang nghiệp vụ có route mà thiếu tour hoặc thiếu hộp "?" (ngoài danh sách MIỄN) | 0 |
 | NV6 | trang mới lên `main` không kèm tour | 0 (CI chặn) |
+| v5 R20 | bước hộp "?" mà nhóm làm lệch ma trận quyền | 0 (test chặn) |
+| v5 R21 | phần tử cuộn ngang / thẻ bị cắt chữ trong hộp ở 360 px × 130 % | 0 |
 
 ## 9. Rules & Invariants
 | # | Rule | Edge case |
@@ -141,6 +144,10 @@ N/A — không cross. Tour chỉ ĐỌC và DẪN; không tạo bản ghi, khôn
 | R15 | **Khuôn tour mọi trang (v4)**: bước 1 = lời giới thiệu giữa trang (không gắn chỗ) — trang làm gì, ai dùng, khâu nào của chuỗi nhập → sản xuất → kho → bán / xuất, cách đi tour; 3 ≤ số bước ≤ 22; id bước không trùng; mọi mốc `data-tour` mà bước chỉ tới có trên màn; văn phong R9; bước chỉ nút ghi (Thêm / Lưu / Chốt / Nạp…) là bước tùy chọn và chỉ có với người có quyền ghi; khu vực có trạng thái có bước giải thích trạng thái (R10) | trang báo cáo chỉ xem ⇒ tour ngắn (5–9 bước), vẫn phải giải thích cách đọc cột / cách tính |
 | R16 | **Lối vào (v4)**: nút "?" ở thanh tiêu đề là lối vào chuẩn của mọi trang (hộp R14 + Bắt đầu). Nút "Hướng dẫn thao tác" ngay trên trang chỉ thêm cho trang nhiều khối, theo khuôn Xuất khẩu (`outline`, icon `Route`, `data-tour-start`) | — |
 | R17 | **Đồng bộ trang ⇄ tour (v4)**: đổi khu vực / nhãn trạng thái / nút chính của trang ⇒ sửa tour + hộp "?" cùng commit; mốc `data-tour` ổn định (đổi tên mốc = sửa bước) | mốc bị xoá khỏi màn ⇒ test "mốc có trên trang" đỏ |
+| R18 | **Hộp "?" dạng quy trình (v5)** — trang có luồng nhiều người (đầu tiên: Xuất khẩu, Nhập khẩu) viết hộp bằng khối dữ liệu (`guides/flowGuide.ts`), không bằng đoạn văn: (1) ô **Việc của bạn**; (2) **Quy trình** 3–8 bước có số, mỗi bước: tên · nhóm làm · việc làm (≤ 2 câu, gọi đúng tên nút) · điều kiện xong · trạng thái sau bước; (3) **chuỗi trạng thái** dùng đúng nhãn + màu thẻ của trang, mỗi trạng thái: nghĩa + việc tiếp · ai làm; (4) **Ai làm gì** — thẻ mỗi nhóm, danh sách bước LẤY TỪ quy trình (không viết tay lần hai); (5) Mẹo ngắn | trang chỉ một người dùng / báo cáo ⇒ giữ hộp dạng danh sách (R14) |
+| R19 | **Việc của bạn theo quyền thật** — bước được đánh dấu khi tài khoản đang đăng nhập có quyền `needs` của bước (`can()`), không suy từ tên vai trò ⇒ vai trò tự tạo, quyền riêng từng người cũng đúng. Không bước nào ⇒ "chỉ xem trang này". Hộp "?" nằm ngoài thân trang ⇒ `App.tsx` bọc nội dung hộp trong `PermissionProvider` | admin ⇒ mọi bước |
+| R20 | **Nhóm làm khớp ma trận quyền** — với mỗi bước, tập vai trò hệ thống (trừ admin) của các nhóm ghi ở bước == tập vai trò có quyền `needs` theo ma trận mặc định (`lib/permissions.ts`); mọi vai trò xem được trang nằm trong đúng một nhóm. Đổi ma trận quyền mà quên hộp ⇒ test đỏ | quyền chỉnh tay ở "Vai trò & quyền" không làm đỏ test (R19 vẫn hiện đúng cho người đó) |
+| R21 | **Ít chữ, đọc được ở 360 px × 130 %** — mỗi bước ≤ 2 câu; thẻ trạng thái không bị cắt chữ; hộp không cuộn ngang. Màn hẹp: số bước vào dòng tiêu đề (bỏ cột số), bỏ mũi tên trước thẻ kết quả | — |
 
 ## 9b. Kiểm kê nội dung (nhánh nội dung — skill ba-flow-logic references/06)
 Mỗi dòng: người đọc gặp gì · lời phải nói gì · nguồn. Văn phong: `src/design-system/noi-dung-va-label.md` (R9).
@@ -295,6 +302,12 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
 | Từng danh mục | tên tiếng Anh mặc định; tên hàng trên chứng từ (trích xuất không ghi đè); bột là phụ gia; 141 mã chỉ tra | 32; 41 R23 R26 | products … finished-goods |
 | Sửa tại chỗ | gõ tên mới trong ô chọn là tạo; bút chì sửa nhanh | CLAUDE.md quy tắc 7 | quick-edit |
 
+### Hộp "?" dạng quy trình (v5) — `/planning-export`, `/planning-import`
+| Trang | Nhóm (vai trò) | Bước (quyền cần → nhóm) | Trạng thái (nguồn) |
+|---|---|---|---|
+| Xuất khẩu `guides/exportPlanningGuide.tsx` | Nhân viên KH (`planner`) · Trưởng / Phó KH (`planning-head`, `planning-deputy`) · Người đóng hàng (`warehouse-keeper`, 3 quản đốc, `vice-manager`) · Kế toán (`chief-accountant`, `accountant`) · BGĐ chỉ xem | 1 Lập HĐ (`export-plans` create → KH) · 2 Đính kèm hồ sơ (update → KH) · 3 Ghi chuyến (create → KH) · 4 Làm các bước của chuyến (update → KH) · 5 Ảnh và sơ đồ đóng cont (`.loading` create → Người đóng hàng + KH) · 6 Gửi chứng từ · tiền về (`.payments` create → Kế toán + KH) · 7 Duyệt cuối (approve → Trưởng / Phó) | HĐ: `CONTRACT_STATE_LABELS` (41 §0a); mục: `ITEM_STATE_LABELS`; thanh 6 khúc: `STEP_TITLES` |
+| Nhập khẩu `guides/importPlanningGuide.tsx` | Phòng Kế hoạch (`planner`, `planning-head`, `planning-deputy`) · Thủ kho (`warehouse-keeper`) · BGĐ + Kế toán chỉ xem | 1 Lập HĐ nhập (`import-plans` create) · 2 Ghi lần nhập (create) · 3 Đính bộ chứng từ (update) · 4 Ghi thực nhập (`.receiving` create → Thủ kho + KH) · 5 Đóng HĐ (update) | lần nhập: `RECEIPT_STATE_LABELS`; HĐ: `CONTRACT_STATE_LABELS` (45 R6); nối mặt hàng: 45 R20–R22 |
+
 ## 10. Acceptance Criteria — ORACLE
 > Repo chưa có harness E2E (màn hình thử tay trên preview — CLAUDE.md). Phần thuần (chọn hồ sơ, dựng bước, tính bước kế) = **unit**; phần trên trang = **manual** bằng script đo trên preview demo (lý do: không có e2e runner), Assert vẫn là số đo được.
 
@@ -386,6 +399,22 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
 - **When** mở từng trang, bắt đầu tour, đi tới Kết thúc
 - **Assert** mỗi trang: băm khóa `bsf*` trước == sau; số bước bắt buộc hiện lời giữa trang vì thiếu mốc == 0 (trừ bước 1); `documentElement.scrollWidth == clientWidth`; `location.hash` sau khi thoát == trước khi bắt đầu
 
+### AC-17 — Nhóm làm của từng bước khớp ma trận quyền · Maps to: R20 · Test: unit
+- **Given** hộp "?" dạng quy trình của Xuất khẩu / Nhập khẩu · **When** đối chiếu mỗi bước với `resolvePermissions` từng vai trò hệ thống · **Then** tập vai trò của nhóm ghi ở bước == tập vai trò có quyền `needs`; mọi vai trò có `view` trang nằm trong đúng 1 nhóm.
+- **Assert**: `rolesOfActors(step) == rolesWith(step)` cho 7 / 7 bước Xuất khẩu, 5 / 5 bước Nhập khẩu (`guides/flowGuide.test.ts`).
+
+### AC-18 — Hộp phủ đủ nhãn trạng thái · Maps to: R18, R10 · Test: unit
+- **Given** hằng số nhãn trong `lib/exportPlanning.ts`, `lib/importPlanning.ts` · **When** gom nhãn các chuỗi trạng thái của hộp · **Then** == toàn bộ nhãn.
+- **Assert**: nhãn thiếu == 0 (HĐ xuất 5, mục 4, lần nhập 4, HĐ nhập 4).
+
+### AC-19 — Việc của bạn theo quyền thật · Maps to: R19 · Test: unit
+- **Given** quyền mặc định · **When** tính bước của người xem · **Then** `planner` Xuất khẩu = 6 bước (trừ Duyệt cuối); `planning-head` = 7; `warehouse-keeper` = ["loading"] (Xuất khẩu), ["quantity"] (Nhập khẩu); `accountant` = ["payments"] (Xuất khẩu), [] (Nhập khẩu); `director` = [].
+- **Assert**: `stepsForViewer(...)` đúng các mảng trên.
+
+### AC-20 — Ít chữ, không tràn ở điện thoại · Maps to: R21 · Test: unit + manual
+- **Given** hộp "?" hai trang · **When** đếm câu / mở ở 360 px chữ 130 % · **Then** 3 ≤ số bước ≤ 8, mỗi bước ≤ 2 câu; trong hộp không phần tử nào cuộn ngang, không thẻ nào bị cắt chữ.
+- **Assert**: unit đếm câu (`flowGuide.test.ts`); manual 2026-10-29 trên preview demo: `scrollWidth == clientWidth` mọi phần tử hộp, `document.scrollWidth == 360`, 0 thẻ `.truncate` bị cắt — cả hai trang.
+
 ## 11. Assumptions / Open
 - **Assumptions**: tour không tự bật lần đầu và không nhớ "đã xem" (R8, OUT); lối vào ở cả hộp "?" của trang lẫn một nút phụ trên trang (cùng một tour); chữ tour viết theo giọng hướng dẫn hiện có (nói việc, không thuật ngữ); tour dùng dữ liệu đang có (thật hay demo đều được) — không sinh số mẫu (quy tắc 15).
 - **Open (RED)**: không có.
@@ -401,6 +430,7 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
   - Chữ trên vài màn còn "Bấm …" (Nhập hàng, Việc của tôi, Tài liệu, Đóng gói, Đối soát, QR) và empty state "Sản xuất BTP" (menu: "Sản xuất thành phẩm"). Hộp "?" (guideContent) đã sửa theo code ở v4.
 
 ## History
+- v5 (2026-10-29, chủ dự án: "trang hướng dẫn Nhập khẩu, Xuất khẩu chưa chính xác, nhiều chữ — tách bước, minh họa trực quan, nêu phân quyền để biết việc mình"): R18–R21, AC-17…AC-20, §9c mục hộp dạng quy trình. Orchestrator tự chấm (nhánh nội dung, 2 trang, khuôn đã có) — cân 3 biến thể: (a) viết lại đoạn văn ngắn hơn *(loại — vẫn không thấy ai làm bước nào, quyền lệch không ai biết)*; (b) ảnh sơ đồ tĩnh *(loại — lệch khi đổi nhãn / quyền, không đọc được ở 130 %)*; (c) khai bước + quyền cần + nhóm làm thành dữ liệu, hộp vẽ từ dữ liệu, đánh dấu Việc của bạn theo quyền thật, test đối chiếu ma trận *(chọn)*. Rà đúng luồng: Xuất khẩu theo 41 §0a v9 (bỏ duyệt HĐ, thêm bước của Người đóng hàng và Kế toán mà hộp cũ không nói); Nhập khẩu theo 45 R1–R9 + v3 R20 (giữ phần nối mặt hàng phiên khác vừa thêm). Tour hai trang không đổi.
 - v4 (2026-10-22, chủ dự án: "bổ sung hướng dẫn thao tác cho các trang đã có và sau này, ghi quy tắc"): mở rộng ra MỌI trang nghiệp vụ (NV5, NV6), R13–R17, AC-12…AC-16, quy tắc 18 (CLAUDE.md), cổng `pageTourCoverage.test.ts` (route ⇄ tour ⇄ hộp "?" ⇄ mốc). Hộp "?" bổ sung cho 7 trang còn thiếu (Sản xuất, Đóng gói, QC, Tồn kho NL, NXT kho, Đối soát, Tổng quan). Orchestrator tự chấm (việc lặp khuôn đã duyệt ở v1–v3, không spawn team BA); viết lời giao cho 7 agent theo nhóm trang, mỗi trang kiểm kê nội dung riêng (§9c).
 - v3 (2026-10-21): áp nhánh nội dung (skill ba-flow-logic references/06) — §9b kiểm kê có nguồn, R10–R12, AC-10 phủ nhãn + AC-11 văn phong (unit, đọc thẳng hằng số nhãn).
 - v2 (2026-10-21): theo góp ý chủ dự án — tên "Hướng dẫn thao tác", lời viết lại theo văn phong tài liệu (R9), thêm bước giải thích trạng thái hợp đồng / chuyến / mục và điều kiện file; R5 trả cả vị trí cuộn; giới hạn 22 bước. Đã chạy: 21 bước đạt ở 1366 px và 360 px × 100 / 130 % (0 bước khuất / đè / tràn), dữ liệu dưới máy không đổi, đường dẫn trả về.

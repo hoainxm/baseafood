@@ -1,0 +1,172 @@
+// ============================================================
+// Tên file: src/features/shared/guides/exportPlanningGuide.tsx
+// Tên tiếng Việt: Hộp "Hướng dẫn: Xuất khẩu" (nút "?" ở thanh tiêu đề)
+// Description: Flow-style guide for /planning-export (ba-spec 43 v5 + 41 §0a v9): your work, 7 steps
+//              with who + done condition, contract states, shipment progress bar, who-does-what.
+//              Tour: export-planning/exportTour.ts.
+// ============================================================
+import { CONTRACT_STATE_LABELS, ITEM_STATE_LABELS, STEP_TITLES } from "@/lib/exportPlanning";
+import type { PageGuide } from "../guideContent";
+import type { GuideActor, GuideFlowStep, GuideState } from "./flowGuide";
+import { GuideActors, GuideFlow, GuideProgressSample, GuideStates, GuideYourWork } from "./FlowGuideBlocks";
+import { GuideList, GuideSection } from "./parts";
+
+export const EXPORT_GUIDE_ACTORS: readonly GuideActor[] = [
+  { id: "planner", name: "Nhân viên Kế hoạch", roles: ["planner"] },
+  {
+    id: "head",
+    name: "Trưởng / Phó phòng Kế hoạch",
+    note: "Làm được mọi việc của Nhân viên Kế hoạch, thêm duyệt cuối và mở lại hợp đồng.",
+    roles: ["planning-head", "planning-deputy"],
+  },
+  {
+    id: "loader",
+    name: "Người đóng hàng",
+    note: "Thủ kho, Quản đốc, Phó quản đốc. Mở trang chỉ thấy chuyến sắp / vừa đóng cont.",
+    roles: ["warehouse-keeper", "manager-dong", "manager-ca", "manager-kho", "vice-manager"],
+  },
+  { id: "accounting", name: "Kế toán", note: "Kế toán trưởng, Kế toán. Xem được hợp đồng và giá.", roles: ["chief-accountant", "accountant"] },
+  { id: "board", name: "Ban giám đốc", note: "Xem hợp đồng, chuyến và giá.", roles: ["director", "vice-director"], viewOnly: true },
+];
+
+const KH = ["planner", "head"] as const;
+
+export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
+  {
+    id: "create",
+    title: "Lập hợp đồng",
+    needs: ["export-plans", "create"],
+    actors: KH,
+    text: "Chọn Lập hợp đồng, nhập đúng như bản giấy: khách, dòng hàng, giá, điều kiện giao, hạn giao.",
+    done: "Lưu xong, không cần ai duyệt",
+    result: { label: CONTRACT_STATE_LABELS.attaching, tone: "warning" },
+  },
+  {
+    id: "attach",
+    title: "Đính kèm hồ sơ",
+    needs: ["export-plans", "update"],
+    actors: KH,
+    text: "Ở hồ sơ hợp đồng chọn Đính kèm hồ sơ: hợp đồng đã ký, thêm L/C nếu thanh toán L/C.",
+    done: "Đủ hồ sơ bắt buộc",
+    result: { label: CONTRACT_STATE_LABELS.shipping, tone: "source" },
+  },
+  {
+    id: "ship",
+    title: "Ghi chuyến",
+    needs: ["export-plans", "create"],
+    actors: KH,
+    text: "Chọn Ghi chuyến cho từng container, xe tải hoặc lô đóng ghép: số lượng, booking, số cont, ETD.",
+    done: "Mọi dòng hàng đã có chuyến (còn thiếu thì hiện thẻ Còn … chưa ghi chuyến)",
+  },
+  {
+    id: "steps",
+    title: "Làm các bước của chuyến",
+    needs: ["export-plans", "update"],
+    actors: KH,
+    text: "Mỗi chuyến làm Lệnh sản xuất, Bao bì, Đóng cont, Bộ chứng từ: đính file, ghi số và ngày. Bước 1 Hợp đồng tự xong.",
+    done: "Đủ 5 bước bắt buộc",
+    result: { label: "Đủ hồ sơ", tone: "done" },
+  },
+  {
+    id: "loading",
+    title: "Ảnh và sơ đồ đóng cont",
+    needs: ["export-plans.loading", "create"],
+    actors: ["loader", ...KH],
+    text: "Lúc đóng cont: chụp ảnh lớp hàng, seal, số cont; đính sơ đồ container. Đây là mục 4a, 4b của bước Đóng cont.",
+    done: "Có file là mục tự Xong",
+  },
+  {
+    id: "payments",
+    title: "Gửi chứng từ · tiền về",
+    needs: ["export-plans.payments", "create"],
+    actors: ["accounting", ...KH],
+    text: "Bước 6 của chuyến: ghi ngày gửi bộ chứng từ cho khách và từng lần tiền về.",
+    done: "Số phải thu = tiền trên Commercial Invoice. Bước này không tính vào đủ hồ sơ",
+  },
+  {
+    id: "final",
+    title: "Duyệt cuối",
+    needs: ["export-plans", "approve"],
+    actors: ["head"],
+    text: "Hợp đồng Chờ duyệt cuối thì chọn Duyệt cuối: xem lại hợp đồng (cả các bản sửa) và hồ sơ chuyến. Chưa ổn thì trả về kèm lý do.",
+    done: "Đồng ý",
+    result: { label: CONTRACT_STATE_LABELS.closed, tone: "done" },
+  },
+];
+
+export const EXPORT_GUIDE_CONTRACT_STATES: readonly GuideState[] = [
+  {
+    label: CONTRACT_STATE_LABELS.attaching,
+    tone: "warning",
+    meaning: "Vừa lập, hoặc còn thiếu hồ sơ bắt buộc (thẻ Thiếu ghi rõ loại). Chưa ghi chuyến được.",
+    next: "Đính kèm hồ sơ · Nhân viên Kế hoạch.",
+  },
+  {
+    label: CONTRACT_STATE_LABELS.shipping,
+    tone: "source",
+    meaning: "Đủ hồ sơ, đang ghi và theo dõi các chuyến.",
+    next: "Ghi chuyến, làm các bước tới khi mọi chuyến Đủ hồ sơ và thực xuất trong dung sai cả kg lẫn tiền.",
+  },
+  {
+    label: CONTRACT_STATE_LABELS["final-review"],
+    tone: "pending",
+    meaning: "Mọi chuyến đủ hồ sơ, đã xuất đủ trong dung sai.",
+    next: "Duyệt cuối · Trưởng / Phó phòng Kế hoạch. Nhân viên Kế hoạch không duyệt được.",
+  },
+  {
+    label: CONTRACT_STATE_LABELS.closed,
+    tone: "done",
+    meaning: "Đã duyệt cuối, hoặc đóng sớm có lý do.",
+    next: "Cần sửa thì Trưởng / Phó phòng mở lại.",
+  },
+];
+export const EXPORT_GUIDE_SIDE_STATES: readonly GuideState[] = [
+  { label: CONTRACT_STATE_LABELS.cancelled, tone: "muted", meaning: "Hợp đồng đã hủy, có ghi lý do." },
+];
+
+export const EXPORT_GUIDE_ITEM_STATES: readonly GuideState[] = [
+  { label: ITEM_STATE_LABELS["not-started"], tone: "muted", meaning: "Chưa có gì." },
+  { label: ITEM_STATE_LABELS["in-progress"], tone: "warning", meaning: "Đã ghi một phần, còn thiếu file, số hoặc ngày." },
+  {
+    label: ITEM_STATE_LABELS.done,
+    tone: "done",
+    meaning: "Đủ giấy tờ theo từng loại: file, số chứng từ, ngày. Sơ đồ container và ảnh đóng cont tự Xong khi có file.",
+  },
+];
+export const EXPORT_GUIDE_ITEM_SIDE: readonly GuideState[] = [
+  { label: ITEM_STATE_LABELS["not-applicable"], tone: "muted", meaning: "Chuyến không cần mục này. Phải ghi lý do." },
+];
+
+export const exportPlanningGuide: PageGuide = {
+  title: "Xuất khẩu",
+  description: "Hợp đồng xuất khẩu đi từ lập → đính kèm hồ sơ → ghi chuyến → duyệt cuối. Chỉ có một lần duyệt, ở cuối.",
+  content: (
+    <>
+      <GuideYourWork steps={EXPORT_GUIDE_STEPS} />
+      <GuideSection title="Quy trình">
+        <GuideFlow steps={EXPORT_GUIDE_STEPS} actors={EXPORT_GUIDE_ACTORS} />
+      </GuideSection>
+      <GuideSection title="Trạng thái hợp đồng">
+        <GuideStates states={EXPORT_GUIDE_CONTRACT_STATES} side={EXPORT_GUIDE_SIDE_STATES} />
+      </GuideSection>
+      <GuideSection title="Một chuyến có 6 bước">
+        <GuideProgressSample titles={STEP_TITLES} />
+        <GuideStates states={EXPORT_GUIDE_ITEM_STATES} side={EXPORT_GUIDE_ITEM_SIDE} />
+        <GuideList>
+          <li>Đầu mỗi bước ghi <b>Còn thiếu</b> kèm tên mục chưa xong.</li>
+          <li>Thẻ <b>Trễ hạn</b>: chuyến quá hạn giao. Thẻ <b>Chờ booking</b>: chưa có số booking và số container.</li>
+        </GuideList>
+      </GuideSection>
+      <GuideSection title="Ai làm gì">
+        <GuideActors steps={EXPORT_GUIDE_STEPS} actors={EXPORT_GUIDE_ACTORS} />
+      </GuideSection>
+      <GuideSection title="Mẹo">
+        <GuideList>
+          <li>Việc ít dùng nằm ở <b>Thao tác khác</b>: Sửa hợp đồng (khi chưa có chuyến), Ghi bản sửa (khi đã có chuyến), Gia hạn giao hàng, hủy.</li>
+          <li>Cuối hồ sơ có <b>Nhật ký thao tác</b>: ai làm gì, lúc nào. Chỉ thêm, không sửa hay xóa được.</li>
+          <li>Rê chuột hoặc chạm vào chữ gạch chấm như <b>ETD</b>, <b>L/C</b>, <b>B/L</b> để xem nghĩa.</li>
+        </GuideList>
+      </GuideSection>
+    </>
+  ),
+};

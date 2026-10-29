@@ -62,6 +62,8 @@ export function GuideButton({
             <p className="min-w-0 flex-1 basis-56 text-sm">Hướng dẫn thao tác chỉ lần lượt từng khu vực trên trang này theo thứ tự công việc. Hướng dẫn không thay đổi dữ liệu.</p>
             <Button
               data-tour-start
+              // Màn hẹp + chữ to: chữ nút xuống dòng thay vì tràn khỏi hộp.
+              className="h-auto min-h-10 max-w-full whitespace-normal py-2 text-left"
               onClick={() => {
                 setOpen(false);
                 // Đợi hộp đóng xong rồi mới phủ lớp tour (khỏi tranh tiêu điểm với hộp).

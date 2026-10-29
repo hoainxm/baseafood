@@ -222,7 +222,16 @@ function ShellLayout() {
       account={username}
       guide={
         guide
-          ? { title: guide.title, description: guide.description, content: guide.content }
+          ? {
+              title: guide.title,
+              description: guide.description,
+              // Hộp "?" nằm ngoài PermissionProvider của thân trang ⇒ bọc riêng để hộp đánh dấu "Việc của bạn" (ba-spec 43 R19).
+              content: (
+                <PermissionProvider permissions={permissions} scopeContext={scopeContext}>
+                  {guide.content}
+                </PermissionProvider>
+              ),
+            }
           : null
       }
       displayName={

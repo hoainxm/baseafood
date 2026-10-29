@@ -1,82 +1,150 @@
 // ============================================================
 // Tên file: src/features/shared/guides/importPlanningGuide.tsx
 // Tên tiếng Việt: Hộp "Hướng dẫn: Nhập khẩu" (nút "?" ở thanh tiêu đề)
-// Description: Static guide for the import planning page (/planning-import). Source: ba-spec 45
-//              (R1, R4–R7) + lib/importPlanning.ts labels. Tour: import-planning/importTour.ts.
+// Description: Flow-style guide for /planning-import (ba-spec 43 v5 + 45 R1, R4–R7, R9, v3 R20):
+//              your work, 5 steps with who + done condition, receipt / contract states, product
+//              mapping, who-does-what. Tour: import-planning/importTour.ts.
 // ============================================================
+import { CONTRACT_STATE_LABELS, RECEIPT_STATE_LABELS } from "@/lib/importPlanning";
 import type { PageGuide } from "../guideContent";
-import { GuideList, GuideSection, GuideSteps } from "./parts";
+import type { GuideActor, GuideFlowStep, GuideState } from "./flowGuide";
+import { GuideActors, GuideFlow, GuideStates, GuideYourWork } from "./FlowGuideBlocks";
+import { GuideList, GuideSection } from "./parts";
+
+export const IMPORT_GUIDE_ACTORS: readonly GuideActor[] = [
+  { id: "planning", name: "Phòng Kế hoạch", note: "Nhân viên, Trưởng, Phó phòng Kế hoạch.", roles: ["planner", "planning-head", "planning-deputy"] },
+  {
+    id: "keeper",
+    name: "Thủ kho",
+    note: "Mở trang chỉ thấy các lô hàng về trong tháng để ghi thực nhập. Không thấy giá, không mở file chứng từ.",
+    roles: ["warehouse-keeper"],
+  },
+  {
+    id: "viewers",
+    name: "Ban giám đốc, Kế toán",
+    note: "Xem hợp đồng, lần nhập, giá và chứng từ.",
+    roles: ["director", "vice-director", "chief-accountant", "accountant"],
+    viewOnly: true,
+  },
+];
+
+export const IMPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
+  {
+    id: "contract",
+    title: "Lập hợp đồng nhập",
+    needs: ["import-plans", "create"],
+    actors: ["planning"],
+    text: "Chọn Lập hợp đồng nhập: đối tác (danh mục NCC nhập khẩu), số hợp đồng, ngày ký, loại hình. Mỗi dòng hàng ghi tên như trên hợp đồng, mặt hàng (danh mục), kg, đơn giá.",
+    done: "Lưu xong, không cần ai duyệt",
+    result: { label: CONTRACT_STATE_LABELS["no-receipts"], tone: "muted" },
+  },
+  {
+    id: "receipt",
+    title: "Ghi lần nhập",
+    needs: ["import-plans", "create"],
+    actors: ["planning"],
+    text: "Hàng sắp về: ở hồ sơ hợp đồng chọn Ghi lần nhập. Ghi ngày về kho (chưa về thì ngày dự kiến), cont lạnh 20 / 40 hoặc hàng lẻ, số cont, số B/L.",
+    done: "Lần nhập mới có sẵn 3 chứng từ bắt buộc",
+    result: { label: RECEIPT_STATE_LABELS["missing-docs"], tone: "warning" },
+  },
+  {
+    id: "docs",
+    title: "Đính bộ chứng từ",
+    needs: ["import-plans", "update"],
+    actors: ["planning"],
+    text: "Chọn Cập nhật ở Commercial Invoice, Packing List, tờ khai nhập khẩu để đính file, ghi số và ngày. C/O, giấy kiểm dịch, B/L có thì chọn Thêm chứng từ.",
+    done: "Đủ 3 chứng từ bắt buộc",
+    result: { label: RECEIPT_STATE_LABELS["awaiting-quantity"], tone: "pending" },
+  },
+  {
+    id: "quantity",
+    title: "Ghi thực nhập",
+    needs: ["import-plans.receiving", "create"],
+    actors: ["keeper", "planning"],
+    text: "Hàng về kho: chọn Ghi thực nhập, ghi số kg từng dòng hàng theo invoice.",
+    done: "Đủ chứng từ và đã có thực nhập",
+    result: { label: RECEIPT_STATE_LABELS.complete, tone: "done" },
+  },
+  {
+    id: "close",
+    title: "Đóng hợp đồng",
+    needs: ["import-plans", "update"],
+    actors: ["planning"],
+    text: "Nhập xong: Thao tác khác → Đóng hợp đồng. Mọi dòng hàng phải đã nối mặt hàng; còn dòng chưa về đủ thì ghi lý do.",
+    done: "Không cần ai duyệt",
+    result: { label: CONTRACT_STATE_LABELS.closed, tone: "done" },
+  },
+];
+
+export const IMPORT_GUIDE_RECEIPT_STATES: readonly GuideState[] = [
+  {
+    label: RECEIPT_STATE_LABELS["missing-docs"],
+    tone: "warning",
+    meaning: "Chưa đủ Commercial Invoice, Packing List, tờ khai nhập khẩu. Dòng Còn thiếu ghi tên chứng từ.",
+    next: "Đính chứng từ · Phòng Kế hoạch.",
+  },
+  {
+    label: RECEIPT_STATE_LABELS["awaiting-quantity"],
+    tone: "pending",
+    meaning: "Chứng từ đã đủ, chưa ghi số kg thực nhập.",
+    next: "Ghi thực nhập · Thủ kho.",
+  },
+  { label: RECEIPT_STATE_LABELS.complete, tone: "done", meaning: "Đủ 3 chứng từ bắt buộc và đã có thực nhập." },
+];
+export const IMPORT_GUIDE_RECEIPT_SIDE: readonly GuideState[] = [
+  { label: RECEIPT_STATE_LABELS.cancelled, tone: "muted", meaning: "Không tính vào tháng và số đã về. Khôi phục được khi hợp đồng còn mở." },
+];
+
+export const IMPORT_GUIDE_CONTRACT_STATES: readonly GuideState[] = [
+  { label: CONTRACT_STATE_LABELS["no-receipts"], tone: "muted", meaning: "Vừa lập, chưa có lần hàng về nào.", next: "Ghi lần nhập khi hàng sắp về." },
+  { label: CONTRACT_STATE_LABELS.receiving, tone: "source", meaning: "Có ít nhất một lần nhập.", next: "Nhập xong thì Đóng hợp đồng." },
+  { label: CONTRACT_STATE_LABELS.closed, tone: "done", meaning: "Không ghi lần nhập mới, không ghi thực nhập.", next: "Cần ghi thêm thì Mở lại hợp đồng." },
+];
+export const IMPORT_GUIDE_CONTRACT_SIDE: readonly GuideState[] = [
+  { label: CONTRACT_STATE_LABELS.cancelled, tone: "muted", meaning: "Hủy hợp đồng thì mọi lần nhập hủy theo." },
+];
 
 export const importPlanningGuide: PageGuide = {
   title: "Nhập khẩu",
-  description: "Hợp đồng nhập với nhà cung cấp nước ngoài, chứng từ từng lần hàng về và số lượng thực nhập. Khác trang Nhập hàng (nguyên liệu trong nước).",
+  description: "Hợp đồng nhập với nhà cung cấp nước ngoài, chứng từ từng lần hàng về và số thực nhập. Khác trang Nhập hàng (nguyên liệu trong nước).",
   content: (
     <>
-      <GuideSection title="Trình tự công việc">
-        <GuideSteps>
-          <li>
-            <b>Lập hợp đồng nhập</b>: chọn đối tác trong danh mục <b>NCC nhập khẩu</b> (Danh mục → tab NCC nhập khẩu, khác Đại lý của Nhập hàng; thêm mới ngay trong ô được), ghi số hợp đồng, ngày ký, <b>loại hình</b> (sản xuất xuất khẩu · kinh doanh · gia công) và từng dòng hàng: tên hàng (như trên hợp đồng), <b>mặt hàng (danh mục)</b>, số lượng (kg), đơn giá. Hàng gia công không ghi giá thì để trống đơn giá.
-          </li>
-          <li>
-            Khi hàng sắp về, ở hồ sơ hợp đồng chọn <b>Ghi lần nhập</b>: ngày về kho (chưa về thì ngày dự kiến), cont lạnh 20 / 40 hoặc hàng lẻ, số cont, số B/L.
-          </li>
-          <li>
-            Đính <b>bộ chứng từ</b> của lần nhập: 3 chứng từ bắt buộc có sẵn, chọn <b>Cập nhật</b> để ghi số, ngày, file. C/O, giấy kiểm dịch, B/L: có thì chọn <b>Thêm chứng từ</b>.
-          </li>
-          <li>
-            Hàng về kho: thủ kho chọn <b>Ghi thực nhập</b>, ghi số kg của từng dòng hàng theo invoice.
-          </li>
-          <li>
-            Nhập xong thì <b>Đóng hợp đồng</b> (Thao tác khác). Mọi dòng hàng phải đã nối mặt hàng. Còn dòng chưa về đủ vẫn đóng được nhưng phải ghi lý do. Không cần ai duyệt.
-          </li>
-        </GuideSteps>
+      <GuideYourWork steps={IMPORT_GUIDE_STEPS} />
+      <GuideSection title="Quy trình">
+        <GuideFlow steps={IMPORT_GUIDE_STEPS} actors={IMPORT_GUIDE_ACTORS} />
       </GuideSection>
-      <GuideSection title="Trạng thái của lần nhập">
-        <GuideList>
-          <li>
-            <b>Thiếu chứng từ</b>: chưa đủ Commercial Invoice, Packing List, tờ khai nhập khẩu. Dòng <b>Còn thiếu</b> ghi tên chứng từ còn thiếu. Việc tiếp: đính file.
-          </li>
-          <li>
-            <b>Chờ thực nhập</b>: chứng từ đã đủ, chưa ghi số kg thực nhập. Việc tiếp: thủ kho Ghi thực nhập.
-          </li>
-          <li>
-            <b>Đủ hồ sơ</b>: đủ 3 chứng từ bắt buộc và đã có thực nhập.
-          </li>
-          <li>
-            <b>Đã hủy</b>: không tính vào tháng và số đã về. Khôi phục được khi hợp đồng còn mở.
-          </li>
-        </GuideList>
+      <GuideSection title="Trạng thái lần nhập">
+        <GuideStates states={IMPORT_GUIDE_RECEIPT_STATES} side={IMPORT_GUIDE_RECEIPT_SIDE} />
+      </GuideSection>
+      <GuideSection title="Trạng thái hợp đồng">
+        <GuideStates states={IMPORT_GUIDE_CONTRACT_STATES} side={IMPORT_GUIDE_CONTRACT_SIDE} />
       </GuideSection>
       <GuideSection title="Khi nào một chứng từ là xong">
         <GuideList>
           <li>Đã đính ít nhất một file. Tờ khai nhập khẩu cần thêm số tờ khai và loại hình.</li>
           <li>Lô không có chứng từ bắt buộc đó: chọn <b>Không áp dụng</b> và ghi lý do (VD hàng mẫu).</li>
-          <li>Chứng từ bắt buộc không xóa được; chứng từ thêm (C/O, kiểm dịch, B/L, khác) xóa được, có Hoàn tác.</li>
+          <li>Chứng từ bắt buộc không xóa được. Chứng từ thêm xóa được, có Hoàn tác.</li>
         </GuideList>
       </GuideSection>
-      <GuideSection title="Trạng thái của hợp đồng và số còn lại">
+      <GuideSection title="Nối dòng hàng với mặt hàng">
         <GuideList>
           <li>
-            <b>Chưa có lần nhập</b> → <b>Đang nhập</b> (có ít nhất một lần nhập) → <b>Đã đóng</b>. Hủy hợp đồng thì mọi lần nhập hủy theo.
+            Mỗi dòng hàng nối <b>một mặt hàng</b> ở Danh mục → Mặt hàng, để Nhập khẩu, sản xuất, kho và Xuất khẩu gọi cùng một tên. Tên như trên hợp đồng giữ nguyên.
           </li>
+          <li>App tự gợi ý khi tên đó đã nối ở hợp đồng nhập trước, hoặc trùng tên tiếng Anh của đúng một mặt hàng. Gợi ý thì kiểm lại. Chưa có thì gõ tên để thêm mới ngay trong ô.</li>
           <li>
-            <b>Còn lại</b> của dòng hàng = kg hợp đồng − tổng thực nhập các lần nhập chưa hủy. Về nhiều hơn hợp đồng thì hiện <b>vượt x kg</b>, vẫn lưu được.
+            Dòng chưa nối hiện <b>Chưa nối</b>: vẫn ghi lần nhập được, nhưng <b>chưa đóng được</b> hợp đồng. Nối ở Thao tác khác → Sửa hợp đồng, kể cả hợp đồng đã đóng.
           </li>
-          <li>Lô được xếp vào tháng theo ngày về kho; chưa về thì theo ngày dự kiến về.</li>
         </GuideList>
       </GuideSection>
-      <GuideSection title="Nối dòng hàng với mặt hàng danh mục">
+      <GuideSection title="Ai làm gì">
+        <GuideActors steps={IMPORT_GUIDE_STEPS} actors={IMPORT_GUIDE_ACTORS} />
+      </GuideSection>
+      <GuideSection title="Mẹo">
         <GuideList>
-          <li>
-            Mỗi dòng hàng nối <b>một mặt hàng</b> trong Danh mục → Mặt hàng, để Nhập khẩu, sản xuất, kho và Xuất khẩu cùng gọi một tên. Tên hàng như trên hợp đồng vẫn giữ nguyên.
-          </li>
-          <li>
-            Gõ tên hàng xong, app tự gợi ý mặt hàng khi tên đó đã nối ở hợp đồng nhập trước, hoặc trùng tên tiếng Anh của đúng một mặt hàng. Gợi ý thì kiểm lại. Mặt hàng chưa có thì gõ tên để thêm mới ngay trong ô.
-          </li>
-          <li>
-            Dòng chưa nối hiện <b>Chưa nối</b>. Hợp đồng vẫn lưu và ghi lần nhập được, nhưng <b>chưa đóng được</b> cho tới khi mọi dòng đã nối. Nối ở Thao tác khác → Sửa hợp đồng, kể cả hợp đồng đã đóng.
-          </li>
-          <li>Tra số ở trang Nhập khẩu tìm được cả theo tên hàng và tên mặt hàng.</li>
+          <li><b>Còn lại</b> của dòng hàng = kg hợp đồng − tổng thực nhập các lần nhập chưa hủy. Về nhiều hơn thì hiện <b>vượt x kg</b>, vẫn lưu được.</li>
+          <li>Lô xếp vào tháng theo ngày về kho; chưa về thì theo ngày dự kiến.</li>
+          <li>Ô tra số tìm theo số hợp đồng, invoice, tờ khai, cont, B/L, tên hàng và tên mặt hàng, ở mọi tháng.</li>
         </GuideList>
       </GuideSection>
     </>

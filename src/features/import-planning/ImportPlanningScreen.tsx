@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
-import { useSuppliers } from "@/lib/catalogRepo";
+import { useImportSupplierStore } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { usePageTour, usePageTourControl } from "@/features/shared/PageTourProvider";
@@ -49,7 +49,8 @@ export default function ImportPlanningScreen() {
   const receivingCan = useCan("import-plans.receiving");
   const store = useImportData();
   const d = store.data;
-  const [suppliers, setSuppliers] = useSuppliers();
+  // Đối tác = danh mục NCC nhập khẩu RIÊNG (ba-spec 45 v2 R15), không phải Đại lý của Nhập hàng.
+  const supplierStore = useImportSupplierStore();
   const [params, setParams] = useSearchParams();
 
   const view = params.get("view") === "contracts" ? "contracts" : "month";
@@ -381,8 +382,14 @@ export default function ImportPlanningScreen() {
       <ContractFormDialog
         target={contractForm}
         data={d}
-        suppliers={suppliers}
-        setSuppliers={(rows) => void setSuppliers(rows)}
+        suppliers={supplierStore.suppliers}
+        setSuppliers={(rows) => {
+          if (!supplierStore.isAvailable) {
+            notify.error("Máy chủ chưa chạy migration 0083 — chưa thêm / sửa NCC nhập khẩu được. Báo chủ dự án.");
+            return;
+          }
+          supplierStore.setSuppliers(rows);
+        }}
         recordedBy={recordedBy}
         onClose={() => setContractForm(null)}
         onSave={saveContract}

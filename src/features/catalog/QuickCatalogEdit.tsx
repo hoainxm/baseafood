@@ -19,6 +19,7 @@ import type {
   Product,
   StorageLocation,
   Supplier,
+  ImportSupplier,
 } from "@/types";
 import { useBatterTypes, useFinishedGoods, useMaterialTypes } from "@/lib/catalogRepo";
 import { CatalogEditDialog, notify, type FieldError } from "@/design-system";
@@ -36,6 +37,7 @@ export interface CatalogRecordMap {
   product: Product;
   customer: Customer;
   supplier: Supplier;
+  importSupplier: ImportSupplier;
   materialType: MaterialType;
   storageLocation: StorageLocation;
   batter: BatterType;
@@ -90,6 +92,7 @@ function QuickEditDialog<K extends CatalogKind>({
       product: emptySource(),
       customer: emptySource(),
       supplier: emptySource(),
+      importSupplier: emptySource(),
       materialType: emptySource(),
       storageLocation: emptySource(),
       batter: emptySource(),
@@ -159,6 +162,7 @@ const KIND_RESOURCE: Record<CatalogKind, string> = {
   product: "catalog.products",
   customer: "catalog.customers",
   supplier: "catalog.suppliers",
+  importSupplier: "catalog.import-suppliers",
   materialType: "catalog.material-types",
   storageLocation: "catalog.storage-locations",
   batter: "catalog.batters",
@@ -189,6 +193,7 @@ export function useQuickCatalogEdit<K extends CatalogKind>(
     product: "mặt hàng",
     customer: "khách hàng",
     supplier: "đại lý",
+    importSupplier: "nhà cung cấp nhập khẩu",
     materialType: "loại nguyên liệu",
     storageLocation: "kho lưu trữ",
     batter: "loại bột",
@@ -237,5 +242,5 @@ export function useQuickCatalogEdit<K extends CatalogKind>(
 }
 
 function nameOf(catalogKind: CatalogKind, r: CatalogRecordMap[CatalogKind]): string {
-  return catalogKind === "supplier" ? (r as Supplier).shortName : (r as { name: string }).name;
+  return catalogKind === "supplier" || catalogKind === "importSupplier" ? (r as Supplier | ImportSupplier).shortName : (r as { name: string }).name;
 }

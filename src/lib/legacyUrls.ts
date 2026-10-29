@@ -22,6 +22,7 @@ export const CATALOG_TABS = [
   "products",
   "customers",
   "suppliers",
+  "import-suppliers",
   "material-types",
   "batters",
   "storage-locations",

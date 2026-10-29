@@ -17,6 +17,7 @@ import type {
   MaterialType,
   Product,
   StorageLocation,
+  ImportSupplier,
 } from "@/types";
 import { CATEGORIES, PROCESSING_TYPES, STORAGE_KIND_LABELS, hasSplitComponents, blockSpec } from "@/types";
 import { newId as uid } from "@/lib/store";
@@ -31,7 +32,10 @@ import {
   useFinishedGoods,
   useStorageLocations,
   useExportDocumentKindStore,
+  useImportContracts,
+  useImportSupplierStore,
 } from "@/lib/catalogRepo";
+import { canDeleteImportSupplier, emptyImportSupplier } from "@/lib/importPlanning";
 import { documentKindList, documentKindRowsFromList, type DocumentKindOption } from "@/lib/exportPlanning";
 import {
   ChoiceGroup,
@@ -45,7 +49,7 @@ import { BatterPicker } from "./BatterPicker";
 
 const MARKETS = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
-export type CatalogKind = "product" | "customer" | "supplier" | "materialType" | "storageLocation" | "batter" | "documentKind";
+export type CatalogKind = "product" | "customer" | "supplier" | "importSupplier" | "materialType" | "storageLocation" | "batter" | "documentKind";
 
 /** Đủ thứ để dựng màn CRUD một danh mục HOẶC hộp sửa nhanh một bản ghi. */
 export interface CatalogConfig<T extends { id: string }> {
@@ -68,12 +72,16 @@ export interface CatalogConfig<T extends { id: string }> {
    * matHang nối bằng id ⇒ false.
    */
   linkedByName: boolean;
+  /** Dòng này xóa được không (bỏ trống = mọi dòng). Không xóa được ⇒ bảng ẩn nút Xóa của dòng. */
+  canDeleteRow?: (r: T) => boolean;
 }
 
 export interface CatalogConfigSet {
   product: CatalogConfig<Product>;
   customer: CatalogConfig<Customer>;
   supplier: CatalogConfig<Supplier>;
+  /** NCC nhập khẩu (mig 0083) — danh mục riêng của Phòng Kế hoạch, khác Đại lý. */
+  importSupplier: CatalogConfig<ImportSupplier>;
   materialType: CatalogConfig<MaterialType>;
   storageLocation: CatalogConfig<StorageLocation>;
   batter: CatalogConfig<BatterType>;
@@ -404,7 +412,6 @@ export function buildCatalogFields(
       hideOnMobile: true,
       example: "VD: CA Bà Rịa - Vũng Tàu",
     },
-    { key: "country", group: "Ghi hóa đơn", hideInTable: true, label: "Quốc gia", hideOnMobile: true, example: "Chỉ NCC nước ngoài (Nhập khẩu), VD: Nhật Bản" },
     // Hàng 4 — chuyển khoản
     { key: "bankAccount", group: "Chuyển khoản", hideInTable: true, label: "Số tài khoản", hideOnMobile: true, example: "VD: 1914845758" },
     { key: "bankName", group: "Chuyển khoản", hideInTable: true, label: "Ngân hàng", hideOnMobile: true, example: "VD: VPBank" },
@@ -492,6 +499,46 @@ export function buildCatalogFields(
     { key: "note", label: "Ghi chú", hideOnMobile: true, example: "VD: Bột tẩm nước tương" },
   ];
 
+  // NCC nhập khẩu (ba-spec 45 v2 R16) — "thừa hơn thiếu": chỉ tên gọi tắt bắt buộc.
+  const importSupplierFields: CatalogField<ImportSupplier>[] = [
+    { key: "shortName", group: "Thông tin chung", label: "Tên gọi tắt", required: true, example: "VD: Pacific Marine" },
+    { key: "code", group: "Thông tin chung", label: "Mã", hideOnMobile: true, example: "VD: NK01" },
+    { key: "fullName", group: "Thông tin chung", span: "wide", hideInTable: true, label: "Tên đầy đủ (như trên hợp đồng)", example: "VD: Pacific Marine Co., Ltd." },
+    { key: "country", group: "Thông tin chung", label: "Quốc gia", example: "VD: Nhật Bản" },
+    { key: "address", group: "Thông tin chung", span: "wide", hideInTable: true, label: "Địa chỉ", hideOnMobile: true, example: "Số nhà, đường, thành phố, nước" },
+    { key: "taxId", group: "Thông tin chung", hideInTable: true, label: "Mã số thuế / số đăng ký", hideOnMobile: true, example: "VD: 0104-01-123456" },
+    { key: "mainProducts", group: "Thông tin chung", hideInTable: true, label: "Mặt hàng chính", hideOnMobile: true, example: "VD: Bạch tuộc nguyên con đông lạnh" },
+    { key: "loadingPort", group: "Thông tin chung", hideInTable: true, label: "Cảng xếp thường dùng", hideOnMobile: true, example: "VD: Tokyo, Nhật Bản" },
+    { key: "contactName", group: "Liên hệ", label: "Người liên hệ", hideOnMobile: true, example: "VD: Mr. Tanaka" },
+    { key: "contactTitle", group: "Liên hệ", hideInTable: true, label: "Chức vụ", hideOnMobile: true, example: "VD: Sales Manager" },
+    { key: "email", group: "Liên hệ", hideInTable: true, label: "Email", hideOnMobile: true, example: "VD: sales@pacificmarine.jp" },
+    { key: "phone", group: "Liên hệ", hideInTable: true, label: "Điện thoại", hideOnMobile: true, example: "VD: +81 3 1234 5678" },
+    { key: "website", group: "Liên hệ", hideInTable: true, label: "Website", hideOnMobile: true, example: "VD: pacificmarine.jp" },
+    { key: "bankName", group: "Ngân hàng thụ hưởng", hideInTable: true, label: "Ngân hàng", hideOnMobile: true, example: "VD: MUFG Bank" },
+    { key: "bankAccount", group: "Ngân hàng thụ hưởng", hideInTable: true, label: "Số tài khoản", hideOnMobile: true, example: "VD: 1234567" },
+    { key: "swiftCode", group: "Ngân hàng thụ hưởng", hideInTable: true, label: "Mã SWIFT", hideOnMobile: true, example: "VD: BOTKJPJT" },
+    { key: "bankAddress", group: "Ngân hàng thụ hưởng", span: "wide", hideInTable: true, label: "Địa chỉ ngân hàng", hideOnMobile: true, example: "VD: Chiyoda-ku, Tokyo" },
+    {
+      key: "status",
+      group: "Khác",
+      label: "Trạng thái",
+      render: (value, changeValue) => (
+        <ChoiceGroup
+          label="Trạng thái"
+          hint="Ngừng giao dịch: không chọn được cho hợp đồng nhập mới, hợp đồng cũ giữ nguyên tên."
+          value={value || "active"}
+          onChange={changeValue}
+          options={[
+            { value: "active", label: "Đang giao dịch" },
+            { value: "inactive", label: "Ngừng giao dịch" },
+          ]}
+        />
+      ),
+      renderValue: (r) => (r.status === "inactive" ? "Ngừng giao dịch" : "Đang giao dịch"),
+    },
+    { key: "note", group: "Khác", span: "wide", hideInTable: true, label: "Ghi chú", hideOnMobile: true, example: "VD: Bên thuê gia công" },
+  ];
+
   const documentKindFields: CatalogField<DocumentKindOption>[] = [
     {
       key: "name",
@@ -507,6 +554,7 @@ export function buildCatalogFields(
     product: productFields,
     customer: customerFields,
     supplier: supplierFields,
+    importSupplier: importSupplierFields,
     materialType: materialTypeFields,
     storageLocation: storageLocationFields,
     batter: batterFields,
@@ -533,6 +581,7 @@ export function buildCatalogConfigs(
     product: CatalogSource<Product>;
     customer: CatalogSource<Customer>;
     supplier: CatalogSource<Supplier>;
+    importSupplier: CatalogSource<ImportSupplier> & { canDeleteRow?: (r: ImportSupplier) => boolean };
     materialType: CatalogSource<MaterialType>;
     storageLocation: CatalogSource<StorageLocation>;
     batter: CatalogSource<BatterType>;
@@ -618,6 +667,26 @@ export function buildCatalogConfigs(
       getRecordDescription: (r) => r.shortName,
       nameField: "shortName",
       linkedByName: true, // import_shipments.supplier_name
+    },
+    importSupplier: {
+      title: "NCC nhập khẩu",
+      description:
+        "Nhà cung cấp nước ngoài (và bên thuê gia công) của mảng Nhập khẩu — khác Đại lý của Nhập hàng. NCC đã có hợp đồng nhập thì không xóa được, chuyển Ngừng giao dịch.",
+      entityName: "nhà cung cấp nhập khẩu",
+      rows: n.importSupplier.rows,
+      onChange: n.importSupplier.onChange,
+      fields: fields.importSupplier,
+      loading: n.importSupplier.loading,
+      validate: (editing, rows) => [
+        ...checkDuplicateCode(editing, rows, "nhà cung cấp"),
+        ...checkDuplicateName(editing, rows, "shortName", "Tên gọi tắt", "nhà cung cấp nhập khẩu"),
+      ],
+      createEmpty: () => emptyImportSupplier(uid()),
+      getSearchText: (r) => `${r.code} ${r.shortName} ${r.fullName} ${r.country} ${r.contactName} ${r.email} ${r.mainProducts}`,
+      getRecordDescription: (r) => `${r.shortName}${r.country ? ` (${r.country})` : ""}`,
+      nameField: "shortName",
+      linkedByName: false, // HĐ nhập nối theo id, giữ chữ tên lúc ghi
+      canDeleteRow: n.importSupplier.canDeleteRow,
     },
     materialType: {
       title: "Loại nguyên liệu",
@@ -739,6 +808,8 @@ export function useCatalogConfigs(): CatalogConfigSet {
   const [storageLocations, setStorageLocations, { status: ttKL }] = useStorageLocations();
   const [batterTypes, setBatterTypes, { status: ttBT }] = useBatterTypes();
   const documentKindStore = useExportDocumentKindStore();
+  const importSupplierStore = useImportSupplierStore();
+  const [importContracts] = useImportContracts();
   const [finishedGoods] = useFinishedGoods();
 
   const isLoadingProducts = productStatus === "loading" && products.length === 0;
@@ -775,6 +846,19 @@ export function useCatalogConfigs(): CatalogConfigSet {
     product: { rows: products, onChange: setProducts, loading: isLoadingProducts },
     customer: { rows: customers, onChange: setCustomers, loading: isLoadingCustomers },
     supplier: { rows: suppliers, onChange: setSuppliers, loading: isLoadingSuppliers },
+    importSupplier: {
+      rows: importSupplierStore.suppliers,
+      loading: importSupplierStore.isLoading,
+      onChange: (next) => {
+        // Máy chủ chưa chạy 0083 ⇒ không ghi (khỏi kẹt hàng chờ).
+        if (!importSupplierStore.isAvailable) {
+          notify.error("Máy chủ chưa chạy migration 0083 — chưa thêm / sửa NCC nhập khẩu được. Báo chủ dự án.");
+          return;
+        }
+        importSupplierStore.setSuppliers(next);
+      },
+      canDeleteRow: (r) => canDeleteImportSupplier(importContracts, r.id),
+    },
     materialType: { rows: materialTypes, onChange: setMaterialTypes, loading: isLoadingMaterials },
     storageLocation: { rows: storageLocations, onChange: setStorageLocations, loading: isLoadingLocations },
     batter: { rows: batterTypes, onChange: setBatterTypes, loading: isLoadingBatters },

@@ -37,7 +37,9 @@ import {
   isRequiredKind,
   lineAmount,
   quantityWarnings,
+  emptyImportSupplier,
   receivedKg,
+  selectableImportSuppliers,
   validateContract,
   validateReceipt,
   type ImportData,
@@ -51,9 +53,9 @@ import type {
   ImportFile,
   ImportReceipt,
   ImportReceiptLine,
+  ImportSupplier,
   ImportTransport,
   ImportType,
-  Supplier,
 } from "@/types";
 import { FileCheck2, FileSignature, Lock, PackageCheck, Plus, Save, Ship, Trash2 } from "lucide-react";
 
@@ -150,8 +152,9 @@ export function ContractFormDialog({
 }: {
   target: ContractFormTarget | null;
   data: ImportData;
-  suppliers: readonly Supplier[];
-  setSuppliers: (rows: Supplier[]) => void;
+  /** Danh mục NCC nhập khẩu (R15 v2 — KHÔNG phải Đại lý). */
+  suppliers: readonly ImportSupplier[];
+  setSuppliers: (rows: ImportSupplier[]) => void;
   recordedBy: string;
   onClose: () => void;
   onSave: (p: ContractSavePayload) => boolean;
@@ -161,7 +164,7 @@ export function ContractFormDialog({
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [busy, setBusy] = useState(false);
   const draft = useDialogDraft({ form: "import-contract", value: form, setValue: setForm, isEmpty: (f) => contractSnap(f) === f.initial });
-  const supplierEditor = useQuickCatalogEdit("supplier", [...suppliers], (rows) => setSuppliers(rows));
+  const supplierEditor = useQuickCatalogEdit("importSupplier", [...suppliers], (rows) => setSuppliers(rows));
 
   useEffect(() => {
     if (!target) return;
@@ -187,17 +190,17 @@ export function ContractFormDialog({
   const set = <K extends keyof ContractForm>(k: K, v: ContractForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
   const setLine = (id: string, patch: Partial<LineForm>) => setForm((f) => (f ? { ...f, lines: f.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) } : f));
 
-  const supplierOptions: ComboboxOption[] = suppliers.map((s) => ({
+  const supplierOptions: ComboboxOption[] = selectableImportSuppliers(suppliers, form?.supplierId).map((s) => ({
     value: s.id,
     label: s.code ? `${s.code} · ${s.shortName}` : s.shortName,
-    subLabel: [s.country, s.billingName].filter(Boolean).join(" · ") || undefined,
+    subLabel: [s.country, s.fullName].filter(Boolean).join(" · ") || undefined,
   }));
   const addSupplier = (name: string) => {
     const existing = suppliers.find((s) => s.shortName.trim().toLowerCase() === name.trim().toLowerCase());
     if (existing) return existing.id;
-    const s: Supplier = { id: newId(), code: "", shortName: name.trim(), billingName: "", address: "", nationalId: "", issuedDate: "", issuedPlace: "", phone: "", email: "", bankAccount: "", bankName: "", bankBranch: "", note: "" };
+    const s: ImportSupplier = { ...emptyImportSupplier(newId()), shortName: name.trim() };
     setSuppliers([...suppliers, s]);
-    notify.saved(`Đã thêm nhà cung cấp "${s.shortName}" vào danh mục`);
+    notify.saved(`Đã thêm "${s.shortName}" vào danh mục NCC nhập khẩu`);
     return s.id;
   };
 
@@ -284,13 +287,13 @@ export function ContractFormDialog({
             <h3 className="font-semibold">1 · Hợp đồng</h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <Combobox
-                label="Đối tác (nhà cung cấp)"
+                label="Đối tác (NCC nhập khẩu)"
                 required
                 value={form.supplierId}
                 onChange={(v) => set("supplierId", v)}
                 options={supplierOptions}
                 onCreate={supplierEditor.canCreate ? addSupplier : undefined}
-                emptyText="Chưa có nhà cung cấp nào trong danh mục."
+                emptyText="Chưa có NCC nhập khẩu nào — gõ tên để thêm mới."
                 onEditItem={supplierEditor.openEdit}
                 canEdit={supplierEditor.canEdit}
                 editLabel={supplierEditor.editLabel}

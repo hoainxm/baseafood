@@ -139,6 +139,9 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   { id: "import-plans.receiving", label: "Nhập khẩu · Số lượng thực nhập", group: "planning", navId: "planning-import", actions: ["view", "create", "update"] },
 
   { id: "catalog.suppliers", label: "Danh mục · Đại lý", group: "catalog", navId: "catalog", actions: CRUD },
+  // NCC nhập khẩu (mig 0083, ba-spec 45 v2) — danh mục RIÊNG của Phòng Kế hoạch, khác Đại lý. Không nằm
+  // trong CATALOG_TABS (catalogAll) ⇒ thủ kho / xưởng không thấy; cấp tay cho planner, BGĐ, kế toán.
+  { id: "catalog.import-suppliers", label: "Danh mục · NCC nhập khẩu", group: "catalog", navId: "catalog", actions: CRUD },
   { id: "catalog.customers", label: "Danh mục · Khách hàng", group: "catalog", navId: "catalog", actions: CRUD },
   { id: "catalog.material-types", label: "Danh mục · Loại nguyên liệu", group: "catalog", navId: "catalog", actions: CRUD },
   { id: "catalog.products", label: "Danh mục · Mặt hàng", group: "catalog", navId: "catalog", actions: CRUD },
@@ -345,6 +348,7 @@ const DIRECTOR: RoleSpec = {
   "export-plans.payments": VIEW,
   "import-plans": ["view", "export", "view-price"],
   "import-plans.receiving": VIEW,
+  "catalog.import-suppliers": VIEW,
   ...catalogAll(VIEW),
 };
 
@@ -377,6 +381,7 @@ const CHIEF_ACCOUNTANT: RoleSpec = {
   "export-plans.payments": ["view", "create", "update", "delete"],
   "import-plans": ["view", "export", "view-price"],
   "import-plans.receiving": VIEW,
+  "catalog.import-suppliers": VIEW,
   ...catalogAll(["view", "create", "update", "delete"]),
 };
 
@@ -408,6 +413,7 @@ const ACCOUNTANT: RoleSpec = {
   "export-plans.payments": ["view", "create", "update"],
   "import-plans": ["view", "export", "view-price"],
   "import-plans.receiving": VIEW,
+  "catalog.import-suppliers": VIEW,
   ...catalogAll(["view", "create", "update"]),
 };
 
@@ -492,8 +498,8 @@ const PLANNER: RoleSpec = {
   warehouse: VIEW,
   ...catalogAll(VIEW),
   "catalog.customers": ["view", "create", "update"],
-  // Đối tác nhập khẩu = danh mục Nhà cung cấp (ba-spec 45 R15) — thêm / sửa ngay trong ô chọn.
-  "catalog.suppliers": ["view", "create", "update"],
+  // Đối tác nhập khẩu = danh mục NCC nhập khẩu RIÊNG (ba-spec 45 v2 R15) — thêm / sửa ngay trong ô chọn.
+  "catalog.import-suppliers": ["view", "create", "update", "delete"],
 };
 
 /**

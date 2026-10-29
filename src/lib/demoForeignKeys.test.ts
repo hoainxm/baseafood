@@ -16,6 +16,7 @@ const REPO_SOURCE = readFileSync(join(__dirname, "repo.ts"), "utf8");
 /** Cột `*_id` KHÔNG phải id bản ghi nghiệp vụ (không mang tiền tố demo) — `bảng.cột` → lý do. */
 const SOFT_REF_EXEMPT: Record<string, string> = {
   "balancing_inputs.reduction_warehouse_id": "mã kho hệ thống (WORKSHOP_WAREHOUSES), hằng số",
+  "import_suppliers.tax_id": "mã số thuế / số đăng ký của NCC nước ngoài (chữ), không trỏ bản ghi nào",
   "row_marks.row_id": "khóa dòng đa hình — có khi là khóa ghép kỳ/bộ lọc của báo cáo, không phải id bản ghi",
   "reconciliation_runs.user_id": "id người dùng (auth.users)",
   "user_permissions.user_id": "id người dùng (auth.users)",

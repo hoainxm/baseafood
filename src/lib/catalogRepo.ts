@@ -10,6 +10,7 @@ import {
   PRODUCTION_LOCK_TABLE,
   IMPORT_SHIPMENT_TABLE,
   IMPORT_CONTRACT_TABLE,
+  IMPORT_SUPPLIER_TABLE,
   IMPORT_CONTRACT_LINE_TABLE,
   IMPORT_RECEIPT_TABLE,
   IMPORT_RECEIPT_LINE_TABLE,
@@ -370,6 +371,14 @@ export function useExportDocumentKindStore() {
  * không ghi, khỏi kẹt hàng chờ). Khác Nhập hàng (`useImportShipments`, mua NL trong nước).
  */
 export const useImportContracts = () => useTable(IMPORT_CONTRACT_TABLE);
+/** NCC nhập khẩu (mig 0083) — danh mục riêng, khác Đại lý (`useSuppliers`). */
+export const useImportSuppliers = () => useTable(IMPORT_SUPPLIER_TABLE);
+/** NCC nhập khẩu + cờ `isAvailable` (máy chủ chưa chạy 0083 ⇒ không ghi, khỏi kẹt hàng chờ). */
+export function useImportSupplierStore() {
+  const [suppliers, setSuppliers, meta] = useImportSuppliers();
+  const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
+  return { suppliers, setSuppliers, isAvailable, isLoading: meta.status === "loading" && suppliers.length === 0 };
+}
 export const useImportContractLines = () => useTable(IMPORT_CONTRACT_LINE_TABLE);
 export const useImportReceipts = () => useTable(IMPORT_RECEIPT_TABLE);
 export const useImportReceiptLines = () => useTable(IMPORT_RECEIPT_LINE_TABLE);

@@ -23,6 +23,7 @@ import type {
   ImportFile,
   ImportReceipt,
   ImportReceiptLine,
+  ImportSupplier,
   BalancingInputItem,
   BalancingOutputItem,
   BalancingPeriod,
@@ -144,6 +145,8 @@ export interface DemoBundle {
   exportDocumentKinds: ExportDocumentKindRow[];
   /** Nhập khẩu (mig 0082) — bộ nhỏ dựng sẵn (lib/importPlanningDemo.ts): 3 HĐ, 4 lần nhập đủ trạng thái;
    *  file là đường dẫn GIỮ CHỖ. NCC nước ngoài của bộ được thêm vào `suppliers`. */
+  /** Danh mục NCC nhập khẩu (mig 0083) — riêng, không thêm vào Đại lý. */
+  importSuppliers: ImportSupplier[];
   importContracts: ImportContract[];
   importContractLines: ImportContractLine[];
   importReceipts: ImportReceipt[];
@@ -692,8 +695,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
   return {
     products: n.products.map((p) => ({ ...p })),
     materialTypes: n.materialTypes.map((m) => ({ ...m })),
-    // NCC nước ngoài của bộ demo Nhập khẩu thêm vào danh mục Nhà cung cấp.
-    suppliers: [...suppliers, ...importDemo.extraSuppliers],
+    suppliers,
     // Khách của sổ kế hoạch Xuất khẩu chưa có trong 8 khách demo được thêm vào danh mục.
     customers: [...customers, ...exportDemo.extraCustomers],
     batterTypes: n.batterTypes.map((b) => ({ ...b })),
@@ -729,6 +731,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     exportActivities: exportDemo.activities,
     customerProductNames: demoCustomerNames(exportDemo),
     exportDocumentKinds: [{ id: "doc-demo-halal", name: "Giấy chứng nhận Halal", sortOrder: 100, note: "Khách Malaysia yêu cầu" }],
+    importSuppliers: importDemo.suppliers,
     importContracts: importDemo.contracts,
     importContractLines: importDemo.lines,
     importReceipts: importDemo.receipts,

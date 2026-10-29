@@ -339,11 +339,6 @@ export interface Supplier {
   bankAccount: string;
   bankName: string;
   bankBranch: string;
-  /**
-   * Quốc gia — NCC nước ngoài của Nhập khẩu (mig 0082, ba-spec 45 R15). `undefined` = máy chủ chưa
-   * có cột ⇒ repo KHÔNG gửi cột này. NCC trong nước để trống.
-   */
-  country?: string;
   note: string;
 }
 
@@ -1416,7 +1411,34 @@ export type ImportDocumentKind =
   | "bill-of-lading"
   | "other";
 
-/** Hợp đồng nhập. Đối tác = một dòng danh mục Nhà cung cấp (R15); giữ chữ tên lúc ghi. */
+/**
+ * Nhà cung cấp NHẬP KHẨU (mig 0083, ba-spec 45 v2 §0b R15–R17) — danh mục RIÊNG, khác hẳn Đại lý
+ * (`Supplier`, đại lý NL trong nước của Nhập hàng). Chỉ tên gọi tắt bắt buộc.
+ */
+export interface ImportSupplier {
+  id: string;
+  code: string;
+  shortName: string;
+  fullName: string;
+  country: string;
+  address: string;
+  taxId: string;
+  mainProducts: string;
+  loadingPort: string;
+  contactName: string;
+  contactTitle: string;
+  email: string;
+  phone: string;
+  website: string;
+  bankName: string;
+  bankAccount: string;
+  swiftCode: string;
+  bankAddress: string;
+  status: "active" | "inactive";
+  note: string;
+}
+
+/** Hợp đồng nhập. Đối tác = một dòng danh mục NCC nhập khẩu (R15 v2); giữ chữ tên lúc ghi. */
 export interface ImportContract {
   id: string;
   supplierId: string;

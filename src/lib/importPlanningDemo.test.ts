@@ -12,7 +12,7 @@ describe("bộ demo Nhập khẩu", () => {
     expect(d.contracts.map((c) => contractState(d, c))).toEqual(["receiving", "receiving", "closed"]);
   });
   it("mọi đối tác có trong danh mục demo, mọi file là file giữ chỗ", () => {
-    const ids = new Set(d.extraSuppliers.map((s) => s.id));
+    const ids = new Set(d.suppliers.map((s) => s.id));
     expect(d.contracts.every((c) => ids.has(c.supplierId))).toBe(true);
     expect(d.files.every((f) => f.path.startsWith(DEMO_PLACEHOLDER_PREFIX))).toBe(true);
   });

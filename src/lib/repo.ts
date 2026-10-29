@@ -59,6 +59,7 @@ import type {
   ImportFile,
   ImportReceipt,
   ImportReceiptLine,
+  ImportSupplier,
   ImportTransport,
   ImportType,
   ExportApprovalStage,
@@ -216,9 +217,6 @@ export const SUPPLIER_TABLE: TableMapping<Supplier> = {
     bank_account: x.bankAccount ?? "",
     bank_name: x.bankName ?? "",
     bank_branch: x.bankBranch ?? "",
-    // 0082 — quốc gia của NCC nước ngoài (Nhập khẩu, ba-spec 45 R15): chỉ gửi khi có giá trị
-    // (đọc được cột từ máy chủ hoặc người dùng vừa gõ) ⇒ máy chủ chưa chạy 0082 thì đại lý cũ vẫn ghi.
-    ...(x.country !== undefined ? { country: x.country ?? "" } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -234,7 +232,6 @@ export const SUPPLIER_TABLE: TableMapping<Supplier> = {
     bankAccount: r.bank_account == null ? "" : s(r.bank_account),
     bankName: r.bank_name == null ? "" : s(r.bank_name),
     bankBranch: r.bank_branch == null ? "" : s(r.bank_branch),
-    ...("country" in r ? { country: r.country == null ? "" : s(r.country) } : {}),
     note: s(r.note),
   }),
   // Bản sao dưới máy ghi trước 0061 chưa có 4 trường liên hệ / ngân hàng.
@@ -2578,6 +2575,60 @@ function parseLinePrices(v: unknown): Record<string, number | null> {
   return out;
 }
 
+/**
+ * NCC nhập khẩu (mig 0083) — danh mục riêng, KHÔNG dùng bảng `suppliers` (đại lý Nhập hàng). Cột
+ * `suppliers.country` của 0082 để yên trên máy chủ, app thôi gửi / đọc.
+ */
+export const IMPORT_SUPPLIER_TABLE: TableMapping<ImportSupplier> = {
+  table: "import_suppliers",
+  localKey: "bsf.import-suppliers.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    code: x.code,
+    short_name: x.shortName,
+    full_name: x.fullName,
+    country: x.country,
+    address: x.address,
+    tax_id: x.taxId,
+    main_products: x.mainProducts,
+    loading_port: x.loadingPort,
+    contact_name: x.contactName,
+    contact_title: x.contactTitle,
+    email: x.email,
+    phone: x.phone,
+    website: x.website,
+    bank_name: x.bankName,
+    bank_account: x.bankAccount,
+    swift_code: x.swiftCode,
+    bank_address: x.bankAddress,
+    status: x.status,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    code: s(r.code),
+    shortName: s(r.short_name),
+    fullName: s(r.full_name),
+    country: s(r.country),
+    address: s(r.address),
+    taxId: s(r.tax_id),
+    mainProducts: s(r.main_products),
+    loadingPort: s(r.loading_port),
+    contactName: s(r.contact_name),
+    contactTitle: s(r.contact_title),
+    email: s(r.email),
+    phone: s(r.phone),
+    website: s(r.website),
+    bankName: s(r.bank_name),
+    bankAccount: s(r.bank_account),
+    swiftCode: s(r.swift_code),
+    bankAddress: s(r.bank_address),
+    status: s(r.status) === "inactive" ? "inactive" : "active",
+    note: s(r.note),
+  }),
+};
+
 export const IMPORT_CONTRACT_TABLE: TableMapping<ImportContract> = {
   table: "import_contracts",
   localKey: "bsf.import-contracts.v1",
@@ -2788,6 +2839,7 @@ const TABLE_LABELS: Record<string, string> = {
   export_activity_log: "Nhật ký hợp đồng xuất khẩu",
   customer_product_names: "Tên hàng theo khách",
   export_document_kinds: "Loại chứng từ xuất khẩu",
+  import_suppliers: "NCC nhập khẩu",
   import_contracts: "Hợp đồng nhập khẩu",
   import_contract_lines: "Dòng hàng hợp đồng nhập khẩu",
   import_receipts: "Lần nhập khẩu",

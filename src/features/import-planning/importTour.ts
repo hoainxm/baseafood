@@ -61,7 +61,7 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
         optional: true,
         title: "Lập hợp đồng nhập",
         body:
-          "Chọn Lập hợp đồng nhập, chọn đối tác trong danh mục Nhà cung cấp (thêm mới ngay trong ô được), ghi số hợp đồng, ngày ký, loại hình (sản xuất xuất khẩu, kinh doanh hoặc gia công) và từng dòng hàng.\n" +
+          "Chọn Lập hợp đồng nhập, chọn đối tác trong danh mục NCC nhập khẩu (khác Đại lý của Nhập hàng; thêm mới ngay trong ô được), ghi số hợp đồng, ngày ký, loại hình (sản xuất xuất khẩu, kinh doanh hoặc gia công) và từng dòng hàng.\n" +
           "Hàng gia công không ghi giá thì để trống đơn giá. Lưu xong hợp đồng ở trạng thái Chưa có lần nhập.",
       }),
     );

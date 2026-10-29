@@ -89,8 +89,7 @@ describe("generateDemoBundle", () => {
   it("ẩn danh: không lộ tên đại lý / khách / địa chỉ thật", () => {
     const text = JSON.stringify([bundle.suppliers, bundle.customers, bundle.shipments, bundle.imports]);
     for (const that of ["Hồng Phú", "Bê 3", "Hanwa", "Chợ Bà Rịa", "12 Lê Lợi", "0909555111"]) expect(text).not.toContain(that);
-    // NCC nước ngoài của bộ demo Nhập khẩu (tên tự đặt, lib/importPlanningDemo.ts) đứng sau đại lý.
-    expect(bundle.suppliers.filter((s) => !s.id.startsWith("imp-sup-")).map((s) => s.shortName)).toEqual(["Đại lý 01", "Đại lý 02"]);
+    expect(bundle.suppliers.map((s) => s.shortName)).toEqual(["Đại lý 01", "Đại lý 02"]);
     // Tắt ẩn danh ⇒ giữ tên thật.
     expect(generateDemoBundle(SOURCE, { today: TODAY, anonymize: false }).suppliers[0].shortName).toBe("Hồng Phú");
   });

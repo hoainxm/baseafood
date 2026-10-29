@@ -9,13 +9,14 @@
 import type { PageTour, PageTourSpec, TourStep } from "@/lib/guidedTour";
 
 /** Id tab (`?tab=`) — khớp TAB_RESOURCE ở CatalogScreen. */
-export type CatalogTourTab = "products" | "customers" | "suppliers" | "material-types" | "batters" | "storage-locations" | "document-kinds" | "finished-goods";
+export type CatalogTourTab = "products" | "customers" | "suppliers" | "import-suppliers" | "material-types" | "batters" | "storage-locations" | "document-kinds" | "finished-goods";
 
 /** Tên tab đang hiện trên trang (CatalogScreen TabsTrigger). */
 export const CATALOG_TAB_LABELS: Readonly<Record<CatalogTourTab, string>> = {
   products: "Mặt hàng",
   customers: "Khách hàng",
   suppliers: "Đại lý",
+  "import-suppliers": "NCC nhập khẩu",
   "material-types": "Loại nguyên liệu",
   batters: "Bột tẩm",
   "storage-locations": "Kho lưu trữ",
@@ -61,7 +62,7 @@ export function buildCatalogTour(ctx: CatalogTourContext): PageTour {
       id: "list",
       title: "Cách dùng một danh mục",
       body:
-        "Sáu tab đầu dùng chung một cách làm:\n" +
+        "Các tab danh mục (trừ Thành phẩm 141 mã) dùng chung một cách làm:\n" +
         "• Đầu tab: tên danh mục và câu nói danh mục dùng ở đâu.\n" +
         "• Ô Tìm: gõ một phần tên hoặc mã số để lọc ngay bảng.\n" +
         "• Bảng: chọn tên cột để sắp xếp; cột phụ xem ở nút Chi tiết cuối dòng. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu, đánh dấu dòng đã rà.",
@@ -117,6 +118,15 @@ export function buildCatalogTour(ctx: CatalogTourContext): PageTour {
         "• Ghi hóa đơn: Tên ghi phiếu (đầy đủ), MST / CCCD, ngày cấp, nơi cấp, địa chỉ.\n" +
         "• Chuyển khoản: Số tài khoản, Ngân hàng, Chi nhánh.\n" +
         "Sổ nhập lưu theo tên gọi tắt: đổi tên đại lý không sửa các dòng đã ghi.",
+    }),
+    at("import-suppliers", {
+      id: "import-suppliers",
+      title: "NCC nhập khẩu",
+      body:
+        "Nhà cung cấp nước ngoài (và bên thuê gia công) của mảng Nhập khẩu — khác hẳn Đại lý của Nhập hàng, hai danh sách không lẫn nhau.\n" +
+        "• Chỉ Tên gọi tắt bắt buộc; còn lại ghi được: tên đầy đủ, quốc gia, địa chỉ, người liên hệ, ngân hàng thụ hưởng, cảng xếp thường dùng.\n" +
+        "• Trạng thái Ngừng giao dịch: không chọn được cho hợp đồng nhập mới, hợp đồng cũ giữ tên.\n" +
+        "NCC đã có hợp đồng nhập thì không xóa được (không có nút Xóa), chỉ chuyển Ngừng giao dịch.",
     }),
     at("material-types", {
       id: "material-types",

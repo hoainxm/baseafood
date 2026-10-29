@@ -79,6 +79,7 @@ export function CatalogCrud<T extends { id: string }>({
   canCreate = true,
   canUpdate = true,
   canDelete = true,
+  canDeleteRow,
   rowActions,
 }: {
   title: string;
@@ -105,6 +106,8 @@ export function CatalogCrud<T extends { id: string }>({
   canCreate?: boolean;
   canUpdate?: boolean;
   canDelete?: boolean;
+  /** Dòng nào xóa được (bỏ trống = mọi dòng). Trả false ⇒ dòng đó không có nút Xóa (VD bản ghi đã có sổ dùng). */
+  canDeleteRow?: (row: T) => boolean;
   /**
    * Nút RIÊNG của từng dòng, đứng trước Sửa / Xóa (VD "Tên hàng" của một khách — mở danh sách
    * con). Nút phải có nhãn chữ + `title` (luật §9).
@@ -235,7 +238,7 @@ export function CatalogCrud<T extends { id: string }>({
                         Sửa
                       </Button>
                     )}
-                    {canDelete && (
+                    {canDelete && (canDeleteRow?.(r) ?? true) && (
                       <ConfirmDelete
                         recordDescription={getRecordDescription(r)}
                         onConfirm={() => remove(r)}

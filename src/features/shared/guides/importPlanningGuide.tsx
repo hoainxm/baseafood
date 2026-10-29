@@ -15,7 +15,7 @@ export const importPlanningGuide: PageGuide = {
       <GuideSection title="Trình tự công việc">
         <GuideSteps>
           <li>
-            <b>Lập hợp đồng nhập</b>: chọn đối tác trong danh mục Nhà cung cấp, ghi số hợp đồng, ngày ký, <b>loại hình</b> (sản xuất xuất khẩu · kinh doanh · gia công) và từng dòng hàng: tên hàng, số lượng (kg), đơn giá. Hàng gia công không ghi giá thì để trống đơn giá.
+            <b>Lập hợp đồng nhập</b>: chọn đối tác trong danh mục <b>NCC nhập khẩu</b> (Danh mục → tab NCC nhập khẩu, khác Đại lý của Nhập hàng; thêm mới ngay trong ô được), ghi số hợp đồng, ngày ký, <b>loại hình</b> (sản xuất xuất khẩu · kinh doanh · gia công) và từng dòng hàng: tên hàng, số lượng (kg), đơn giá. Hàng gia công không ghi giá thì để trống đơn giá.
           </li>
           <li>
             Khi hàng sắp về, ở hồ sơ hợp đồng chọn <b>Ghi lần nhập</b>: ngày về kho (chưa về thì ngày dự kiến), cont lạnh 20 / 40 hoặc hàng lẻ, số cont, số B/L.

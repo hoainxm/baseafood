@@ -1,11 +1,12 @@
 # 45 — ba-spec: Phòng Kế hoạch · Nhập khẩu — Đợt 1 (hợp đồng → bộ chứng từ → số lượng thực nhập)
 
 > Load khi: xây hoặc sửa mảng Nhập khẩu của Phòng Kế hoạch: hợp đồng nhập (đối tác nước ngoài, dòng hàng tên · kg · đơn giá), lần nhập (cont / hàng lẻ, ngày về kho), bộ chứng từ đính kèm (Invoice, Packing List, tờ khai nhập, C/O, kiểm dịch…), số lượng thực nhập theo dòng hàng, đóng hợp đồng, quyền `import-plans`.
-covers: src/features/import-planning/**, src/lib/importPlanning.ts, src/lib/importPlanningDemo.ts, src/lib/importFileStorage.ts, supabase/migrations/0082_import_planning.sql
+covers: src/features/import-planning/**, src/lib/importPlanning.ts, supabase/migrations/0083_import_suppliers.sql, src/lib/importPlanningDemo.ts, src/lib/importFileStorage.ts, supabase/migrations/0082_import_planning.sql
 last_verified: 2026-10-29
 ttl_days: 90
-status: ba-spec v1.1 (2026-10-29) — ĐÃ BUILD 2026-10-29 (code + `0082_import_planning.sql`, kiểm PGlite) — ⏳ 0082 CHƯA chạy trên DB thật: tạo bucket `import-files` (private, 20 MB) → chạy 0082 (2 lần) → deploy. Giao diện: design-spec [46](46-import-planning-ui.design-spec.md).
+status: ba-spec v2 (2026-10-29 tối) — **danh mục Nhà cung cấp nhập khẩu RIÊNG** (§0b, ĐÃ BUILD 2026-10-29 — mig `0083` ⏳ CHƯA chạy DB thật) · v1.1 ĐÃ BUILD 2026-10-29 (commit 91b8f14, `0082` ✅ chạy DB thật 2026-10-29 theo chủ dự án). Giao diện: design-spec [46](46-import-planning-ui.design-spec.md).
 
+<!-- re-verified: 2026-10-29 21:00 — v2 build: AC-25/26 = test `importPlanning.test.ts` (23); AC-27/28 PGlite (0001→0082 + HĐ trỏ Đại lý, 0083 chạy 2 lần: chép đúng 1 NCC giữ id, Đại lý còn nguyên, 0 HĐ mất đối tác; planner thêm / xóa NCC, kế toán chỉ đọc, thủ kho đọc 0); AC-24 thử tay preview sandbox: ô Đối tác trống dù Đại lý có dòng, thêm "Andaman Seafood" ⇒ vào bsf.import-suppliers, Đại lý không có; nhóm Kế hoạch đúng 1 Tra cứu mở tab NCC nhập khẩu. -->
 <!-- re-verified: 2026-10-29 16:00 — build: AC-3…AC-18 = test `src/lib/importPlanning.test.ts` (21) + `importPlanningDemo.test.ts` (4); AC-1/2/19 RLS thử PGlite (chuỗi 0001→0082 + chạy lại 0082: Nhân viên KH ghi 4 bảng; thủ kho đọc dòng hàng, KHÔNG đọc HĐ / chứng từ, chỉ ghi thực nhập, sửa lần nhập ⇒ 0 dòng; kế toán chỉ đọc; qc đọc 0; anon bị từ chối); luồng lập HĐ 2 dòng → lần nhập → 3 chứng từ → thực nhập vượt 200 kg (cảnh báo, vẫn lưu) → đóng thiếu lý do bị chặn → đóng có lý do → mở lại, tra số cont, 360 px × 130 % không tràn — thử tay preview sandbox (không nối máy chủ). Chưa thử: tải file thật, AC-22 demo trên DB thật, AC-23 cần DB. -->
 
 > **Mục đích:** oracle HÀNH VI cho mảng Nhập khẩu đợt 1. Ai làm nghiệp vụ gì, vào gì ra gì, thế nào là đúng (AC). **Không** mô tả giao diện (design-spec viết sau, đọc kèm [42](42-export-planning-ui.design-spec.md) để giữ cùng kiểu với Xuất khẩu).
@@ -35,7 +36,46 @@ Phạm vi chủ dự án nêu: **"chỉ cần tạo ngắn gọn: Hợp đồng 
 | 13 | Hạn giao, dung sai | **Không cần** | Không trễ hạn, không dung sai (R10) |
 | 14 | Vận chuyển | **Cont lạnh 20 / 40 + hàng lẻ ghép cont**; **không** nhắc hạn trả cont / lưu bãi | R12 |
 
-Đối tác lấy từ **danh mục Nhà cung cấp** (chủ dự án chốt 2026-10-29). Hai câu về cách dựng app (quyền riêng, nối sổ kho) chủ dự án để Claude quyết — xem §11 Assumptions.
+Đối tác: v1.1 lấy từ danh mục Đại lý — **v2 đổi sang danh mục NCC nhập khẩu riêng (§0b)**. Hai câu về cách dựng app (quyền riêng, nối sổ kho) chủ dự án để Claude quyết — xem §11 Assumptions.
+
+## 0b. v2 (2026-10-29 tối) — danh mục Nhà cung cấp nhập khẩu RIÊNG · THẮNG R15, A1, AC-23 cũ
+
+Chủ dự án xem bản v1.1 trên app: **"những nhà cung cấp cho nhập khẩu này hoàn toàn khác so với nhập hàng"** và nhóm Kế hoạch có 2 mục Tra cứu thừa. v1.1 cho đối tác dùng chung danh mục **Đại lý** (bảng `suppliers` của Nhập hàng — đại lý trong nước, CCCD, hóa đơn GTGT) ⇒ sai nghiệp vụ, trộn hai danh sách.
+
+**Đã chốt (4 câu, 2026-10-29):**
+
+| # | Câu | Trả lời |
+|---|---|---|
+| 1 | 0082 đã chạy DB thật chưa | **Đã chạy** ⇒ viết `0083`, không sửa 0082 |
+| 2 | Danh mục NCC nhập khẩu đặt ở đâu | **Tab riêng trong Danh mục** ("NCC nhập khẩu", cạnh Khách hàng / Đại lý); ô đối tác của HĐ vẫn thêm mới + sửa nhanh |
+| 3 | Nhóm Kế hoạch giữ Tra cứu nào | **Một mục Tra cứu, mở tab NCC nhập khẩu** (bỏ Tra cứu Khách hàng + Tra cứu Đại lý ở nhóm này; nhóm Bán hàng vẫn có Tra cứu Khách hàng) |
+| 4 | Lưu thông tin gì | **"Thừa hơn thiếu"**: tên đầy đủ, quốc gia, địa chỉ; người liên hệ, email, điện thoại; ngân hàng thụ hưởng; cảng xếp hàng thường dùng — + các trường cần thiết khác (R16) |
+
+**Nghiệp vụ mới NI10 — Quản lý danh mục NCC nhập khẩu · owner U1** (Flow ở §5). Đối tác của HĐ nhập (NI2) chọn từ danh mục này, **không** từ Đại lý.
+
+**Luật v2:**
+- **R15 (v2) — Đối tác = danh mục NCC nhập khẩu**, tách hẳn Đại lý. Ô đối tác của HĐ nhập chỉ liệt kê NCC nhập khẩu **đang giao dịch**; danh sách Đại lý của Nhập hàng không có NCC nhập khẩu và ngược lại. Bên thuê gia công cũng ghi ở đây.
+- **R16 — Trường của NCC nhập khẩu.** Bắt buộc: **tên gọi tắt** (duy nhất, không phân hoa thường, bỏ khoảng trắng đầu / cuối). Không bắt: mã · tên đầy đủ (như trên HĐ) · quốc gia · địa chỉ · mã số thuế / số đăng ký nước ngoài · người liên hệ · chức vụ · email · điện thoại · website · mặt hàng chính · cảng xếp thường dùng · ngân hàng thụ hưởng · số tài khoản · SWIFT · địa chỉ ngân hàng · ghi chú · trạng thái (**Đang giao dịch** · **Ngừng giao dịch**, mặc định Đang giao dịch).
+- **R17 — Không xóa NCC đã có HĐ** (luật repo 6): NCC có ≥ 1 HĐ nhập (kể cả HĐ đã hủy) ⇒ chỉ chuyển **Ngừng giao dịch**; chưa có HĐ ⇒ xóa được (xác nhận + Hoàn tác). NCC ngừng giao dịch vẫn hiện tên ở HĐ cũ, không chọn được cho HĐ mới.
+- **R18 — Dữ liệu cũ của v1.1.** HĐ nhập đã ghi trỏ vào một dòng Đại lý ⇒ `0083` **chép** dòng Đại lý đó sang danh mục NCC nhập khẩu **giữ nguyên id** (tên gọi tắt, tên ghi phiếu → tên đầy đủ, địa chỉ, email, quốc gia), HĐ không phải sửa. Dòng Đại lý gốc **không tự xóa** (chủ dự án tự xóa ở tab Đại lý nếu đó là NCC nhập khẩu nhập nhầm). Cột `suppliers.country` (0082) để yên, app thôi dùng, form Đại lý bỏ ô Quốc gia.
+- **R19 — Tra cứu ở nhóm Kế hoạch**: đúng 1 mục, mở danh mục ở tab NCC nhập khẩu (khuôn "một mục Tra cứu mỗi nhóm" của nav).
+- **R9 (bổ sung)** — tài nguyên quyền MỚI `catalog.import-suppliers` (nhóm Danh mục): planner / Trưởng / Phó phòng KH: xem · thêm · sửa · xóa; BGĐ · kế toán trưởng · kế toán: xem; thủ kho: không (thủ kho đọc tên đối tác qua bản chép ở lần nhập). Admin đủ. Máy chủ RLS riêng của 0083.
+
+**Cross-user v2:** không thêm bàn giao — NI10 chỉ U1 làm; U2 / U3 xem.
+
+**Flow optimization log v2:**
+
+| Flow | Candidate | Chọn / Loại | Lý do | Đánh giá bởi |
+|---|---|---|---|---|
+| R15 | A. Dùng chung Đại lý + cột quốc gia (v1.1) | Loại (**VETO** chủ dự án) | Hai nhóm đối tác khác hẳn; trộn làm ô chọn Nhập hàng lẫn NCC nước ngoài | Domain (chủ dự án) |
+| R15 | B. Dùng danh mục Khách hàng | Loại | Khách là người MUA thành phẩm; trộn vào báo cáo bán / XK | Optimizer |
+| R15 | C. Danh mục riêng NCC nhập khẩu | **Chọn** | Đúng nghiệp vụ, không đụng 2 danh mục đang chạy | Chủ dự án + Optimizer |
+| R18 | A. 0083 chuyển + xóa dòng Đại lý cũ · B. chép giữ id, không xóa · C. bắt chọn lại đối tác từng HĐ | **B** | A xóa dữ liệu (🔴); C bắt người dùng làm lại; B HĐ chạy tiếp, dọn tay sau | Orchestrator |
+| R19 | A. Bỏ hết Tra cứu · B. Giữ Khách hàng · C. Giữ NCC nhập khẩu | **C** (chủ dự án chọn) | Danh mục mới chưa có lối vào nào khác ngoài Danh mục chung | Chủ dự án |
+
+**AC v2:** AC-23 (cũ) **bỏ**; thêm AC-24 … AC-28 ở §10.
+
+**Assumptions v2:** (1) NCC trùng tên gọi tắt bị chặn (giống đại lý); (2) đổi tên NCC **không** sửa chữ đã chép ở HĐ / lần nhập cũ (sổ giữ chữ lúc ghi) — trừ khi lưu lại HĐ (lúc đó chép tên mới, như v1.1); (3) thủ kho không thấy danh mục NCC nhập khẩu.
 
 ## 1. Vấn đề & JTBD
 
@@ -63,7 +103,8 @@ Phạm vi chủ dự án nêu: **"chỉ cần tạo ngắn gọn: Hợp đồng 
 | # | Nghiệp vụ | Owner | Cross | Phụ thuộc | Tần suất | Ưu tiên |
 |---|---|---|---|---|---|---|
 | NI1 | Cấp quyền Nhập khẩu | U5 | U1, U4 (người được cấp) | — | 1 lần / người | Must |
-| NI2 | Lập hợp đồng nhập | U1 | — | — | vài / tháng | Must |
+| NI10 | Quản lý danh mục NCC nhập khẩu (v2) | U1 | U2, U3 (xem) | — | khi có NCC mới | Must |
+| NI2 | Lập hợp đồng nhập | U1 | — | NI10 | vài / tháng | Must |
 | NI3 | Sửa hợp đồng nhập | U1 | — | NI2 | thỉnh thoảng | Must |
 | NI4 | Ghi lần nhập | U1 | U4 (nhận việc ghi thực nhập) | NI2 | mỗi lô | Must |
 | NI5 | Đính bộ chứng từ của lần nhập | U1 | — | NI4 | mỗi lô | Must |
@@ -87,6 +128,13 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 ### Flow NI1 — Cấp quyền · owner U5
 - **Input:** tài khoản, quyền `import-plans` hoặc `import-plans.receiving` (ma trận mặc định R9).
 - **Output:** lần đăng nhập kế tiếp mở được `/planning-import` theo đúng quyền.
+
+### Flow NI10 — Quản lý danh mục NCC nhập khẩu · owner U1 (v2)
+- **Start:** có NCC nước ngoài mới (hoặc bên thuê gia công mới), hoặc cần sửa thông tin NCC.
+- **Input:** các trường R16 (chỉ tên gọi tắt bắt buộc). Thêm từ danh mục (tab NCC nhập khẩu) hoặc ngay trong ô đối tác của HĐ nhập (gõ tên ⇒ thêm mới; sửa nhanh bằng bút chì).
+- **Output:** NCC có trong danh mục, chọn được ở HĐ nhập mới. Không xuất hiện ở danh sách Đại lý của Nhập hàng.
+- **Ngừng / xóa:** theo R17.
+- **End:** HĐ lập sau chọn được NCC; HĐ đã lưu giữ tên đã chép.
 
 ### Flow NI2 — Lập hợp đồng nhập · owner U1
 - **Start:** đã ký HĐ với đối tác nước ngoài.
@@ -185,7 +233,7 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 | R12 | Cách vận chuyển: cont lạnh 20 · cont lạnh 40 · hàng lẻ ghép cont | hàng lẻ không bắt số cont |
 | R13 | File: tối đa 20 MB / file; PDF, ảnh, Word, Excel; kho file riêng của Phòng Kế hoạch, chỉ người có `import-plans` đọc được | — |
 | R14 | Chế độ demo: mọi bảng mới vào bộ demo; thao tác demo không đổi số thật (luật repo 15) | — |
-| R15 | Đối tác chọn từ **danh mục Nhà cung cấp** (bảng `suppliers`, trên app gọi là "Đại lý" — [32](32-danh-muc.md)). Ô đối tác có thêm mới + sửa nhanh (luật repo 7). Bổ sung trường **quốc gia** (không bắt); trường cũ (tên gọi tắt, tên ghi phiếu, địa chỉ, CCCD / MST, email, ngân hàng) giữ nguyên nghĩa, NCC nước ngoài để trống CCCD được. Nhập hàng không đổi luật: NCC nước ngoài có thể hiện trong ô chọn đại lý của Nhập hàng (chấp nhận ở đợt 1) | — xem A1 |
+| R15 | ~~Đối tác chọn từ danh mục Đại lý (`suppliers`) + cột quốc gia~~ — **thay bằng R15 v2 (§0b): danh mục NCC nhập khẩu riêng** | — |
 
 **R9 — ma trận quyền mặc định:**
 
@@ -332,15 +380,39 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 - **Then** số thật không đổi
 - **Assert** số dòng thật sau `==` trước
 
-### AC-23 — NCC nước ngoài lưu được, sổ đại lý không kẹt · Maps to: NI2, R15 · Test: integration
-- **Given** (a) máy chủ đã có cột quốc gia; (b) máy chủ chưa có cột quốc gia
-- **When** (a) thêm NCC "Ocean Fresh Co." quốc gia "Nhật Bản", CCCD / MST trống; (b) thêm NCC không ghi quốc gia ngay trong ô đối tác của HĐ nhập, rồi sửa một đại lý cũ ở Nhập hàng
-- **Then** (a) NCC lưu được, chọn được cho HĐ; (b) NCC không ghi quốc gia vẫn lưu, sửa đại lý cũ vẫn lên máy chủ (app chỉ gửi cột quốc gia khi có giá trị — ghi quốc gia khi máy chủ chưa có cột thì kẹt, nên chạy 0082 trước khi deploy)
-- **Assert** số dòng hàng chờ ghi của bảng `suppliers` sau cả hai ca `== 0`; (a) quốc gia đọc lại `== "Nhật Bản"`
+### AC-24 — Hai danh mục tách hẳn · Maps to: NI10, R15 v2 · Test: integration
+- **Given** danh mục Đại lý có 2 dòng, danh mục NCC nhập khẩu có 1 dòng "Pacific Marine"
+- **When** thêm NCC "Andaman Seafood" ngay trong ô đối tác của HĐ nhập; rồi đọc danh sách chọn đối tác của HĐ nhập và danh sách chọn đại lý của Nhập hàng
+- **Then** NCC mới vào danh mục NCC nhập khẩu, không vào Đại lý
+- **Assert** số dòng Đại lý `== 2`; số NCC nhập khẩu `== 2`; danh sách chọn của Nhập hàng chứa "Andaman Seafood" `== 0` lần
+
+### AC-25 — Tên gọi tắt bắt buộc và không trùng · Maps to: NI10, R16 · Test: unit
+- **Given** danh mục có "Pacific Marine"
+- **When** lưu NCC (a) tên trống; (b) tên " pacific marine "; (c) tên "Ocean Fresh", mọi trường khác trống
+- **Then** (a), (b) bị chặn; (c) lưu được
+- **Assert** mã lỗi (a) `== "name"`, (b) `== "duplicate-name"`; (c) số lỗi `== 0`
+
+### AC-26 — NCC đã có HĐ chỉ ngừng giao dịch, không xóa · Maps to: NI10, R17 · Test: unit
+- **Given** NCC A có 1 HĐ nhập đã hủy; NCC B chưa có HĐ
+- **When** kiểm xóa A, B; chuyển A sang Ngừng giao dịch rồi lấy danh sách chọn đối tác cho HĐ mới
+- **Then** A không xóa được, B xóa được; A không nằm trong danh sách chọn HĐ mới
+- **Assert** `canDeleteSupplier(A) == false`; `canDeleteSupplier(B) == true`; danh sách chọn chứa A `== 0` lần; HĐ cũ của A vẫn đọc ra tên A
+
+### AC-27 — 0083 chép đối tác cũ, HĐ không phải sửa · Maps to: R18 · Test: integration (PGlite)
+- **Given** DB sau 0082 có HĐ nhập trỏ `supplier_id` vào 1 dòng Đại lý "Pacific Marine" (country "Nhật Bản")
+- **When** chạy 0083 hai lần
+- **Then** danh mục NCC nhập khẩu có đúng 1 dòng cùng id, tên, quốc gia; dòng Đại lý vẫn còn
+- **Assert** `count(import_suppliers where id = <id>) == 1`; `count(suppliers where id = <id>) == 1`; lần chạy thứ 2 không lỗi, không nhân đôi (`== 1`)
+
+### AC-28 — Quyền danh mục NCC nhập khẩu · Maps to: R9 v2, R19 · Test: integration
+- **Given** tài khoản planner, accountant, warehouse-keeper
+- **When** mỗi tài khoản đọc và thêm một NCC nhập khẩu
+- **Then** planner đọc + thêm được; accountant chỉ đọc; thủ kho không đọc
+- **Assert** planner thêm `ok == true`; accountant thêm bị từ chối, đọc `>= 1` dòng; thủ kho đọc `== 0` dòng; nhóm Kế hoạch có đúng `1` mục Tra cứu
 
 ## 11. Assumptions (Claude quyết, chủ dự án đổi được)
 
-- **A1 — Đối tác lấy từ danh mục Nhà cung cấp** (R15) — **chủ dự án chốt 2026-10-29** (bản nháp trước đề xuất danh mục Khách hàng, bị loại). Bên thuê gia công cũng ghi ở danh mục Nhà cung cấp. **Lưu ý khi build:** `toRow` của bảng `suppliers` gửi ĐỦ mọi cột mỗi lần ghi ([32](32-danh-muc.md)) ⇒ cột quốc gia phải chạy migration TRƯỚC khi deploy, hoặc chỉ gửi khi máy chủ đã có cột (như trường khách xuất khẩu của mig 0075) — không thì mọi lần lưu đại lý kẹt hàng chờ.
+- **A1 — ~~Đối tác lấy từ danh mục Nhà cung cấp (Đại lý)~~ — THAY bởi §0b v2: danh mục NCC nhập khẩu riêng.** Ghi chú cũ giữ để tra: Bên thuê gia công cũng ghi ở danh mục Nhà cung cấp. **Lưu ý khi build:** `toRow` của bảng `suppliers` gửi ĐỦ mọi cột mỗi lần ghi ([32](32-danh-muc.md)) ⇒ cột quốc gia phải chạy migration TRƯỚC khi deploy, hoặc chỉ gửi khi máy chủ đã có cột (như trường khách xuất khẩu của mig 0075) — không thì mọi lần lưu đại lý kẹt hàng chờ.
 - **A2 — Quyền riêng** `import-plans` + `import-plans.receiving` (R9), không dùng chung quyền Xuất khẩu ⇒ giao được người chỉ làm Nhập khẩu, không đổi ma trận đang chạy.
 - **A3 — Bộ 3 chứng từ bắt buộc** (Invoice, Packing List, tờ khai). C/O, kiểm dịch, B/L không bắt (chủ dự án ghi "kiểm dịch nếu có"). Mục bắt buộc vẫn "Không áp dụng" được (có lý do) để không kẹt lô đặc biệt.
 - **A4 — Không nối sổ kho** đợt này (R11). Thực nhập chỉ nằm trong Nhập khẩu.
@@ -354,3 +426,5 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 - 2026-10-29 — v1: dựng từ trả lời 14 câu của chủ dự án; phạm vi gọn HĐ → chứng từ → thực nhập.
 - 2026-10-29 — v1.1: chủ dự án chốt đối tác lấy từ danh mục Nhà cung cấp (A1, R15), thay danh mục Khách hàng.
 - 2026-10-29 — build: `features/import-planning/**`, `lib/importPlanning.ts` (+ test), `lib/importFileStorage.ts` (bucket `import-files`), `lib/importPlanningDemo.ts`, mig `0082`. Thêm khi build: chạy không nối máy chủ ⇒ số chứng từ / ghi chú tính thay file (như Xuất khẩu); thủ kho không sửa ngày về kho (NI6).
+- 2026-10-29 tối — v2 ĐÃ BUILD: `import_suppliers` + `catalog.import-suppliers` (mig 0083), tab Danh mục "NCC nhập khẩu", bảng danh mục ẩn nút Xóa dòng NCC đã có HĐ (`canDeleteRow`), form Đại lý bỏ ô Quốc gia, planner thôi có quyền thêm / sửa Đại lý.
+- 2026-10-29 tối — v2: chủ dự án xem app, NCC nhập khẩu khác hẳn đại lý Nhập hàng ⇒ danh mục riêng (NI10, R15 v2, R16–R19, AC-24…28), một mục Tra cứu ở nhóm Kế hoạch; 0082 đã chạy ⇒ mig 0083. CHƯA BUILD.

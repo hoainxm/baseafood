@@ -199,8 +199,9 @@ export const NAV_TREE: NavTreeGroup[] = [
       { ref: "reconciliation" },
     ],
   },
-  // Phòng Kế hoạch: Xuất khẩu · Nhập khẩu (ba-spec 45); "Khác" thêm vào nhánh này về sau.
-  { name: "Kế hoạch", icon: Container, children: [{ ref: "planning-export" }, { ref: "planning-import" }, LOOKUP_CHILD("customers"), LOOKUP_CHILD("suppliers")] },
+  // Phòng Kế hoạch: Xuất khẩu · Nhập khẩu (ba-spec 45); "Khác" thêm vào nhánh này về sau. MỘT mục Tra cứu
+  // (ba-spec 45 v2 R19, chủ dự án chọn): mở danh mục NCC nhập khẩu. Tra cứu Khách hàng ở nhóm Bán hàng.
+  { name: "Kế hoạch", icon: Container, children: [{ ref: "planning-export" }, { ref: "planning-import" }, LOOKUP_CHILD("import-suppliers")] },
   { name: "Tài liệu công ty", icon: FolderOpen, children: [{ ref: "documents" }] },
   {
     name: "Hệ thống",

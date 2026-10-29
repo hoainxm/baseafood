@@ -157,6 +157,8 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   // Nhập khẩu (mig 0082): RLS RIÊNG theo import-plans / import-plans.receiving (thủ kho chỉ ghi
   // số lượng thực nhập) — không qua trigger 0065. App kiểm ở /planning-import bằng useCan.
   import_contracts: null,
+  // NCC nhập khẩu (mig 0083): RLS riêng theo catalog.import-suppliers.
+  import_suppliers: null,
   import_contract_lines: null,
   import_receipts: null,
   import_receipt_lines: null,

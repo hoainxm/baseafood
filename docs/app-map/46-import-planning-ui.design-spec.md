@@ -37,7 +37,7 @@ Trọng số (nhân viên KH): **3** = trạng thái lô + chứng từ còn thi
 **Hồ sơ HĐ.** Đầu: Quay lại · "HĐ <số>" · thẻ trạng thái · nút chính việc tiếp + "Thao tác khác ▾" (Sửa hợp đồng · Đóng hợp đồng · Hủy · Xóa). Ô tóm tắt (lưới nhãn–giá trị như 42): Đối tác · Ngày ký · Loại hình · Tiền tệ · Tổng kg · Tổng tiền (ẩn khi không quyền giá / không dòng nào có giá) · Đã về. Khối **Dòng hàng**: Tên hàng · Kg HĐ · Đơn giá · Thành tiền · Đã về · Còn lại (âm ⇒ thẻ vàng "vượt x kg"). Khối **File hợp đồng** (`FileList` + Đính file). Khối **Các lần nhập**: mỗi lô một khung — đầu (ngày về / dự kiến · vận chuyển · cont · B/L · thẻ trạng thái · Sửa / Hủy / Xóa), rồi **Chứng từ** (mỗi mục một hàng checklist: tên · số · ngày · `FileList` · Cập nhật; mục "nếu có" thêm 🗑 `InlineConfirmDelete`; mục "Không áp dụng" ghi lý do) + "Thêm chứng từ", rồi **Thực nhập** (bảng tên hàng · kg lô này + nút "Ghi thực nhập"). HĐ đóng ⇒ dải "Đã đóng · Lý do: …".
 
 **Hộp.** Mọi hộp ghi là `FormDialog` + `useDialogDraft` + `ErrorSummary`, nút Lưu không `disabled`.
-- **Hợp đồng nhập** (cỡ lg): khối 1 Hợp đồng (Đối tác = `Combobox` danh mục Nhà cung cấp có Thêm mới + bút chì · Số HĐ · Ngày ký · Loại hình `ChoiceGroup` 3 lựa chọn · Tiền tệ · Ghi chú); khối 2 Dòng hàng (mỗi dòng: Tên hàng · Số lượng (kg) · Đơn giá · thành tiền chữ phụ · 🗑) + "Thêm dòng"; chân "n dòng · x kg · y USD".
+- **Hợp đồng nhập** (cỡ lg): khối 1 Hợp đồng (Đối tác = `Combobox` danh mục **NCC nhập khẩu** (v2 — chỉ NCC Đang giao dịch) có Thêm mới + bút chì · Số HĐ · Ngày ký · Loại hình `ChoiceGroup` 3 lựa chọn · Tiền tệ · Ghi chú); khối 2 Dòng hàng (mỗi dòng: Tên hàng · Số lượng (kg) · Đơn giá · thành tiền chữ phụ · 🗑) + "Thêm dòng"; chân "n dòng · x kg · y USD".
 - **Lần nhập**: Ngày về kho · Ngày dự kiến về (dòng phụ khối: "Chưa về thì ghi ngày dự kiến") · Vận chuyển `ChoiceGroup` · Số cont · Số B/L · Ghi chú.
 - **Chứng từ**: Loại (mục bắt buộc: cố định; thêm mới: chọn trong C/O · Giấy kiểm dịch · B/L · Chứng từ khác + ô Tên) · Số · Ngày · Loại hình (chỉ tờ khai) · File (`FilePicker` nhiều file) · `ChoiceGroup` "Không áp dụng?" (mục bắt buộc) + Lý do.
 - **Ghi thực nhập**: mỗi dòng hàng HĐ một hàng: tên · "HĐ x kg · đã về lô khác y kg" · ô kg (ô số ≥ 44px) · cảnh báo vàng "vượt HĐ z kg" ngay dưới (không chặn).
@@ -45,6 +45,8 @@ Trọng số (nhân viên KH): **3** = trạng thái lô + chứng từ còn thi
 - **Hủy** (HĐ / lô): Lý do; xóa qua `ConfirmDelete` + toast Hoàn tác.
 
 **Phần thủ kho.** Một trang: ‹ tháng › + danh sách lô (thẻ trên điện thoại): HĐ · đối tác · ngày về · "Đã ghi thực nhập" / "Chưa ghi thực nhập" · nút "Ghi thực nhập". Không giá, không chứng từ.
+
+**Danh mục NCC nhập khẩu (v2 — ba-spec 45 §0b).** Tab mới **"NCC nhập khẩu"** ở trang Danh mục, đứng ngay sau "Đại lý"; khuôn `CatalogCrudFor` như các tab khác (bảng `rowMarkKey`, hộp Thêm / Sửa gom nhóm: *Thông tin chung* (mã · tên gọi tắt · tên đầy đủ · quốc gia · địa chỉ · MST / số đăng ký · mặt hàng chính · cảng xếp thường dùng) · *Liên hệ* (người liên hệ · chức vụ · email · điện thoại · website) · *Ngân hàng thụ hưởng* (ngân hàng · số tài khoản · SWIFT · địa chỉ ngân hàng) · *Khác* (trạng thái Đang / Ngừng giao dịch · ghi chú)). Cột bảng: mã · tên gọi tắt · quốc gia · người liên hệ · trạng thái; còn lại ở Chi tiết. Nhóm nav **Kế hoạch**: Xuất khẩu · Nhập khẩu · **1 mục Tra cứu** → `catalog?tab=import-suppliers`. Form Đại lý bỏ ô Quốc gia.
 
 ## Ma trận trạng thái
 
@@ -65,3 +67,4 @@ Thử preview demo: lập HĐ 2 dòng → ghi lần nhập → đính 3 chứng 
 ## History
 
 - 2026-10-29 — v1 theo ba-spec 45 v1.1.
+- 2026-10-29 tối — v2: tab Danh mục "NCC nhập khẩu", 1 mục Tra cứu ở nhóm Kế hoạch, ô đối tác đổi nguồn (ba-spec 45 §0b).

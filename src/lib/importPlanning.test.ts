@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { ImportContract, ImportContractLine, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine } from "@/types";
 import {
   canClose,
+  canDeleteImportSupplier,
+  emptyImportSupplier,
+  selectableImportSuppliers,
+  validateImportSupplier,
   canDeleteDocument,
   canDeleteReceipt,
   canMarkNotApplicable,
@@ -302,5 +306,26 @@ describe("AC-17 / AC-18 — tra số và tháng (NI7)", () => {
     expect(v.stats).toEqual({ total: 3, complete: 1, incomplete: 2 });
     expect(monthView(d, "2026-11", "sB").stats.total).toBe(1);
     expect(v.groups[1].receipts[0].state).toBe("awaiting-quantity");
+  });
+});
+
+describe("AC-25 / AC-26 — danh mục NCC nhập khẩu (v2 R16, R17)", () => {
+  const pm = { ...emptyImportSupplier("sA"), shortName: "Pacific Marine" };
+  it("AC-25 tên gọi tắt bắt buộc, không trùng", () => {
+    expect(validateImportSupplier({ ...emptyImportSupplier("x"), shortName: "  " }, [pm]).map((i) => i.code)).toEqual(["name"]);
+    expect(validateImportSupplier({ ...emptyImportSupplier("x"), shortName: " pacific marine " }, [pm]).map((i) => i.code)).toEqual(["duplicate-name"]);
+    expect(validateImportSupplier({ ...emptyImportSupplier("x"), shortName: "Ocean Fresh" }, [pm])).toHaveLength(0);
+    // sửa chính nó không tính trùng
+    expect(validateImportSupplier(pm, [pm])).toHaveLength(0);
+  });
+  it("AC-26 NCC đã có HĐ (kể cả đã hủy) chỉ ngừng giao dịch, không xóa", () => {
+    const contracts = [contract({ supplierId: "sA", status: "cancelled" })];
+    expect(canDeleteImportSupplier(contracts, "sA")).toBe(false);
+    expect(canDeleteImportSupplier(contracts, "sB")).toBe(true);
+    const a = { ...pm, status: "inactive" as const };
+    const b = { ...emptyImportSupplier("sB"), shortName: "Ocean" };
+    expect(selectableImportSuppliers([a, b]).map((x) => x.id)).toEqual(["sB"]);
+    // HĐ cũ của A vẫn giữ A trong ô chọn khi sửa
+    expect(selectableImportSuppliers([a, b], "sA").map((x) => x.id)).toEqual(["sA", "sB"]);
   });
 });

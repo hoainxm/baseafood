@@ -15,6 +15,7 @@ import type {
   ImportFile,
   ImportReceipt,
   ImportReceiptLine,
+  ImportSupplier,
   ImportTransport,
   ImportType,
 } from "@/types";
@@ -137,7 +138,7 @@ export function validateContract(
   d?: Pick<ImportData, "lines" | "receipts" | "receiptLines">,
 ): ImportIssue[] {
   const out: ImportIssue[] = [];
-  if (!c.supplierId) out.push({ code: "supplier", message: "Chọn đối tác (nhà cung cấp)." });
+  if (!c.supplierId) out.push({ code: "supplier", message: "Chọn đối tác (NCC nhập khẩu)." });
   if (!c.contractNo.trim()) out.push({ code: "contract-no", message: "Nhập số hợp đồng." });
   if (!c.signedDate) out.push({ code: "signed-date", message: "Nhập ngày ký." });
   if (!c.importType) out.push({ code: "import-type", message: "Chọn loại hình nhập." });
@@ -408,4 +409,46 @@ export function monthView(d: ImportData, month: string, supplierId = ""): MonthV
   }
   const groups = [...map.values()].sort((a, b) => a.supplierName.localeCompare(b.supplierName, "vi"));
   return { groups, stats: { total: rows.length, complete, incomplete: rows.length - complete } };
+}
+
+/* ---------- Danh mục NCC nhập khẩu (v2 — R15–R17) ---------- */
+
+export function emptyImportSupplier(id: string): ImportSupplier {
+  return {
+    id,
+    code: "",
+    shortName: "",
+    fullName: "",
+    country: "",
+    address: "",
+    taxId: "",
+    mainProducts: "",
+    loadingPort: "",
+    contactName: "",
+    contactTitle: "",
+    email: "",
+    phone: "",
+    website: "",
+    bankName: "",
+    bankAccount: "",
+    swiftCode: "",
+    bankAddress: "",
+    status: "active",
+    note: "",
+  };
+}
+
+/** R16 — tên gọi tắt bắt buộc, không trùng (không phân hoa thường, bỏ khoảng trắng đầu / cuối). */
+export function validateImportSupplier(x: Pick<ImportSupplier, "id" | "shortName">, rows: readonly Pick<ImportSupplier, "id" | "shortName">[]): ImportIssue[] {
+  if (!x.shortName.trim()) return [{ code: "name", message: "Nhập tên gọi tắt của nhà cung cấp." }];
+  if (rows.some((r) => r.id !== x.id && key(r.shortName) === key(x.shortName))) return [{ code: "duplicate-name", message: "Đã có nhà cung cấp cùng tên gọi tắt." }];
+  return [];
+}
+
+/** R17 — NCC đã có HĐ nhập (kể cả đã hủy) không xóa được, chỉ chuyển Ngừng giao dịch. */
+export const canDeleteImportSupplier = (contracts: readonly Pick<ImportContract, "supplierId">[], supplierId: string) => !contracts.some((c) => c.supplierId === supplierId);
+
+/** NCC chọn được cho HĐ: đang giao dịch, cộng NCC đang gắn với HĐ đang sửa (giữ tên HĐ cũ). */
+export function selectableImportSuppliers<T extends Pick<ImportSupplier, "id" | "status">>(rows: readonly T[], currentId = ""): T[] {
+  return rows.filter((r) => r.status !== "inactive" || r.id === currentId);
 }

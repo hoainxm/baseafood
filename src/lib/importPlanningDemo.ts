@@ -5,13 +5,13 @@
 // ============================================================
 // Số + tên TỰ ĐẶT (không lấy hồ sơ thật — luật repo 15). File là đường dẫn GIỮ CHỖ
 // `demo-placeholder/…` (không chạm kho file). Ngày dời theo `today` để luôn rơi vào tháng gần đây.
-import type { ImportContract, ImportContractLine, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, Supplier } from "@/types";
+import type { ImportContract, ImportContractLine, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, ImportSupplier } from "@/types";
 import { DEMO_PLACEHOLDER_PREFIX } from "./exportPlanning";
-import type { ImportData } from "./importPlanning";
+import { emptyImportSupplier, type ImportData } from "./importPlanning";
 
 export interface ImportDemoSet extends ImportData {
-  /** NCC nước ngoài thêm vào danh mục Nhà cung cấp của bộ demo. */
-  extraSuppliers: Supplier[];
+  /** Danh mục NCC nhập khẩu của bộ demo (mig 0083 — danh mục riêng, không lẫn Đại lý). */
+  suppliers: ImportSupplier[];
 }
 
 const addDays = (iso: string, days: number) => {
@@ -20,31 +20,16 @@ const addDays = (iso: string, days: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-function supplier(id: string, code: string, shortName: string, billingName: string, country: string): Supplier {
-  return {
-    id,
-    code,
-    shortName,
-    billingName,
-    address: "",
-    nationalId: "",
-    issuedDate: "",
-    issuedPlace: "",
-    phone: "",
-    email: "",
-    bankAccount: "",
-    bankName: "",
-    bankBranch: "",
-    country,
-    note: "NCC nước ngoài (bộ demo Nhập khẩu)",
-  };
+function supplier(id: string, code: string, shortName: string, fullName: string, country: string, extra: Partial<ImportSupplier> = {}): ImportSupplier {
+  return { ...emptyImportSupplier(id), code, shortName, fullName, country, note: "Bộ demo Nhập khẩu", ...extra };
 }
 
 export function buildImportDemo(today: string): ImportDemoSet {
   const at = `${today}T08:00:00.000Z`;
-  const extraSuppliers = [
-    supplier("imp-sup-pacific", "NK01", "Pacific Marine", "Pacific Marine Co., Ltd.", "Nhật Bản"),
-    supplier("imp-sup-andaman", "NK02", "Andaman Seafood", "Andaman Seafood Trading Co.", "Ấn Độ"),
+  const suppliers = [
+    supplier("imp-sup-pacific", "NK01", "Pacific Marine", "Pacific Marine Co., Ltd.", "Nhật Bản", { loadingPort: "Tokyo", contactName: "Mr. Tanaka", mainProducts: "Bạch tuộc nguyên con" }),
+    supplier("imp-sup-andaman", "NK02", "Andaman Seafood", "Andaman Seafood Trading Co.", "Ấn Độ", { loadingPort: "Chennai", bankName: "State Bank (demo)", swiftCode: "DEMOINBB" }),
+    supplier("imp-sup-oldco", "NK03", "Old Ocean", "Old Ocean Fisheries", "Indonesia", { status: "inactive", note: "Ngừng giao dịch từ 2025 (bộ demo)" }),
   ];
   const contract = (id: string, p: Partial<ImportContract>): ImportContract => ({
     id,
@@ -199,5 +184,5 @@ export function buildImportDemo(today: string): ImportDemoSet {
     updatedAt: at,
   });
   const receiptLines: ImportReceiptLine[] = [qty("imp-r1", "imp-c1-l1", 6000), qty("imp-r1", "imp-c1-l2", 4000), qty("imp-r4", "imp-c3-l1", 4900)];
-  return { extraSuppliers, contracts, lines, receipts, receiptLines, documents, files };
+  return { suppliers, contracts, lines, receipts, receiptLines, documents, files };
 }

@@ -31,6 +31,8 @@ const TAB_RESOURCE: Record<string, string> = {
   products: "catalog.products",
   customers: "catalog.customers",
   suppliers: "catalog.suppliers",
+  // NCC nhập khẩu (mig 0083, ba-spec 45 v2) — khác Đại lý của Nhập hàng.
+  "import-suppliers": "catalog.import-suppliers",
   "material-types": "catalog.material-types",
   batters: "catalog.batters",
   "storage-locations": "catalog.storage-locations",
@@ -107,6 +109,7 @@ export default function CatalogScreen() {
           {canViewTab("products") && <TabsTrigger value="products" title="Danh mục mặt hàng thực tế của xưởng — dùng khi ghi sản lượng, đóng gói và bán hàng.">Mặt hàng</TabsTrigger>}
           {canViewTab("customers") && <TabsTrigger value="customers" title="Khách mua thành phẩm, kèm thị trường (Nhật, EU, nội địa…).">Khách hàng</TabsTrigger>}
           {canViewTab("suppliers") && <TabsTrigger value="suppliers" title="Đại lý cung cấp nguyên liệu — dùng khi ghi chuyến nhập hàng.">Đại lý</TabsTrigger>}
+          {canViewTab("import-suppliers") && <TabsTrigger value="import-suppliers" title="Nhà cung cấp nước ngoài (và bên thuê gia công) của mảng Nhập khẩu — khác Đại lý của Nhập hàng.">NCC nhập khẩu</TabsTrigger>}
           {canViewTab("material-types") && <TabsTrigger value="material-types" title="Quy cách / size nguyên liệu, có gắn loài (bạch tuộc, mực, cá…).">Loại nguyên liệu</TabsTrigger>}
           {canViewTab("batters") && <TabsTrigger value="batters" title="Các loại bột tẩm (24V, 18V, 220H, 232, 20802…) — gắn vào mặt hàng tẩm bột để ghi kg bột theo từng loại.">Bột tẩm</TabsTrigger>}
           {canViewTab("storage-locations") && <TabsTrigger value="storage-locations" title="Nơi hàng đang nằm: kho nhà và các kho lạnh thuê ngoài.">Kho lưu trữ</TabsTrigger>}
@@ -146,6 +149,9 @@ export default function CatalogScreen() {
 
         <TabsContent value="suppliers" data-tour="catalog-suppliers" className="pt-6">
           <CatalogCrudFor cfg={c.supplier} rowMarkKey="danh-muc-dai-ly" resource={TAB_RESOURCE["suppliers"]} />
+        </TabsContent>
+        <TabsContent value="import-suppliers" data-tour="catalog-import-suppliers" className="pt-6">
+          <CatalogCrudFor cfg={c.importSupplier} rowMarkKey="import-suppliers" resource={TAB_RESOURCE["import-suppliers"]} />
         </TabsContent>
 
         <TabsContent value="material-types" data-tour="catalog-material-types" className="pt-6">
@@ -193,6 +199,7 @@ function CatalogCrudFor<T extends { id: string }>({
       canCreate={allowed.create}
       canUpdate={allowed.update}
       canDelete={allowed.delete}
+      canDeleteRow={cfg.canDeleteRow}
       rowMarkKey={rowMarkKey}
       loading={cfg.loading}
       title={cfg.title}

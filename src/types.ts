@@ -1524,6 +1524,52 @@ export interface ImportDocument {
 }
 
 /** File đính kèm: HĐ đã ký (`documentId` rỗng) hoặc file của một chứng từ. */
+/**
+ * Một mẫu trong báo cáo kiểm mẫu của Kho, gắn với một lần nhập (= invoice) — ba-spec 45 v4 NI11
+ * (mig 0085). CHỈ LƯU giá trị như báo cáo, app không tính lại (R23). Ô trống = null / "".
+ */
+export interface ImportSampleCheck {
+  id: string;
+  contractId: string;
+  receiptId: string;
+  /** Dòng hàng HĐ của mẫu (gợi ý theo size); "" = chưa gắn. */
+  contractLineId: string;
+  /** Đợt đọc: các mẫu nạp cùng một lần — nạp lại thì thay đúng nhóm này (R26 / Q4). */
+  batchId: string;
+  /** File báo cáo (`import_files.id`); "" = nhập tay không đính file. */
+  fileId: string;
+  reportDate: string;
+  sampleNo: string;
+  size: string;
+  exporterName: string;
+  importDate: string;
+  packing: string;
+  productionDate: string;
+  expiryDate: string;
+  grossWeightG: number | null;
+  netWeightG: number | null;
+  netShortagePct: number | null;
+  color: string;
+  blackSpot: string;
+  odor: string;
+  mossPct: number | null;
+  oneSkinPct: number | null;
+  twoSkinPct: number | null;
+  madaPct: number | null;
+  /** Phân bố size theo nhãn khoảng của kho ("<30gr", "30/50"…) → %. */
+  sizeDistribution: Record<string, number | null>;
+  thawingNorm: number | null;
+  preprocessingNorm: number | null;
+  blanchingNorm: number | null;
+  cuttingNorm: number | null;
+  surplusNorm: number | null;
+  materialToFinishedNorm: number | null;
+  /** Hàng kho thêm ngoài khuôn: nhãn → giá trị chữ. */
+  extra: Record<string, string>;
+  note: string;
+  createdAt: string;
+}
+
 export interface ImportFile {
   id: string;
   contractId: string;

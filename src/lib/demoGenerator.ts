@@ -21,6 +21,7 @@ import type {
   ImportContractLine,
   ImportDocument,
   ImportFile,
+  ImportSampleCheck,
   ImportReceipt,
   ImportReceiptLine,
   ImportSupplier,
@@ -153,6 +154,7 @@ export interface DemoBundle {
   importReceiptLines: ImportReceiptLine[];
   importDocuments: ImportDocument[];
   importFiles: ImportFile[];
+  importSampleChecks: ImportSampleCheck[];
   labelPrints: LabelPrint[];
   qcChecklists: QcChecklistItem[];
   qcLocks: DailyLock[];
@@ -738,6 +740,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     importReceiptLines: importDemo.receiptLines,
     importDocuments: importDemo.documents,
     importFiles: importDemo.files,
+    importSampleChecks: importDemo.sampleChecks,
     labelPrints,
     qcChecklists,
     qcLocks,

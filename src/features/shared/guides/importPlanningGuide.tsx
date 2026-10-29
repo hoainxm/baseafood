@@ -137,6 +137,15 @@ export const importPlanningGuide: PageGuide = {
           </li>
         </GuideList>
       </GuideSection>
+      <GuideSection title="Kiểm mẫu của kho">
+        <GuideList>
+          <li>
+            Kho gửi báo cáo kiểm mẫu thì vào lần nhập, chọn <b>Nạp báo cáo kiểm mẫu</b>. File Excel được đọc tự động: app chọn sẵn các cột của invoice này theo nhà xuất khẩu và ngày về kho, gợi ý dòng hàng theo size.
+          </li>
+          <li>Ảnh chụp báo cáo chỉ đính kèm, số gõ tay. Ô không đọc được để trống và tô vàng để soát.</li>
+          <li>App chỉ lưu số như báo cáo, không tính lại, không đổi trạng thái lô. Kho gửi bản sửa thì nạp lại và chọn <b>Thay bằng mẫu mới</b>.</li>
+        </GuideList>
+      </GuideSection>
       <GuideSection title="Ai làm gì">
         <GuideActors steps={IMPORT_GUIDE_STEPS} actors={IMPORT_GUIDE_ACTORS} />
       </GuideSection>

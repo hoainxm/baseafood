@@ -3,6 +3,7 @@
 > Load khi: chỉnh giao diện màn Nhập khẩu `/planning-import` (lô nhập theo tháng, danh sách hợp đồng nhập, hồ sơ HĐ, hộp lần nhập / chứng từ / thực nhập / đóng HĐ, phần thủ kho).
 covers: src/features/import-planning/**
 last_verified: 2026-10-29
+<!-- updated: 2026-10-30 (v4) — kiểm mẫu của kho (ba-spec 45 §0d): trong thẻ mỗi lần nhập, dưới Thực nhập, khối "Kiểm mẫu của kho (n mẫu)" — bảng đúng khuôn báo cáo (hàng = chỉ số, cột = mẫu, cột nhãn ghim trái, `HorizontalScroll`; chỉ hiện hàng có số), mỗi cột có Sửa (`edit`) / Xóa (`danger` → ConfirmDelete + Hoàn tác), dòng file báo cáo (xem trước). Nút `outline` "Nạp báo cáo kiểm mẫu". Hộp `FormDialog xl`: chọn file (Excel đọc; ảnh / PDF chỉ đính) → câu kết quả đọc → khung vàng liệt kê ô cần soát → Ngày báo cáo + (đã có mẫu) ChoiceGroup Thay / Giữ và thêm → lưới soát (mỗi cột: ô tick Lưu, tên nhà XK, Combobox Dòng hàng HĐ; ô số `NumberField` ẩn nhãn, điều hướng ↑/↓ theo hàng; ô đọc lỗi tô vàng) → "Thêm mẫu nhập tay". Nháp `useDialogDraft`. -->
 <!-- updated: 2026-10-29 (v3) — dòng hàng nối mặt hàng (ba-spec 45 §0c): hộp HĐ mỗi dòng 2 cột Tên hàng (như trên hợp đồng) · `Combobox` "Mặt hàng (danh mục)" có Thêm mới + bút chì (`useQuickCatalogEdit("product")`), dòng phụ "Gợi ý … — kiểm lại" khi app điền sẵn; máy chủ chưa chạy 0084 ⇒ ô thay bằng chữ báo. Hồ sơ HĐ: bảng Dòng hàng thêm cột "Mặt hàng (danh mục)" (tên mặt hàng, chưa nối ⇒ `Tag` warning "Chưa nối"); hộp Ghi thực nhập + thẻ lần nhập hiện tên mặt hàng dưới tên hàng (`LineProductLabel` ở parts.tsx). Đóng HĐ còn dòng chưa nối ⇒ toast lỗi nêu tên dòng + "vào Sửa hợp đồng để nối". -->
 ttl_days: 90
 
@@ -69,4 +70,5 @@ Thử preview demo: lập HĐ 2 dòng → ghi lần nhập → đính 3 chứng 
 
 - 2026-10-29 — v1 theo ba-spec 45 v1.1.
 - 2026-10-29 tối — v2: tab Danh mục "NCC nhập khẩu", 1 mục Tra cứu ở nhóm Kế hoạch, ô đối tác đổi nguồn (ba-spec 45 §0b).
+- 2026-10-30 — v4: khối Kiểm mẫu của kho trong lần nhập + hộp nạp báo cáo (ba-spec 45 §0d).
 - 2026-10-29 khuya — v3: ô Mặt hàng (danh mục) ở dòng hàng, cột / nhãn "Chưa nối" ở hồ sơ, hộp thực nhập, thẻ lần nhập (ba-spec 45 §0c).

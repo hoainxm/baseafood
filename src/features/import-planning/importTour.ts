@@ -137,6 +137,15 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
           "Hàng về kho thì thủ kho (hoặc nhân viên Kế hoạch) chọn Ghi thực nhập và ghi số kg của từng dòng hàng theo invoice.\n" +
           "Ghi xong và chứng từ đủ thì lô thành Đủ hồ sơ. Mọi dòng về đủ và đã nối mặt hàng thì đóng hợp đồng; còn thiếu kg vẫn đóng được nhưng phải ghi lý do.",
       }),
+      dossier({
+        id: "samples",
+        target: "import-receipt-samples",
+        optional: true,
+        title: "Kiểm mẫu của kho",
+        body:
+          "Kho gửi báo cáo kiểm mẫu (Excel) thì chọn Nạp báo cáo kiểm mẫu. App đọc file, chọn sẵn các cột của lần nhập này theo nhà xuất khẩu và ngày về kho, gợi ý dòng hàng theo size. Kiểm lại rồi lưu.\n" +
+          "Ảnh chụp báo cáo chỉ đính kèm, số gõ tay. App chỉ lưu số như báo cáo, không tính lại và không đổi trạng thái lô.",
+      }),
     );
   }
   return { title: "Nhập khẩu", steps, onExit: ctx.backToList };

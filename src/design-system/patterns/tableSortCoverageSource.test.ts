@@ -28,6 +28,7 @@ const EXEMPT: Record<string, string> = {
   "features/reconciliation/ReconciliationModeView.tsx": "bảng tóm tắt nhỏ 'phần lệch do…' (vài dòng)",
   "features/admin/AdminHomeScreen.tsx": "bảng tóm tắt vài vai trò",
   "features/admin/RolePermissionsScreen.tsx": "ma trận phân quyền — thứ tự màn theo cây điều hướng",
+  "features/import-planning/SampleChecks.tsx": "bảng kiểm mẫu theo khuôn báo cáo của kho — hàng là chỉ số, cột là mẫu, thứ tự như tờ báo cáo (sắp theo cột vô nghĩa)",
 };
 
 function listTsx(dir: string): string[] {

@@ -13,6 +13,7 @@ import {
   useImportFiles,
   useImportReceiptLines,
   useImportReceipts,
+  useImportSampleChecks,
 } from "@/lib/catalogRepo";
 import type { ImportData } from "@/lib/importPlanning";
 import { hasImportStorage } from "@/lib/importFileStorage";
@@ -30,13 +31,14 @@ export function useImportData() {
   const [receiptLines, saveReceiptLines] = useImportReceiptLines();
   const [documents, saveDocuments] = useImportDocuments();
   const [files, saveFiles] = useImportFiles();
+  const [sampleChecks, saveSampleChecks, sampleMeta] = useImportSampleChecks();
 
   // R22 (ba-spec 45 v3): máy chủ chỉ trả `product_id` khi đã chạy 0084 ⇒ dò ở dòng đọc về. Chưa có
   // dòng nào thì chưa biết ⇒ coi như chưa có cột (không gửi, không bắt nối).
   const productLinkAvailable = !isServerConnected || lines.some((l) => l.productId !== undefined);
   const data: ImportData = useMemo(
-    () => ({ contracts, lines, receipts, receiptLines, documents, files, filesAvailable: hasImportStorage, productLinkAvailable }),
-    [contracts, lines, receipts, receiptLines, documents, files, productLinkAvailable],
+    () => ({ contracts, lines, receipts, receiptLines, documents, files, sampleChecks, filesAvailable: hasImportStorage, productLinkAvailable }),
+    [contracts, lines, receipts, receiptLines, documents, files, sampleChecks, productLinkAvailable],
   );
   // Thủ kho không đọc được bảng HĐ (RLS) ⇒ dò "máy chủ chưa có bảng" ở bảng lần nhập (ai cũng đọc).
   const probe = receiptsMeta;
@@ -53,6 +55,9 @@ export function useImportData() {
     saveReceiptLines: ro(saveReceiptLines),
     saveDocuments: ro(saveDocuments),
     saveFiles: ro(saveFiles),
+    saveSampleChecks: ro(saveSampleChecks),
+    /** Máy chủ chưa chạy 0085 ⇒ không ghi kiểm mẫu (khỏi kẹt hàng chờ). */
+    sampleChecksAvailable: !isServerConnected || (sampleMeta.status !== "loading" && !isMissingTableError(sampleMeta.error)),
   };
 }
 

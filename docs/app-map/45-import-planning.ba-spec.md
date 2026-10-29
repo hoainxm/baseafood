@@ -1,11 +1,12 @@
 # 45 — ba-spec: Phòng Kế hoạch · Nhập khẩu — Đợt 1 (hợp đồng → bộ chứng từ → số lượng thực nhập)
 
 > Load khi: xây hoặc sửa mảng Nhập khẩu của Phòng Kế hoạch: hợp đồng nhập (đối tác nước ngoài, dòng hàng tên · kg · đơn giá), lần nhập (cont / hàng lẻ, ngày về kho), bộ chứng từ đính kèm (Invoice, Packing List, tờ khai nhập, C/O, kiểm dịch…), số lượng thực nhập theo dòng hàng, đóng hợp đồng, quyền `import-plans`.
-covers: src/features/import-planning/**, src/lib/importPlanning.ts, supabase/migrations/0083_import_suppliers.sql, supabase/migrations/0084_import_line_products.sql, src/lib/importPlanningDemo.ts, src/lib/importFileStorage.ts, supabase/migrations/0082_import_planning.sql
+covers: src/features/import-planning/**, src/lib/importPlanning.ts, supabase/migrations/0083_import_suppliers.sql, supabase/migrations/0084_import_line_products.sql, supabase/migrations/0085_import_sample_checks.sql, src/lib/importSampleChecks.ts, src/lib/importSampleFile.ts, src/lib/importPlanningDemo.ts, src/lib/importFileStorage.ts, supabase/migrations/0082_import_planning.sql
 last_verified: 2026-10-29
 ttl_days: 90
-status: ba-spec v3 (2026-10-29 khuya) — **dòng hàng nối mặt hàng danh mục** (§0c, mig `0084` ⏳ CHƯA chạy DB thật) · v2 (2026-10-29 tối) — **danh mục Nhà cung cấp nhập khẩu RIÊNG** (§0b, ĐÃ BUILD 2026-10-29 — mig `0083` ⏳ CHƯA chạy DB thật) · v1.1 ĐÃ BUILD 2026-10-29 (commit 91b8f14, `0082` ✅ chạy DB thật 2026-10-29 theo chủ dự án). Giao diện: design-spec [46](46-import-planning-ui.design-spec.md).
+status: ba-spec v4 ĐÃ BUILD (2026-10-29) — **chỉ số kiểm mẫu của kho đi theo từng invoice** (§0d, mig `0085` ⏳ CHƯA chạy DB thật) · v3 (2026-10-29 khuya) — **dòng hàng nối mặt hàng danh mục** (§0c, mig `0084` ⏳ CHƯA chạy DB thật) · v2 (2026-10-29 tối) — **danh mục Nhà cung cấp nhập khẩu RIÊNG** (§0b, ĐÃ BUILD 2026-10-29 — mig `0083` ⏳ CHƯA chạy DB thật) · v1.1 ĐÃ BUILD 2026-10-29 (commit 91b8f14, `0082` ✅ chạy DB thật 2026-10-29 theo chủ dự án). Giao diện: design-spec [46](46-import-planning-ui.design-spec.md).
 
+<!-- re-verified: 2026-10-30 — v4 build: AC-35/36/37/39 = test `importSampleChecks.test.ts` (11, lưới dựng đúng khuôn ảnh báo cáo 25/10/2026: 5 mẫu, ô gộp, % Excel, ngày serial); AC-38 = luật trạng thái không đọc kiểm mẫu (receiptState / closeGate không đổi); AC-41 PGlite (0001→0084 + 0085 chạy 2 lần, 4 policy, ma trận không đổi, planner thêm / xóa, kế toán chỉ đọc, thủ kho + qc đọc 0); AC-40 thử tay preview. Chưa thử: file Excel GỐC của kho (chủ dự án gửi sau). -->
 <!-- re-verified: 2026-10-29 23:00 — v3: AC-29…AC-33 = test `importPlanning.test.ts` (28) + `importPlanningDemo.test.ts` (5); 0084 PGlite (0001→0083 + dòng mẫu, chạy 2 lần, dòng cũ product_id null, policy / quyền không đổi, thủ kho đọc được sửa 0 dòng); AC-34 thử tay preview (worktree sạch, không nối máy chủ): gợi ý "Frozen  whole OCTOPUS 1-2 kg" ra mặt hàng của HĐ trước, thêm mặt hàng mới trong ô ⇒ danh mục +1 + tên hàng trống tự điền, hồ sơ 1 dòng "Chưa nối" (bảng + thẻ lần nhập), đóng HĐ bị chặn nêu tên dòng, nối xong đóng được, nháp giữ mặt hàng khi rời trang, 360 px × 130 % không cuộn ngang. -->
 <!-- re-verified: 2026-10-29 21:00 — v2 build: AC-25/26 = test `importPlanning.test.ts` (23); AC-27/28 PGlite (0001→0082 + HĐ trỏ Đại lý, 0083 chạy 2 lần: chép đúng 1 NCC giữ id, Đại lý còn nguyên, 0 HĐ mất đối tác; planner thêm / xóa NCC, kế toán chỉ đọc, thủ kho đọc 0); AC-24 thử tay preview sandbox: ô Đối tác trống dù Đại lý có dòng, thêm "Andaman Seafood" ⇒ vào bsf.import-suppliers, Đại lý không có; nhóm Kế hoạch đúng 1 Tra cứu mở tab NCC nhập khẩu. -->
 <!-- re-verified: 2026-10-29 16:00 — build: AC-3…AC-18 = test `src/lib/importPlanning.test.ts` (21) + `importPlanningDemo.test.ts` (4); AC-1/2/19 RLS thử PGlite (chuỗi 0001→0082 + chạy lại 0082: Nhân viên KH ghi 4 bảng; thủ kho đọc dòng hàng, KHÔNG đọc HĐ / chứng từ, chỉ ghi thực nhập, sửa lần nhập ⇒ 0 dòng; kế toán chỉ đọc; qc đọc 0; anon bị từ chối); luồng lập HĐ 2 dòng → lần nhập → 3 chứng từ → thực nhập vượt 200 kg (cảnh báo, vẫn lưu) → đóng thiếu lý do bị chặn → đóng có lý do → mở lại, tra số cont, 360 px × 130 % không tràn — thử tay preview sandbox (không nối máy chủ). Chưa thử: tải file thật, AC-22 demo trên DB thật, AC-23 cần DB. -->
@@ -117,6 +118,81 @@ Không có chỗ nào khác ghi tên hàng (lần nhập, chứng từ chỉ tr�
 **AC v3:** AC-29 … AC-34 ở §10.
 
 **Assumptions v3:** (1) nối với danh mục **Mặt hàng** (không phải Loại NL) — đổi được nếu chủ dự án muốn; (2) một dòng HĐ = một mặt hàng (HĐ gộp nhiều size thì tách dòng); (3) mặt hàng ngừng dùng vẫn chọn được (danh mục Mặt hàng chưa có trạng thái); (4) máy chủ đã chạy 0084 mà chưa có dòng hàng nào thì app chưa biết có cột ⇒ ô mặt hàng hiện từ khi có dòng hàng đầu tiên — lưu HĐ đầu xong mở Sửa để nối.
+
+## 0d. v4 (2026-10-29) — CHỈ SỐ KIỂM MẪU CỦA KHO ĐI THEO TỪNG INVOICE · ĐÃ BUILD (mig 0085 chưa chạy)
+
+**Yêu cầu (chủ dự án):** bộ phận Kho gửi Phòng Kế hoạch **báo cáo kiểm mẫu hàng nhập khẩu**. Báo cáo là một bảng Excel, mỗi cột một mẫu, có thể gom nhiều invoice của nhiều nhà xuất khẩu. Khi làm hồ sơ một invoice, Phòng Kế hoạch đính ảnh chụp (hoặc file Excel) của báo cáo. App **tự đọc** các cột thuộc invoice đó và **lưu nguyên giá trị** đi kèm invoice và hợp đồng. **Không tính** gì từ các số này.
+
+**Đã soi tài liệu mẫu (25/10/2026):**
+
+| Cột | Nhà XK trên báo cáo | Size | Invoice khớp | Lần nhập |
+|---|---|---|---|---|
+| 1–3 | Grand Marine (ô gộp 3 cột) | 70/100 · 80/100 · 100/200 | GMF/022/26-27 ngày 29.07.2026, 1×40 FCL, 4 size: 70/100 840 kg · 80/100 4.060 kg · 100/200 17.700 kg · **200/300 2.400 kg (không có mẫu)** | ngày nhập 21/08/2026 |
+| 4 | Frontline | 50/100 | FLE/65/2026-2027 ngày 10.08.2026, 1 size 25.000 kg, 5 kg/BL × 4 | 29/09/2026 |
+| 5 | Ife (= International Freezfish Exports, viết tắt theo số invoice "IFE/…") | 100/200 | IFE/21/2026-27 ngày 10.08.2026, 1 size 26.000 kg, 4 kg × 5 | 10/09/2026 |
+
+⇒ **Một invoice = một lần nhập (1 cont)** đúng như mô hình hiện có. **Một cột mẫu = một size của invoice**, tức là một dòng hàng của HĐ. Không phải size nào cũng có mẫu. Ba invoice đều là bản scan (PDF không có chữ). Báo cáo kho là ảnh chụp Excel, chữ in, có ô gộp ("Grand Marine", "21/08/2026", "4kg/BL x 5/CTN" trải 3 cột).
+
+**Các hàng của một mẫu** (giữ nguyên nhãn của kho):
+- **Đầu mẫu:** ngày báo cáo · STT mẫu · size · nhà xuất khẩu · ngày nhập · packing · ngày sản xuất · ngày hết hạn.
+- **Cân:** GW (gr) · NW (gr) · thiếu net (%).
+- **Cảm quan:** màu · nám · mùi (chữ: "Đạt", "Hơi sẫm"…) · rêu (%).
+- **Loại:** 1 da · 2 da · Mada (%).
+- **Phân bố size (gr/pc, %):** <30gr · 30/50 · 50/70 · 70/100 · 100/150 · 150/200 · 200/300 · 300/up.
+- **Định mức:** XĐ · SC · chần · cắt · phụ trội 3% · **ĐM NL – TP**.
+
+Ô trống là "không có", khác với 0. Hàng lạ của kho (mẫu đổi khuôn) vẫn được giữ, ghi theo nhãn.
+
+**Nghiệp vụ mới NI11 — Lưu kiểm mẫu của kho cho một lần nhập (invoice) · owner U1**
+- **Start:** lần nhập đã có (NI4) và Kho đã gửi báo cáo kiểm mẫu.
+- **Input:** file Excel gốc của báo cáo (đọc tự động) **hoặc** ảnh chụp (chỉ đính kèm, số nhập tay — Q1) · lần nhập đang mở hồ sơ.
+- **Steps:**
+  1. U1 đính file báo cáo vào lần nhập.
+  2. File Excel: S1 đọc ra bảng mẫu (mỗi cột một mẫu; ô gộp chép sang từng cột; số theo kiểu Việt "5,0%", "1,05"). Ảnh: S1 không đọc; U1 thêm cột mẫu và gõ số nhìn theo ảnh.
+  3. S1 **chọn sẵn** các cột thuộc lần nhập này: nhà XK khớp NCC của HĐ (tên, tên đầy đủ, hoặc chữ viết tắt / tiền tố số invoice) **và** ngày nhập khớp ngày về kho (nếu có). Mỗi cột gợi ý dòng hàng HĐ theo size, khớp khi tên hàng chứa đúng size đó.
+  4. U1 soát bảng: bỏ hoặc chọn cột, sửa ô đọc sai, chọn dòng hàng cho cột chưa khớp.
+  5. U1 lưu.
+- **Output:** các mẫu đã lưu gắn với lần nhập (và qua đó với HĐ), mỗi mẫu trỏ dòng hàng (có thể trống). File báo cáo đính kèm lần nhập. Hồ sơ HĐ hiện bảng kiểm mẫu đúng khuôn của kho (hàng = chỉ số, cột = mẫu).
+- **End:** lưu xong. Hoặc hủy, khi đó không lưu gì; file đã tải lên bị gỡ.
+- **Sửa / xóa:** sửa từng ô sau khi lưu; xóa mẫu có xác nhận và Hoàn tác. Nạp lại cùng báo cáo thì hỏi **thay** các mẫu cũ của file đó, không cộng đôi.
+
+**Luật v4:**
+- **R23 — Chỉ lưu, không tính.** App không tính lại thiếu net, định mức, tổng %, và không so với thực nhập. Giá trị đọc được lưu đúng như báo cáo, người dùng sửa được. **Không** chỉ số nào chặn đóng HĐ hay đổi trạng thái lô (R6 giữ nguyên).
+- **R24 — Đọc file (Q1: chỉ Excel).** Excel (.xlsx / .xls): đọc theo nhãn hàng ở cột đầu, không theo số dòng. Ô gộp chép sang mọi cột của vùng gộp. Ô số không đọc được thì để trống và đánh dấu cần soát, không đoán. Kết quả luôn qua bước soát trước khi lưu. **Ảnh / PDF:** chỉ đính kèm, không đọc; U1 nhập tay theo cùng khuôn chỉ số.
+- **R25 — Gắn invoice.** Mẫu thuộc **một lần nhập**. Dòng hàng HĐ là tùy chọn (gợi ý theo size). Thông tin "nhà XK", "ngày nhập", "packing" lưu như chữ của kho, **không** ghi đè NCC, ngày về kho hay packing của hồ sơ.
+- **R26 — Quyền:** theo `import-plans` (xem / thêm / sửa / xóa như chứng từ). Thủ kho: xem câu hỏi Q3. Báo cáo không có giá ⇒ không cần ẩn với người không có `view-price`.
+- **R14 (bổ sung)** — bảng mới vào bộ demo; mẫu demo lấy số tự đặt, không chép báo cáo thật.
+
+**Cross-user v4:** Kho → Phòng KH là bàn giao **ngoài app** (Zalo / email file Excel), như hiện nay. Trong app chỉ U1 làm NI11, trừ khi Q3 chọn cho thủ kho tự đính.
+
+**Hướng làm (chờ duyệt):**
+- **Dữ liệu:** bảng mới `import_sample_checks`, mỗi dòng một mẫu:
+  - Trỏ tới: lần nhập · dòng hàng (tùy chọn) · file báo cáo (`import_files`).
+  - Thông tin báo cáo: mã đợt đọc (để nạp lại thì thay đúng nhóm) · ngày báo cáo · STT mẫu.
+  - Chữ như trên báo cáo: size · nhà XK · ngày nhập · packing · ngày SX · ngày HH.
+  - Chỉ số chính, mỗi chỉ số một cột số: GW · NW · thiếu net · rêu · 1 da · 2 da · Mada · 6 định mức.
+  - Cảm quan (chữ): màu · nám · mùi.
+  - Phân bố size (`jsonb` theo nhãn khoảng).
+  - Hàng lạ (`jsonb`).
+  - Ghi chú.
+  - Lý do để chỉ số chính thành cột số: sau này lọc / so ĐM NL–TP theo nhà XK được.
+  - Mig `0085`: chỉ thêm bảng + RLS theo `has_export_permission('import-plans', …)`, không đổi ma trận quyền (trừ khi Q3 cấp thủ kho).
+- **Đọc Excel:** dùng thư viện `xlsx` sẵn có (như đọc Commercial Invoice của Xuất khẩu). Hàm thuần có test: nhận diện nhãn, ô gộp, số kiểu Việt, ô trống.
+- **Ảnh:** không đọc (Q1). Đính kèm như file báo cáo, bảng soát mở trống để nhập tay. Muốn đọc ảnh về sau thì đi đường `lib/ocrCloud.ts` → Edge Function (đã có ở Nhập hàng), không cần đổi bảng.
+- **Màn:** khối "Kiểm mẫu của kho" trong mỗi lần nhập ở hồ sơ HĐ (cạnh Chứng từ / Thực nhập). Chi tiết giao diện để design-spec 46 v4.
+
+**AC v4 (nháp):** AC-35 … AC-41 ở §10.
+
+**Đã chốt (chủ dự án 2026-10-29):**
+
+| # | Câu | Trả lời |
+|---|---|---|
+| Q1 | Đọc ảnh bằng gì | **Chỉ đọc Excel**; ảnh chỉ đính kèm, số nhập tay |
+| Q2 | Mẫu gắn vào đâu | **Lần nhập (= invoice)**, cột tự gợi ý dòng hàng HĐ theo size |
+| Q3 | Ai được đính báo cáo | **Phòng Kế hoạch** (không đổi ma trận quyền) |
+| Q4 | Nạp lại báo cáo đã sửa | **Hỏi rồi thay** các mẫu cũ của cùng đợt đọc, có Hoàn tác |
+
+**Ngoài phạm vi v4:** đọc chính invoice scan (số invoice, size, kg, giá) để tự điền lần nhập; so định mức kho với Cân đối; cảnh báo chỉ số xấu.
 
 ## 1. Vấn đề & JTBD
 
@@ -488,6 +564,48 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 - **Then** dòng đã nối hiện tên mặt hàng, dòng chưa nối hiện "Chưa nối"; mặt hàng mới vào danh mục Mặt hàng
 - **Assert** số dòng hiện "Chưa nối" `== 1`; danh mục Mặt hàng tăng `1` dòng; 360 px × 130 % không cuộn ngang
 
+### AC-35 — Đọc Excel báo cáo mẫu đủ 5 cột · Maps to: NI11, R24 · Test: unit
+- **Given** file Excel khuôn ngày 25/10/2026 (5 mẫu, ô gộp "Grand Marine" 3 cột)
+- **When** đọc file
+- **Then** ra 5 mẫu, ô gộp chép sang từng cột, số kiểu Việt đổi đúng
+- **Assert** số mẫu `== 5`; mẫu 1–3 nhà XK `== "Grand Marine"`; mẫu 3 phân bố 100/150 `== 65`; mẫu 4 màu `== "Hơi sẫm"`; mẫu 5 ĐM NL–TP `== 1.96`; mẫu 1 ô Mada `== null`
+
+### AC-36 — Chọn sẵn đúng cột của invoice · Maps to: NI11, R25 · Test: unit
+- **Given** 5 mẫu như AC-35; lần nhập của HĐ NCC "Grand Marine Foods", ngày về kho 21/08/2026, dòng hàng chứa "70/100", "80/100", "100/200", "200/300"
+- **When** gợi ý cột
+- **Then** chọn 3 cột đầu, mỗi cột gợi ý đúng dòng theo size; lần nhập NCC "International Freezfish Exports" invoice "IFE/21/…" chọn cột 5
+- **Assert** cột chọn `== [1,2,3]` và `== [5]`; dòng hàng gợi ý của cột 2 `== dòng "80/100"`; dòng "200/300" có `0` mẫu
+
+### AC-37 — Ô Excel không đọc được để trống, đánh dấu soát · Maps to: NI11, R24 · Test: unit
+- **Given** file Excel khuôn trên, ô GW mẫu 1 `= "24300"`, ô thiếu net mẫu 2 `= "abc"`, ô % mẫu 3 `= "105%"`
+- **When** đọc file
+- **Then** giữ GW, bỏ hai ô sai, đánh dấu cần soát
+- **Assert** GW `== 24300`; thiếu net mẫu 2 `== null`; % mẫu 3 `== null`; ô cần soát `== 2`
+
+### AC-38 — Chỉ lưu, không tính, không chặn · Maps to: R23 · Test: unit
+- **Given** mẫu có NW 19.000 gr, thiếu net 5,0%, ĐM NL–TP 2,11; lần nhập Đủ hồ sơ
+- **When** lưu mẫu, sửa ĐM thành 2,2
+- **Then** giá trị lưu đúng như gõ; trạng thái lô và điều kiện đóng HĐ không đổi
+- **Assert** ĐM `== 2.2`; thiếu net `== 5`; `receiptState == "complete"` trước và sau; `closeGate` trước == sau
+
+### AC-39 — Nạp lại cùng báo cáo thay, không cộng đôi · Maps to: NI11 · Test: unit
+- **Given** lần nhập đã có 3 mẫu từ đợt đọc A
+- **When** nạp lại báo cáo đã sửa và chọn thay
+- **Then** còn đúng 3 mẫu của đợt mới
+- **Assert** số mẫu của lần nhập `== 3`; mẫu của đợt A `== 0`
+
+### AC-40 — Ảnh chỉ đính kèm, mẫu nhập tay · Maps to: R24 (Q1) · Test: manual (preview)
+- **Given** lần nhập chưa có mẫu
+- **When** đính ảnh chụp báo cáo rồi nhập tay 1 mẫu
+- **Then** ảnh lưu cùng lần nhập, app không đọc ảnh, mẫu nhập tay lưu được
+- **Assert** số file của lần nhập tăng `1`; số mẫu `== 1`; số ô app tự điền từ ảnh `== 0`
+
+### AC-41 — Quyền xem / ghi kiểm mẫu · Maps to: R26 · Test: integration (PGlite)
+- **Given** tài khoản planner, accountant, qc
+- **When** đọc và thêm một mẫu
+- **Then** planner đọc + thêm; accountant chỉ đọc; qc không đọc
+- **Assert** planner thêm `ok == true`; accountant thêm bị từ chối, đọc `>= 1`; qc đọc `== 0`
+
 ## 11. Assumptions (Claude quyết, chủ dự án đổi được)
 
 - **A1 — ~~Đối tác lấy từ danh mục Nhà cung cấp (Đại lý)~~ — THAY bởi §0b v2: danh mục NCC nhập khẩu riêng.** Ghi chú cũ giữ để tra: Bên thuê gia công cũng ghi ở danh mục Nhà cung cấp. **Lưu ý khi build:** `toRow` của bảng `suppliers` gửi ĐỦ mọi cột mỗi lần ghi ([32](32-danh-muc.md)) ⇒ cột quốc gia phải chạy migration TRƯỚC khi deploy, hoặc chỉ gửi khi máy chủ đã có cột (như trường khách xuất khẩu của mig 0075) — không thì mọi lần lưu đại lý kẹt hàng chờ.
@@ -507,3 +625,5 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 - 2026-10-29 tối — v2 ĐÃ BUILD: `import_suppliers` + `catalog.import-suppliers` (mig 0083), tab Danh mục "NCC nhập khẩu", bảng danh mục ẩn nút Xóa dòng NCC đã có HĐ (`canDeleteRow`), form Đại lý bỏ ô Quốc gia, planner thôi có quyền thêm / sửa Đại lý.
 - 2026-10-29 tối — v2: chủ dự án xem app, NCC nhập khẩu khác hẳn đại lý Nhập hàng ⇒ danh mục riêng (NI10, R15 v2, R16–R19, AC-24…28), một mục Tra cứu ở nhóm Kế hoạch; 0082 đã chạy ⇒ mig 0083. CHƯA BUILD.
 - 2026-10-29 khuya — v3: chủ dự án yêu cầu mọi chỗ có tên hàng nối mặt hàng danh mục ⇒ §0c (kiểm kê 7 chỗ, R20–R22, R7 bổ sung, AC-29…34), mig 0084 thêm cột `import_contract_lines.product_id`.
+- 2026-10-29 — v4 NHÁP: chỉ số kiểm mẫu của kho theo từng invoice (§0d, NI11, R23–R26, AC-35…41); soi 3 invoice scan + báo cáo 25/10/2026; chủ dự án chốt Q1 chỉ Excel · Q2 lần nhập · Q3 Phòng KH · Q4 hỏi rồi thay; chờ duyệt code.
+- 2026-10-30 — v4 ĐÃ BUILD: bảng `import_sample_checks` (mig 0085), `lib/importSampleChecks.ts` (khuôn chỉ số, đọc lưới Excel theo nhãn, chọn cột theo nhà XK + ngày về kho, gợi ý dòng theo size, nạp lại thay), `lib/importSampleFile.ts` (SheetJS), khối "Kiểm mẫu của kho" trong mỗi lần nhập + hộp nạp / nhập tay / sửa; lần nhập có mẫu không xóa được; file báo cáo không còn tính là file HĐ.

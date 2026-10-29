@@ -34,7 +34,7 @@ import {
   IMPORT_DOCUMENT_KINDS,
   type ImportData,
 } from "@/lib/importPlanning";
-import type { ImportContract, ImportContractLine, ImportDocument, ImportFile, ImportReceipt } from "@/types";
+import type { ImportContract, ImportContractLine, ImportDocument, ImportFile, ImportReceipt, ImportSampleCheck } from "@/types";
 import {
   ArrowLeft,
   Ban,
@@ -53,6 +53,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { ContractStateTag, ImportFileList, LineProductLabel, ReceiptStateTag, type ImportPreviewTarget } from "./parts";
+import { SampleCheckSection } from "./SampleChecks";
 
 export interface DossierCan {
   create: boolean;
@@ -79,6 +80,10 @@ export interface DossierActions {
   onCancelContract: () => void;
   onDeleteContract: () => void;
   onPreview: (f: ImportPreviewTarget) => void;
+  /** Kiểm mẫu của kho (v4): nạp báo cáo / sửa / xóa một mẫu. */
+  onImportSamples: (r: ImportReceipt) => void;
+  onEditSample: (r: ImportReceipt, s: ImportSampleCheck) => void;
+  onDeleteSample: (s: ImportSampleCheck) => void;
 }
 
 const kindLabel = (k: string) => IMPORT_DOCUMENT_KINDS.find((x) => x.value === k)?.label ?? k;
@@ -450,6 +455,17 @@ function ReceiptCard({
           </ul>
         )}
       </div>
+
+      <SampleCheckSection
+        data={data}
+        receipt={receipt}
+        canEdit={!cancelled && can.update}
+        onImport={actions.onImportSamples}
+        onEdit={actions.onEditSample}
+        onDelete={actions.onDeleteSample}
+        onPreview={actions.onPreview}
+        tourTarget={isFirst}
+      />
     </article>
   );
 }

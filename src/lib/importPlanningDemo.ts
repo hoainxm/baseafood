@@ -5,13 +5,16 @@
 // ============================================================
 // Số + tên TỰ ĐẶT (không lấy hồ sơ thật — luật repo 15). File là đường dẫn GIỮ CHỖ
 // `demo-placeholder/…` (không chạm kho file). Ngày dời theo `today` để luôn rơi vào tháng gần đây.
-import type { ImportContract, ImportContractLine, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, ImportSupplier, Product } from "@/types";
+import type { ImportContract, ImportContractLine, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, ImportSampleCheck, ImportSupplier, Product } from "@/types";
+import { emptySample } from "./importSampleChecks";
 import { DEMO_PLACEHOLDER_PREFIX } from "./exportPlanning";
 import { emptyImportSupplier, type ImportData } from "./importPlanning";
 
 export interface ImportDemoSet extends ImportData {
   /** Danh mục NCC nhập khẩu của bộ demo (mig 0083 — danh mục riêng, không lẫn Đại lý). */
   suppliers: ImportSupplier[];
+  /** Kiểm mẫu của kho (mig 0085, ba-spec 45 v4) — số tự đặt, không chép báo cáo thật. */
+  sampleChecks: ImportSampleCheck[];
 }
 
 const addDays = (iso: string, days: number) => {
@@ -192,5 +195,70 @@ export function buildImportDemo(today: string, products: readonly Pick<Product, 
     updatedAt: at,
   });
   const receiptLines: ImportReceiptLine[] = [qty("imp-r1", "imp-c1-l1", 6000), qty("imp-r1", "imp-c1-l2", 4000), qty("imp-r4", "imp-c3-l1", 4900)];
-  return { suppliers, contracts, lines, receipts, receiptLines, documents, files };
+  // Báo cáo kiểm mẫu của kho cho lô đã về đủ (imp-r1): 2 mẫu, mỗi mẫu một size của HĐ.
+  const sample = (no: string, lineId: string, size: string, p: Partial<ImportSampleCheck>): ImportSampleCheck =>
+    emptySample(`imp-r1-s${no}`, {
+      contractId: "imp-c1",
+      receiptId: "imp-r1",
+      contractLineId: lineId,
+      batchId: "imp-r1-b1",
+      fileId: "imp-r1-sample-file",
+      reportDate: addDays(today, -18),
+      sampleNo: no,
+      size,
+      exporterName: "Pacific",
+      importDate: addDays(today, -20),
+      packing: "4kg/BL x 5/CTN",
+      productionDate: addDays(today, -150),
+      expiryDate: addDays(today, 580),
+      color: "Đạt",
+      blackSpot: "Đạt",
+      odor: "Đạt",
+      createdAt: at,
+      ...p,
+    });
+  const sampleChecks: ImportSampleCheck[] = [
+    sample("1", "imp-c1-l1", "1-2 kg", {
+      grossWeightG: 24100,
+      netWeightG: 19200,
+      netShortagePct: 4,
+      mossPct: 6,
+      oneSkinPct: 20,
+      twoSkinPct: 80,
+      sizeDistribution: { "70/100": 30, "100/150": 70 },
+      thawingNorm: 1.04,
+      preprocessingNorm: 1.42,
+      blanchingNorm: 1.22,
+      cuttingNorm: 1.08,
+      surplusNorm: 1.03,
+      materialToFinishedNorm: 2.03,
+    }),
+    sample("2", "imp-c1-l2", "2-3 kg", {
+      grossWeightG: 23900,
+      netWeightG: 19400,
+      netShortagePct: 3,
+      color: "Hơi sẫm",
+      mossPct: 4,
+      oneSkinPct: 15,
+      twoSkinPct: 85,
+      sizeDistribution: { "100/150": 40, "150/200": 60 },
+      thawingNorm: 1.03,
+      preprocessingNorm: 1.38,
+      blanchingNorm: 1.23,
+      cuttingNorm: 1.07,
+      surplusNorm: 1.03,
+      materialToFinishedNorm: 1.95,
+    }),
+  ];
+  files.push({
+    id: "imp-r1-sample-file",
+    contractId: "imp-c1",
+    receiptId: "imp-r1",
+    documentId: "",
+    path: `${DEMO_PLACEHOLDER_PREFIX}import/imp-r1-kiem-mau.xlsx`,
+    fileName: "Bao-cao-kiem-mau-kho.xlsx",
+    uploadedBy: "Bộ demo",
+    createdAt: at,
+  });
+  return { suppliers, contracts, lines, receipts, receiptLines, documents, files, sampleChecks };
 }

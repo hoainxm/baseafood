@@ -15,6 +15,7 @@ import type {
   ImportFile,
   ImportReceipt,
   ImportReceiptLine,
+  ImportSampleCheck,
   ImportSupplier,
   ImportTransport,
   ImportType,
@@ -89,6 +90,8 @@ export interface ImportData {
   productLinkAvailable?: boolean;
   /** Danh mục Mặt hàng (R20) — có thì dòng trỏ mặt hàng đã xóa tính là chưa nối, tra số theo tên mặt hàng. */
   products?: readonly ImportProductRef[];
+  /** Kiểm mẫu của kho theo lần nhập (v4, mig 0085) — chỉ lưu, không vào luật trạng thái (R23). */
+  sampleChecks?: readonly ImportSampleCheck[];
 }
 
 /** Phần của mặt hàng danh mục mà Nhập khẩu cần (R20, R21). */
@@ -279,7 +282,8 @@ export function filesOfDocument(d: Pick<ImportData, "files">, documentId: string
 }
 
 export function contractFiles(d: Pick<ImportData, "files">, contractId: string): ImportFile[] {
-  return d.files.filter((f) => f.contractId === contractId && !f.documentId);
+  // File của lần nhập không thuộc mục chứng từ (báo cáo kiểm mẫu của kho, v4) không phải file HĐ.
+  return d.files.filter((f) => f.contractId === contractId && !f.documentId && !f.receiptId);
 }
 
 /** R4 — mục "Đã có": ≥ 1 file (không nối máy chủ: số hoặc ghi chú); tờ khai thêm số + loại hình. */
@@ -409,8 +413,9 @@ export function canClose(d: ImportData, contractId: string, reason: string): { o
 
 /* ---------- Xóa / hủy (NI9) ---------- */
 
-export function canDeleteReceipt(d: Pick<ImportData, "files" | "receiptLines">, receiptId: string): boolean {
+export function canDeleteReceipt(d: Pick<ImportData, "files" | "receiptLines" | "sampleChecks">, receiptId: string): boolean {
   if (d.files.some((f) => f.receiptId === receiptId)) return false;
+  if (d.sampleChecks?.some((x) => x.receiptId === receiptId)) return false;
   return !d.receiptLines.some((x) => x.receiptId === receiptId && num(x.kg) > 0);
 }
 

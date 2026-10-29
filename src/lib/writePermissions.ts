@@ -164,6 +164,7 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   import_receipt_lines: null,
   import_documents: null,
   import_files: null,
+  import_sample_checks: null,
 };
 
 export interface WriteDenial {

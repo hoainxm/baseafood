@@ -47,7 +47,8 @@ import {
   validateReceipt,
   type ImportData,
 } from "@/lib/importPlanning";
-import { IMPORT_FILE_ACCEPT, checkImportFile, hasImportStorage, importFilePath, removeImportFiles, uploadImportFile } from "@/lib/importFileStorage";
+import { IMPORT_FILE_ACCEPT, checkImportFile, hasImportStorage, removeImportFiles } from "@/lib/importFileStorage";
+import { uploadAll } from "./importUpload";
 import type {
   ImportContract,
   ImportContractLine,
@@ -82,22 +83,7 @@ const issuesToErrors = (issues: { code: string; message: string }[], field: stri
   issues.map((i) => ({ field: ISSUE_FIELD[i.code] ?? field, message: i.message }));
 
 /** Tải các file đã chọn; lỗi giữa chừng ⇒ gỡ file đã lên rồi báo. */
-async function uploadAll(files: File[], contractId: string, meta: Omit<ImportFile, "id" | "path" | "fileName" | "createdAt">): Promise<ImportFile[] | { error: string }> {
-  if (!files.length || !hasImportStorage) return [];
-  const done: ImportFile[] = [];
-  for (const f of files) {
-    const id = newId();
-    const up = await uploadImportFile(importFilePath(contractId, id, f.name), f);
-    if ("error" in up) {
-      if (done.length) void removeImportFiles(done.map((x) => x.path));
-      return { error: up.error };
-    }
-    done.push({ ...meta, id, path: up.path, fileName: up.fileName, createdAt: new Date().toISOString() });
-  }
-  return done;
-}
-
-function DialogFooter({ busy, onCancel, onSave, label, title, icon = Save }: { busy: boolean; onCancel: () => void; onSave: () => void; label: string; title: string; icon?: typeof Save }) {
+export function DialogFooter({ busy, onCancel, onSave, label, title, icon = Save }: { busy: boolean; onCancel: () => void; onSave: () => void; label: string; title: string; icon?: typeof Save }) {
   const Icon = icon;
   return (
     <>

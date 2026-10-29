@@ -17,7 +17,9 @@ import { ReasonDialog, type ReasonTarget } from "@/features/export-planning/Reco
 import { newId } from "@/lib/store";
 import { closeGate, contractProgress, documentLabel, requiredDocumentStubs, type ImportData } from "@/lib/importPlanning";
 import { hasImportStorage } from "@/lib/importFileStorage";
-import type { ImportContract, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine } from "@/types";
+import type { ImportContract, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, ImportSampleCheck } from "@/types";
+import { mergeSamples } from "@/lib/importSampleChecks";
+import { SampleCheckDialog, type SampleDialogTarget, type SampleSavePayload } from "./SampleChecks";
 import { FilePlus2, FileText, FolderLock, Route, Ship } from "lucide-react";
 import { ImportDossier } from "./ImportDossier";
 import {
@@ -80,6 +82,8 @@ export default function ImportPlanningScreen() {
   const [reason, setReason] = useState<ReasonTarget | null>(null);
   const [deletingContract, setDeletingContract] = useState<ImportContract | null>(null);
   const [deletingReceipt, setDeletingReceipt] = useState<ImportReceipt | null>(null);
+  const [sampleTarget, setSampleTarget] = useState<SampleDialogTarget | null>(null);
+  const [deletingSample, setDeletingSample] = useState<ImportSampleCheck | null>(null);
   const [preview, setPreview] = useState<ImportPreviewTarget | null>(null);
 
   const contract = contractId ? d.contracts.find((c) => c.id === contractId) : undefined;
@@ -156,6 +160,36 @@ export default function ImportPlanningScreen() {
     const prev = dataRef.current;
     if (!store.saveFiles(prev.files.filter((x) => x.id !== f.id))) return;
     notify.deleted(`Đã gỡ file ${f.fileName}`, () => store.saveFiles(prev.files));
+  };
+
+  /* ---------- Kiểm mẫu của kho (v4, NI11) ---------- */
+
+  const saveSamples = (p: SampleSavePayload): boolean => {
+    if (!store.sampleChecksAvailable) {
+      notify.error("Máy chủ chưa chạy migration 0085 — chưa lưu kiểm mẫu được. Báo chủ dự án.");
+      return false;
+    }
+    const prev = dataRef.current;
+    const rows = prev.sampleChecks ?? [];
+    const next = p.editId
+      ? rows.map((x) => (x.id === p.editId ? (p.samples[0] ?? x) : x))
+      : mergeSamples(rows, p.receiptId, p.samples, p.replace);
+    if (!store.saveSampleChecks(next)) return false;
+    if (p.files.length) store.saveFiles([...prev.files, ...p.files]);
+    const msg = p.editId ? "Đã lưu mẫu kiểm" : `Đã lưu ${p.samples.length} mẫu kiểm của kho`;
+    notify.saved(msg, () => {
+      store.saveSampleChecks(rows);
+      if (p.files.length) store.saveFiles(prev.files);
+    });
+    setSampleTarget(null);
+    return true;
+  };
+
+  const doDeleteSample = (s: ImportSampleCheck) => {
+    const prev = dataRef.current;
+    const rows = prev.sampleChecks ?? [];
+    if (!store.saveSampleChecks(rows.filter((x) => x.id !== s.id))) return;
+    notify.deleted(`Đã xóa mẫu ${s.sampleNo || ""}${s.size ? ` · ${s.size}` : ""}`.trim(), () => store.saveSampleChecks(rows));
   };
 
   const saveQuantity = (receiptId: string, rows: ImportReceiptLine[]): boolean => {
@@ -334,6 +368,9 @@ export default function ImportPlanningScreen() {
               }),
             onDeleteContract: () => setDeletingContract(contract),
             onPreview: setPreview,
+            onImportSamples: (r) => setSampleTarget({ receipt: r }),
+            onEditSample: (r, s) => setSampleTarget({ receipt: r, edit: s }),
+            onDeleteSample: setDeletingSample,
           }}
         />
       ) : (
@@ -416,6 +453,29 @@ export default function ImportPlanningScreen() {
       <CloseContractDialog target={closeTarget} onClose={() => setCloseTarget(null)} />
       <ReasonDialog target={reason} onClose={() => setReason(null)} />
       <ImportFilePreview file={preview} onClose={() => setPreview(null)} />
+      <SampleCheckDialog
+        target={sampleTarget}
+        data={d}
+        supplierNames={(cid) => {
+          const c = d.contracts.find((x) => x.id === cid);
+          const s = supplierStore.suppliers.find((x) => x.id === c?.supplierId);
+          return [c?.supplierName ?? "", s?.shortName ?? "", s?.fullName ?? ""].filter(Boolean);
+        }}
+        recordedBy={recordedBy}
+        onClose={() => setSampleTarget(null)}
+        onSave={saveSamples}
+      />
+      <ConfirmDelete
+        open={!!deletingSample}
+        onOpenChange={(o) => !o && setDeletingSample(null)}
+        title="Xóa mẫu kiểm này?"
+        confirmLabel="Xóa mẫu"
+        recordDescription={deletingSample ? [`Mẫu ${deletingSample.sampleNo}`, deletingSample.size, deletingSample.exporterName].filter(Boolean).join(" · ") : ""}
+        onConfirm={() => {
+          if (deletingSample) doDeleteSample(deletingSample);
+          setDeletingSample(null);
+        }}
+      />
       <ConfirmDelete
         open={!!deletingContract}
         onOpenChange={(o) => !o && setDeletingContract(null)}

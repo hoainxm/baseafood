@@ -23,10 +23,14 @@ import {
   remainingKg,
   requiredDocumentStubs,
   searchImports,
+  suggestImportProductId,
+  unlinkedLines,
+  productNameAfterPick,
   validateContract,
   validateReceipt,
   type ImportData,
 } from "./importPlanning";
+import { IMPORT_CONTRACT_LINE_TABLE } from "./repo";
 
 const NOW = "2026-10-29T08:00:00.000Z";
 
@@ -53,6 +57,7 @@ const line = (id: string, kg: number | null, p: Partial<ImportContractLine> = {}
   contractId: "c1",
   lineNo: 1,
   productName: `Hàng ${id}`,
+  productId: `prod-${id}`,
   kg,
   note: "",
   ...p,
@@ -327,5 +332,70 @@ describe("AC-25 / AC-26 — danh mục NCC nhập khẩu (v2 R16, R17)", () => {
     expect(selectableImportSuppliers([a, b]).map((x) => x.id)).toEqual(["sB"]);
     // HĐ cũ của A vẫn giữ A trong ô chọn khi sửa
     expect(selectableImportSuppliers([a, b], "sA").map((x) => x.id)).toEqual(["sA", "sB"]);
+  });
+});
+
+describe("v3 — dòng hàng nối mặt hàng danh mục (R20–R22)", () => {
+  const products = [
+    { id: "P1", name: "Bạch tuộc nguyên con 1-2", tradeName: "" },
+    { id: "P2", name: "Bạch tuộc nguyên con", tradeName: "" },
+    { id: "P3", name: "Cá đuối cánh", tradeName: "Frozen skate wing" },
+  ];
+  const doneReceipt = (lines: ReturnType<typeof line>[]) =>
+    data({
+      lines,
+      receipts: [receipt("r1")],
+      ...fullDocs("r1"),
+      receiptLines: lines.map((l) => ({ id: `q-${l.id}`, receiptId: "r1", contractLineId: l.id, kg: l.kg, recordedBy: "", updatedAt: NOW })),
+    });
+
+  it("AC-29 lưu được khi chưa nối; mặt hàng đã xóa tính là chưa nối", () => {
+    const lines = [line("l1", 100, { productId: "P1" }), line("l2", 50, { lineNo: 2, productId: "" })];
+    expect(validateContract(contract(), lines, [contract()])).toHaveLength(0);
+    expect(unlinkedLines(data({ lines, products }), "c1").map((l) => l.id)).toEqual(["l2"]);
+    expect(unlinkedLines(data({ lines, products: products.filter((p) => p.id !== "P1") }), "c1")).toHaveLength(2);
+  });
+
+  it("AC-30 đóng HĐ bắt mọi dòng đã nối", () => {
+    const d = doneReceipt([line("l1", 100, { productId: "" })]);
+    const g = closeGate(d, "c1");
+    expect(g).toMatchObject({ ok: false, reason: "unlinked-lines" });
+    expect(g.unlinkedLines).toHaveLength(1);
+    expect(closeGate(doneReceipt([line("l1", 100, { productId: "P3" })]), "c1")).toEqual({ ok: true, needsReason: false });
+  });
+
+  it("AC-31 máy chủ chưa chạy 0084 không bắt nối, dòng không gửi product_id", () => {
+    const d = { ...doneReceipt([line("l1", 100, { productId: undefined })]), productLinkAvailable: false };
+    expect(closeGate(d, "c1")).toEqual({ ok: true, needsReason: false });
+    expect("product_id" in IMPORT_CONTRACT_LINE_TABLE.toRow(line("l1", 100, { productId: undefined }))).toBe(false);
+    expect(IMPORT_CONTRACT_LINE_TABLE.toRow(line("l1", 100, { productId: "" })).product_id).toBeNull();
+  });
+
+  it("AC-32 gợi ý ra đúng một mặt hàng", () => {
+    const d = {
+      contracts: [
+        contract({ id: "cA", supplierId: "sA", signedDate: "2026-01-01" }),
+        contract({ id: "cB", supplierId: "sB", contractNo: "B-1", signedDate: "2026-06-01" }),
+      ],
+      lines: [
+        line("a1", 1, { contractId: "cA", productName: "Frozen whole octopus 1-2 kg", productId: "P1" }),
+        line("b1", 1, { contractId: "cB", productName: "Frozen whole octopus 1-2 kg", productId: "P2" }),
+      ],
+    };
+    expect(suggestImportProductId(d, "frozen  WHOLE octopus 1-2 kg", "sA", products)).toBe("P1");
+    expect(suggestImportProductId(d, "Frozen whole octopus 1-2 kg", "sX", products)).toBe("P2");
+    expect(suggestImportProductId(d, "Frozen skate wing", "sA", products)).toBe("P3");
+    expect(suggestImportProductId(d, "Hàng lạ", "sA", products)).toBe("");
+    const twin = [...products, { id: "P4", name: "Cá đuối", tradeName: "frozen skate wing" }];
+    expect(suggestImportProductId(d, "Frozen skate wing", "sA", twin)).toBe("");
+    // Ô tên trống ⇒ điền tên tiếng Anh; đã có chữ ⇒ giữ.
+    expect(productNameAfterPick("", products[2])).toBe("Frozen skate wing");
+    expect(productNameAfterPick("", products[0])).toBe("Bạch tuộc nguyên con 1-2");
+    expect(productNameAfterPick("Skate", products[2])).toBe("Skate");
+  });
+
+  it("AC-33 tra theo tên hàng và tên mặt hàng", () => {
+    const d = data({ lines: [line("l1", 100, { productName: "Frozen skate wing", productId: "P3" })], products });
+    for (const q of ["skate", "cá đuối"]) expect(searchImports(d, q)).toContainEqual({ kind: "contract", id: "c1", contractId: "c1" });
   });
 });

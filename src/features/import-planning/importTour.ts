@@ -62,6 +62,7 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
         title: "Lập hợp đồng nhập",
         body:
           "Chọn Lập hợp đồng nhập, chọn đối tác trong danh mục NCC nhập khẩu (khác Đại lý của Nhập hàng; thêm mới ngay trong ô được), ghi số hợp đồng, ngày ký, loại hình (sản xuất xuất khẩu, kinh doanh hoặc gia công) và từng dòng hàng.\n" +
+          "Mỗi dòng hàng chọn Mặt hàng (danh mục) để mọi khu cùng gọi một tên. Gõ tên hàng xong app tự gợi ý khi tên đã nối ở hợp đồng trước. Chưa nối vẫn lưu được.\n" +
           "Hàng gia công không ghi giá thì để trống đơn giá. Lưu xong hợp đồng ở trạng thái Chưa có lần nhập.",
       }),
     );
@@ -113,7 +114,9 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
         id: "lines",
         target: "import-lines",
         title: "Dòng hàng và số còn lại",
-        body: "Mỗi dòng hàng có kg theo hợp đồng, số đã về (cộng các lần nhập chưa hủy) và số còn lại. Về nhiều hơn hợp đồng thì hiện vượt bao nhiêu kg, vẫn lưu được.",
+        body:
+          "Mỗi dòng hàng có mặt hàng đã nối, kg theo hợp đồng, số đã về (cộng các lần nhập chưa hủy) và số còn lại. Về nhiều hơn hợp đồng thì hiện vượt bao nhiêu kg, vẫn lưu được.\n" +
+          "Dòng hiện Chưa nối thì vào Thao tác khác → Sửa hợp đồng để chọn mặt hàng. Còn dòng chưa nối thì chưa đóng được hợp đồng.",
       }),
       dossier({
         id: "docs",
@@ -132,7 +135,7 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
         title: "Thực nhập",
         body:
           "Hàng về kho thì thủ kho (hoặc nhân viên Kế hoạch) chọn Ghi thực nhập và ghi số kg của từng dòng hàng theo invoice.\n" +
-          "Ghi xong và chứng từ đủ thì lô thành Đủ hồ sơ. Mọi dòng về đủ thì đóng hợp đồng; còn thiếu vẫn đóng được nhưng phải ghi lý do.",
+          "Ghi xong và chứng từ đủ thì lô thành Đủ hồ sơ. Mọi dòng về đủ và đã nối mặt hàng thì đóng hợp đồng; còn thiếu kg vẫn đóng được nhưng phải ghi lý do.",
       }),
     );
   }

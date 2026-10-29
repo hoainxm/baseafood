@@ -25,6 +25,7 @@ import {
   isRequiredKind,
   lineAmount,
   linesOf,
+  lineProduct,
   missingDocs,
   receiptLinesOf,
   receiptState,
@@ -51,7 +52,7 @@ import {
   Ship,
   Trash2,
 } from "lucide-react";
-import { ContractStateTag, ImportFileList, ReceiptStateTag, type ImportPreviewTarget } from "./parts";
+import { ContractStateTag, ImportFileList, LineProductLabel, ReceiptStateTag, type ImportPreviewTarget } from "./parts";
 
 export interface DossierCan {
   create: boolean;
@@ -120,6 +121,16 @@ export function ImportDossier({
 
   const lineColumns: RecordTableColumn<{ line: ImportContractLine; receivedKg: number; remainingKg: number }>[] = [
     { key: "name", header: "Tên hàng", primary: true, getSortValue: (x) => x.line.productName, render: (x) => <span className="break-words">{x.line.productName}</span> },
+    ...(data.productLinkAvailable !== false
+      ? ([
+          {
+            key: "product",
+            header: "Mặt hàng (danh mục)",
+            getSortValue: (x) => lineProduct(data, x.line)?.name || null,
+            render: (x) => <LineProductLabel data={data} line={x.line} />,
+          },
+        ] satisfies RecordTableColumn<{ line: ImportContractLine; receivedKg: number; remainingKg: number }>[])
+      : []),
     { key: "kg", header: "Kg HĐ", numeric: true, sortKind: "number", getSortValue: (x) => x.line.kg, render: (x) => formatNumber(x.line.kg ?? 0) },
     ...(can.viewPrice
       ? ([
@@ -201,7 +212,13 @@ export function ImportDossier({
                     variant="lock"
                     className="justify-start"
                     onClick={() => (setMenuOpen(false), actions.onClose())}
-                    title={gate.reason === "no-receipts" ? "Chưa có lần nhập nào — chưa đóng được." : "Đóng hợp đồng: không ghi lần nhập mới nữa."}
+                    title={
+                      gate.reason === "no-receipts"
+                        ? "Chưa có lần nhập nào — chưa đóng được."
+                        : gate.reason === "unlinked-lines"
+                          ? "Còn dòng hàng chưa nối mặt hàng danh mục — Sửa hợp đồng để nối trước khi đóng."
+                          : "Đóng hợp đồng: không ghi lần nhập mới nữa."
+                    }
                   >
                     <Lock className="mr-2 h-4 w-4" aria-hidden />
                     Đóng hợp đồng
@@ -420,7 +437,13 @@ function ReceiptCard({
           <ul className="grid gap-1">
             {qty.map((x) => (
               <li key={x.id} className="tnum flex flex-wrap justify-between gap-2">
-                <span className="break-words">{lines.find((l) => l.id === x.contractLineId)?.productName ?? "Dòng đã bỏ"}</span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="break-words">{lines.find((l) => l.id === x.contractLineId)?.productName ?? "Dòng đã bỏ"}</span>
+                  {(() => {
+                    const l = lines.find((y) => y.id === x.contractLineId);
+                    return l ? <LineProductLabel data={data} line={l} /> : null;
+                  })()}
+                </span>
                 <span>{formatNumber(x.kg ?? 0)} kg</span>
               </li>
             ))}

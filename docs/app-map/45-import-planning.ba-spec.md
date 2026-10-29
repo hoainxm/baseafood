@@ -1,11 +1,12 @@
 # 45 — ba-spec: Phòng Kế hoạch · Nhập khẩu — Đợt 1 (hợp đồng → bộ chứng từ → số lượng thực nhập)
 
 > Load khi: xây hoặc sửa mảng Nhập khẩu của Phòng Kế hoạch: hợp đồng nhập (đối tác nước ngoài, dòng hàng tên · kg · đơn giá), lần nhập (cont / hàng lẻ, ngày về kho), bộ chứng từ đính kèm (Invoice, Packing List, tờ khai nhập, C/O, kiểm dịch…), số lượng thực nhập theo dòng hàng, đóng hợp đồng, quyền `import-plans`.
-covers: src/features/import-planning/**, src/lib/importPlanning.ts, supabase/migrations/0083_import_suppliers.sql, src/lib/importPlanningDemo.ts, src/lib/importFileStorage.ts, supabase/migrations/0082_import_planning.sql
+covers: src/features/import-planning/**, src/lib/importPlanning.ts, supabase/migrations/0083_import_suppliers.sql, supabase/migrations/0084_import_line_products.sql, src/lib/importPlanningDemo.ts, src/lib/importFileStorage.ts, supabase/migrations/0082_import_planning.sql
 last_verified: 2026-10-29
 ttl_days: 90
-status: ba-spec v2 (2026-10-29 tối) — **danh mục Nhà cung cấp nhập khẩu RIÊNG** (§0b, ĐÃ BUILD 2026-10-29 — mig `0083` ⏳ CHƯA chạy DB thật) · v1.1 ĐÃ BUILD 2026-10-29 (commit 91b8f14, `0082` ✅ chạy DB thật 2026-10-29 theo chủ dự án). Giao diện: design-spec [46](46-import-planning-ui.design-spec.md).
+status: ba-spec v3 (2026-10-29 khuya) — **dòng hàng nối mặt hàng danh mục** (§0c, mig `0084` ⏳ CHƯA chạy DB thật) · v2 (2026-10-29 tối) — **danh mục Nhà cung cấp nhập khẩu RIÊNG** (§0b, ĐÃ BUILD 2026-10-29 — mig `0083` ⏳ CHƯA chạy DB thật) · v1.1 ĐÃ BUILD 2026-10-29 (commit 91b8f14, `0082` ✅ chạy DB thật 2026-10-29 theo chủ dự án). Giao diện: design-spec [46](46-import-planning-ui.design-spec.md).
 
+<!-- re-verified: 2026-10-29 23:00 — v3: AC-29…AC-33 = test `importPlanning.test.ts` (28) + `importPlanningDemo.test.ts` (5); 0084 PGlite (0001→0083 + dòng mẫu, chạy 2 lần, dòng cũ product_id null, policy / quyền không đổi, thủ kho đọc được sửa 0 dòng); AC-34 thử tay preview (worktree sạch, không nối máy chủ): gợi ý "Frozen  whole OCTOPUS 1-2 kg" ra mặt hàng của HĐ trước, thêm mặt hàng mới trong ô ⇒ danh mục +1 + tên hàng trống tự điền, hồ sơ 1 dòng "Chưa nối" (bảng + thẻ lần nhập), đóng HĐ bị chặn nêu tên dòng, nối xong đóng được, nháp giữ mặt hàng khi rời trang, 360 px × 130 % không cuộn ngang. -->
 <!-- re-verified: 2026-10-29 21:00 — v2 build: AC-25/26 = test `importPlanning.test.ts` (23); AC-27/28 PGlite (0001→0082 + HĐ trỏ Đại lý, 0083 chạy 2 lần: chép đúng 1 NCC giữ id, Đại lý còn nguyên, 0 HĐ mất đối tác; planner thêm / xóa NCC, kế toán chỉ đọc, thủ kho đọc 0); AC-24 thử tay preview sandbox: ô Đối tác trống dù Đại lý có dòng, thêm "Andaman Seafood" ⇒ vào bsf.import-suppliers, Đại lý không có; nhóm Kế hoạch đúng 1 Tra cứu mở tab NCC nhập khẩu. -->
 <!-- re-verified: 2026-10-29 16:00 — build: AC-3…AC-18 = test `src/lib/importPlanning.test.ts` (21) + `importPlanningDemo.test.ts` (4); AC-1/2/19 RLS thử PGlite (chuỗi 0001→0082 + chạy lại 0082: Nhân viên KH ghi 4 bảng; thủ kho đọc dòng hàng, KHÔNG đọc HĐ / chứng từ, chỉ ghi thực nhập, sửa lần nhập ⇒ 0 dòng; kế toán chỉ đọc; qc đọc 0; anon bị từ chối); luồng lập HĐ 2 dòng → lần nhập → 3 chứng từ → thực nhập vượt 200 kg (cảnh báo, vẫn lưu) → đóng thiếu lý do bị chặn → đóng có lý do → mở lại, tra số cont, 360 px × 130 % không tràn — thử tay preview sandbox (không nối máy chủ). Chưa thử: tải file thật, AC-22 demo trên DB thật, AC-23 cần DB. -->
 
@@ -76,6 +77,46 @@ Chủ dự án xem bản v1.1 trên app: **"những nhà cung cấp cho nhập k
 **AC v2:** AC-23 (cũ) **bỏ**; thêm AC-24 … AC-28 ở §10.
 
 **Assumptions v2:** (1) NCC trùng tên gọi tắt bị chặn (giống đại lý); (2) đổi tên NCC **không** sửa chữ đã chép ở HĐ / lần nhập cũ (sổ giữ chữ lúc ghi) — trừ khi lưu lại HĐ (lúc đó chép tên mới, như v1.1); (3) thủ kho không thấy danh mục NCC nhập khẩu.
+
+## 0c. v3 (2026-10-29 khuya) — dòng hàng nối MẶT HÀNG danh mục · BỔ SUNG R7, NI2, NI3, NI7
+
+Chủ dự án: **"các vị trí có dòng hàng hoặc mặt hàng như Tên hàng (như trên hợp đồng) của mục Nhập khẩu thì cần chức năng nối với mặt hàng trong danh mục của hệ thống để đồng bộ dữ liệu"**. v1/v2 chỉ ghi tên hàng bằng chữ tự do ⇒ cùng một hàng mỗi HĐ gõ một kiểu ("Frozen whole octopus 1-2 kg" / "Octopus WR 1-2"), không cộng / tra theo mặt hàng được, không nối được sang sản xuất, kho, xuất khẩu.
+
+**Kiểm kê chỗ có tên hàng trong Nhập khẩu (B0):**
+
+| # | Chỗ | Trước v3 | v3 |
+|---|---|---|---|
+| 1 | Dòng hàng khi lập / sửa HĐ (NI2, NI3) | chỉ chữ "Tên hàng (như trên hợp đồng)" | + **mặt hàng danh mục** của dòng, gợi ý sẵn (R20, R21) |
+| 2 | Dòng hàng trong hồ sơ HĐ | tên chữ | + mặt hàng đã nối, hoặc **"Chưa nối"** |
+| 3 | Ghi thực nhập theo dòng (NI6) | tên chữ | + tên mặt hàng (thủ kho nhận đúng hàng) |
+| 4 | Thực nhập trong từng lần nhập | tên chữ | + tên mặt hàng |
+| 5 | Đóng HĐ (NI8) | — | **bắt mọi dòng đã nối** (R7 bổ sung) |
+| 6 | Tra số (NI7) | số HĐ, invoice, tờ khai, cont, B/L | + tên hàng trên HĐ và tên mặt hàng đã nối |
+| 7 | Bộ demo (R14) | dòng chữ | dòng nối mặt hàng của danh mục demo |
+
+Không có chỗ nào khác ghi tên hàng (lần nhập, chứng từ chỉ trỏ dòng HĐ).
+
+**Luật v3:**
+- **R20 — Dòng hàng nối một mặt hàng.** Mỗi dòng hàng HĐ nhập nối **một mặt hàng ở danh mục mở Mặt hàng** (`products` — danh mục dùng chung của sản xuất, đóng gói, bán, cân đối, Xuất khẩu; KHÔNG phải 141 mã kế toán, cũng không phải Loại NL). Tên như trên HĐ giữ nguyên ở "Tên hàng" (chữ của chứng từ, không đổi). **Không bắt lúc lập HĐ**; bắt trước khi đóng HĐ (R7). Nối / đổi nối ghi thẳng vào dòng (không có bước duyệt — R10), kể cả HĐ đã đóng (dòng đã có thực nhập vẫn đổi nối được — nối là thông tin nội bộ, không đổi số). Mặt hàng chưa có ⇒ thêm mới ngay trong ô chọn + bút chì sửa nhanh (luật repo 7). Dòng trỏ mặt hàng đã bị xóa khỏi danh mục ⇒ coi như **chưa nối**.
+- **R21 — Gợi ý nối** (dòng chưa nối, khi tên hàng đã có chữ; lấy bậc đầu tiên ra đúng MỘT mặt hàng, không ra một ⇒ không điền): (1) cùng tên hàng (không phân hoa thường, gộp khoảng trắng) đã nối ở HĐ nhập trước — ưu tiên cùng NCC, rồi HĐ mới nhất; (2) tên tiếng Anh mặc định (`trade_name`) của mặt hàng trùng tên hàng; (3) tên mặt hàng trùng tên hàng. Gợi ý ghi rõ là gợi ý, người lập kiểm lại. Chọn mặt hàng khi ô tên hàng còn trống ⇒ điền tên tiếng Anh mặc định (không có thì tên mặt hàng); ô tên đã có chữ **không** bị ghi đè.
+- **R7 (bổ sung v3)** — đóng HĐ còn dòng chưa nối mặt hàng ⇒ **chặn**, báo tên các dòng chưa nối và cách nối (sửa HĐ).
+- **R22 — Máy chủ chưa chạy `0084`** (chưa có cột mặt hàng của dòng) ⇒ app không gửi mặt hàng, không bắt nối khi đóng, ô chọn mặt hàng báo "chưa chạy 0084" — không kẹt hàng chờ.
+- **R11 giữ nguyên** — nối mặt hàng **không** tự ghi sổ kho / cân đối / sản xuất. Nối chỉ để mọi khu đọc chung một mã mặt hàng khi sau này nối luồng ([`trien-khai/flow-end-to-end-2-bo-phan`](../trien-khai/flow-end-to-end-2-bo-phan.md)).
+
+**Cross-user v3:** không thêm bàn giao. U1 nối; U4 (thủ kho) chỉ đọc tên mặt hàng ở dòng thực nhập.
+
+**Flow optimization log v3:**
+
+| Flow | Candidate | Chọn / Loại | Lý do | Đánh giá bởi |
+|---|---|---|---|---|
+| R20 nối với gì | A. Mặt hàng (`products`) · B. Loại NL · C. 141 mã kế toán | **A** | Chủ dự án nói "mặt hàng trong danh mục"; `products` đã mang loại NL + loài, Xuất khẩu đã nối vào đây (41 R16) ⇒ một mã chung. C là của kế toán, cấm sửa / chỉ ánh xạ qua `products` | Chủ dự án + Domain (kho) |
+| R20 khi nào bắt | A. Bắt lúc lập HĐ · B. Không bắt lúc lập, bắt trước đóng HĐ · C. Không bao giờ bắt | **B** | A chậm khâu nhập khi mặt hàng chưa có; C để dữ liệu rời rạc mãi, trái mục đích "đồng bộ"; B như Xuất khẩu (bắt trước Lệnh SX) | Optimizer |
+| R20 nối ở đâu | A. Hộp nối riêng · B. Ngay ở dòng hàng khi lập / sửa HĐ | **B** | Nhập khẩu không có bản sửa / duyệt (lý do Xuất khẩu cần hộp riêng) ⇒ sửa HĐ là đủ, ít bước | Optimizer |
+| R21 | A. Không gợi ý · B. Gợi ý theo lịch sử + tên tiếng Anh · C. Dịch / đoán gần đúng | **B** | A gõ lại mỗi HĐ; C đoán sai lặng lẽ; B chỉ điền khi ra đúng một | Domain + Optimizer |
+
+**AC v3:** AC-29 … AC-34 ở §10.
+
+**Assumptions v3:** (1) nối với danh mục **Mặt hàng** (không phải Loại NL) — đổi được nếu chủ dự án muốn; (2) một dòng HĐ = một mặt hàng (HĐ gộp nhiều size thì tách dòng); (3) mặt hàng ngừng dùng vẫn chọn được (danh mục Mặt hàng chưa có trạng thái); (4) máy chủ đã chạy 0084 mà chưa có dòng hàng nào thì app chưa biết có cột ⇒ ô mặt hàng hiện từ khi có dòng hàng đầu tiên — lưu HĐ đầu xong mở Sửa để nối.
 
 ## 1. Vấn đề & JTBD
 
@@ -225,7 +266,7 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 | R4 | **Chứng từ.** Bắt buộc mỗi lần nhập: Commercial Invoice · Packing List · Tờ khai nhập khẩu. Một mục **"Đã có"** khi có ≥ 1 file; tờ khai còn bắt **số tờ khai + loại hình**. Mục bắt buộc được **"Không áp dụng"** khi có lý do. C/O · Giấy kiểm dịch · B/L · Khác: thêm khi có, không bắt, xóa được (hỏi lại + Hoàn tác); mục bắt buộc không xóa được | lô hàng mẫu không có invoice thương mại ⇒ "Không áp dụng: hàng mẫu" |
 | R5 | **Thực nhập** ghi theo dòng hàng HĐ, kg ≥ 0, theo invoice. Còn lại dòng = kg HĐ − Σ thực nhập của dòng ở các lần nhập chưa hủy. Còn lại < 0 ⇒ cảnh báo "vượt HĐ x kg", **không chặn** | HĐ 10.000 kg, hai lô 6.000 + 4.200 ⇒ còn lại −200, "vượt HĐ 200 kg" |
 | R6 | **Trạng thái lần nhập:** thiếu ≥ 1 mục bắt buộc ⇒ "Thiếu chứng từ" (kèm tên mục thiếu); đủ mà chưa dòng nào có thực nhập > 0 ⇒ "Chờ thực nhập"; đủ + có thực nhập ⇒ **"Đủ hồ sơ"**; "Đã hủy". **Trạng thái HĐ:** "Chưa có lần nhập" · "Đang nhập" · "Đã đóng" · "Đã hủy" | thiếu cả chứng từ lẫn thực nhập ⇒ "Thiếu chứng từ" |
-| R7 | Đóng HĐ: U1, cần ≥ 1 lần nhập chưa hủy; còn dòng có còn lại > 0 ⇒ bắt lý do. HĐ đã đóng / đã hủy ⇒ không ghi lần nhập mới, không ghi thực nhập | — |
+| R7 | Đóng HĐ: U1, cần ≥ 1 lần nhập chưa hủy; **mọi dòng đã nối mặt hàng (v3 R20)**; còn dòng có còn lại > 0 ⇒ bắt lý do. HĐ đã đóng / đã hủy ⇒ không ghi lần nhập mới, không ghi thực nhập | — |
 | R8 | Dòng hàng đã có thực nhập > 0 ở lần nhập chưa hủy ⇒ không xóa được (sửa tên / kg / giá vẫn được) | — |
 | R9 | **Quyền** (tài nguyên MỚI, mặc định cấm; không đổi `export-plans`) — bảng dưới. U4 đọc được đầu HĐ, tên hàng, kg HĐ, đầu lần nhập; **không** đọc đơn giá, thành tiền, file chứng từ | — |
 | R10 | **Không có trong đợt 1** (chủ dự án 2026-10-29): thanh toán, duyệt, hạn giao, trễ, dung sai, ngưỡng thiếu hàng, ảnh nhận hàng, nhắc trả cont / lưu bãi | — |
@@ -234,6 +275,7 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 | R13 | File: tối đa 20 MB / file; PDF, ảnh, Word, Excel; kho file riêng của Phòng Kế hoạch, chỉ người có `import-plans` đọc được | — |
 | R14 | Chế độ demo: mọi bảng mới vào bộ demo; thao tác demo không đổi số thật (luật repo 15) | — |
 | R15 | ~~Đối tác chọn từ danh mục Đại lý (`suppliers`) + cột quốc gia~~ — **thay bằng R15 v2 (§0b): danh mục NCC nhập khẩu riêng** | — |
+| R20–R22 | **Dòng hàng nối mặt hàng danh mục** (v3, §0c): nối không bắt lúc lập, bắt trước đóng HĐ; gợi ý lịch sử → tên tiếng Anh → tên mặt hàng; máy chủ chưa chạy 0084 ⇒ không gửi, không bắt | HĐ PM-GC-2026/07 dòng "Frozen whole octopus 1-2 kg" ⇒ mặt hàng Bạch tuộc nguyên con |
 
 **R9 — ma trận quyền mặc định:**
 
@@ -410,6 +452,42 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 - **Then** planner đọc + thêm được; accountant chỉ đọc; thủ kho không đọc
 - **Assert** planner thêm `ok == true`; accountant thêm bị từ chối, đọc `>= 1` dòng; thủ kho đọc `== 0` dòng; nhóm Kế hoạch có đúng `1` mục Tra cứu
 
+### AC-29 — Dòng hàng lưu được khi chưa nối · Maps to: NI2, R20 · Test: unit
+- **Given** HĐ mới 2 dòng, dòng 1 nối mặt hàng P1, dòng 2 chưa nối
+- **When** lưu HĐ
+- **Then** HĐ lưu; dòng 2 tính là chưa nối
+- **Assert** lỗi kiểm `== 0`; số dòng chưa nối `== 1`; dòng trỏ mặt hàng không còn trong danh mục cũng tính chưa nối (`== 2` khi P1 bị xóa)
+
+### AC-30 — Đóng HĐ bắt mọi dòng đã nối · Maps to: NI8, R7 v3 · Test: unit
+- **Given** HĐ có 1 lần nhập về đủ, 1 dòng chưa nối
+- **When** đóng HĐ
+- **Then** bị chặn, báo dòng chưa nối; nối xong đóng được không cần lý do
+- **Assert** `closeGate.ok == false`, `reason == "unlinked-lines"`, `unlinkedLines.length == 1`; sau nối `ok == true`, `needsReason == false`
+
+### AC-31 — Máy chủ chưa chạy 0084 không bắt nối · Maps to: R22 · Test: unit
+- **Given** dữ liệu báo máy chủ chưa có cột mặt hàng của dòng
+- **When** đóng HĐ có dòng chưa nối
+- **Then** không chặn vì nối; dòng gửi lên không có trường mặt hàng
+- **Assert** `closeGate.ok == true`; `toRow` của dòng không có khóa `product_id` khi `productId === undefined`
+
+### AC-32 — Gợi ý nối ra đúng một mặt hàng · Maps to: NI2, R21 · Test: unit
+- **Given** HĐ nhập trước của NCC A nối "Frozen whole octopus 1-2 kg" → P1; HĐ của NCC B nối cùng tên → P2 (mới hơn); mặt hàng P3 có tên tiếng Anh "Frozen skate wing"
+- **When** gợi ý cho dòng "frozen  WHOLE octopus 1-2 kg" của NCC A, dòng "Frozen skate wing", dòng "Hàng lạ"
+- **Then** lấy P1 (cùng NCC thắng HĐ mới hơn), P3, không gợi ý
+- **Assert** `== "P1"`, `== "P3"`, `== ""`; hai mặt hàng cùng tên tiếng Anh ⇒ `== ""`
+
+### AC-33 — Tra số theo tên hàng / mặt hàng · Maps to: NI7, R20 · Test: unit
+- **Given** HĐ có dòng "Frozen skate wing" nối mặt hàng tên "Cá đuối cánh"
+- **When** tra "skate" rồi tra "cá đuối"
+- **Then** cả hai lần ra HĐ đó
+- **Assert** mỗi lần `>= 1` kết quả loại hợp đồng có `contractId` của HĐ
+
+### AC-34 — Nối mặt hàng hiện ở mọi chỗ có tên hàng · Maps to: R20 · Test: manual (preview)
+- **Given** HĐ demo 2 dòng, 1 dòng chưa nối
+- **When** mở hồ sơ HĐ, hộp Ghi thực nhập, thẻ lần nhập, lập HĐ chọn mặt hàng mới gõ trong ô
+- **Then** dòng đã nối hiện tên mặt hàng, dòng chưa nối hiện "Chưa nối"; mặt hàng mới vào danh mục Mặt hàng
+- **Assert** số dòng hiện "Chưa nối" `== 1`; danh mục Mặt hàng tăng `1` dòng; 360 px × 130 % không cuộn ngang
+
 ## 11. Assumptions (Claude quyết, chủ dự án đổi được)
 
 - **A1 — ~~Đối tác lấy từ danh mục Nhà cung cấp (Đại lý)~~ — THAY bởi §0b v2: danh mục NCC nhập khẩu riêng.** Ghi chú cũ giữ để tra: Bên thuê gia công cũng ghi ở danh mục Nhà cung cấp. **Lưu ý khi build:** `toRow` của bảng `suppliers` gửi ĐỦ mọi cột mỗi lần ghi ([32](32-danh-muc.md)) ⇒ cột quốc gia phải chạy migration TRƯỚC khi deploy, hoặc chỉ gửi khi máy chủ đã có cột (như trường khách xuất khẩu của mig 0075) — không thì mọi lần lưu đại lý kẹt hàng chờ.
@@ -428,3 +506,4 @@ Chỉ một bàn giao giữa người với người (H2), có người ghi thay
 - 2026-10-29 — build: `features/import-planning/**`, `lib/importPlanning.ts` (+ test), `lib/importFileStorage.ts` (bucket `import-files`), `lib/importPlanningDemo.ts`, mig `0082`. Thêm khi build: chạy không nối máy chủ ⇒ số chứng từ / ghi chú tính thay file (như Xuất khẩu); thủ kho không sửa ngày về kho (NI6).
 - 2026-10-29 tối — v2 ĐÃ BUILD: `import_suppliers` + `catalog.import-suppliers` (mig 0083), tab Danh mục "NCC nhập khẩu", bảng danh mục ẩn nút Xóa dòng NCC đã có HĐ (`canDeleteRow`), form Đại lý bỏ ô Quốc gia, planner thôi có quyền thêm / sửa Đại lý.
 - 2026-10-29 tối — v2: chủ dự án xem app, NCC nhập khẩu khác hẳn đại lý Nhập hàng ⇒ danh mục riêng (NI10, R15 v2, R16–R19, AC-24…28), một mục Tra cứu ở nhóm Kế hoạch; 0082 đã chạy ⇒ mig 0083. CHƯA BUILD.
+- 2026-10-29 khuya — v3: chủ dự án yêu cầu mọi chỗ có tên hàng nối mặt hàng danh mục ⇒ §0c (kiểm kê 7 chỗ, R20–R22, R7 bổ sung, AC-29…34), mig 0084 thêm cột `import_contract_lines.product_id`.

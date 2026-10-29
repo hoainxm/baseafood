@@ -6,11 +6,11 @@
 // ============================================================
 import { useEffect, useState } from "react";
 import { Button, FormDialog, ProcessingState, Tag, type TagVariant } from "@/design-system";
-import { CONTRACT_STATE_LABELS, RECEIPT_STATE_LABELS, type ImportContractState, type ReceiptState } from "@/lib/importPlanning";
+import { CONTRACT_STATE_LABELS, RECEIPT_STATE_LABELS, lineProduct, type ImportContractState, type ImportData, type ReceiptState } from "@/lib/importPlanning";
 import { DEMO_PLACEHOLDER_PREFIX, getImportFileUrl } from "@/lib/importFileStorage";
 import { filePreviewKind } from "@/lib/documents";
 import { formatDateVN } from "@/lib/format";
-import type { ImportFile } from "@/types";
+import type { ImportContractLine, ImportFile } from "@/types";
 import { Download, ExternalLink, Eye, FileText, Trash2 } from "lucide-react";
 
 const RECEIPT_STATE_TAG: Record<ReceiptState, TagVariant> = {
@@ -25,6 +25,14 @@ const CONTRACT_STATE_TAG: Record<ImportContractState, TagVariant> = {
   closed: "done",
   cancelled: "muted",
 };
+
+/** Mặt hàng danh mục đã nối của dòng hàng, hoặc "Chưa nối" (ba-spec 45 v3 R20). Máy chủ chưa chạy 0084 ⇒ không hiện. */
+export function LineProductLabel({ data, line }: { data: Pick<ImportData, "products" | "productLinkAvailable">; line: Pick<ImportContractLine, "productId"> }) {
+  if (data.productLinkAvailable === false) return null;
+  const p = lineProduct(data, line);
+  if (!p) return <Tag variant="warning">Chưa nối</Tag>;
+  return <span className="text-sm text-muted-foreground break-words">{p.name || "Mặt hàng đã nối"}</span>;
+}
 
 export function ReceiptStateTag({ state }: { state: ReceiptState }) {
   return <Tag variant={RECEIPT_STATE_TAG[state]}>{RECEIPT_STATE_LABELS[state]}</Tag>;

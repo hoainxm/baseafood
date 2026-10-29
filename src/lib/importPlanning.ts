@@ -5,7 +5,7 @@
 //              receipt month, required documents, receipt / contract state, remaining kg,
 //              close gate, delete gates, search and month view.
 // ============================================================
-// Oracle: docs/app-map/45-import-planning.ba-spec.md (R1…R15, AC-3…AC-18). Hàm THUẦN — màn chỉ
+// Oracle: docs/app-map/45-import-planning.ba-spec.md (R1…R22, AC-3…AC-18, AC-25…AC-33). Hàm THUẦN — màn chỉ
 // gọi, không tự tính lại. Đổi luật ⇒ sửa test cùng thư mục (importPlanning.test.ts).
 import type {
   ImportContract,
@@ -18,6 +18,7 @@ import type {
   ImportSupplier,
   ImportTransport,
   ImportType,
+  Product,
 } from "@/types";
 
 /* ---------- Nhãn ---------- */
@@ -84,7 +85,14 @@ export interface ImportData {
    * (như EvidenceOptions của Xuất khẩu). Bỏ trống = có kho file.
    */
   filesAvailable?: boolean;
+  /** `false` = máy chủ chưa chạy 0084 (chưa có cột mặt hàng của dòng) ⇒ không bắt nối khi đóng HĐ (R22). */
+  productLinkAvailable?: boolean;
+  /** Danh mục Mặt hàng (R20) — có thì dòng trỏ mặt hàng đã xóa tính là chưa nối, tra số theo tên mặt hàng. */
+  products?: readonly ImportProductRef[];
 }
+
+/** Phần của mặt hàng danh mục mà Nhập khẩu cần (R20, R21). */
+export type ImportProductRef = Pick<Product, "id" | "name" | "tradeName">;
 
 export const EMPTY_IMPORT_DATA: ImportData = { contracts: [], lines: [], receipts: [], receiptLines: [], documents: [], files: [] };
 
@@ -97,6 +105,57 @@ const key = (s: string) => s.trim().toLowerCase();
 export function linesOf(d: Pick<ImportData, "lines">, contractId: string): ImportContractLine[] {
   return d.lines.filter((l) => l.contractId === contractId).sort((a, b) => a.lineNo - b.lineNo);
 }
+
+/* ---------- Nối mặt hàng (R20, R21 — v3) ---------- */
+
+const nameKey = (v: string | undefined | null) => (v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+/** Mặt hàng đã nối của dòng; trỏ mặt hàng không còn trong danh mục ⇒ undefined (R20). */
+export function lineProduct(d: Pick<ImportData, "products">, line: Pick<ImportContractLine, "productId">): ImportProductRef | undefined {
+  if (!line.productId) return undefined;
+  if (!d.products) return { id: line.productId, name: "", tradeName: "" };
+  return d.products.find((p) => p.id === line.productId);
+}
+
+/** Dòng hàng của HĐ chưa nối mặt hàng (kể cả trỏ mặt hàng đã xóa). */
+export function unlinkedLines(d: Pick<ImportData, "lines" | "products">, contractId: string): ImportContractLine[] {
+  return linesOf(d, contractId).filter((l) => !lineProduct(d, l));
+}
+
+/**
+ * R21 — gợi ý mặt hàng cho tên hàng (bậc đầu tiên ra đúng MỘT): (1) cùng tên đã nối ở HĐ nhập trước,
+ * cùng NCC thắng rồi HĐ mới nhất; (2) tên tiếng Anh mặc định trùng; (3) tên mặt hàng trùng. Không ra ⇒ "".
+ */
+export function suggestImportProductId(
+  d: Pick<ImportData, "contracts" | "lines">,
+  productName: string,
+  supplierId: string,
+  products: readonly ImportProductRef[],
+  excludeContractId = "",
+): string {
+  const key = nameKey(productName);
+  if (!key) return "";
+  const known = new Set(products.map((p) => p.id));
+  const contractOf = new Map(d.contracts.map((c) => [c.id, c]));
+  let best: { productId: string; score: number; at: string } | null = null;
+  for (const l of d.lines) {
+    if (!l.productId || !known.has(l.productId) || l.contractId === excludeContractId || nameKey(l.productName) !== key) continue;
+    const c = contractOf.get(l.contractId);
+    if (!c || c.status === "cancelled") continue;
+    const score = supplierId && c.supplierId === supplierId ? 1 : 0;
+    const at = c.signedDate || c.createdAt;
+    if (!best || score > best.score || (score === best.score && at > best.at)) best = { productId: l.productId, score, at };
+  }
+  if (best) return best.productId;
+  const byTrade = products.filter((p) => nameKey(p.tradeName) === key);
+  if (byTrade.length) return byTrade.length === 1 ? byTrade[0].id : "";
+  const byName = products.filter((p) => nameKey(p.name) === key);
+  return byName.length === 1 ? byName[0].id : "";
+}
+
+/** Chọn mặt hàng khi ô tên hàng còn trống ⇒ tên tiếng Anh mặc định, không có thì tên mặt hàng (R21). */
+export const productNameAfterPick = (current: string, product: ImportProductRef | undefined) =>
+  current.trim() || !product ? current : product.tradeName?.trim() || product.name;
 
 /** R2 — thành tiền dòng = kg × đơn giá (2 số lẻ); không có giá ⇒ null. */
 export function lineAmount(line: Pick<ImportContractLine, "id" | "kg">, prices: Record<string, number | null>): number | null {
@@ -325,13 +384,19 @@ export function contractState(d: Pick<ImportData, "receipts">, c: Pick<ImportCon
 export interface CloseGate {
   ok: boolean;
   needsReason: boolean;
-  reason?: "no-receipts" | "not-open";
+  reason?: "no-receipts" | "not-open" | "unlinked-lines";
+  /** Dòng chưa nối mặt hàng khi `reason == "unlinked-lines"` (R7 v3). */
+  unlinkedLines?: ImportContractLine[];
 }
 
 export function closeGate(d: ImportData, contractId: string): CloseGate {
   const c = findContract(d, contractId);
   if (!c || c.status !== "open") return { ok: false, needsReason: false, reason: "not-open" };
   if (contractState(d, c) === "no-receipts") return { ok: false, needsReason: false, reason: "no-receipts" };
+  if (d.productLinkAvailable !== false) {
+    const unlinked = unlinkedLines(d, contractId);
+    if (unlinked.length) return { ok: false, needsReason: false, reason: "unlinked-lines", unlinkedLines: unlinked };
+  }
   return { ok: true, needsReason: contractProgress(d, contractId).shortKg > 0 };
 }
 
@@ -375,7 +440,12 @@ export function searchImports(d: ImportData, query: string): SearchHit[] {
     if ([r.containerNo, r.blNo, ...docs].some((s) => s && norm(s).includes(q))) hits.push({ kind: "receipt", id: r.id, contractId: r.contractId });
   }
   for (const c of d.contracts) {
-    if (norm(c.contractNo).includes(q)) hits.push({ kind: "contract", id: c.id, contractId: c.id });
+    // v3: cả tên hàng trên HĐ và tên mặt hàng đã nối (R20).
+    const names = linesOf(d, c.id).flatMap((l) => {
+      const p = lineProduct(d, l);
+      return [l.productName, p?.name ?? "", p?.tradeName ?? ""];
+    });
+    if ([c.contractNo, ...names].some((s) => s && norm(s).includes(q))) hits.push({ kind: "contract", id: c.id, contractId: c.id });
   }
   return hits;
 }

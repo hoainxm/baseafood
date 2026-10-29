@@ -690,7 +690,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     priceFactor,
   });
 
-  const importDemo = buildImportDemo(tc.today);
+  const importDemo = buildImportDemo(tc.today, n.products);
 
   return {
     products: n.products.map((p) => ({ ...p })),

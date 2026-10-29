@@ -15,7 +15,7 @@ export const importPlanningGuide: PageGuide = {
       <GuideSection title="Trình tự công việc">
         <GuideSteps>
           <li>
-            <b>Lập hợp đồng nhập</b>: chọn đối tác trong danh mục <b>NCC nhập khẩu</b> (Danh mục → tab NCC nhập khẩu, khác Đại lý của Nhập hàng; thêm mới ngay trong ô được), ghi số hợp đồng, ngày ký, <b>loại hình</b> (sản xuất xuất khẩu · kinh doanh · gia công) và từng dòng hàng: tên hàng, số lượng (kg), đơn giá. Hàng gia công không ghi giá thì để trống đơn giá.
+            <b>Lập hợp đồng nhập</b>: chọn đối tác trong danh mục <b>NCC nhập khẩu</b> (Danh mục → tab NCC nhập khẩu, khác Đại lý của Nhập hàng; thêm mới ngay trong ô được), ghi số hợp đồng, ngày ký, <b>loại hình</b> (sản xuất xuất khẩu · kinh doanh · gia công) và từng dòng hàng: tên hàng (như trên hợp đồng), <b>mặt hàng (danh mục)</b>, số lượng (kg), đơn giá. Hàng gia công không ghi giá thì để trống đơn giá.
           </li>
           <li>
             Khi hàng sắp về, ở hồ sơ hợp đồng chọn <b>Ghi lần nhập</b>: ngày về kho (chưa về thì ngày dự kiến), cont lạnh 20 / 40 hoặc hàng lẻ, số cont, số B/L.
@@ -27,7 +27,7 @@ export const importPlanningGuide: PageGuide = {
             Hàng về kho: thủ kho chọn <b>Ghi thực nhập</b>, ghi số kg của từng dòng hàng theo invoice.
           </li>
           <li>
-            Nhập xong thì <b>Đóng hợp đồng</b> (Thao tác khác). Còn dòng chưa về đủ vẫn đóng được nhưng phải ghi lý do. Không cần ai duyệt.
+            Nhập xong thì <b>Đóng hợp đồng</b> (Thao tác khác). Mọi dòng hàng phải đã nối mặt hàng. Còn dòng chưa về đủ vẫn đóng được nhưng phải ghi lý do. Không cần ai duyệt.
           </li>
         </GuideSteps>
       </GuideSection>
@@ -63,6 +63,20 @@ export const importPlanningGuide: PageGuide = {
             <b>Còn lại</b> của dòng hàng = kg hợp đồng − tổng thực nhập các lần nhập chưa hủy. Về nhiều hơn hợp đồng thì hiện <b>vượt x kg</b>, vẫn lưu được.
           </li>
           <li>Lô được xếp vào tháng theo ngày về kho; chưa về thì theo ngày dự kiến về.</li>
+        </GuideList>
+      </GuideSection>
+      <GuideSection title="Nối dòng hàng với mặt hàng danh mục">
+        <GuideList>
+          <li>
+            Mỗi dòng hàng nối <b>một mặt hàng</b> trong Danh mục → Mặt hàng, để Nhập khẩu, sản xuất, kho và Xuất khẩu cùng gọi một tên. Tên hàng như trên hợp đồng vẫn giữ nguyên.
+          </li>
+          <li>
+            Gõ tên hàng xong, app tự gợi ý mặt hàng khi tên đó đã nối ở hợp đồng nhập trước, hoặc trùng tên tiếng Anh của đúng một mặt hàng. Gợi ý thì kiểm lại. Mặt hàng chưa có thì gõ tên để thêm mới ngay trong ô.
+          </li>
+          <li>
+            Dòng chưa nối hiện <b>Chưa nối</b>. Hợp đồng vẫn lưu và ghi lần nhập được, nhưng <b>chưa đóng được</b> cho tới khi mọi dòng đã nối. Nối ở Thao tác khác → Sửa hợp đồng, kể cả hợp đồng đã đóng.
+          </li>
+          <li>Tra số ở trang Nhập khẩu tìm được cả theo tên hàng và tên mặt hàng.</li>
         </GuideList>
       </GuideSection>
     </>

@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
-import { useImportSupplierStore } from "@/lib/catalogRepo";
+import { useImportSupplierStore, useProducts } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { usePageTour, usePageTourControl } from "@/features/shared/PageTourProvider";
@@ -48,7 +48,9 @@ export default function ImportPlanningScreen() {
   const can = useCan("import-plans");
   const receivingCan = useCan("import-plans.receiving");
   const store = useImportData();
-  const d = store.data;
+  // Dòng hàng nối mặt hàng danh mục (ba-spec 45 v3 R20) — danh mục đi kèm dữ liệu để luật thuần đọc.
+  const [products, setProducts] = useProducts();
+  const d = useMemo(() => ({ ...store.data, products }), [store.data, products]);
   // Đối tác = danh mục NCC nhập khẩu RIÊNG (ba-spec 45 v2 R15), không phải Đại lý của Nhập hàng.
   const supplierStore = useImportSupplierStore();
   const [params, setParams] = useSearchParams();
@@ -210,7 +212,13 @@ export default function ImportPlanningScreen() {
   const openClose = (c: ImportContract) => {
     const g = closeGate(d, c.id);
     if (!g.ok) {
-      notify.error(g.reason === "no-receipts" ? "Hợp đồng chưa có lần nhập nào — chưa đóng được" : "Hợp đồng không còn mở");
+      notify.error(
+        g.reason === "no-receipts"
+          ? "Hợp đồng chưa có lần nhập nào — chưa đóng được"
+          : g.reason === "unlinked-lines"
+            ? `Còn ${g.unlinkedLines?.length ?? 0} dòng hàng chưa nối mặt hàng danh mục (${(g.unlinkedLines ?? []).map((l) => l.productName).join("; ")}) — vào Sửa hợp đồng để nối rồi đóng`
+            : "Hợp đồng không còn mở",
+      );
       return;
     }
     const shortLines = contractProgress(d, c.id)
@@ -390,6 +398,8 @@ export default function ImportPlanningScreen() {
           }
           supplierStore.setSuppliers(rows);
         }}
+        products={products}
+        setProducts={setProducts}
         recordedBy={recordedBy}
         onClose={() => setContractForm(null)}
         onSave={saveContract}

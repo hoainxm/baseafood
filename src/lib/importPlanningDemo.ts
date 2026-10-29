@@ -5,7 +5,7 @@
 // ============================================================
 // Số + tên TỰ ĐẶT (không lấy hồ sơ thật — luật repo 15). File là đường dẫn GIỮ CHỖ
 // `demo-placeholder/…` (không chạm kho file). Ngày dời theo `today` để luôn rơi vào tháng gần đây.
-import type { ImportContract, ImportContractLine, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, ImportSupplier } from "@/types";
+import type { ImportContract, ImportContractLine, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, ImportSupplier, Product } from "@/types";
 import { DEMO_PLACEHOLDER_PREFIX } from "./exportPlanning";
 import { emptyImportSupplier, type ImportData } from "./importPlanning";
 
@@ -24,7 +24,14 @@ function supplier(id: string, code: string, shortName: string, fullName: string,
   return { ...emptyImportSupplier(id), code, shortName, fullName, country, note: "Bộ demo Nhập khẩu", ...extra };
 }
 
-export function buildImportDemo(today: string): ImportDemoSet {
+/** Mặt hàng demo cho dòng hàng (v3 R20): tên chứa từ khóa, không có thì theo loài, không có nữa thì mặt hàng đầu. */
+function pickProduct(products: readonly Pick<Product, "id" | "name" | "category">[], keyword: string, category: string): string {
+  const k = keyword.toLowerCase();
+  return (products.find((p) => p.name.toLowerCase().includes(k)) ?? products.find((p) => p.category === category) ?? products[0])?.id ?? "";
+}
+
+/** `products` = danh mục Mặt hàng của bộ demo — dòng hàng nối vào đó (không truyền ⇒ dòng chưa nối). */
+export function buildImportDemo(today: string, products: readonly Pick<Product, "id" | "name" | "category">[] = []): ImportDemoSet {
   const at = `${today}T08:00:00.000Z`;
   const suppliers = [
     supplier("imp-sup-pacific", "NK01", "Pacific Marine", "Pacific Marine Co., Ltd.", "Nhật Bản", { loadingPort: "Tokyo", contactName: "Mr. Tanaka", mainProducts: "Bạch tuộc nguyên con" }),
@@ -75,19 +82,20 @@ export function buildImportDemo(today: string): ImportDemoSet {
       closeReason: "Đối tác giao thiếu 100 kg, hai bên đồng ý kết thúc hợp đồng",
     }),
   ];
-  const line = (id: string, contractId: string, lineNo: number, productName: string, kg: number): ImportContractLine => ({
+  const line = (id: string, contractId: string, lineNo: number, productName: string, kg: number, product: [string, string]): ImportContractLine => ({
     id,
     contractId,
     lineNo,
     productName,
+    productId: pickProduct(products, ...product),
     kg,
     note: "",
   });
   const lines: ImportContractLine[] = [
-    line("imp-c1-l1", "imp-c1", 1, "Frozen whole octopus 1-2 kg", 12000),
-    line("imp-c1-l2", "imp-c1", 2, "Frozen whole octopus 2-3 kg", 8000),
-    line("imp-c2-l1", "imp-c2", 1, "Frozen skate wing", 12000),
-    line("imp-c3-l1", "imp-c3", 1, "Frozen whole squid", 5000),
+    line("imp-c1-l1", "imp-c1", 1, "Frozen whole octopus 1-2 kg", 12000, ["bạch tuộc", "Bạch tuộc"]),
+    line("imp-c1-l2", "imp-c1", 2, "Frozen whole octopus 2-3 kg", 8000, ["bạch tuộc", "Bạch tuộc"]),
+    line("imp-c2-l1", "imp-c2", 1, "Frozen skate wing", 12000, ["đuối", "Cá"]),
+    line("imp-c3-l1", "imp-c3", 1, "Frozen whole squid", 5000, ["mực", "Mực"]),
   ];
   const receipt = (id: string, contractId: string, p: Partial<ImportReceipt>): ImportReceipt => {
     const c = contracts.find((x) => x.id === contractId) as ImportContract;

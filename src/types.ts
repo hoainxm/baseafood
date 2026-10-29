@@ -1465,6 +1465,11 @@ export interface ImportContractLine {
   contractId: string;
   lineNo: number;
   productName: string;
+  /**
+   * Mặt hàng danh mục (`products.id`) của dòng — ba-spec 45 R20 (mig 0084). "" = chưa nối;
+   * undefined = máy chủ chưa có cột (chưa chạy 0084) ⇒ không gửi.
+   */
+  productId?: string;
   kg: number | null;
   note: string;
 }

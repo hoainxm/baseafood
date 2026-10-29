@@ -5,7 +5,7 @@
 // ============================================================
 // Mọi hộp ghi tự lưu NHÁP (luật 17), nút Lưu không `disabled` (thiếu ⇒ ErrorSummary). Luật ở
 // lib/importPlanning.ts — hộp chỉ gọi, không tự tính lại.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   ChoiceGroup,
@@ -25,6 +25,7 @@ import {
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { FilePicker } from "@/features/export-planning/parts";
+import { LineProductLabel } from "./parts";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import { formatMoney } from "@/lib/format";
@@ -38,7 +39,9 @@ import {
   lineAmount,
   quantityWarnings,
   emptyImportSupplier,
+  productNameAfterPick,
   receivedKg,
+  suggestImportProductId,
   selectableImportSuppliers,
   validateContract,
   validateReceipt,
@@ -56,6 +59,7 @@ import type {
   ImportSupplier,
   ImportTransport,
   ImportType,
+  Product,
 } from "@/types";
 import { FileCheck2, FileSignature, Lock, PackageCheck, Plus, Save, Ship, Trash2 } from "lucide-react";
 
@@ -115,6 +119,8 @@ export type ContractFormTarget = { mode: "create" } | { mode: "edit"; contract: 
 interface LineForm {
   id: string;
   productName: string;
+  /** Mặt hàng danh mục (R20); "" = chưa nối. */
+  productId: string;
   kg: number | null;
   unitPrice: number | null;
 }
@@ -132,7 +138,7 @@ interface ContractForm {
   initial: string;
 }
 const contractSnap = (f: ContractForm) => JSON.stringify([f.supplierId, f.contractNo, f.signedDate, f.importType, f.currency, f.note, f.lines]);
-const blankLine = (): LineForm => ({ id: newId(), productName: "", kg: null, unitPrice: null });
+const blankLine = (): LineForm => ({ id: newId(), productName: "", productId: "", kg: null, unitPrice: null });
 
 export interface ContractSavePayload {
   contract: ImportContract;
@@ -146,12 +152,17 @@ export function ContractFormDialog({
   data,
   suppliers,
   setSuppliers,
+  products,
+  setProducts,
   recordedBy,
   onClose,
   onSave,
 }: {
   target: ContractFormTarget | null;
   data: ImportData;
+  /** Danh mục Mặt hàng — dòng hàng nối vào đây (ba-spec 45 v3 R20). */
+  products: Product[];
+  setProducts: (rows: Product[]) => boolean | void;
   /** Danh mục NCC nhập khẩu (R15 v2 — KHÔNG phải Đại lý). */
   suppliers: readonly ImportSupplier[];
   setSuppliers: (rows: ImportSupplier[]) => void;
@@ -165,6 +176,10 @@ export function ContractFormDialog({
   const [busy, setBusy] = useState(false);
   const draft = useDialogDraft({ form: "import-contract", value: form, setValue: setForm, isEmpty: (f) => contractSnap(f) === f.initial });
   const supplierEditor = useQuickCatalogEdit("importSupplier", [...suppliers], (rows) => setSuppliers(rows));
+  const productEditor = useQuickCatalogEdit("product", products, (rows) => void setProducts(rows));
+  const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
+  // R22: máy chủ chưa chạy 0084 ⇒ không nối (không gửi product_id, khỏi kẹt hàng chờ).
+  const canLink = data.productLinkAvailable !== false;
 
   useEffect(() => {
     if (!target) return;
@@ -176,14 +191,16 @@ export function ContractFormDialog({
       const lines = data.lines
         .filter((l) => l.contractId === c.id)
         .sort((a, b) => a.lineNo - b.lineNo)
-        .map((l) => ({ id: l.id, productName: l.productName, kg: l.kg, unitPrice: c.linePrices[l.id] ?? null }));
+        .map((l) => ({ id: l.id, productName: l.productName, productId: l.productId ?? "", kg: l.kg, unitPrice: c.linePrices[l.id] ?? null }));
       f = { key: c.id, mode: "edit", id: c.id, supplierId: c.supplierId, contractNo: c.contractNo, signedDate: c.signedDate, importType: c.importType, currency: c.currency, note: c.note, lines, initial: "" };
     }
     const fresh = { ...f, initial: contractSnap(f) };
     const kept = draft.takeKept();
-    setForm(kept && kept.key === fresh.key ? kept : fresh);
+    // Nháp lưu trước v3 không có mặt hàng của dòng ⇒ coi là chưa nối.
+    setForm(kept && kept.key === fresh.key ? { ...kept, lines: kept.lines.map((l) => ({ ...l, productId: l.productId ?? "" })) } : fresh);
     setFiles([]);
     setErrors([]);
+    setSuggestedLines(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
 
@@ -204,11 +221,47 @@ export function ContractFormDialog({
     return s.id;
   };
 
+  const productOptions: ComboboxOption[] = [...products]
+    .sort((a, b) => a.name.localeCompare(b.name, "vi"))
+    .map((p) => ({ value: p.id, label: p.name, subLabel: [p.tradeName, p.code].filter(Boolean).join(" · ") || undefined }));
+  // Mặt hàng vừa thêm trong ô chưa kịp vào `products` lúc ô gọi onChange ⇒ giữ tạm để điền tên (R21).
+  const createdProduct = useRef<Product | null>(null);
+  const addProduct = (name: string) => {
+    const existing = products.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing.id;
+    const m: Product = { id: newId(), code: "", name: name.trim(), finishedGoodCode: "" };
+    createdProduct.current = m;
+    setProducts([...products, m]);
+    notify.saved(`Đã thêm mặt hàng "${m.name}" vào danh mục`);
+    return m.id;
+  };
+  /** R21 — rời ô tên hàng: dòng chưa nối mà tên ra đúng một mặt hàng ⇒ điền sẵn, ghi là gợi ý. */
+  const suggestFor = (lineId: string) => {
+    if (!canLink) return;
+    setForm((f) => {
+      if (!f) return f;
+      const l = f.lines.find((x) => x.id === lineId);
+      if (!l || l.productId || !l.productName.trim()) return f;
+      const pid = suggestImportProductId(data, l.productName, f.supplierId, products, f.id);
+      if (!pid) return f;
+      setSuggestedLines((s) => new Set(s).add(lineId));
+      return { ...f, lines: f.lines.map((x) => (x.id === lineId ? { ...x, productId: pid } : x)) };
+    });
+  };
+
   const save = async () => {
     if (!form || busy) return;
     const prices: Record<string, number | null> = {};
     for (const l of form.lines) prices[l.id] = l.unitPrice;
-    const lines: ImportContractLine[] = form.lines.map((l, i) => ({ id: l.id, contractId: form.id, lineNo: i + 1, productName: l.productName.trim(), kg: l.kg, note: "" }));
+    const lines: ImportContractLine[] = form.lines.map((l, i) => ({
+      id: l.id,
+      contractId: form.id,
+      lineNo: i + 1,
+      productName: l.productName.trim(),
+      ...(canLink ? { productId: l.productId } : {}),
+      kg: l.kg,
+      note: "",
+    }));
     const head = { id: form.id, supplierId: form.supplierId, contractNo: form.contractNo.trim(), signedDate: form.signedDate, importType: form.importType };
     const errs = issuesToErrors(validateContract(head, lines, data.contracts, data), "Hợp đồng");
     for (const f of files) {
@@ -321,7 +374,9 @@ export function ContractFormDialog({
           <section className="grid gap-4 rounded-lg bg-muted/40 p-4">
             <div className="grid gap-1">
               <h3 className="font-semibold">2 · Dòng hàng</h3>
-              <p className="text-sm text-muted-foreground">Số lượng tính bằng kg. Hàng gia công không ghi giá thì để trống đơn giá.</p>
+              <p className="text-sm text-muted-foreground">
+                Số lượng tính bằng kg. Hàng gia công không ghi giá thì để trống đơn giá. Mỗi dòng nối một mặt hàng trong danh mục; chưa nối vẫn lưu được nhưng phải nối đủ trước khi đóng hợp đồng.
+              </p>
             </div>
             {form.lines.map((l, i) => {
               const amount = lineAmount({ id: l.id, kg: l.kg }, { [l.id]: l.unitPrice });
@@ -342,9 +397,43 @@ export function ContractFormDialog({
                       </Button>
                     )}
                   </div>
-                  <Field label="Tên hàng (như trên hợp đồng)" required>
-                    <Input value={l.productName} onChange={(e) => setLine(l.id, { productName: e.target.value })} aria-required />
-                  </Field>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {/* Bọc div: Field đẩy ô xuống đáy ô lưới (mt-auto) — dòng gợi ý dưới ô Mặt hàng sẽ làm lệch hai ô. */}
+                    <div className="min-w-0 self-start">
+                      <Field label="Tên hàng (như trên hợp đồng)" required>
+                        <Input value={l.productName} onChange={(e) => setLine(l.id, { productName: e.target.value })} onBlur={() => suggestFor(l.id)} aria-required />
+                      </Field>
+                    </div>
+                    {canLink ? (
+                      <div className="grid min-w-0 gap-1">
+                        <Combobox
+                          label="Mặt hàng (danh mục)"
+                          value={l.productId}
+                          onChange={(v) => {
+                            // R21: ô tên hàng còn trống ⇒ điền tên tiếng Anh mặc định (không có thì tên mặt hàng).
+                            const picked = products.find((p) => p.id === v) ?? (createdProduct.current?.id === v ? createdProduct.current : undefined);
+                            setLine(l.id, { productId: v, productName: productNameAfterPick(l.productName, picked) });
+                            setSuggestedLines((s) => {
+                              const n = new Set(s);
+                              n.delete(l.id);
+                              return n;
+                            });
+                          }}
+                          options={productOptions}
+                          onCreate={productEditor.canCreate ? addProduct : undefined}
+                          emptyText="Chưa có mặt hàng nào trong danh mục — gõ tên để thêm mới."
+                          onEditItem={productEditor.openEdit}
+                          canEdit={productEditor.canEdit}
+                          editLabel={productEditor.editLabel}
+                        />
+                        {suggestedLines.has(l.id) && <span className="text-sm text-muted-foreground">Gợi ý theo hợp đồng nhập trước / tên tiếng Anh — kiểm lại.</span>}
+                      </div>
+                    ) : (
+                      <Field label="Mặt hàng (danh mục)">
+                        <p className="text-sm text-muted-foreground">Máy chủ chưa chạy migration 0084 — chưa nối mặt hàng được. Báo chủ dự án.</p>
+                      </Field>
+                    )}
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <NumberField label="Số lượng" unit="kg" required value={l.kg} onChange={(v) => setLine(l.id, { kg: v })} />
                     <NumberField label="Đơn giá" unit={`${form.currency || "USD"}/kg`} value={l.unitPrice} onChange={(v) => setLine(l.id, { unitPrice: v })} />
@@ -831,6 +920,7 @@ export function QuantityDialog({
               <div key={l.id} className="grid gap-2 rounded-lg border border-border p-3">
                 <div className="grid gap-0.5">
                   <span className="font-medium break-words">{l.productName}</span>
+                  <LineProductLabel data={data} line={l} />
                   <span className="tnum text-sm text-muted-foreground">
                     HĐ {formatNumber(l.kg ?? 0)} kg · đã về ở lô khác {formatNumber(other)} kg
                   </span>

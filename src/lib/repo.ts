@@ -52,6 +52,15 @@ import type {
   CompanyDocument,
   DocumentVersion,
   ExportActivity,
+  ImportContract,
+  ImportContractLine,
+  ImportDocument,
+  ImportDocumentKind,
+  ImportFile,
+  ImportReceipt,
+  ImportReceiptLine,
+  ImportTransport,
+  ImportType,
   ExportApprovalStage,
   ExportContract,
   ExportContractApproval,
@@ -207,6 +216,9 @@ export const SUPPLIER_TABLE: TableMapping<Supplier> = {
     bank_account: x.bankAccount ?? "",
     bank_name: x.bankName ?? "",
     bank_branch: x.bankBranch ?? "",
+    // 0082 — quốc gia của NCC nước ngoài (Nhập khẩu, ba-spec 45 R15): chỉ gửi khi có giá trị
+    // (đọc được cột từ máy chủ hoặc người dùng vừa gõ) ⇒ máy chủ chưa chạy 0082 thì đại lý cũ vẫn ghi.
+    ...(x.country !== undefined ? { country: x.country ?? "" } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -222,6 +234,7 @@ export const SUPPLIER_TABLE: TableMapping<Supplier> = {
     bankAccount: r.bank_account == null ? "" : s(r.bank_account),
     bankName: r.bank_name == null ? "" : s(r.bank_name),
     bankBranch: r.bank_branch == null ? "" : s(r.bank_branch),
+    ...("country" in r ? { country: r.country == null ? "" : s(r.country) } : {}),
     note: s(r.note),
   }),
   // Bản sao dưới máy ghi trước 0061 chưa có 4 trường liên hệ / ngân hàng.
@@ -2541,6 +2554,192 @@ export const EXPORT_DOCUMENT_KIND_TABLE: TableMapping<ExportDocumentKindRow> = {
 
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
+/* ---------- Phòng Kế hoạch · Nhập khẩu (mig 0082, ba-spec 45) ---------- */
+
+const IMPORT_TYPE_VALUES = new Set(["export-production", "trading", "processing"]);
+const IMPORT_TRANSPORT_VALUES = new Set(["20RF", "40RF", "lcl"]);
+const IMPORT_DOCUMENT_KIND_VALUES = new Set([
+  "commercial-invoice",
+  "packing-list",
+  "import-declaration",
+  "certificate-of-origin",
+  "quarantine-certificate",
+  "bill-of-lading",
+  "other",
+]);
+const importTypeOf = (v: unknown): ImportType | "" => (IMPORT_TYPE_VALUES.has(s(v)) ? (s(v) as ImportType) : "");
+
+/** Đơn giá theo id dòng (jsonb) — giá trị lạ ⇒ null (dòng không ghi giá). */
+function parseLinePrices(v: unknown): Record<string, number | null> {
+  const o = jsonOf(v);
+  if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+  const out: Record<string, number | null> = {};
+  for (const [k, x] of Object.entries(o as Record<string, unknown>)) out[k] = numOrNull(x);
+  return out;
+}
+
+export const IMPORT_CONTRACT_TABLE: TableMapping<ImportContract> = {
+  table: "import_contracts",
+  localKey: "bsf.import-contracts.v1",
+  getKey: theoId,
+  refColumns: ["supplier_id"],
+  toRow: (x) => ({
+    id: x.id,
+    supplier_id: x.supplierId,
+    supplier_name: x.supplierName,
+    contract_no: x.contractNo,
+    signed_date: dateOrNull(x.signedDate),
+    import_type: x.importType,
+    currency: x.currency,
+    line_prices: x.linePrices,
+    status: x.status,
+    close_reason: x.closeReason,
+    cancel_reason: x.cancelReason,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    supplierId: s(r.supplier_id),
+    supplierName: s(r.supplier_name),
+    contractNo: s(r.contract_no),
+    signedDate: s(r.signed_date).slice(0, 10),
+    importType: importTypeOf(r.import_type),
+    currency: s(r.currency) || "USD",
+    linePrices: parseLinePrices(r.line_prices),
+    status: s(r.status) === "closed" ? "closed" : s(r.status) === "cancelled" ? "cancelled" : "open",
+    closeReason: s(r.close_reason),
+    cancelReason: s(r.cancel_reason),
+    note: s(r.note),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const IMPORT_CONTRACT_LINE_TABLE: TableMapping<ImportContractLine> = {
+  table: "import_contract_lines",
+  localKey: "bsf.import-contract-lines.v1",
+  getKey: theoId,
+  refColumns: ["contract_id"],
+  toRow: (x) => ({ id: x.id, contract_id: x.contractId, line_no: x.lineNo, product_name: x.productName, kg: x.kg, note: x.note }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    lineNo: numOrNull(r.line_no) ?? 0,
+    productName: s(r.product_name),
+    kg: numOrNull(r.kg),
+    note: s(r.note),
+  }),
+};
+
+export const IMPORT_RECEIPT_TABLE: TableMapping<ImportReceipt> = {
+  table: "import_receipts",
+  localKey: "bsf.import-receipts.v1",
+  getKey: theoId,
+  refColumns: ["contract_id"],
+  toRow: (x) => ({
+    id: x.id,
+    contract_id: x.contractId,
+    contract_no: x.contractNo,
+    supplier_name: x.supplierName,
+    arrival_date: dateOrNull(x.arrivalDate),
+    expected_date: dateOrNull(x.expectedDate),
+    transport: x.transport,
+    container_no: x.containerNo,
+    bl_no: x.blNo,
+    status: x.status,
+    cancel_reason: x.cancelReason,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    contractNo: s(r.contract_no),
+    supplierName: s(r.supplier_name),
+    arrivalDate: s(r.arrival_date).slice(0, 10),
+    expectedDate: s(r.expected_date).slice(0, 10),
+    transport: (IMPORT_TRANSPORT_VALUES.has(s(r.transport)) ? s(r.transport) : "40RF") as ImportTransport,
+    containerNo: s(r.container_no),
+    blNo: s(r.bl_no),
+    status: s(r.status) === "cancelled" ? "cancelled" : "open",
+    cancelReason: s(r.cancel_reason),
+    note: s(r.note),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const IMPORT_RECEIPT_LINE_TABLE: TableMapping<ImportReceiptLine> = {
+  table: "import_receipt_lines",
+  localKey: "bsf.import-receipt-lines.v1",
+  getKey: theoId,
+  refColumns: ["receipt_id", "contract_line_id"],
+  toRow: (x) => ({ id: x.id, receipt_id: x.receiptId, contract_line_id: x.contractLineId, kg: x.kg, recorded_by: x.recordedBy }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    receiptId: s(r.receipt_id),
+    contractLineId: s(r.contract_line_id),
+    kg: numOrNull(r.kg),
+    recordedBy: s(r.recorded_by),
+    updatedAt: s(r.updated_at),
+  }),
+};
+
+export const IMPORT_DOCUMENT_TABLE: TableMapping<ImportDocument> = {
+  table: "import_documents",
+  localKey: "bsf.import-documents.v1",
+  getKey: theoId,
+  refColumns: ["receipt_id"],
+  toRow: (x) => ({
+    id: x.id,
+    receipt_id: x.receiptId,
+    kind: x.kind,
+    custom_name: x.customName,
+    doc_no: x.docNo,
+    doc_date: dateOrNull(x.docDate),
+    import_type: x.importType,
+    not_applicable: x.notApplicable,
+    na_reason: x.naReason,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    receiptId: s(r.receipt_id),
+    kind: (IMPORT_DOCUMENT_KIND_VALUES.has(s(r.kind)) ? s(r.kind) : "other") as ImportDocumentKind,
+    customName: s(r.custom_name),
+    docNo: s(r.doc_no),
+    docDate: s(r.doc_date).slice(0, 10),
+    importType: importTypeOf(r.import_type),
+    notApplicable: Boolean(r.not_applicable),
+    naReason: s(r.na_reason),
+    note: s(r.note),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const IMPORT_FILE_TABLE: TableMapping<ImportFile> = {
+  table: "import_files",
+  localKey: "bsf.import-files.v1",
+  getKey: theoId,
+  refColumns: ["contract_id", "receipt_id", "document_id"],
+  toRow: (x) => ({
+    id: x.id,
+    contract_id: x.contractId,
+    receipt_id: x.receiptId,
+    document_id: x.documentId,
+    path: x.path,
+    file_name: x.fileName,
+    uploaded_by: x.uploadedBy,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    contractId: s(r.contract_id),
+    receiptId: s(r.receipt_id),
+    documentId: s(r.document_id),
+    path: s(r.path),
+    fileName: s(r.file_name),
+    uploadedBy: s(r.uploaded_by),
+    createdAt: s(r.created_at),
+  }),
+};
+
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
 const TABLE_LABELS: Record<string, string> = {
   material_imports: "Nhập nguyên liệu",
@@ -2589,6 +2788,12 @@ const TABLE_LABELS: Record<string, string> = {
   export_activity_log: "Nhật ký hợp đồng xuất khẩu",
   customer_product_names: "Tên hàng theo khách",
   export_document_kinds: "Loại chứng từ xuất khẩu",
+  import_contracts: "Hợp đồng nhập khẩu",
+  import_contract_lines: "Dòng hàng hợp đồng nhập khẩu",
+  import_receipts: "Lần nhập khẩu",
+  import_receipt_lines: "Số lượng thực nhập",
+  import_documents: "Chứng từ nhập khẩu",
+  import_files: "File hồ sơ nhập khẩu",
   row_marks: "Tô màu dòng",
   app_roles: "Vai trò",
   role_permissions: "Quyền của vai trò",

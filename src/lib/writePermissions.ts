@@ -154,6 +154,14 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   // Tên hàng theo khách (mig 0077) — RLS riêng: danh mục khách HOẶC Xuất khẩu (trích xuất khi lưu HĐ).
   customer_product_names: null,
   export_document_kinds: null,
+  // Nhập khẩu (mig 0082): RLS RIÊNG theo import-plans / import-plans.receiving (thủ kho chỉ ghi
+  // số lượng thực nhập) — không qua trigger 0065. App kiểm ở /planning-import bằng useCan.
+  import_contracts: null,
+  import_contract_lines: null,
+  import_receipts: null,
+  import_receipt_lines: null,
+  import_documents: null,
+  import_files: null,
 };
 
 export interface WriteDenial {

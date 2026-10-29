@@ -54,6 +54,7 @@ const MyTasksScreen = lazy(() => import("@/features/my-tasks"));
 // Tài liệu công ty — quy trình, biểu mẫu, chứng nhận, hồ sơ năng lực (mig 0072)
 const DocumentsScreen = lazy(() => import("@/features/documents"));
 const ExportPlanningScreen = lazy(() => import("@/features/export-planning"));
+const ImportPlanningScreen = lazy(() => import("@/features/import-planning"));
 // Tổng quan — dòng chảy số liệu
 const DashboardScreen = lazy(() => import("@/features/dashboard/DashboardScreen"));
 
@@ -346,6 +347,7 @@ export default function App() {
             <Route path="/my-tasks" element={<MyTasksScreen />} />
             <Route path="/documents" element={<DocumentsScreen />} />
             <Route path="/planning-export" element={<ExportPlanningScreen />} />
+            <Route path="/planning-import" element={<ImportPlanningScreen />} />
 
             {/* Nghiệp vụ gốc */}
             <Route path="/imports" element={<MaterialImportScreen />} />

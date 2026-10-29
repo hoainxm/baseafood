@@ -107,6 +107,7 @@ export const KIT_NAV: ShellNavItem[] = [
   { id: "monthly-stock", label: "Sổ kho theo tháng", icon: CalendarRange , description: "Sổ kho theo tháng dương lịch cho cả nguyên liệu, bán thành phẩm và thành phẩm — tồn cuối tháng này tự thành tồn đầu tháng sau." },
   { id: "reconciliation", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 , description: "Đối soát sổ phần mềm với hóa đơn điện tử, tìm dòng lệch và lưu bản đối soát." },
   { id: "planning-export", label: "Xuất khẩu", icon: Container, description: "Kế hoạch xuất khẩu theo tháng: từng khách, từng hợp đồng, từng chuyến container đang ở bước nào (hợp đồng → lệnh SX → bao bì → đóng cont → chứng từ) và còn thiếu gì." },
+  { id: "planning-import", label: "Nhập khẩu", icon: Ship, description: "Hợp đồng nhập khẩu với nhà cung cấp nước ngoài: chứng từ từng lần hàng về (Invoice, Packing List, tờ khai nhập, C/O, kiểm dịch) và số lượng thực nhập. Khác Nhập hàng nguyên liệu trong nước." },
   { id: "documents", label: "Tài liệu công ty", icon: FolderOpen, description: "Quy trình, biểu mẫu, chứng nhận, hồ sơ năng lực của công ty: bản đang hiệu lực, các lần ban hành và file gốc. Chỉ thấy tài liệu của phòng mình." },
   { id: "catalog", label: "Danh mục", icon: Library , description: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ, thành phẩm." },
   { id: "admin", label: "Tổng quan quản trị", icon: LayoutGrid , description: "Trang riêng của quản trị viên: tình trạng tài khoản, vai trò và lối vào các việc quản trị." },
@@ -198,8 +199,8 @@ export const NAV_TREE: NavTreeGroup[] = [
       { ref: "reconciliation" },
     ],
   },
-  // Phòng Kế hoạch: Xuất khẩu trước; Nhập khẩu + Khác thêm vào nhánh này về sau (spec xuat-khau-phong-ke-hoach).
-  { name: "Kế hoạch", icon: Container, children: [{ ref: "planning-export" }, LOOKUP_CHILD("customers")] },
+  // Phòng Kế hoạch: Xuất khẩu · Nhập khẩu (ba-spec 45); "Khác" thêm vào nhánh này về sau.
+  { name: "Kế hoạch", icon: Container, children: [{ ref: "planning-export" }, { ref: "planning-import" }, LOOKUP_CHILD("customers"), LOOKUP_CHILD("suppliers")] },
   { name: "Tài liệu công ty", icon: FolderOpen, children: [{ ref: "documents" }] },
   {
     name: "Hệ thống",

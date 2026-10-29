@@ -17,6 +17,12 @@
  * Id trong gói là id của app; lên máy chủ tầng repo tự thêm tiền tố `demo:` (lib/demoMode).
  */
 import type {
+  ImportContract,
+  ImportContractLine,
+  ImportDocument,
+  ImportFile,
+  ImportReceipt,
+  ImportReceiptLine,
   BalancingInputItem,
   BalancingOutputItem,
   BalancingPeriod,
@@ -69,6 +75,7 @@ import { calculateBalancing } from "@/lib/balancingCalc";
 import { RETAIL_WAREHOUSE, FG_WAREHOUSE } from "@/lib/inventory";
 import { listDatesInRange, subtractDays } from "@/lib/dataFlow";
 import { buildExportDemo, type ExportDemoPack } from "@/lib/exportPlanningDemo";
+import { buildImportDemo } from "@/lib/importPlanningDemo";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 
 /** Sổ thật đưa vào để quét tham số (chỉ ĐỌC). */
@@ -135,6 +142,14 @@ export interface DemoBundle {
   customerProductNames: CustomerProductName[];
   /** Danh mục loại chứng từ (mig 0081) — một loại tự thêm để trình diễn thêm / sửa tại chỗ. */
   exportDocumentKinds: ExportDocumentKindRow[];
+  /** Nhập khẩu (mig 0082) — bộ nhỏ dựng sẵn (lib/importPlanningDemo.ts): 3 HĐ, 4 lần nhập đủ trạng thái;
+   *  file là đường dẫn GIỮ CHỖ. NCC nước ngoài của bộ được thêm vào `suppliers`. */
+  importContracts: ImportContract[];
+  importContractLines: ImportContractLine[];
+  importReceipts: ImportReceipt[];
+  importReceiptLines: ImportReceiptLine[];
+  importDocuments: ImportDocument[];
+  importFiles: ImportFile[];
   labelPrints: LabelPrint[];
   qcChecklists: QcChecklistItem[];
   qcLocks: DailyLock[];
@@ -672,10 +687,13 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     priceFactor,
   });
 
+  const importDemo = buildImportDemo(tc.today);
+
   return {
     products: n.products.map((p) => ({ ...p })),
     materialTypes: n.materialTypes.map((m) => ({ ...m })),
-    suppliers,
+    // NCC nước ngoài của bộ demo Nhập khẩu thêm vào danh mục Nhà cung cấp.
+    suppliers: [...suppliers, ...importDemo.extraSuppliers],
     // Khách của sổ kế hoạch Xuất khẩu chưa có trong 8 khách demo được thêm vào danh mục.
     customers: [...customers, ...exportDemo.extraCustomers],
     batterTypes: n.batterTypes.map((b) => ({ ...b })),
@@ -711,6 +729,12 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     exportActivities: exportDemo.activities,
     customerProductNames: demoCustomerNames(exportDemo),
     exportDocumentKinds: [{ id: "doc-demo-halal", name: "Giấy chứng nhận Halal", sortOrder: 100, note: "Khách Malaysia yêu cầu" }],
+    importContracts: importDemo.contracts,
+    importContractLines: importDemo.lines,
+    importReceipts: importDemo.receipts,
+    importReceiptLines: importDemo.receiptLines,
+    importDocuments: importDemo.documents,
+    importFiles: importDemo.files,
     labelPrints,
     qcChecklists,
     qcLocks,

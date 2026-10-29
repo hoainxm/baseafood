@@ -132,6 +132,11 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   { id: "export-plans", label: "Kế hoạch · Xuất khẩu", group: "planning", navId: "planning-export", actions: [...CRUD, "approve", "export", "view-price"] },
   { id: "export-plans.loading", label: "Xuất khẩu · Ảnh & sơ đồ đóng cont", group: "planning", navId: "planning-export", actions: ["view", "create"] },
   { id: "export-plans.payments", label: "Xuất khẩu · Chứng từ gửi khách & tiền về", group: "planning", navId: "planning-export", actions: CRUD },
+  // Phòng Kế hoạch · Nhập khẩu (mig 0082, ba-spec docs/app-map/45-import-planning.ba-spec.md R9).
+  // `import-plans` = hợp đồng nhập (có giá), lần nhập, chứng từ, file. `.receiving` = thủ kho ghi số
+  // lượng thực nhập (đọc dòng hàng + lần nhập, KHÔNG thấy giá / chứng từ). RLS riêng của 0082.
+  { id: "import-plans", label: "Kế hoạch · Nhập khẩu", group: "planning", navId: "planning-import", actions: [...CRUD, "export", "view-price"] },
+  { id: "import-plans.receiving", label: "Nhập khẩu · Số lượng thực nhập", group: "planning", navId: "planning-import", actions: ["view", "create", "update"] },
 
   { id: "catalog.suppliers", label: "Danh mục · Đại lý", group: "catalog", navId: "catalog", actions: CRUD },
   { id: "catalog.customers", label: "Danh mục · Khách hàng", group: "catalog", navId: "catalog", actions: CRUD },
@@ -212,9 +217,9 @@ export const LEGACY_ROLE_PERMISSIONS: RolePermissionMatrix = {
   "manager-kho": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
   "vice-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
   // Vai trò mới (0075) — đường lùi khẩn vẫn giữ đúng module của Phòng Kế hoạch.
-  planner: grantAll(byNav(["planning-export", "catalog"])),
-  "planning-head": grantAll(byNav(["planning-export", "catalog"])),
-  "planning-deputy": grantAll(byNav(["planning-export", "catalog"])),
+  planner: grantAll(byNav(["planning-export", "planning-import", "catalog"])),
+  "planning-head": grantAll(byNav(["planning-export", "planning-import", "catalog"])),
+  "planning-deputy": grantAll(byNav(["planning-export", "planning-import", "catalog"])),
 };
 
 type RoleSpec = Readonly<Record<string, readonly PermissionAction[]>>;
@@ -338,6 +343,8 @@ const DIRECTOR: RoleSpec = {
   "export-plans": ["view", "export", "view-price"],
   "export-plans.loading": VIEW,
   "export-plans.payments": VIEW,
+  "import-plans": ["view", "export", "view-price"],
+  "import-plans.receiving": VIEW,
   ...catalogAll(VIEW),
 };
 
@@ -368,6 +375,8 @@ const CHIEF_ACCOUNTANT: RoleSpec = {
   "export-plans": ["view", "export", "view-price"],
   "export-plans.loading": VIEW,
   "export-plans.payments": ["view", "create", "update", "delete"],
+  "import-plans": ["view", "export", "view-price"],
+  "import-plans.receiving": VIEW,
   ...catalogAll(["view", "create", "update", "delete"]),
 };
 
@@ -397,6 +406,8 @@ const ACCOUNTANT: RoleSpec = {
   "export-plans.loading": VIEW,
   // Kế toán không xóa (luật chung của vai trò) — ghi sai tiền về thì KTT / phòng KH xóa.
   "export-plans.payments": ["view", "create", "update"],
+  "import-plans": ["view", "export", "view-price"],
+  "import-plans.receiving": VIEW,
   ...catalogAll(["view", "create", "update"]),
 };
 
@@ -414,6 +425,8 @@ const WAREHOUSE_KEEPER: RoleSpec = {
   "catalog.material-types": ["view", "create", "update"],
   // Đóng cont: chỉ THÊM ảnh lớp hàng / seal / sơ đồ (A2) — không thấy giá, không sửa bước khác.
   "export-plans.loading": ["view", "create"],
+  // Nhập khẩu: ghi số lượng thực nhập theo invoice (ba-spec 45 NI6) — không thấy giá / chứng từ.
+  "import-plans.receiving": ["view", "create", "update"],
 };
 
 /** Quản đốc xưởng: toàn quyền khâu sản xuất, MỞ LẠI ngày SX (xưởng mình — phạm vi là Đợt 5). Không thấy giá. */
@@ -471,12 +484,16 @@ const PLANNER: RoleSpec = {
   "export-plans": ["view", "create", "update", "delete", "export", "view-price"],
   "export-plans.loading": ["view", "create"],
   "export-plans.payments": ["view", "create", "update", "delete"],
+  "import-plans": ["view", "create", "update", "delete", "export", "view-price"],
+  "import-plans.receiving": ["view", "create", "update"],
   orders: VIEW,
   "export-report": VIEW_EXPORT,
   qr: VIEW,
   warehouse: VIEW,
   ...catalogAll(VIEW),
   "catalog.customers": ["view", "create", "update"],
+  // Đối tác nhập khẩu = danh mục Nhà cung cấp (ba-spec 45 R15) — thêm / sửa ngay trong ô chọn.
+  "catalog.suppliers": ["view", "create", "update"],
 };
 
 /**

@@ -9,6 +9,12 @@ import {
   DAILY_LOCK_TABLE,
   PRODUCTION_LOCK_TABLE,
   IMPORT_SHIPMENT_TABLE,
+  IMPORT_CONTRACT_TABLE,
+  IMPORT_CONTRACT_LINE_TABLE,
+  IMPORT_RECEIPT_TABLE,
+  IMPORT_RECEIPT_LINE_TABLE,
+  IMPORT_DOCUMENT_TABLE,
+  IMPORT_FILE_TABLE,
   SUPPLIER_TABLE,
   SALES_ORDER_TABLE,
   ORDER_ITEM_TABLE,
@@ -358,6 +364,17 @@ export function useExportDocumentKindStore() {
   const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
   return { kinds, setKinds, isAvailable, isLoading: meta.status === "loading" && kinds.length === 0 };
 }
+/**
+ * Phòng Kế hoạch · Nhập khẩu (mig 0082) — luật ở lib/importPlanning.ts. Màn đọc qua
+ * `features/import-planning/useImportData.ts` (cờ `isAvailable`: có máy chủ mà chưa chạy 0082 ⇒
+ * không ghi, khỏi kẹt hàng chờ). Khác Nhập hàng (`useImportShipments`, mua NL trong nước).
+ */
+export const useImportContracts = () => useTable(IMPORT_CONTRACT_TABLE);
+export const useImportContractLines = () => useTable(IMPORT_CONTRACT_LINE_TABLE);
+export const useImportReceipts = () => useTable(IMPORT_RECEIPT_TABLE);
+export const useImportReceiptLines = () => useTable(IMPORT_RECEIPT_LINE_TABLE);
+export const useImportDocuments = () => useTable(IMPORT_DOCUMENT_TABLE);
+export const useImportFiles = () => useTable(IMPORT_FILE_TABLE);
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */

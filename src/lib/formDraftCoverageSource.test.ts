@@ -25,6 +25,8 @@ const EXEMPT: Record<string, string> = {
   "features/reports/WarehouseNxtScreen.tsx": "nạp báo cáo từ file / thêm mã một ô",
   "features/warehouse/ReserveWarehouseScreen.tsx": "xác nhận nhập kho một bước",
   "features/my-tasks/MyTasksScreen.tsx": "nút Xong đánh dấu việc một chạm; form giao việc ở AssignTaskDialog có nháp",
+  "features/import-planning/ImportDossier.tsx": "nút Ghi thực nhập chỉ mở QuantityDialog (hộp có nháp ở ImportDialogs.tsx)",
+  "features/import-planning/ImportViews.tsx": "nút Ghi thực nhập chỉ mở QuantityDialog (hộp có nháp ở ImportDialogs.tsx)",
 };
 
 function listTsx(dir: string): string[] {

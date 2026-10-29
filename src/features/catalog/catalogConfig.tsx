@@ -404,6 +404,7 @@ export function buildCatalogFields(
       hideOnMobile: true,
       example: "VD: CA Bà Rịa - Vũng Tàu",
     },
+    { key: "country", group: "Ghi hóa đơn", hideInTable: true, label: "Quốc gia", hideOnMobile: true, example: "Chỉ NCC nước ngoài (Nhập khẩu), VD: Nhật Bản" },
     // Hàng 4 — chuyển khoản
     { key: "bankAccount", group: "Chuyển khoản", hideInTable: true, label: "Số tài khoản", hideOnMobile: true, example: "VD: 1914845758" },
     { key: "bankName", group: "Chuyển khoản", hideInTable: true, label: "Ngân hàng", hideOnMobile: true, example: "VD: VPBank" },

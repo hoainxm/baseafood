@@ -35,7 +35,7 @@ supabase/migrations/     0001 … 0078 — trạng thái từng file: docs/app-m
 docs/                    README.md (bản đồ tài liệu, doc mới bỏ đâu) · app-map/ · ops/ · spec/ · trien-khai/
 ```
 
-**Migration trên DB thật**: tới `0079` đã chạy hết (kiểm chỉ-đọc 2026-10-28; 0079 theo [`ops/export-v8-go-live.md`](docs/ops/export-v8-go-live.md)). `0080` (admin đặt lại mật khẩu / tạm ngưng tài khoản) · `0081` (danh mục loại chứng từ xuất khẩu) **CHƯA chạy**. ⛔ Đừng chạy lại `0073` / `0075` (xóa trọn ma trận quyền, chèn bản cũ). Viết migration mới ⇒ rà [`03-database`](docs/app-map/03-database.md) + số migration trên origin trước khi đặt số. ⛔ Đừng chạy `0002`, `0003`, `0023`.
+**Migration trên DB thật**: tới `0079` đã chạy hết (kiểm chỉ-đọc 2026-10-28; 0079 theo [`ops/export-v8-go-live.md`](docs/ops/export-v8-go-live.md)). `0080` (admin đặt lại mật khẩu / tạm ngưng tài khoản) · `0081` (danh mục loại chứng từ xuất khẩu) · `0082` (Nhập khẩu — tạo bucket `import-files` trước) **CHƯA chạy**. ⛔ Đừng chạy lại `0073` / `0075` / `0079` (xóa trọn ma trận quyền, chèn bản cũ). Viết migration mới ⇒ rà [`03-database`](docs/app-map/03-database.md) + số migration trên origin trước khi đặt số. ⛔ Đừng chạy `0002`, `0003`, `0023`.
 
 Ranh giới import: [`01-app-structure.md`](docs/app-map/01-app-structure.md).
 
@@ -106,6 +106,7 @@ Sửa doc xong ⇒ cập nhật `last_verified:` trong frontmatter. Hook pre-com
 | `features/my-tasks/**`, `lib/myTasks.ts` | [`39-my-tasks`](docs/app-map/39-my-tasks.md) |
 | `features/documents/**`, `lib/documents*.ts`, phòng ban | [`40-documents`](docs/app-map/40-documents.md) (+ [`spec/quan-ly-tai-lieu`](docs/spec/quan-ly-tai-lieu.md)) |
 | `features/export-planning/**`, `lib/export*.ts`, `lib/customerProductNames.ts`, `lib/invoice*Reader.ts`, bảng `export_*`, vai trò `planner` | [`41`](docs/app-map/41-export-planning.ba-spec.md) (+ [`42`](docs/app-map/42-export-planning-ui.design-spec.md) nếu đổi giao diện) |
+| `features/import-planning/**`, `lib/importPlanning*.ts`, `lib/importFileStorage.ts`, bảng `import_contracts`/`import_receipt*`/`import_documents`/`import_files` (≠ `import_shipments` của Nhập hàng) | [`45`](docs/app-map/45-import-planning.ba-spec.md) (+ [`46`](docs/app-map/46-import-planning-ui.design-spec.md) nếu đổi giao diện) |
 | Tour + hộp "?": `lib/guidedTour.ts`, `features/*/…Tour.ts`, `features/shared/guide*` — **kể cả thêm trang mới** | [`43-guided-tour`](docs/app-map/43-guided-tour.ba-spec.md) |
 | `features/dashboard/**`, `lib/dataFlow.ts` | [`spec/che-do-demo` §5b](docs/spec/che-do-demo.md) |
 | `lib/demoMode.ts`, `lib/demoGenerator.ts`, `features/shared/DemoMode.tsx` | [`spec/che-do-demo`](docs/spec/che-do-demo.md) |
@@ -155,6 +156,7 @@ Index đầy đủ + định tuyến theo task: [`docs/app-map/README.md`](docs/
 | [`39-my-tasks`](docs/app-map/39-my-tasks.md) | Việc của tôi, hạn, giao việc, chuông header |
 | [`40-documents`](docs/app-map/40-documents.md) | tài liệu công ty, lần ban hành, xem theo phòng ban |
 | [`41`](docs/app-map/41-export-planning.ba-spec.md) · [`42`](docs/app-map/42-export-planning-ui.design-spec.md) | Phòng Kế hoạch · Xuất khẩu |
+| [`45`](docs/app-map/45-import-planning.ba-spec.md) · [`46`](docs/app-map/46-import-planning-ui.design-spec.md) | Phòng Kế hoạch · Nhập khẩu (≠ Nhập hàng) |
 | [`43-guided-tour`](docs/app-map/43-guided-tour.ba-spec.md) | tour hướng dẫn + hộp "?" |
 | [`spec/qr-truy-xuat-lo`](docs/spec/qr-truy-xuat-lo.md) | truy xuất lô QR, gắn lô |
 | [`spec/che-do-demo`](docs/spec/che-do-demo.md) | chế độ demo, Tổng quan dòng chảy số liệu |

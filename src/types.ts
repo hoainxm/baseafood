@@ -339,6 +339,11 @@ export interface Supplier {
   bankAccount: string;
   bankName: string;
   bankBranch: string;
+  /**
+   * Quốc gia — NCC nước ngoài của Nhập khẩu (mig 0082, ba-spec 45 R15). `undefined` = máy chủ chưa
+   * có cột ⇒ repo KHÔNG gửi cột này. NCC trong nước để trống.
+   */
+  country?: string;
   note: string;
 }
 
@@ -1392,5 +1397,108 @@ export interface ExportPayment {
   filePath: string;
   fileName: string;
   recordedBy: string;
+  createdAt: string;
+}
+
+/* ---------- Phòng Kế hoạch · Nhập khẩu (ba-spec 45, mig 0082) ---------- */
+
+/** Loại hình nhập (câu 5 — cả ba đều có): sản xuất xuất khẩu · kinh doanh · gia công. */
+export type ImportType = "export-production" | "trading" | "processing";
+/** Cách vận chuyển (R12): cont lạnh 20 · cont lạnh 40 · hàng lẻ ghép cont. */
+export type ImportTransport = "20RF" | "40RF" | "lcl";
+/** Loại chứng từ của lần nhập (R4). 3 loại đầu bắt buộc. */
+export type ImportDocumentKind =
+  | "commercial-invoice"
+  | "packing-list"
+  | "import-declaration"
+  | "certificate-of-origin"
+  | "quarantine-certificate"
+  | "bill-of-lading"
+  | "other";
+
+/** Hợp đồng nhập. Đối tác = một dòng danh mục Nhà cung cấp (R15); giữ chữ tên lúc ghi. */
+export interface ImportContract {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  contractNo: string;
+  signedDate: string;
+  importType: ImportType | "";
+  currency: string;
+  /**
+   * Đơn giá theo id dòng hàng. Nằm ở HĐ (bảng chỉ người có `import-plans` đọc) để thủ kho đọc
+   * dòng hàng mà không thấy giá (R9). `null` = dòng không ghi giá (HĐ gia công).
+   */
+  linePrices: Record<string, number | null>;
+  status: "open" | "closed" | "cancelled";
+  closeReason: string;
+  cancelReason: string;
+  note: string;
+  createdAt: string;
+}
+
+/** Dòng hàng của HĐ nhập — tên + kg. Đơn giá ở `ImportContract.linePrices`. */
+export interface ImportContractLine {
+  id: string;
+  contractId: string;
+  lineNo: number;
+  productName: string;
+  kg: number | null;
+  note: string;
+}
+
+/** Một lần hàng về (lô nhập). Chép số HĐ + tên đối tác để thủ kho đọc mà không cần bảng HĐ. */
+export interface ImportReceipt {
+  id: string;
+  contractId: string;
+  contractNo: string;
+  supplierName: string;
+  arrivalDate: string;
+  expectedDate: string;
+  transport: ImportTransport;
+  containerNo: string;
+  blNo: string;
+  status: "open" | "cancelled";
+  cancelReason: string;
+  note: string;
+  createdAt: string;
+}
+
+/** Số lượng thực nhập của một dòng hàng HĐ trong một lần nhập (R5, kg theo invoice). */
+export interface ImportReceiptLine {
+  id: string;
+  receiptId: string;
+  contractLineId: string;
+  kg: number | null;
+  recordedBy: string;
+  updatedAt: string;
+}
+
+/** Một chứng từ của lần nhập. */
+export interface ImportDocument {
+  id: string;
+  receiptId: string;
+  kind: ImportDocumentKind;
+  /** Tên tự đặt khi `kind = "other"` (VD L/C, giấy ATTP). */
+  customName: string;
+  docNo: string;
+  docDate: string;
+  /** Loại hình — chỉ tờ khai nhập (mặc định theo HĐ, sửa được). */
+  importType: ImportType | "";
+  notApplicable: boolean;
+  naReason: string;
+  note: string;
+  createdAt: string;
+}
+
+/** File đính kèm: HĐ đã ký (`documentId` rỗng) hoặc file của một chứng từ. */
+export interface ImportFile {
+  id: string;
+  contractId: string;
+  receiptId: string;
+  documentId: string;
+  path: string;
+  fileName: string;
+  uploadedBy: string;
   createdAt: string;
 }

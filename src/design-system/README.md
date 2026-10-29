@@ -574,7 +574,8 @@ Lưới an toàn: màn nào sót, lượt ghi vẫn bị chốt ở `useTable.wr
 
 (Chốt 2026-10-06.) **Mọi `Combobox` ĐỂ NHẬP LIỆU mà nguồn là một DANH MỤC có
 CRUD ở `/catalog`** — mặt hàng · khách hàng · đại lý · loại NL · kho lưu trữ ·
-bột tẩm — phải có **đủ hai thứ**, kể cả ô thêm về sau:
+bột tẩm · loại chứng từ xuất khẩu (2026-10-29, `useDocumentKindPicker` ở `features/export-planning/documentKindPicker.tsx`)
+— phải có **đủ hai thứ**, kể cả ô thêm về sau:
 
 1. **Thêm mới tại chỗ — `onCreate`.** Lưu NGAY vào danh mục qua setter của màn
    (đúng instance `useTable` đang mở), báo `notify.saved("Đã thêm … vào danh mục")`,

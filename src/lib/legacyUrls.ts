@@ -25,6 +25,7 @@ export const CATALOG_TABS = [
   "material-types",
   "batters",
   "storage-locations",
+  "document-kinds",
   "finished-goods",
 ] as const;
 export type CatalogTab = (typeof CATALOG_TABS)[number];

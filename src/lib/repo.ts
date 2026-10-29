@@ -63,6 +63,7 @@ import type {
   ExportFile,
   ExportPayment,
   CustomerProductName,
+  ExportDocumentKindRow,
   ExportShipment,
   ExportStepItem,
   BatterType,
@@ -2519,6 +2520,25 @@ export const CUSTOMER_PRODUCT_NAME_TABLE: TableMapping<CustomerProductName> = {
   }),
 };
 
+/** Danh mục loại chứng từ xuất khẩu (mig 0081) — đổi tên loại hệ thống + loại tự thêm. */
+export const EXPORT_DOCUMENT_KIND_TABLE: TableMapping<ExportDocumentKindRow> = {
+  table: "export_document_kinds",
+  localKey: "bsf.export-document-kinds.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    name: x.name,
+    sort_order: Math.round(Number(x.sortOrder) || 0),
+    note: x.note ?? "",
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    name: s(r.name),
+    sortOrder: Number(r.sort_order) || 0,
+    note: s(r.note),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
@@ -2568,6 +2588,7 @@ const TABLE_LABELS: Record<string, string> = {
   export_payments: "Gửi chứng từ / tiền về",
   export_activity_log: "Nhật ký hợp đồng xuất khẩu",
   customer_product_names: "Tên hàng theo khách",
+  export_document_kinds: "Loại chứng từ xuất khẩu",
   row_marks: "Tô màu dòng",
   app_roles: "Vai trò",
   role_permissions: "Quyền của vai trò",

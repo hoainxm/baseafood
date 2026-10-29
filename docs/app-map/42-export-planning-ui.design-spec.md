@@ -160,6 +160,11 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 
 - 2026-10-22 (b) — **v6** (preview `baseafood-demo`, bộ demo mới 18 tên trích xuất): danh mục Khách hàng có "Tên hàng (n)" mỗi dòng; hộp Tên hàng của khách 9 tên (tên đậm · quy cách · mặt hàng xưởng · "Trích xuất từ HĐ …"), Thêm → Lưu trống ⇒ `ErrorSummary` 2 lỗi; form HĐ: chọn khách → ô mặt hàng có dòng phụ = tên của khách → chọn ⇒ tên + quy cách tự điền; hồ sơ HĐ có nút "Tên hàng của <khách>"; nối 1 dòng chưa nối ⇒ toast "… · thêm 1 tên hàng của khách" (Hoàn tác — chưa bấm thử); hộp Tên hàng 360 px × 130 % không tràn; console 0 lỗi của app.
 
+## v9.1 (2026-10-29) — ô Loại chứng từ có Thêm mới + bút chì (ba-spec 41 §0b)
+
+- Ô "Chứng từ n" (form HĐ, phần Chứng từ khách yêu cầu) và ô "Loại chứng từ" (hộp mục chứng từ bước 5) dùng `useDocumentKindPicker` (`documentKindPicker.tsx`): danh sách 10 loại hệ thống + loại tự thêm (dòng phụ = ghi chú), `onCreate` khi có quyền thêm / sửa Xuất khẩu và máy chủ đã có bảng, bút chì mở `CatalogEditDialog` của loại `documentKind`. Hộp sửa render một lần trong mỗi hộp form.
+- Danh mục: tab "Loại chứng từ" ở `/catalog?tab=document-kinds`.
+
 ## v9 (2026-10-29) — bỏ bước duyệt HĐ (ba-spec 41 §0a) · THẮNG v8 ở các điểm dưới
 
 - **Thanh chặng** còn 4 mục: Đính kèm · Ghi chuyến · Duyệt cuối · Đóng HĐ (điện thoại "Chặng n/4").
@@ -180,6 +185,7 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 - **Chú thích viết tắt**: nút "?" (`AbbrHint`) tự gắn cạnh nhãn `Field` / `DateField` / `Combobox` / `NumberField`, tiêu đề cột `RecordTable` (ngoài nút sắp xếp), nhãn thông tin hồ sơ / chuyến (`Info`, `Fact`); chữ trong câu dùng `Abbr`.
 
 ## History
+- v9.1 (2026-10-29): ô Loại chứng từ thêm mới / sửa nhanh tại chỗ.
 - v9 (2026-10-29): bỏ bước duyệt HĐ — thanh chặng 4 mục, gỡ hộp Duyệt hợp đồng, Sửa hợp đồng khi chưa có chuyến, thẻ 5 trạng thái.
 - v8.1 (2026-10-28, audit sau 0079): thanh chặng điện thoại một dòng nhãn riêng; đầu khung chuyến (tên + thẻ trạng thái) xuống dòng — trước tràn ngang 390–452 px ở 360 px × 130 % (lỗi có sẵn); chữ cũ "BGĐ đồng ý / file ký / chốt HĐ / lên chuyến" ở bước 1, hộp lập HĐ, lỗi lệnh SX, gia hạn, nối mặt hàng, Thao tác khác, báo cáo đổi theo quy trình v8.
 - v8 (2026-10-28): quy trình duyệt mới — thanh chặng, nút chính theo chặng + vai trò, khối Hồ sơ đính kèm, hộp Duyệt / Duyệt cuối / Đính kèm, khối Nhật ký thao tác, thẻ 6 trạng thái, chú thích viết tắt. Tour 22 bước (thêm "Thanh chặng của hợp đồng"). Chưa chạy thử tay trên preview ở bản ghi này — xem mục QA.

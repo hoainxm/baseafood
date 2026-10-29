@@ -1108,7 +1108,8 @@ export interface DocumentVersion {
 export type ExportPaymentMethod = "ttr" | "lc" | "other";
 /** Loại chuyến: cont lạnh, xe tải (biển số thay số cont), đóng ghép (không có cont riêng). */
 export type ExportShipmentKind = "20RF" | "40RF" | "40HC-RF" | "truck" | "consolidated";
-export type ExportDocumentKind =
+/** Loại chứng từ HỆ THỐNG — mỗi loại có luật riêng gắn theo id (CI bắt kg / tiền, B/L ngày on board…). */
+export type SystemExportDocumentKind =
   | "commercial-invoice"
   | "packing-list"
   | "bill-of-lading"
@@ -1119,6 +1120,22 @@ export type ExportDocumentKind =
   | "insurance"
   | "microbiology-report"
   | "other";
+/**
+ * Id loại chứng từ: loại hệ thống hoặc loại TỰ THÊM ở danh mục (mig 0081, `doc-…`). Chứng từ đã ghi
+ * lưu id ⇒ đổi tên loại không tách sổ.
+ */
+export type ExportDocumentKind = SystemExportDocumentKind | (string & {});
+
+/**
+ * Một dòng danh mục loại chứng từ (mig 0081): `id` trùng loại hệ thống = đổi tên hiển thị loại đó;
+ * id khác = loại tự thêm (luật như "Chứng từ khác").
+ */
+export interface ExportDocumentKindRow {
+  id: string;
+  name: string;
+  sortOrder: number;
+  note: string;
+}
 
 /** Chứng từ khách yêu cầu trên hợp đồng — giữ form (C/O form VJ…) và người cấp (H/C tự cấp…). */
 export interface ExportRequiredDocument {

@@ -34,6 +34,8 @@ const TAB_RESOURCE: Record<string, string> = {
   "material-types": "catalog.material-types",
   batters: "catalog.batters",
   "storage-locations": "catalog.storage-locations",
+  // Loại chứng từ xuất khẩu (mig 0081) — thuộc khu Xuất khẩu, quyền theo export-plans.
+  "document-kinds": "export-plans",
   "finished-goods": "catalog.finished-goods",
 };
 
@@ -108,6 +110,7 @@ export default function CatalogScreen() {
           {canViewTab("material-types") && <TabsTrigger value="material-types" title="Quy cách / size nguyên liệu, có gắn loài (bạch tuộc, mực, cá…).">Loại nguyên liệu</TabsTrigger>}
           {canViewTab("batters") && <TabsTrigger value="batters" title="Các loại bột tẩm (24V, 18V, 220H, 232, 20802…) — gắn vào mặt hàng tẩm bột để ghi kg bột theo từng loại.">Bột tẩm</TabsTrigger>}
           {canViewTab("storage-locations") && <TabsTrigger value="storage-locations" title="Nơi hàng đang nằm: kho nhà và các kho lạnh thuê ngoài.">Kho lưu trữ</TabsTrigger>}
+          {canViewTab("document-kinds") && <TabsTrigger value="document-kinds" title="Loại chứng từ xuất khẩu (Commercial Invoice, B/L, H/C, C/O…) — thêm loại khách mới yêu cầu, đổi tên loại có sẵn.">Loại chứng từ</TabsTrigger>}
           {canViewTab("finished-goods") && <TabsTrigger value="finished-goods" title="141 mã thành phẩm kế toán (TK 1551) — chỉ đọc, không sửa ở đây.">Thành phẩm (141 mã)</TabsTrigger>}
         </TabsList>
 
@@ -155,6 +158,10 @@ export default function CatalogScreen() {
 
         <TabsContent value="storage-locations" data-tour="catalog-storage-locations" className="pt-6">
           <CatalogCrudFor cfg={c.storageLocation} rowMarkKey="danh-muc-kho-luu" resource={TAB_RESOURCE["storage-locations"]} />
+        </TabsContent>
+
+        <TabsContent value="document-kinds" data-tour="catalog-document-kinds" className="pt-6">
+          <CatalogCrudFor cfg={c.documentKind} rowMarkKey="export-document-kinds" resource={TAB_RESOURCE["document-kinds"]} />
         </TabsContent>
 
         <TabsContent value="finished-goods" data-tour="catalog-finished-goods" className="pt-6">

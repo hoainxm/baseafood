@@ -1,6 +1,7 @@
 > Load khi: làm chế độ DEMO (bật/tắt), sinh bộ dữ liệu demo, gỡ màn DEMO dữ liệu mẫu, thêm chức năng mới cần có mặt trong demo.
 > Trạng thái: **ĐÃ CHỐT hướng (2026-10-12)** — chủ dự án chọn **phương án B `site-demo` trong DB thật** · ẩn danh mặc định có công tắc · xóa hẳn `/production` + `/reports` · **chỉ admin** bật demo. Chưa build. Đọc §4b (rào chắn bắt buộc của B) trước khi code.
-last_verified: 2026-10-28
+last_verified: 2026-10-29
+<!-- updated: 2026-10-29 — bảng MỚI `export_document_kinds` (mig 0081) vào `DemoBundle` (`exportDocumentKinds`, demoGenerator: 1 loại tự thêm "Giấy chứng nhận Halal") + `DemoPackLoader` (DemoMode.tsx). -->
 <!-- updated: 2026-10-27 (b) — rà commit: §4c ghi NGƯỢC về hàm gộp mặt hàng — bản vá refColumns làm hàm 0069 bỏ sót dòng demo mới ⇒ thêm `0078` (bắt cả id thô lẫn `demo:`), §4c ghi thứ tự: chạy 0078 trước lệnh thêm tiền tố. -->
 <!-- updated: 2026-10-27 — R1 bổ sung khóa ngoại MỀM (19 bảng khai `refColumns`, cột mảng `batter_ids`, test quét `*_id` của toRow) + §4c cách sửa dữ liệu demo cũ thiếu tiền tố. Không thêm bảng ⇒ checklist §5 không đổi. -->
 <!-- updated: 2026-10-20 (z) — GÓI DEMO XUẤT KHẨU: admin "Nạp gói demo Xuất khẩu…" (menu Demo, `features/shared/ExportDemoPackUpload.tsx`) tải pack.json + file thật (HĐ scan, bộ chứng từ tách tờ, thiết kế thùng, container plan, LSX, LXH, ảnh đóng cont) vào bucket riêng `export-files` thư mục cố định `site-demo/export-files/demo-pack/…`; "Tạo bộ mới" (`createAndEnter`) đọc gói (`fetchExportDemoPack`) ⇒ 7 ca gắn file thật + mỗi dòng sổ Kế hoạch xuất hàng thành HĐ + chuyến dời về các tháng gần đây, khách chưa có được thêm vào danh mục demo (`extraCustomers`). Không gói ⇒ 7 ca số tự đặt + file giữ chỗ. Số / tên khách thật KHÔNG nằm trong mã nguồn. -->

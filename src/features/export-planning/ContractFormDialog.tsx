@@ -26,10 +26,10 @@ import {
 } from "@/design-system";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
+import { useDocumentKindPicker, type DocumentKindSource } from "./documentKindPicker";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import {
-  DOCUMENT_KINDS,
   INCOTERMS,
   PAYMENT_METHODS,
   computedLineKg,
@@ -166,6 +166,7 @@ export function ContractFormDialog({
   setProducts,
   customerNames,
   data,
+  documentKindSource,
   recordedBy,
   canSeePrice,
   onClose,
@@ -182,6 +183,8 @@ export function ContractFormDialog({
   setProducts: (rows: Product[]) => boolean | void;
   /** Dữ liệu module — gợi ý mặt hàng theo tên tiếng Anh đã nối ở HĐ trước. */
   data: Pick<ExportData, "contracts" | "revisions">;
+  /** Danh mục loại chứng từ (mig 0081) — ô Chứng từ khách yêu cầu thêm / sửa loại tại chỗ (luật 7). */
+  documentKindSource: DocumentKindSource;
   recordedBy: string;
   canSeePrice: boolean;
   onClose: () => void;
@@ -197,6 +200,7 @@ export function ContractFormDialog({
   const draft = useDialogDraft({ form: "export-contract", value: form, setValue: setForm, isEmpty: (f) => snapshot(f) === f.initial });
   const customerEditor = useQuickCatalogEdit("customer", customers, (rows) => void setCustomers(rows));
   const productEditor = useQuickCatalogEdit("product", products, (rows) => void setProducts(rows));
+  const kindPicker = useDocumentKindPicker(documentKindSource);
   /** Dòng vừa được tự gợi ý mặt hàng (chỉ để hiện dòng nhắc "kiểm lại", không lưu). */
   const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
   /**
@@ -523,7 +527,11 @@ export function ContractFormDialog({
                       clearable={false}
                       value={d.kind}
                       onChange={(v) => setDocs(form.terms.requiredDocuments.map((x, j) => (j === i ? { ...x, kind: (v || "other") as ExportDocumentKind } : x)))}
-                      options={DOCUMENT_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                      options={kindPicker.options}
+                      onCreate={kindPicker.onCreate}
+                      onEditItem={kindPicker.onEditItem}
+                      canEdit={kindPicker.canEdit}
+                      editLabel={kindPicker.editLabel}
                     />
                     <Field label="Form">
                       <Input value={d.form} onChange={(e) => setDocs(form.terms.requiredDocuments.map((x, j) => (j === i ? { ...x, form: e.target.value } : x)))} />
@@ -682,6 +690,7 @@ export function ContractFormDialog({
       )}
       {customerEditor.dialog}
       {productEditor.dialog}
+      {kindPicker.dialog}
     </FormDialog>
   );
 }

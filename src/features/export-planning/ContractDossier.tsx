@@ -530,7 +530,7 @@ export function ContractDossier({
               <div className="flex flex-wrap gap-1">
                 {terms.requiredDocuments.map((d, i) => (
                   <Tag key={i} variant="category" tone="blue" className="max-w-full whitespace-normal">
-                    {requiredDocumentLabel(d)}
+                    {requiredDocumentLabel(d, data.documentKinds)}
                   </Tag>
                 ))}
               </div>

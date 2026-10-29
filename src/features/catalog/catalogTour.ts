@@ -9,7 +9,7 @@
 import type { PageTour, PageTourSpec, TourStep } from "@/lib/guidedTour";
 
 /** Id tab (`?tab=`) — khớp TAB_RESOURCE ở CatalogScreen. */
-export type CatalogTourTab = "products" | "customers" | "suppliers" | "material-types" | "batters" | "storage-locations" | "finished-goods";
+export type CatalogTourTab = "products" | "customers" | "suppliers" | "material-types" | "batters" | "storage-locations" | "document-kinds" | "finished-goods";
 
 /** Tên tab đang hiện trên trang (CatalogScreen TabsTrigger). */
 export const CATALOG_TAB_LABELS: Readonly<Record<CatalogTourTab, string>> = {
@@ -19,6 +19,7 @@ export const CATALOG_TAB_LABELS: Readonly<Record<CatalogTourTab, string>> = {
   "material-types": "Loại nguyên liệu",
   batters: "Bột tẩm",
   "storage-locations": "Kho lưu trữ",
+  "document-kinds": "Loại chứng từ",
   "finished-goods": "Thành phẩm (141 mã)",
 };
 
@@ -135,6 +136,13 @@ export function buildCatalogTour(ctx: CatalogTourContext): PageTour {
       body:
         "Nơi hàng đang nằm: Kho nhà hoặc Kho thuê ngoài (kho lạnh thuê). Dùng ở cột Kho lưu của báo cáo Xuất – Nhập – Tồn và ô vị trí ở Sổ kho tháng. Tên kho là chỗ nối dữ liệu nên không được trùng.\n" +
         "Danh mục này khác với các kho hệ thống của sổ kho tháng (K1000T, K1500T…), không sửa ở đây.",
+    }),
+    at("document-kinds", {
+      id: "document-kinds",
+      title: "Loại chứng từ",
+      body:
+        "Loại chứng từ xuất khẩu khách yêu cầu, dùng ở phần Chứng từ khách yêu cầu của hợp đồng và Bộ chứng từ của chuyến. 10 loại gốc có luật riêng (Commercial Invoice bắt kg, số thùng, tiền; B/L bắt ngày on board; Bảo hiểm khi CIF / CIP): đổi tên được, xóa thì về tên gốc.\n" +
+        "Loại thêm mới tính như Chứng từ khác: cần số, ngày và file mới Xong. Thêm nhanh được ngay trong ô chọn Loại chứng từ.",
     }),
     at("finished-goods", {
       id: "finished-goods",

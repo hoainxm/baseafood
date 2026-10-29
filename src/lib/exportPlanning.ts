@@ -19,6 +19,8 @@ import type {
   ExportContractTerms,
   ExportDeadlineExtension,
   ExportDocumentKind,
+  ExportDocumentKindRow,
+  SystemExportDocumentKind,
   ExportFile,
   ExportItemState,
   ExportPayment,
@@ -54,7 +56,8 @@ const shipmentKindShort = (k: ExportShipmentKind) => SHIPMENT_KINDS.find((x) => 
 /** Chuyến đi bằng container riêng (đếm vào số cont của HĐ, cần số cont + seal). */
 export const isContainerKind = (k: ExportShipmentKind) => k !== "truck" && k !== "consolidated";
 
-export const DOCUMENT_KINDS: { value: ExportDocumentKind; label: string }[] = [
+/** 10 loại chứng từ HỆ THỐNG (luật riêng gắn theo id). Tên hiển thị đổi được ở danh mục (mig 0081). */
+export const DOCUMENT_KINDS: { value: SystemExportDocumentKind; label: string }[] = [
   { value: "commercial-invoice", label: "Commercial Invoice" },
   { value: "packing-list", label: "Packing List" },
   { value: "bill-of-lading", label: "Bill of Lading (B/L)" },
@@ -66,10 +69,77 @@ export const DOCUMENT_KINDS: { value: ExportDocumentKind; label: string }[] = [
   { value: "microbiology-report", label: "Kết quả kiểm vi sinh" },
   { value: "other", label: "Chứng từ khác" },
 ];
-export const documentKindLabel = (k: ExportDocumentKind | "") => DOCUMENT_KINDS.find((x) => x.value === k)?.label ?? "Chứng từ";
+
+/* ---------- Danh mục loại chứng từ (mig 0081, ba-spec 41 §0b R37) ---------- */
+
+/** Một loại chứng từ để chọn: hệ thống (tên có thể đã đổi) hoặc tự thêm. */
+export interface DocumentKindOption {
+  id: string;
+  name: string;
+  isSystem: boolean;
+  note: string;
+  sortOrder: number;
+}
+
+const SYSTEM_KIND_IDS = new Set<string>(DOCUMENT_KINDS.map((k) => k.value));
+export const isSystemDocumentKind = (id: string): id is SystemExportDocumentKind => SYSTEM_KIND_IDS.has(id);
+/** Thứ tự loại tự thêm bắt đầu sau 10 loại hệ thống. */
+const CUSTOM_ORDER_BASE = 100;
+
+/**
+ * Danh sách loại chứng từ đầy đủ: 10 loại hệ thống (dòng danh mục cùng id ⇒ đổi tên) rồi loại tự thêm
+ * (theo thứ tự, rồi tên). Dòng tự thêm tên rỗng bị bỏ.
+ */
+export function documentKindList(rows: readonly ExportDocumentKindRow[] = []): DocumentKindOption[] {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const system = DOCUMENT_KINDS.map((k, i) => {
+    const o = byId.get(k.value);
+    return { id: k.value, name: o?.name.trim() || k.label, isSystem: true, note: o?.note ?? "", sortOrder: i };
+  });
+  const custom = rows
+    .filter((r) => !isSystemDocumentKind(r.id) && r.name.trim())
+    .map((r) => ({ id: r.id, name: r.name.trim(), isSystem: false, note: r.note, sortOrder: r.sortOrder }))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"));
+  return [...system, ...custom];
+}
+
+/** Đổi danh sách đầy đủ (màn danh mục sửa) về dòng cần lưu: loại tự thêm + loại hệ thống ĐÃ đổi tên / có ghi chú. */
+export function documentKindRowsFromList(list: readonly DocumentKindOption[]): ExportDocumentKindRow[] {
+  const defaults = new Map<string, string>(DOCUMENT_KINDS.map((k) => [k.value, k.label]));
+  return list
+    .filter((k) => !isSystemDocumentKind(k.id) || k.name.trim() !== defaults.get(k.id) || !!k.note.trim())
+    .map((k) => ({ id: k.id, name: k.name.trim(), sortOrder: k.sortOrder, note: k.note }));
+}
+
+/**
+ * Thêm loại chứng từ theo tên gõ trong ô chọn. Trùng tên (không phân hoa thường, kể cả loại hệ thống)
+ * ⇒ trả loại có sẵn, không đẻ bản trùng (README § Ô chọn danh mục).
+ */
+export function findOrCreateDocumentKind(
+  name: string,
+  rows: readonly ExportDocumentKindRow[],
+  newId: () => string,
+): { id: string; rows: ExportDocumentKindRow[]; created: boolean } {
+  const n = name.trim();
+  const key = n.toLocaleLowerCase("vi");
+  const found = documentKindList(rows).find((k) => k.name.toLocaleLowerCase("vi") === key);
+  if (found || !n) return { id: found?.id ?? "", rows: [...rows], created: false };
+  const maxOrder = Math.max(CUSTOM_ORDER_BASE - 1, ...rows.filter((r) => !isSystemDocumentKind(r.id)).map((r) => r.sortOrder));
+  const row: ExportDocumentKindRow = { id: `doc-${newId()}`, name: n, sortOrder: maxOrder + 1, note: "" };
+  return { id: row.id, rows: [...rows, row], created: true };
+}
+
+/** Tên loại chứng từ theo id (danh mục nếu có). Id lạ (bảng chưa nạp / đã gỡ) ⇒ "Chứng từ khác". */
+export function documentKindLabel(k: ExportDocumentKind | "", rows: readonly ExportDocumentKindRow[] = []): string {
+  if (!k) return "Chứng từ";
+  return documentKindList(rows).find((x) => x.id === k)?.name ?? "Chứng từ khác";
+}
 /** Nhãn đầy đủ một chứng từ yêu cầu: "C/O form VJ", "Health Certificate (H/C) · công ty tự cấp". */
-export function requiredDocumentLabel(d: { kind: ExportDocumentKind | ""; form: string; issuer: string }): string {
-  return [documentKindLabel(d.kind) + (d.form.trim() ? ` form ${d.form.trim()}` : ""), d.issuer.trim()].filter(Boolean).join(" · ");
+export function requiredDocumentLabel(
+  d: { kind: ExportDocumentKind | ""; form: string; issuer: string },
+  rows: readonly ExportDocumentKindRow[] = [],
+): string {
+  return [documentKindLabel(d.kind, rows) + (d.form.trim() ? ` form ${d.form.trim()}` : ""), d.issuer.trim()].filter(Boolean).join(" · ");
 }
 
 export const INCOTERMS = ["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"] as const;
@@ -168,6 +238,8 @@ export interface ExportData {
   payments: readonly ExportPayment[];
   /** Nhật ký thao tác của hợp đồng (mig 0079) — chỉ thêm. */
   activities: readonly ExportActivity[];
+  /** Danh mục loại chứng từ (mig 0081) — đổi tên loại hệ thống + loại tự thêm. Bỏ trống ⇒ 10 loại gốc. */
+  documentKinds?: readonly ExportDocumentKindRow[];
 }
 
 export const EMPTY_EXPORT_DATA: ExportData = {
@@ -450,10 +522,10 @@ export function blankItem(shipmentId: string, step: ExportStep, id: string, now 
 }
 
 export function documentItems(d: Pick<ExportData, "items">, shipmentId: string): ExportStepItem[] {
-  const order = new Map(DOCUMENT_KINDS.map((k, i) => [k.value, i]));
+  const order = new Map<string, number>(DOCUMENT_KINDS.map((k, i) => [k.value, i]));
   return d.items
     .filter((i) => i.shipmentId === shipmentId && i.step === "document")
-    .sort((a, b) => (order.get(a.docKind as ExportDocumentKind) ?? 99) - (order.get(b.docKind as ExportDocumentKind) ?? 99) || a.createdAt.localeCompare(b.createdAt));
+    .sort((a, b) => (order.get(a.docKind) ?? 99) - (order.get(b.docKind) ?? 99) || a.createdAt.localeCompare(b.createdAt));
 }
 
 /** Mục duy nhất của một bước không phải chứng từ (bước 2, 3, 4a–4d) — chưa có thì undefined. */

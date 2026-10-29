@@ -193,7 +193,7 @@ export default function ExportPlanningScreen() {
     track(contractId, shipmentId, "undo", `Hoàn tác: ${summary}`);
   };
   const shipName = (s: Pick<ExportShipment, "lotCode" | "bookingNo"> | undefined) => (s ? (s.lotCode ? `lô ${s.lotCode}` : s.bookingNo ? `booking ${s.bookingNo}` : "chưa có mã lô") : "");
-  const itemName = (i: Pick<ExportStepItem, "step" | "docKind">) => (i.step === "document" ? documentKindLabel(i.docKind) : SUB_STEP_LABELS[i.step]);
+  const itemName = (i: Pick<ExportStepItem, "step" | "docKind">) => (i.step === "document" ? documentKindLabel(i.docKind, d.documentKinds) : SUB_STEP_LABELS[i.step]);
   const contractIdOfShipment = (shipmentId: string) => d.shipments.find((x) => x.id === shipmentId)?.contractId ?? "";
 
   /* ---------- Ghi (mọi lượt ghi có Hoàn tác — luật 6 / 13) ---------- */
@@ -829,6 +829,7 @@ export default function ExportPlanningScreen() {
 
       <ContractFormDialog
         target={contractForm}
+        documentKindSource={store.documentKindSource}
         contracts={d.contracts}
         customers={customers}
         setCustomers={setCustomers}
@@ -847,6 +848,7 @@ export default function ExportPlanningScreen() {
       <ShipmentFormDialog target={shipmentTarget} onClose={() => setShipmentTarget(null)} onSave={saveShipment} />
       <StepItemDialog
         target={itemTarget}
+        documentKindSource={store.documentKindSource}
         data={d}
         filesAvailable={filesAvailable}
         recordedBy={recordedBy}

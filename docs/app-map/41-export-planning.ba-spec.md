@@ -1,10 +1,11 @@
 # 41 — ba-spec: Phòng Kế hoạch · Xuất khẩu — Đợt 1 (khung tháng × khách × hợp đồng × chuyến)
 
 > Load khi: xây hoặc sửa module Xuất khẩu của Phòng Kế hoạch đợt 1: hồ sơ hợp đồng (dòng hàng, bản sửa, gia hạn, file ký, kết quả duyệt giấy), chuyến (mã lô MSL, booking, cont, seal, ngày đóng/ETD), 6 bước dạng checklist tay kèm file, thực xuất lấy từ invoice, khép kín chuyến/hợp đồng theo dung sai, tiền về, vai trò Phòng Kế hoạch, mở rộng danh mục khách.
-covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql, supabase/migrations/0079_export_approval_workflow.sql, src/lib/abbreviations.ts
+covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql, supabase/migrations/0079_export_approval_workflow.sql, src/lib/abbreviations.ts, supabase/migrations/0081_export_document_kinds.sql
 last_verified: 2026-10-29
 ttl_days: 90
-status: ba-spec v9 (2026-10-29: **bỏ bước duyệt HĐ**, chỉ còn duyệt cuối — §0a) · v8 (2026-10-28: **quy trình duyệt mới** — Trưởng / Phó phòng KH duyệt → đính kèm → ghi chuyến → duyệt cuối đóng HĐ; vai trò `planning-head` / `planning-deputy`; nhật ký HĐ; chú thích viết tắt; ĐÃ BUILD, mig 0079 CHƯA chạy) · v7 (2026-10-22 tối: **đọc Commercial Invoice** từ file Excel gốc / PDF xuất từ Excel — NV17 · R27; ĐÃ BUILD 2026-10-22, không migration) · v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Hoài Nam ↔ Lê Khiêm; ĐÃ BUILD 2026-10-22, `0077` ✅ chạy DB thật 2026-10-22) · v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+status: ba-spec v9.1 (2026-10-29: danh mục Loại chứng từ — §0b) · v9 (2026-10-29: **bỏ bước duyệt HĐ**, chỉ còn duyệt cuối — §0a) · v8 (2026-10-28: **quy trình duyệt mới** — Trưởng / Phó phòng KH duyệt → đính kèm → ghi chuyến → duyệt cuối đóng HĐ; vai trò `planning-head` / `planning-deputy`; nhật ký HĐ; chú thích viết tắt; ĐÃ BUILD, mig 0079 CHƯA chạy) · v7 (2026-10-22 tối: **đọc Commercial Invoice** từ file Excel gốc / PDF xuất từ Excel — NV17 · R27; ĐÃ BUILD 2026-10-22, không migration) · v6 (2026-10-22 chiều: **tên hàng THEO KHÁCH** — họp Hoài Nam ↔ Lê Khiêm; ĐÃ BUILD 2026-10-22, `0077` ✅ chạy DB thật 2026-10-22) · v5 (2026-10-22: tên thương mại mặt hàng, số PO của khách, báo cáo kỳ — ĐÃ BUILD, `0076` ✅ chạy DB thật 2026-10-22) · v4 (bổ sung sau audit hồ sơ SCM 2026-10-20: nhãn, người ký BGĐ, kỳ xem, nối mặt hàng) — ĐÃ BUILD v1 2026-10-20 (code + `0075_export_planning.sql`, kiểm PGlite) — ⏳ 0075 CHƯA chạy trên DB thật: tạo bucket `export-files` → chạy 0075 (2 lần) → deploy
+<!-- re-verified: 2026-10-29 14:00 — v9.1: R37 / AC-68…71 = test exportPlanning.test.ts (4) xanh; AC-72 thử tay preview demo; DOCUMENT_KINDS (10 loại) + luật CI / B/L / bảo hiểm theo id đối chiếu canMarkDone, isRequiredDocumentItem. -->
 <!-- re-verified: 2026-10-29 10:30 — v9: ContractState/CONTRACT_FLOW_STAGES/effectiveRevision/shipmentGate/finalReviewGate ở lib/exportPlanning.ts đối chiếu code sau sửa; AC-57/64/65/66/67 = test exportPlanning.test.ts + exportPlanningDemo.test.ts xanh. -->
 <!-- re-verified: 2026-10-28 15:00 — v8: luồng duyệt cũ (NV4 ghi kết quả BGĐ ký giấy, approvers = director/vice-director ở ExportPlanningScreen, RLS approvals = export-plans create/update ở 0075, contractState pending/approved/closed) đối chiếu code TRƯỚC khi sửa — khớp doc; sau sửa: AC-56…AC-61 = test `exportPlanning.test.ts`, RLS 0079 thử PGlite (Nhân viên KH bị chặn duyệt / đóng / mở lại; Trưởng / Phó làm được; nhật ký không sửa / xóa); nối mặt hàng R16/R23: 4 lỗi sửa + test. -->
 <!-- re-verified: 2026-10-22 (c) — v7: R27 + AC-51…AC-55 = test `invoiceReader.test.ts` (18, oracle invoice 234/26 chép từng ô); thử tay preview demo (localStorage): file Excel → điền số / ngày / 3 số tổng, PDF có chữ ra cùng kết quả, bản scan 234/26 → câu "bản scan", ô đã có số khác → báo + "Dùng số trên invoice", nối 1 dòng → Lưu trích xuất 1 tên "Trích xuất từ Invoice 234/26" + Hoàn tác, Hủy không ghi; 360 px × 130 % không tràn. Chưa thử: tải file từ kho file thật (cần DB), file Excel gốc THẬT của Phòng KH (chưa có). -->
@@ -18,6 +19,32 @@ status: ba-spec v9 (2026-10-29: **bỏ bước duyệt HĐ**, chỉ còn duyệt
 > **Mục đích:** oracle HÀNH VI cho đợt 1. Định nghĩa ai làm nghiệp vụ gì, vào gì ra gì, thế nào là đúng (AC). **Không** mô tả giao diện (việc của design-spec).
 > **Nguồn đã chốt:** kế hoạch [`spec/xuat-khau-phong-ke-hoach.md`](../spec/xuat-khau-phong-ke-hoach.md) (§9 chốt 11 câu 2026-10-20) · quy trình [`QTI-KH-01`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (luật KH-R1…R16) · phân quyền [`spec/role-permissions.md`](../spec/role-permissions.md) · tài liệu công ty [`40-documents.md`](40-documents.md) (khuôn file + RLS).
 
+
+## 0b. v9.1 (2026-10-29) — danh mục Loại chứng từ: thêm / sửa ngay trong ô chọn
+
+Chủ dự án yêu cầu: ô chọn "Loại chứng từ" thêm / sửa được loại mới tại chỗ (như mặt hàng), khỏi nhờ sửa code.
+
+**Nghiệp vụ NV18 — Khai loại chứng từ · owner U1 Nhân viên KH** (U6 làm được như U1). Input: tên loại khách yêu cầu chưa có. Flow: gõ tên ở ô Loại chứng từ (Chứng từ khách yêu cầu của HĐ, hoặc mục chứng từ bước 5) → "Thêm mới" ⇒ loại vào danh mục, ô nhận luôn; hoặc bút chì / tab Danh mục → Loại chứng từ để đổi tên, thêm ghi chú. Output: loại có trong mọi ô chọn Loại chứng từ. Không bàn giao user khác.
+
+**Luật:**
+- **R37 — Danh mục loại chứng từ** (bảng `export_document_kinds`, mig 0081; luật thuần `documentKindList` · `findOrCreateDocumentKind` · `documentKindRowsFromList` ở `lib/exportPlanning.ts`).
+  - Danh sách = 10 loại HỆ THỐNG (`DOCUMENT_KINDS`) rồi loại tự thêm.
+  - Loại hệ thống giữ luật riêng theo id (R6 / R5: Commercial Invoice bắt số thùng · kg · tiền và tự có ở mọi chuyến; B/L bắt ngày on board; Bảo hiểm khi CIF / CIP). Đổi tên được. Xóa ⇒ về tên gốc.
+  - Loại tự thêm (`doc-…`) tính như "Chứng từ khác": số (trừ tự cấp) + ngày + file.
+  - Chứng từ đã ghi lưu id ⇒ đổi tên không tách sổ. Id lạ (bảng chưa nạp) ⇒ hiện "Chứng từ khác".
+  - Gõ trùng tên (không phân hoa thường, kể cả tên loại hệ thống) ⇒ dùng loại có sẵn.
+  - Quyền: theo `export-plans` (xem / thêm hoặc sửa / xóa), không có tài nguyên catalog riêng. Máy chủ chưa chạy 0081 ⇒ ô chỉ cho chọn 10 loại gốc (không ghi, không kẹt hàng chờ).
+
+**Flow optimization log v9.1:** (a) bảng danh mục + loại hệ thống "ảo" đổi tên được *(chọn — giữ luật theo id, không seed dữ liệu, chạy cả không máy chủ)*; (b) seed 10 loại vào bảng *(loại — bảng trống / chưa chạy migration là mất cả 10 loại, phải đồng bộ seed với code)*; (c) chỉ cho thêm loại mới, không sửa loại hệ thống *(loại — trái luật 7: mọi mục trong ô phải có bút chì)*.
+
+**AC v9.1** (test `exportPlanning.test.ts` khối "v9.1"):
+- **AC-68** · Test: unit · Danh mục trống ⇒ `documentKindList([]).length == 10`, tên gốc.
+- **AC-69** · Test: unit · Thêm "Giấy chứng nhận Halal" ⇒ id bắt đầu `doc-`, vị trí 10 (sau 10 loại hệ thống); gõ lại khác hoa thường ⇒ `created == false`, cùng id; gõ "packing list" ⇒ id `packing-list`.
+- **AC-70** · Test: unit · Đổi tên C/O ⇒ đúng 1 dòng lưu `{ id: "certificate-of-origin" }`, nhãn chứng từ yêu cầu đổi theo; tên gốc ⇒ 0 dòng lưu.
+- **AC-71** · Test: unit · Loại tự thêm thiếu số + ngày + file ⇒ `missing == ["number","issuedOn","file"]`; id lạ ⇒ nhãn "Chứng từ khác".
+- **AC-72** · Test: manual (preview demo, đã thử 2026-10-29) · Ô Chứng từ 1 của form HĐ: gõ "Giấy kiểm dịch" → Thêm mới ⇒ ô nhận loại mới, danh mục có thêm đúng 1 dòng; tab Danh mục → Loại chứng từ hiện 10 + loại tự thêm.
+
+---
 
 ## 0a. v9 (2026-10-29) — BỎ bước duyệt hợp đồng, chỉ còn duyệt cuối · THẮNG §0 v8 và mọi mục cũ
 

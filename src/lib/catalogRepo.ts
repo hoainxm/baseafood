@@ -52,6 +52,7 @@ import {
   EXPORT_PAYMENT_TABLE,
   EXPORT_ACTIVITY_TABLE,
   CUSTOMER_PRODUCT_NAME_TABLE,
+  EXPORT_DOCUMENT_KIND_TABLE,
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
   DOMESTIC_SALE_TABLE,
@@ -344,6 +345,18 @@ export function useCustomerProductNameStore() {
   const [names, setNames, meta] = useCustomerProductNames();
   const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
   return { names, setNames, isAvailable, isLoading: meta.status === "loading" && names.length === 0 };
+}
+/** Danh mục loại chứng từ xuất khẩu (mig 0081) — dùng qua `useExportDocumentKindStore`. */
+export const useExportDocumentKinds = () => useTable(EXPORT_DOCUMENT_KIND_TABLE);
+
+/**
+ * Loại chứng từ + cờ `isAvailable` (như tên hàng theo khách): có máy chủ mà chưa chạy 0081 ⇒ không
+ * ghi (ô chọn vẫn đủ 10 loại hệ thống, không thêm / sửa được) — khỏi kẹt hàng chờ.
+ */
+export function useExportDocumentKindStore() {
+  const [kinds, setKinds, meta] = useExportDocumentKinds();
+  const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
+  return { kinds, setKinds, isAvailable, isLoading: meta.status === "loading" && kinds.length === 0 };
 }
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần

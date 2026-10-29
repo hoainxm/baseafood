@@ -30,7 +30,9 @@ import {
   useProducts,
   useFinishedGoods,
   useStorageLocations,
+  useExportDocumentKindStore,
 } from "@/lib/catalogRepo";
+import { documentKindList, documentKindRowsFromList, type DocumentKindOption } from "@/lib/exportPlanning";
 import {
   ChoiceGroup,
   Combobox,
@@ -43,7 +45,7 @@ import { BatterPicker } from "./BatterPicker";
 
 const MARKETS = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
-export type CatalogKind = "product" | "customer" | "supplier" | "materialType" | "storageLocation" | "batter";
+export type CatalogKind = "product" | "customer" | "supplier" | "materialType" | "storageLocation" | "batter" | "documentKind";
 
 /** Đủ thứ để dựng màn CRUD một danh mục HOẶC hộp sửa nhanh một bản ghi. */
 export interface CatalogConfig<T extends { id: string }> {
@@ -75,6 +77,8 @@ export interface CatalogConfigSet {
   materialType: CatalogConfig<MaterialType>;
   storageLocation: CatalogConfig<StorageLocation>;
   batter: CatalogConfig<BatterType>;
+  /** Loại chứng từ xuất khẩu (mig 0081) — hàng = 10 loại hệ thống (đổi tên được) + loại tự thêm. */
+  documentKind: CatalogConfig<DocumentKindOption>;
 }
 
 /** Cảnh báo khi mã số trùng với bản ghi khác (khách hàng / đại lý). Mã trống thì bỏ qua. */
@@ -487,6 +491,17 @@ export function buildCatalogFields(
     { key: "note", label: "Ghi chú", hideOnMobile: true, example: "VD: Bột tẩm nước tương" },
   ];
 
+  const documentKindFields: CatalogField<DocumentKindOption>[] = [
+    {
+      key: "name",
+      label: "Tên loại chứng từ",
+      required: true,
+      example: "VD: Giấy chứng nhận Halal",
+      hint: "Tên hiện ở ô chọn Loại chứng từ (hợp đồng, bước 5 của chuyến). Chứng từ đã ghi nối theo mã nên đổi tên không tách sổ.",
+    },
+    { key: "note", label: "Ghi chú", hideOnMobile: true, example: "VD: Khách Malaysia yêu cầu từ 2026" },
+  ];
+
   return {
     product: productFields,
     customer: customerFields,
@@ -494,6 +509,7 @@ export function buildCatalogFields(
     materialType: materialTypeFields,
     storageLocation: storageLocationFields,
     batter: batterFields,
+    documentKind: documentKindFields,
   };
 }
 
@@ -519,6 +535,7 @@ export function buildCatalogConfigs(
     materialType: CatalogSource<MaterialType>;
     storageLocation: CatalogSource<StorageLocation>;
     batter: CatalogSource<BatterType>;
+    documentKind: CatalogSource<DocumentKindOption>;
   }
 ): CatalogConfigSet {
   return {
@@ -670,6 +687,45 @@ export function buildCatalogConfigs(
       nameField: "name",
       linkedByName: true, // production_wips.batter_kg lưu theo TÊN loại bột
     },
+    documentKind: {
+      title: "Loại chứng từ",
+      description:
+        "Loại chứng từ xuất khẩu khách yêu cầu (Commercial Invoice, B/L, H/C, C/O…). 10 loại gốc có luật riêng (VD Commercial Invoice bắt kg và tiền) — đổi tên được, xóa thì về tên gốc. Loại thêm mới tính như Chứng từ khác: cần số, ngày và file.",
+      entityName: "loại chứng từ",
+      rows: n.documentKind.rows,
+      onChange: n.documentKind.onChange,
+      fields: fields.documentKind,
+      loading: n.documentKind.loading,
+      validate: (editing, rows) => checkDuplicateName(editing, rows, "name", "Tên loại chứng từ", "loại chứng từ"),
+      createEmpty: (): DocumentKindOption => ({ id: `doc-${uid()}`, name: "", isSystem: false, note: "", sortOrder: 0 }),
+      getSearchText: (r) => `${r.name} ${r.note}`,
+      getRecordDescription: (r) => r.name,
+      nameField: "name",
+      linkedByName: false, // chứng từ đã ghi lưu id loại
+    },
+  };
+}
+
+/**
+ * Nguồn danh mục loại chứng từ từ một instance store: hàng = danh sách đầy đủ; ghi ⇒ chỉ lưu loại tự
+ * thêm + loại hệ thống đã đổi tên. Loại thêm mới (thứ tự 0) xếp cuối danh sách.
+ */
+export function documentKindSource(
+  store: Pick<ReturnType<typeof useExportDocumentKindStore>, "kinds" | "setKinds" | "isLoading" | "isAvailable">,
+): CatalogSource<DocumentKindOption> {
+  const rows = documentKindList(store.kinds);
+  return {
+    rows,
+    loading: store.isLoading,
+    onChange: (next) => {
+      // Máy chủ chưa có bảng ⇒ không ghi (khỏi kẹt hàng chờ); ô chọn vẫn đủ 10 loại gốc.
+      if (!store.isAvailable) {
+        notify.error("Máy chủ chưa chạy migration 0081 — chưa thêm / sửa loại chứng từ được. Báo chủ dự án.");
+        return;
+      }
+      let max = Math.max(99, ...next.filter((k) => !k.isSystem).map((k) => k.sortOrder));
+      store.setKinds(documentKindRowsFromList(next.map((k) => (!k.isSystem && !k.sortOrder ? { ...k, sortOrder: ++max } : k))));
+    },
   };
 }
 
@@ -681,6 +737,7 @@ export function useCatalogConfigs(): CatalogConfigSet {
   const [materialTypes, setMaterialTypes, { status: materialTypeStatus }] = useMaterialTypes();
   const [storageLocations, setStorageLocations, { status: ttKL }] = useStorageLocations();
   const [batterTypes, setBatterTypes, { status: ttBT }] = useBatterTypes();
+  const documentKindStore = useExportDocumentKindStore();
   const [finishedGoods] = useFinishedGoods();
 
   const isLoadingProducts = productStatus === "loading" && products.length === 0;
@@ -720,5 +777,6 @@ export function useCatalogConfigs(): CatalogConfigSet {
     materialType: { rows: materialTypes, onChange: setMaterialTypes, loading: isLoadingMaterials },
     storageLocation: { rows: storageLocations, onChange: setStorageLocations, loading: isLoadingLocations },
     batter: { rows: batterTypes, onChange: setBatterTypes, loading: isLoadingBatters },
+    documentKind: documentKindSource(documentKindStore),
   });
 }

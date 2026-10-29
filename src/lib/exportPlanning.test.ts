@@ -51,6 +51,11 @@ import {
   validateContract,
   validateShipment,
   type ExportData,
+  documentKindList,
+  documentKindRowsFromList,
+  findOrCreateDocumentKind,
+  documentKindLabel,
+  requiredDocumentLabel,
 } from "./exportPlanning";
 import type {
   ExportContract,
@@ -816,5 +821,42 @@ describe("Nhãn: duyệt sau khi sửa, chiều lệch dung sai, tra HĐ chưa c
     expect(searchContracts(d, "test-g").map((c) => c.id)).toEqual(["c2"]);
     expect(searchContracts(d, "b182").map((c) => c.id)).toEqual(["c1"]);
     expect(searchContracts(d, "matsu", [{ id: "mtd", name: "Matsuda" }]).map((c) => c.id)).toEqual(["c2"]);
+  });
+});
+
+describe("v9.1 · danh mục loại chứng từ (mig 0081, R37)", () => {
+  const ids = (() => {
+    let n = 0;
+    return () => `x${++n}`;
+  })();
+  it("AC-68: danh mục trống ⇒ đủ 10 loại hệ thống, tên gốc", () => {
+    const list = documentKindList([]);
+    expect(list).toHaveLength(10);
+    expect(list.every((k) => k.isSystem)).toBe(true);
+    expect(documentKindLabel("commercial-invoice")).toBe("Commercial Invoice");
+  });
+  it("AC-69: thêm loại mới theo tên ⇒ id doc-…, hiện sau 10 loại hệ thống; gõ trùng tên (khác hoa thường) ⇒ trả loại có sẵn", () => {
+    const a = findOrCreateDocumentKind("Giấy chứng nhận Halal", [], ids);
+    expect(a.created).toBe(true);
+    expect(a.id.startsWith("doc-")).toBe(true);
+    expect(documentKindList(a.rows).map((k) => k.name).indexOf("Giấy chứng nhận Halal")).toBe(10);
+    const again = findOrCreateDocumentKind("  giấy chứng nhận HALAL ", a.rows, ids);
+    expect(again).toMatchObject({ id: a.id, created: false });
+    expect(again.rows).toHaveLength(1);
+    const sys = findOrCreateDocumentKind("packing list", a.rows, ids);
+    expect(sys).toMatchObject({ id: "packing-list", created: false });
+  });
+  it("AC-70: đổi tên loại hệ thống ⇒ nhãn đổi theo, id giữ nguyên; trả về tên gốc ⇒ không còn dòng lưu", () => {
+    const list = documentKindList([]).map((k) => (k.id === "certificate-of-origin" ? { ...k, name: "C/O (giấy chứng nhận xuất xứ)" } : k));
+    const rows = documentKindRowsFromList(list);
+    expect(rows).toEqual([{ id: "certificate-of-origin", name: "C/O (giấy chứng nhận xuất xứ)", sortOrder: 4, note: "" }]);
+    expect(requiredDocumentLabel({ kind: "certificate-of-origin", form: "VJ", issuer: "" }, rows)).toBe("C/O (giấy chứng nhận xuất xứ) form VJ");
+    expect(documentKindRowsFromList(documentKindList([]))).toEqual([]);
+  });
+  it("AC-71: loại tự thêm có luật như Chứng từ khác; id lạ (bảng chưa nạp) ⇒ tên Chứng từ khác", () => {
+    const it5 = { ...item("s1", "document"), docKind: "doc-x9", number: "", issuedOn: "" };
+    const d = data({ shipments: [shipment("s1", "c1")], items: [it5] });
+    expect(canMarkDone(it5, d)).toMatchObject({ ok: false, missing: ["number", "issuedOn", "file"] });
+    expect(documentKindLabel("doc-x9")).toBe("Chứng từ khác");
   });
 });

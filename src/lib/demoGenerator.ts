@@ -61,6 +61,7 @@ import type {
   ExportPayment,
   ExportActivity,
   CustomerProductName,
+  ExportDocumentKindRow,
   ExportShipment,
   ExportStepItem,
 } from "@/types";
@@ -132,6 +133,8 @@ export interface DemoBundle {
   exportActivities: ExportActivity[];
   /** Tên hàng theo khách (mig 0077) — TRÍCH XUẤT từ dòng hàng đã nối của bộ HĐ demo (như app làm khi lưu HĐ). */
   customerProductNames: CustomerProductName[];
+  /** Danh mục loại chứng từ (mig 0081) — một loại tự thêm để trình diễn thêm / sửa tại chỗ. */
+  exportDocumentKinds: ExportDocumentKindRow[];
   labelPrints: LabelPrint[];
   qcChecklists: QcChecklistItem[];
   qcLocks: DailyLock[];
@@ -707,6 +710,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     exportPayments: exportDemo.payments,
     exportActivities: exportDemo.activities,
     customerProductNames: demoCustomerNames(exportDemo),
+    exportDocumentKinds: [{ id: "doc-demo-halal", name: "Giấy chứng nhận Halal", sortOrder: 100, note: "Khách Malaysia yêu cầu" }],
     labelPrints,
     qcChecklists,
     qcLocks,

@@ -70,7 +70,7 @@ export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string
     case 5: {
       const items = documentItems(d, s.id);
       return items.length
-        ? items.filter((i) => !settled(itemState(d, i))).map((i) => requiredDocumentLabel({ kind: i.docKind, form: i.docForm, issuer: "" }))
+        ? items.filter((i) => !settled(itemState(d, i))).map((i) => requiredDocumentLabel({ kind: i.docKind, form: i.docForm, issuer: "" }, d.documentKinds))
         : ["mục chứng từ"];
     }
     case 6:

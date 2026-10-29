@@ -385,7 +385,7 @@ export function ShipmentPanel({
         )}
         {!docs.length && <p className="py-3 text-sm text-muted-foreground">Chưa có mục chứng từ.</p>}
         {docs.map((d) => {
-          const title = requiredDocumentLabel({ kind: d.docKind, form: d.docForm, issuer: d.docIssuer });
+          const title = requiredDocumentLabel({ kind: d.docKind, form: d.docForm, issuer: d.docIssuer }, data.documentKinds);
           const st = itemState(data, d);
           return (
             <ChecklistRow

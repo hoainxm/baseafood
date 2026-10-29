@@ -24,10 +24,10 @@ import {
   type FieldError,
 } from "@/design-system";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
+import { useDocumentKindPicker, type DocumentKindSource } from "./documentKindPicker";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import {
-  DOCUMENT_KINDS,
   ITEM_STATE_LABELS,
   MISSING_LABELS,
   SHIPMENT_KINDS,
@@ -283,6 +283,7 @@ export function StepItemDialog({
   recordedBy,
   canDelete,
   invoiceCatalog,
+  documentKindSource,
   canViewPrice,
   onClose,
   onSave,
@@ -297,6 +298,8 @@ export function StepItemDialog({
   canDelete: boolean;
   /** Danh mục cho khối Đọc invoice: nối dòng invoice với mặt hàng (luật 7 — tạo mới + bút chì). */
   invoiceCatalog: { products: Product[]; setProducts: (rows: Product[]) => boolean | void; customerNames: readonly CustomerProductName[] };
+  /** Danh mục loại chứng từ (mig 0081) — ô Loại chứng từ thêm / sửa loại tại chỗ (luật 7). */
+  documentKindSource: DocumentKindSource;
   canViewPrice: boolean;
   onClose: () => void;
   onSave: (item: ExportStepItem, newFiles: ExportFile[], isNew: boolean, extract?: InvoiceNameExtract) => boolean;
@@ -310,6 +313,7 @@ export function StepItemDialog({
   const [busy, setBusy] = useState(false);
   const [invoiceRead, setInvoiceRead] = useState<InvoiceReadState | null>(null);
   const draft = useDialogDraft({ form: "export-step-item", value: form, setValue: setForm, isEmpty: (f) => itemSnap(f.item) === f.initial });
+  const kindPicker = useDocumentKindPicker(documentKindSource);
 
   useEffect(() => {
     if (!target) return;
@@ -337,7 +341,7 @@ export function StepItemDialog({
   const isInvoice = item?.docKind === "commercial-invoice";
   const isBl = item?.docKind === "bill-of-lading";
   const invoiceContract = isInvoice && tgt ? data.contracts.find((c) => c.id === tgt.contractId) : undefined;
-  const title = item ? (isDoc ? requiredDocumentLabel({ kind: item.docKind, form: item.docForm, issuer: item.docIssuer }) : SUB_STEP_LABELS[item.step]) : "";
+  const title = item ? (isDoc ? requiredDocumentLabel({ kind: item.docKind, form: item.docForm, issuer: item.docIssuer }, data.documentKinds) : SUB_STEP_LABELS[item.step]) : "";
 
   const save = async () => {
     if (!form || !tgt || busy) return;
@@ -474,7 +478,11 @@ export function StepItemDialog({
                 clearable={false}
                 value={item.docKind}
                 onChange={(v) => set("docKind", (v || "other") as ExportDocumentKind)}
-                options={DOCUMENT_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                options={kindPicker.options}
+                onCreate={kindPicker.onCreate}
+                onEditItem={kindPicker.onEditItem}
+                canEdit={kindPicker.canEdit}
+                editLabel={kindPicker.editLabel}
               />
               <Field label="Form">
                 <Input value={item.docForm} onChange={(e) => set("docForm", e.target.value)} />
@@ -557,6 +565,7 @@ export function StepItemDialog({
           )}
         </div>
       )}
+      {kindPicker.dialog}
     </FormDialog>
   );
 }

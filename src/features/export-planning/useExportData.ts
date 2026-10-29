@@ -6,6 +6,7 @@
 import { useMemo } from "react";
 import {
   useExportActivityStore,
+  useExportDocumentKindStore,
   useExportContractApprovals,
   useExportContractRevisions,
   useExportContracts,
@@ -33,10 +34,11 @@ export function useExportData() {
   const [files, saveFiles] = useExportFiles();
   const [payments, savePayments] = useExportPayments();
   const { activities, setActivities: saveActivities, canLog } = useExportActivityStore();
+  const { kinds: documentKinds, setKinds: saveDocumentKinds, isAvailable: documentKindsAvailable } = useExportDocumentKindStore();
 
   const data: ExportData = useMemo(
-    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities }),
-    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities],
+    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds }),
+    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds],
   );
 
   return {
@@ -53,6 +55,8 @@ export function useExportData() {
     savePayments: ro(savePayments),
     saveActivities: ro(saveActivities),
     canLog,
+    /** Danh mục loại chứng từ (mig 0081) — ô chọn Loại chứng từ thêm / sửa qua đây. */
+    documentKindSource: { rows: documentKinds, setRows: ro(saveDocumentKinds), isAvailable: documentKindsAvailable },
   };
 }
 

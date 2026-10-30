@@ -2,7 +2,8 @@
 
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
-last_verified: 2026-10-29
+last_verified: 2026-10-30
+<!-- updated: 2026-10-30 (lsx) — Lệnh sản xuất (design-spec [49](49-production-order-ui.design-spec.md)): bước 2 của chuyến có khối `ShipmentOrders` dưới hàng mục — lệnh đã gắn (số · thẻ trạng thái · kg, mở sang /planning-production), `default` "Lập lệnh sản xuất" (mở trang lệnh với `?new=1&contract&shipment`, phát hành xong gắn sẵn chuyến) + `outline` "Gắn lệnh có sẵn" (hộp tick lệnh cùng HĐ); chỉ người có `production-orders` ghi thấy nút. Hồ sơ HĐ, bảng Dòng hàng: cột "Đã ra lệnh (kg)" sau Kg (dòng phụ "còn x" / "vượt dung sai"), chỉ khi xem được Lệnh sản xuất. -->
 ttl_days: 90
 <!-- updated: 2026-10-22 (c) — v7 (ba-spec 41 v7 NV17): khối "Đọc invoice" trong hộp mục Commercial Invoice (hộp cỡ xl), nút "Trích xuất từ chứng từ" quét thêm invoice. -->
 <!-- updated: 2026-10-22 (b) — v6 (ba-spec 41 v6): hộp "Tên hàng trên chứng từ" của một khách (danh mục Khách hàng + lối từ hồ sơ HĐ), form HĐ chọn mặt hàng điền 4 ô theo tên của khách, hộp Nối mặt hàng gợi ý theo tên + size của khách, ô danh mục đổi thành "Tên tiếng Anh mặc định". -->

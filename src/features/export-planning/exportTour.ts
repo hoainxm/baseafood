@@ -255,7 +255,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           "Mỗi mục có một thẻ trạng thái: Chưa làm · Đang làm · Xong · Không áp dụng.\n" +
           "Mục chỉ được đánh dấu Xong khi đủ giấy tờ:\n" +
           "• Bước 1 Hợp đồng: tự Xong khi hợp đồng đủ hồ sơ đính kèm bắt buộc.\n" +
-          "• Lệnh sản xuất: có file và mọi dòng hàng của hợp đồng đã nối danh mục.\n" +
+          "• Lệnh sản xuất: tự Xong khi có lệnh đã phát hành gắn chuyến (trang Lệnh sản xuất); không thì có file và mọi dòng hàng của hợp đồng đã nối danh mục.\n" +
           "• Bao bì: có file hoặc ghi chú.\n" +
           "• Sơ đồ container, Hình ảnh đóng cont: tự Xong khi có file.\n" +
           "• Tờ khai: có số tờ khai và file. Lệnh xuất: có file đã có chữ ký Ban Giám đốc.\n" +

@@ -166,6 +166,11 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   import_documents: null,
   import_files: null,
   import_sample_checks: null,
+  // Lệnh sản xuất (mig 0088): RLS riêng theo production-orders (chỉ Xem ⇒ chỉ lệnh đã phát hành).
+  production_orders: null,
+  production_order_lines: null,
+  production_order_materials: null,
+  production_order_shipments: null,
 };
 
 export interface WriteDenial {

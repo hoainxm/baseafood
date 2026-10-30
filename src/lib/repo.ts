@@ -58,6 +58,11 @@ import type {
   ImportDocumentKind,
   ImportFile,
   ImportSampleCheck,
+  ProductionOrder,
+  ProductionOrderLine,
+  ProductionOrderMaterial,
+  ProductionOrderRequirements,
+  ProductionOrderShipment,
   ImportReceipt,
   ImportReceiptLine,
   ImportSupplier,
@@ -2916,6 +2921,164 @@ export const IMPORT_SAMPLE_CHECK_TABLE: TableMapping<ImportSampleCheck> = {
   }),
 };
 
+/* ---------- Phòng Kế hoạch · Lệnh sản xuất (mig 0088, ba-spec 48) ---------- */
+// Liên kết mềm như Xuất khẩu / Nhập khẩu ⇒ khai refColumns. `contract_line_id` là id dòng trong JSON `lines`
+// của bản HĐ xuất (không phải khóa bảng) ⇒ miễn ở demoForeignKeys.test.ts.
+
+const ORDER_STATUS_VALUES = new Set(["draft", "issued", "cancelled"]);
+
+function parseRequirements(v: unknown): ProductionOrderRequirements {
+  const o = (jsonOf(v) ?? {}) as Record<string, unknown>;
+  const ready = s(o.packagingReady);
+  return {
+    packagingReady: ready === "ready" || ready === "pending" ? ready : "",
+    cartonLayers: s(o.cartonLayers),
+    strapNote: s(o.strapNote),
+    peBagNote: s(o.peBagNote),
+    cartonMarking: s(o.cartonMarking),
+    bagMarking: s(o.bagMarking),
+    nafiTests: Array.isArray(o.nafiTests) ? o.nafiTests.map(s).filter(Boolean) : [],
+    nafiNote: s(o.nafiNote),
+    processNote: s(o.processNote),
+  };
+}
+
+function parseDateList(v: unknown): string[] {
+  const o = jsonOf(v);
+  return Array.isArray(o) ? o.map((x) => s(x).slice(0, 10)).filter(Boolean) : [];
+}
+
+export const PRODUCTION_ORDER_TABLE: TableMapping<ProductionOrder> = {
+  table: "production_orders",
+  localKey: "bsf.production-orders.v1",
+  getKey: theoId,
+  refColumns: ["contract_id", "contract_revision_id", "stale_ack_revision_id"],
+  toRow: (x) => ({
+    id: x.id,
+    order_no: x.orderNo,
+    order_date: dateOrNull(x.orderDate),
+    contract_id: x.contractId,
+    contract_revision_id: x.contractRevisionId,
+    contract_no: x.contractNo,
+    customer_name: x.customerName,
+    market: x.market,
+    lot_code: x.lotCode,
+    production_dates: x.productionDates,
+    delivery_date: dateOrNull(x.deliveryDate),
+    shelf_life_months: x.shelfLifeMonths,
+    requirements: x.requirements,
+    note: x.note,
+    status: x.status,
+    issued_at: x.issuedAt || null,
+    issued_by: x.issuedBy,
+    revision_no: x.revisionNo,
+    revision_reason: x.revisionReason,
+    cancel_reason: x.cancelReason,
+    stale_ack_revision_id: x.staleAckRevisionId,
+    stale_ack_reason: x.staleAckReason,
+    created_by: x.createdBy,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    orderNo: s(r.order_no),
+    orderDate: s(r.order_date).slice(0, 10),
+    contractId: s(r.contract_id),
+    contractRevisionId: s(r.contract_revision_id),
+    contractNo: s(r.contract_no),
+    customerName: s(r.customer_name),
+    market: s(r.market),
+    lotCode: s(r.lot_code),
+    productionDates: parseDateList(r.production_dates),
+    deliveryDate: s(r.delivery_date).slice(0, 10),
+    shelfLifeMonths: numOrNull(r.shelf_life_months) ?? 24,
+    requirements: parseRequirements(r.requirements),
+    note: s(r.note),
+    status: (ORDER_STATUS_VALUES.has(s(r.status)) ? s(r.status) : "draft") as ProductionOrder["status"],
+    issuedAt: s(r.issued_at),
+    issuedBy: s(r.issued_by),
+    revisionNo: numOrNull(r.revision_no) ?? 0,
+    revisionReason: s(r.revision_reason),
+    cancelReason: s(r.cancel_reason),
+    staleAckRevisionId: s(r.stale_ack_revision_id),
+    staleAckReason: s(r.stale_ack_reason),
+    createdBy: s(r.created_by),
+    createdAt: s(r.created_at),
+  }),
+};
+
+export const PRODUCTION_ORDER_LINE_TABLE: TableMapping<ProductionOrderLine> = {
+  table: "production_order_lines",
+  localKey: "bsf.production-order-lines.v1",
+  getKey: theoId,
+  refColumns: ["order_id", "product_id"],
+  toRow: (x) => ({
+    id: x.id,
+    order_id: x.orderId,
+    line_no: x.lineNo,
+    contract_line_id: x.contractLineId,
+    product_id: x.productId,
+    product_name: x.productName,
+    description: x.description,
+    spec: x.spec,
+    unit_kind: x.unitKind,
+    cartons_per_unit: x.cartonsPerUnit,
+    net_kg_per_carton: x.netKgPerCarton,
+    units: x.units,
+    kg: x.kg,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    orderId: s(r.order_id),
+    lineNo: numOrNull(r.line_no) ?? 1,
+    contractLineId: s(r.contract_line_id),
+    productId: s(r.product_id),
+    productName: s(r.product_name),
+    description: s(r.description),
+    spec: s(r.spec),
+    unitKind: s(r.unit_kind) === "bundle" ? "bundle" : "carton",
+    cartonsPerUnit: numOrNull(r.cartons_per_unit) ?? 1,
+    netKgPerCarton: numOrNull(r.net_kg_per_carton),
+    units: numOrNull(r.units),
+    kg: numOrNull(r.kg),
+    note: s(r.note),
+  }),
+};
+
+export const PRODUCTION_ORDER_MATERIAL_TABLE: TableMapping<ProductionOrderMaterial> = {
+  table: "production_order_materials",
+  localKey: "bsf.production-order-materials.v1",
+  getKey: theoId,
+  refColumns: ["order_id", "order_line_id", "receipt_id", "import_line_id"],
+  toRow: (x) => ({
+    id: x.id,
+    order_id: x.orderId,
+    order_line_id: x.orderLineId,
+    receipt_id: x.receiptId,
+    import_line_id: x.importLineId,
+    label: x.label,
+    kg: x.kg,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    orderId: s(r.order_id),
+    orderLineId: s(r.order_line_id),
+    receiptId: s(r.receipt_id),
+    importLineId: s(r.import_line_id),
+    label: s(r.label),
+    kg: numOrNull(r.kg),
+  }),
+};
+
+export const PRODUCTION_ORDER_SHIPMENT_TABLE: TableMapping<ProductionOrderShipment> = {
+  table: "production_order_shipments",
+  localKey: "bsf.production-order-shipments.v1",
+  getKey: theoId,
+  refColumns: ["order_id", "shipment_id"],
+  toRow: (x) => ({ id: x.id, order_id: x.orderId, shipment_id: x.shipmentId }),
+  fromRow: (r) => ({ id: s(r.id), orderId: s(r.order_id), shipmentId: s(r.shipment_id), createdAt: s(r.created_at) }),
+};
+
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
 const TABLE_LABELS: Record<string, string> = {
   material_imports: "Nhập nguyên liệu",
@@ -2973,6 +3136,10 @@ const TABLE_LABELS: Record<string, string> = {
   import_documents: "Chứng từ nhập khẩu",
   import_files: "File hồ sơ nhập khẩu",
   import_sample_checks: "Kiểm mẫu hàng nhập khẩu",
+  production_orders: "Lệnh sản xuất",
+  production_order_lines: "Dòng lệnh sản xuất",
+  production_order_materials: "NL nhập khẩu dự kiến của lệnh sản xuất",
+  production_order_shipments: "Lệnh sản xuất gắn chuyến xuất",
   row_marks: "Tô màu dòng",
   app_roles: "Vai trò",
   role_permissions: "Quyền của vai trò",

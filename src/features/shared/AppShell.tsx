@@ -23,6 +23,7 @@ import {
   LayoutDashboard,
   ListTodo,
   ClipboardCheck,
+  ClipboardList,
   QrCode,
   BarChart3,
   Truck,
@@ -108,6 +109,7 @@ export const KIT_NAV: ShellNavItem[] = [
   { id: "reconciliation", label: "Đối soát hóa đơn điện tử", icon: FileCheck2 , description: "Đối soát sổ phần mềm với hóa đơn điện tử, tìm dòng lệch và lưu bản đối soát." },
   { id: "planning-export", label: "Xuất khẩu", icon: Container, description: "Kế hoạch xuất khẩu theo tháng: từng khách, từng hợp đồng, từng chuyến container đang ở bước nào (hợp đồng → lệnh SX → bao bì → đóng cont → chứng từ) và còn thiếu gì." },
   { id: "planning-import", label: "Nhập khẩu", icon: Ship, description: "Hợp đồng nhập khẩu với nhà cung cấp nước ngoài: chứng từ từng lần hàng về (Invoice, Packing List, tờ khai nhập, C/O, kiểm dịch) và số lượng thực nhập. Khác Nhập hàng nguyên liệu trong nước." },
+  { id: "planning-production", label: "Lệnh sản xuất", icon: ClipboardList, description: "Lệnh sản xuất của Phòng Kế hoạch: lập từ dòng hàng hợp đồng xuất, gắn nguyên liệu nhập khẩu dự kiến, phát hành tới Ban quản đốc phân xưởng và Thủ kho, gắn chuyến xuất, in mẫu QTI-KH-01-04." },
   { id: "documents", label: "Tài liệu công ty", icon: FolderOpen, description: "Quy trình, biểu mẫu, chứng nhận, hồ sơ năng lực của công ty: bản đang hiệu lực, các lần ban hành và file gốc. Chỉ thấy tài liệu của phòng mình." },
   { id: "catalog", label: "Danh mục", icon: Library , description: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ, thành phẩm." },
   { id: "admin", label: "Tổng quan quản trị", icon: LayoutGrid , description: "Trang riêng của quản trị viên: tình trạng tài khoản, vai trò và lối vào các việc quản trị." },
@@ -201,7 +203,7 @@ export const NAV_TREE: NavTreeGroup[] = [
   },
   // Phòng Kế hoạch: Xuất khẩu · Nhập khẩu (ba-spec 45); "Khác" thêm vào nhánh này về sau. MỘT mục Tra cứu
   // (ba-spec 45 v2 R19, chủ dự án chọn): mở danh mục NCC nhập khẩu. Tra cứu Khách hàng ở nhóm Bán hàng.
-  { name: "Kế hoạch", icon: Container, children: [{ ref: "planning-export" }, { ref: "planning-import" }, LOOKUP_CHILD("import-suppliers")] },
+  { name: "Kế hoạch", icon: Container, children: [{ ref: "planning-export" }, { ref: "planning-import" }, { ref: "planning-production" }, LOOKUP_CHILD("import-suppliers")] },
   { name: "Tài liệu công ty", icon: FolderOpen, children: [{ ref: "documents" }] },
   {
     name: "Hệ thống",

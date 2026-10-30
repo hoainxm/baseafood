@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 import { CONTRACT_STATE_LABELS, ITEM_STATE_LABELS } from "@/lib/exportPlanning";
 import { CONTRACT_STATE_LABELS as IMPORT_CONTRACT_LABELS, RECEIPT_STATE_LABELS } from "@/lib/importPlanning";
 import { can, resolvePermissions } from "@/lib/permissions";
+import { ORDER_STATUS_LABELS } from "@/lib/productionOrder";
 import { ROLES, type Role } from "@/types";
 import {
   EXPORT_GUIDE_ACTORS,
@@ -21,6 +22,7 @@ import {
   IMPORT_GUIDE_RECEIPT_STATES,
   IMPORT_GUIDE_STEPS,
 } from "./importPlanningGuide";
+import { ORDER_GUIDE_ACTORS, ORDER_GUIDE_SIDE, ORDER_GUIDE_STATES, ORDER_GUIDE_STEPS } from "./productionOrderGuide";
 import { stepsForViewer, stepsOfActor, type GuideActor, type GuideFlowStep } from "./flowGuide";
 
 const SYSTEM_ROLES = ROLES.map((r) => r.value).filter((r): r is Role => r !== "admin");
@@ -82,6 +84,20 @@ describe("Nhập khẩu: phủ nhãn trạng thái (AC-18)", () => {
   test("đủ mọi trạng thái hợp đồng", () => {
     const shown = [...IMPORT_GUIDE_CONTRACT_STATES, ...IMPORT_GUIDE_CONTRACT_SIDE].map((s) => s.label).sort();
     expect(shown).toEqual(Object.values(IMPORT_CONTRACT_LABELS).sort());
+  });
+});
+
+checkFlow("Lệnh sản xuất", ORDER_GUIDE_STEPS, ORDER_GUIDE_ACTORS, "production-orders");
+
+describe("Lệnh sản xuất: phủ nhãn trạng thái (AC-18) + việc của bạn", () => {
+  test("đủ mọi trạng thái lệnh", () => {
+    const shown = [...ORDER_GUIDE_STATES, ...ORDER_GUIDE_SIDE].map((s) => s.label).sort();
+    expect(shown).toEqual(Object.values(ORDER_STATUS_LABELS).sort());
+  });
+  test("Nhân viên Kế hoạch: cả 4 bước; quản đốc, thủ kho, kế toán: không bước nào", () => {
+    const of = (role: Role) => stepsForViewer(ORDER_GUIDE_STEPS, (r, a) => can(permsOf(role), r, a));
+    expect(of("planner")).toEqual(ORDER_GUIDE_STEPS.map((s) => s.id));
+    for (const r of ["frozen-workshop-manager", "warehouse-keeper", "accountant"] as const) expect(of(r)).toEqual([]);
   });
 });
 

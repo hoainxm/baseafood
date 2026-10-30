@@ -23,14 +23,17 @@ export function PrintSheet({
   subtitle: phuDe,
   onClose,
   children,
+  landscape = true,
 }: {
   title: string;
   subtitle?: string;
   onClose: () => void;
   children: ReactNode;
+  /** `false` ⇒ in A4 dọc (VD lệnh sản xuất mẫu QTI-KH-01-04). Mặc định khổ ngang như cũ. */
+  landscape?: boolean;
 }) {
   return (
-    <div className="print-root print-landscape fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900 sm:p-10">
+    <div className={`print-root ${landscape ? "print-landscape" : ""} fixed inset-0 z-50 overflow-auto bg-white p-6 text-slate-900 sm:p-10`}>
       <div className="no-print mx-auto mb-5 flex max-w-6xl items-center justify-between gap-4">
         <Button variant="outline" onClick={onClose}>
           <X className="size-4" /> Đóng

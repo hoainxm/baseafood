@@ -57,6 +57,7 @@ const MyTasksScreen = lazy(() => import("@/features/my-tasks"));
 const DocumentsScreen = lazy(() => import("@/features/documents"));
 const ExportPlanningScreen = lazy(() => import("@/features/export-planning"));
 const ImportPlanningScreen = lazy(() => import("@/features/import-planning"));
+const ProductionOrderScreen = lazy(() => import("@/features/production-orders"));
 // Tổng quan — dòng chảy số liệu
 const DashboardScreen = lazy(() => import("@/features/dashboard/DashboardScreen"));
 
@@ -375,6 +376,7 @@ export default function App() {
             <Route path="/documents" element={<DocumentsScreen />} />
             <Route path="/planning-export" element={<ExportPlanningScreen />} />
             <Route path="/planning-import" element={<ImportPlanningScreen />} />
+            <Route path="/planning-production" element={<ProductionOrderScreen />} />
 
             {/* Nghiệp vụ gốc */}
             <Route path="/imports" element={<MaterialImportScreen />} />

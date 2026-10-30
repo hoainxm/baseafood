@@ -54,6 +54,7 @@ import {
 import { formatDateVN, formatMoney } from "@/lib/format";
 import { useGoodsTypeStore } from "@/lib/catalogRepo";
 import { goodsTypeName } from "@/lib/goodsTypes";
+import { useOrderCoverage } from "@/features/production-orders/useOrderCoverage";
 import type { ExportContract, ExportContractLine, ExportFile, ExportPayment, ExportShipment, Product } from "@/types";
 import {
   ArrowLeft,
@@ -181,6 +182,7 @@ export function ContractDossier({
 
   // Loại hàng (mig 0089) — chưa chạy ⇒ không hiện cột.
   const goodsStore = useGoodsTypeStore();
+  const orderCoverage = useOrderCoverage();
   const lineColumns: RecordTableColumn<ExportContractLine>[] = [
     { key: "description", header: "Tên hàng (như HĐ)", primary: true, render: (l) => <span className="font-semibold">{l.description}</span> },
     {
@@ -208,6 +210,29 @@ export function ContractDossier({
       render: (l) => `${formatNumber(l.quantity)} ${l.unitKind === "bundle" ? `kiện (${formatNumber(lineCartons(l))} thùng)` : "thùng"}`,
     },
     { key: "kg", header: "Kg", numeric: true, render: (l) => formatNumber(lineKg(l)) },
+    // Đã ra lệnh sản xuất (ba-spec 48 R4) — chỉ người xem được Lệnh sản xuất.
+    ...(orderCoverage
+      ? ([
+          {
+            key: "ordered",
+            header: "Đã ra lệnh (kg)",
+            numeric: true,
+            sortKind: "number",
+            getSortValue: (l) => orderCoverage(l, eff?.terms.tolerancePct ?? null).orderedKg,
+            render: (l) => {
+              const c = orderCoverage(l, eff?.terms.tolerancePct ?? null);
+              return (
+                <span className="grid justify-items-end">
+                  <span className="tnum">{formatNumber(c.orderedKg)}</span>
+                  <span className={`tnum text-sm ${c.overTolerance ? "text-warning" : "text-muted-foreground"}`}>
+                    {c.overTolerance ? "vượt dung sai" : `còn ${formatNumber(c.remainingKg)}`}
+                  </span>
+                </span>
+              );
+            },
+          },
+        ] satisfies RecordTableColumn<ExportContractLine>[])
+      : []),
     ...(can.viewPrice
       ? [
           { key: "price", header: `Đơn giá (${currency}/kg)`, numeric: true, render: (l: ExportContractLine) => formatMoney(l.unitPrice) },

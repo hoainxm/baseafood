@@ -22,6 +22,10 @@ import type {
   ImportDocument,
   ImportFile,
   ImportSampleCheck,
+  ProductionOrder,
+  ProductionOrderLine,
+  ProductionOrderMaterial,
+  ProductionOrderShipment,
   ImportReceipt,
   ImportReceiptLine,
   ImportSupplier,
@@ -79,6 +83,7 @@ import { RETAIL_WAREHOUSE, FG_WAREHOUSE } from "@/lib/inventory";
 import { listDatesInRange, subtractDays } from "@/lib/dataFlow";
 import { buildExportDemo, type ExportDemoPack } from "@/lib/exportPlanningDemo";
 import { buildImportDemo } from "@/lib/importPlanningDemo";
+import { buildProductionOrderDemo } from "@/lib/productionOrderDemo";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 
 /** Sổ thật đưa vào để quét tham số (chỉ ĐỌC). */
@@ -157,6 +162,11 @@ export interface DemoBundle {
   importDocuments: ImportDocument[];
   importFiles: ImportFile[];
   importSampleChecks: ImportSampleCheck[];
+  /** Lệnh sản xuất (mig 0088, ba-spec 48) — 1 lệnh đã phát hành theo khuôn LSX 19.10 + 1 nháp (lib/productionOrderDemo.ts). */
+  productionOrders: ProductionOrder[];
+  productionOrderLines: ProductionOrderLine[];
+  productionOrderMaterials: ProductionOrderMaterial[];
+  productionOrderShipments: ProductionOrderShipment[];
   labelPrints: LabelPrint[];
   qcChecklists: QcChecklistItem[];
   qcLocks: DailyLock[];
@@ -695,6 +705,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
   });
 
   const importDemo = buildImportDemo(tc.today, n.products);
+  const orderDemo = buildProductionOrderDemo(tc.today, exportDemo, importDemo, n.products, [...customers, ...exportDemo.extraCustomers]);
 
   return {
     products: n.products.map((p) => ({ ...p })),
@@ -750,6 +761,10 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     importDocuments: importDemo.documents,
     importFiles: importDemo.files,
     importSampleChecks: importDemo.sampleChecks,
+    productionOrders: orderDemo.orders,
+    productionOrderLines: orderDemo.lines,
+    productionOrderMaterials: orderDemo.materials,
+    productionOrderShipments: orderDemo.shipments,
     labelPrints,
     qcChecklists,
     qcLocks,

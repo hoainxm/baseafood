@@ -15,8 +15,11 @@ import {
   useExportPayments,
   useExportShipments,
   useExportStepItems,
+  useProductionOrderShipments,
+  useProductionOrders,
 } from "@/lib/catalogRepo";
 import type { ExportData } from "@/lib/exportPlanning";
+import { issuedShipmentIds } from "@/lib/productionOrder";
 
 /** Hàm ghi của repo nhận mảng thường — bọc lại để màn truyền thẳng mảng chỉ-đọc của `ExportData`. */
 const ro =
@@ -35,10 +38,14 @@ export function useExportData() {
   const [payments, savePayments] = useExportPayments();
   const { activities, setActivities: saveActivities, canLog } = useExportActivityStore();
   const { kinds: documentKinds, setKinds: saveDocumentKinds, isAvailable: documentKindsAvailable } = useExportDocumentKindStore();
+  // Lệnh sản xuất (mig 0088, ba-spec 48 R6): chuyến gắn lệnh đã phát hành ⇒ bước 2 xong. Chưa chạy 0088 ⇒ rỗng, luật cũ.
+  const [productionOrders] = useProductionOrders();
+  const [orderLinks] = useProductionOrderShipments();
+  const issuedOrderShipmentIds = useMemo(() => issuedShipmentIds(productionOrders, orderLinks), [productionOrders, orderLinks]);
 
   const data: ExportData = useMemo(
-    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds }),
-    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds],
+    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds }),
+    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds],
   );
 
   return {

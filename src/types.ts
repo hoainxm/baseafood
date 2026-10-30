@@ -1599,3 +1599,105 @@ export interface ImportFile {
   uploadedBy: string;
   createdAt: string;
 }
+
+/* ---------- Phòng Kế hoạch · Lệnh sản xuất (mig 0088, ba-spec docs/app-map/48-production-order.ba-spec.md) ---------- */
+
+/** Nháp → Đã phát hành; hủy bất kỳ lúc nào (có lý do). Không xóa cứng (R11). */
+export type ProductionOrderStatus = "draft" | "issued" | "cancelled";
+
+/** Yêu cầu bao bì · kiểm Nafi của lệnh (vài ô hay dùng — Q10). Ô trống = không ghi. */
+export interface ProductionOrderRequirements {
+  /** "ready" = bao bì đã có sẵn · "pending" = chưa có · "" = chưa ghi. */
+  packagingReady: "ready" | "pending" | "";
+  cartonLayers: string;
+  strapNote: string;
+  peBagNote: string;
+  /** Ghi trên thùng / bao PE: mã lô · NSX · HSD — chữ cách ghi, trống = không ghi. */
+  cartonMarking: string;
+  bagMarking: string;
+  /** Nafi: chỉ tiêu đã chọn (vi sinh, kháng sinh, kim loại nặng, histamine, khác). */
+  nafiTests: string[];
+  nafiNote: string;
+  processNote: string;
+}
+
+export interface ProductionOrder {
+  id: string;
+  /** Số lệnh ("19.10") — duy nhất toàn công ty, không phân hoa thường (R3). */
+  orderNo: string;
+  orderDate: string;
+  /** HĐ xuất của lệnh (R1). */
+  contractId: string;
+  /** Bản HĐ (export_contract_revisions.id) mà dòng lệnh đang theo — tính cờ "Theo bản HĐ trước" (R12). */
+  contractRevisionId: string;
+  /** Chép lúc lập để nơi nhận (không đọc bảng HĐ xuất) vẫn thấy khách / số HĐ. */
+  contractNo: string;
+  customerName: string;
+  market: string;
+  /** MSL — mã số lô. */
+  lotCode: string;
+  /** Ngày SX yyyy-mm-dd, ≥ 1 ngày (R8). */
+  productionDates: string[];
+  deliveryDate: string;
+  /** HSD = tháng ngày SX sớm nhất + N tháng, về ngày 01 (R7). */
+  shelfLifeMonths: number;
+  requirements: ProductionOrderRequirements;
+  note: string;
+  status: ProductionOrderStatus;
+  issuedAt: string;
+  issuedBy: string;
+  /** Số lần sửa SAU phát hành (R10). */
+  revisionNo: number;
+  revisionReason: string;
+  cancelReason: string;
+  /** "Giữ nguyên theo bản cũ" (LS6): bản HĐ mới nhất người dùng đã xác nhận giữ + lý do. */
+  staleAckRevisionId: string;
+  staleAckReason: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+/** Dòng lệnh — trỏ dòng HĐ xuất của bản `contractRevisionId`, tên / quy cách chép sẵn để in. */
+export interface ProductionOrderLine {
+  id: string;
+  orderId: string;
+  lineNo: number;
+  /** id dòng trong `lines` (JSON) của bản HĐ — không phải khóa bảng. */
+  contractLineId: string;
+  productId: string;
+  /** Tên tiếng Việt (mặt hàng danh mục). */
+  productName: string;
+  /** Tên trên HĐ (tiếng Anh). */
+  description: string;
+  /** Quy cách: size, yêu cầu NL, packing — như ô Quy cách của mẫu QTI-KH-01-04. */
+  spec: string;
+  unitKind: "carton" | "bundle";
+  cartonsPerUnit: number;
+  netKgPerCarton: number | null;
+  /** Số gõ: thùng (carton) hoặc kiện (bundle). */
+  units: number | null;
+  /** kg = thùng × kg tịnh/thùng (R2); sửa tay được khi dòng HĐ thiếu kg tịnh/thùng. */
+  kg: number | null;
+  note: string;
+}
+
+/** NL nhập khẩu dự kiến của một dòng lệnh (R5) — chỉ dành, KHÔNG ghi sổ kho / Nhập khẩu. */
+export interface ProductionOrderMaterial {
+  id: string;
+  orderId: string;
+  orderLineId: string;
+  receiptId: string;
+  /** Dòng hàng HĐ nhập (import_contract_lines.id) của lần nhập. */
+  importLineId: string;
+  /** Nhãn lúc chọn (HĐ nhập · đối tác · ngày về · cont) — tra được khi nguồn đổi. */
+  label: string;
+  kg: number | null;
+}
+
+/** Lệnh gắn chuyến xuất cùng HĐ (Q2 = B, 0..n). Bước 2 của chuyến xong khi lệnh đã phát hành (R6). */
+export interface ProductionOrderShipment {
+  id: string;
+  orderId: string;
+  shipmentId: string;
+  createdAt: string;
+}

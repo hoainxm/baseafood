@@ -28,22 +28,22 @@ describe("allowedIds — tập màn theo vai trò (Đợt 4, ma trận spec §7 
   });
   it("thủ kho nhập hàng: Nhập hàng + kho/tồn + QR + danh mục", () => {
     expect(sorted(allowedIds(["warehouse-keeper"], false))).toEqual(
-      ["catalog", "documents", "imports", "monthly-stock", "my-tasks", "nxt", "nxt-material", "nxt-warehouse", "planning-export", "planning-import", "qr", "warehouse"]
+      ["catalog", "documents", "imports", "monthly-stock", "my-tasks", "nxt", "nxt-material", "nxt-warehouse", "planning-export", "planning-import", "planning-production", "qr", "warehouse"]
     );
   });
   it("quản đốc: khâu sản xuất + tồn kho + báo cáo; không sổ kế toán", () => {
     for (const r of ["frozen-workshop-manager", "fish-workshop-manager", "dried-workshop-manager"] as const)
-      expect(sorted(allowedIds([r], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog", "documents", "my-tasks", "nxt", "nxt-material", "nxt-warehouse", "planning-export"].sort());
+      expect(sorted(allowedIds([r], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog", "documents", "my-tasks", "nxt", "nxt-material", "nxt-warehouse", "planning-export", "planning-production"].sort());
   });
   it("phó quản đốc: khâu sản xuất + báo cáo; tổ trưởng: chỉ khâu sản xuất", () => {
     // Người đóng hàng (thủ kho, quản đốc, phó QĐ) mở được Xuất khẩu để đính ảnh / sơ đồ đóng cont (mig 0075, A2).
-    expect(sorted(allowedIds(["vice-manager"], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog", "documents", "my-tasks", "planning-export"].sort());
+    expect(sorted(allowedIds(["vice-manager"], false))).toEqual([...PRODUCTION, ...REPORTS, "catalog", "documents", "my-tasks", "planning-export", "planning-production"].sort());
     expect(sorted(allowedIds(["team-leader"], false))).toEqual([...PRODUCTION, "catalog", "documents", "my-tasks"].sort());
     for (const id of ACCOUNTING) expect(allowedIds(["vice-manager"], false).has(id), id).toBe(false);
   });
   it("nhân viên Kế hoạch: Xuất khẩu (trang chủ) + Nhập khẩu + Đơn đặt, báo cáo đơn xuất, kho, QR để xem + danh mục", () => {
     expect(sorted(allowedIds(["planner"], false))).toEqual(
-      ["catalog", "documents", "export-report", "my-tasks", "orders", "planning-export", "planning-import", "qr", "warehouse"]
+      ["catalog", "documents", "export-report", "my-tasks", "orders", "planning-export", "planning-import", "planning-production", "qr", "warehouse"]
     );
     expect(homeFor(["planner"])).toBe("planning-export");
   });

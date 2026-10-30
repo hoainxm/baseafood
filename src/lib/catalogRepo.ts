@@ -17,6 +17,10 @@ import {
   IMPORT_DOCUMENT_TABLE,
   IMPORT_FILE_TABLE,
   IMPORT_SAMPLE_CHECK_TABLE,
+  PRODUCTION_ORDER_TABLE,
+  PRODUCTION_ORDER_LINE_TABLE,
+  PRODUCTION_ORDER_MATERIAL_TABLE,
+  PRODUCTION_ORDER_SHIPMENT_TABLE,
   SUPPLIER_TABLE,
   SALES_ORDER_TABLE,
   ORDER_ITEM_TABLE,
@@ -400,6 +404,12 @@ export const useImportDocuments = () => useTable(IMPORT_DOCUMENT_TABLE);
 export const useImportFiles = () => useTable(IMPORT_FILE_TABLE);
 /** Kiểm mẫu của kho theo lần nhập (mig 0085). */
 export const useImportSampleChecks = () => useTable(IMPORT_SAMPLE_CHECK_TABLE);
+
+/** Lệnh sản xuất của Phòng Kế hoạch (mig 0088, ba-spec 48). */
+export const useProductionOrders = () => useTable(PRODUCTION_ORDER_TABLE);
+export const useProductionOrderLines = () => useTable(PRODUCTION_ORDER_LINE_TABLE);
+export const useProductionOrderMaterials = () => useTable(PRODUCTION_ORDER_MATERIAL_TABLE);
+export const useProductionOrderShipments = () => useTable(PRODUCTION_ORDER_SHIPMENT_TABLE);
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */

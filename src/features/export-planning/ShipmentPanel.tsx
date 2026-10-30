@@ -38,6 +38,7 @@ import { FileList, StateTag, StepDot, StepStepper, type PreviewTarget } from "./
 import { progressText, shipmentProgress, stepMissing } from "./progress";
 import type { LoadingUploadTarget, StepItemTarget } from "./ShipmentDialogs";
 import type { PaymentTarget } from "./RecordDialogs";
+import { ShipmentOrders } from "@/features/production-orders/ShipmentOrders";
 
 export interface ShipmentPanelCan {
   update: boolean;
@@ -347,6 +348,8 @@ export function ShipmentPanel({
 
       <StepBlock n={2} state={progress.steps[2]} summary={summaryOf(2)} isCurrent={progress.next === 2}>
         {singleRow("production-order", 2)}
+        {/* Lệnh sản xuất có cấu trúc (ba-spec 48 R6): lệnh phát hành gắn chuyến ⇒ bước 2 xong; file cũ vẫn tính. */}
+        <ShipmentOrders shipment={shipment} isCancelled={isCancelled} />
       </StepBlock>
 
       <StepBlock n={3} state={progress.steps[3]} summary={summaryOf(3)} isCurrent={progress.next === 3}>

@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { dashboardGuide } from "./guides/dashboardGuide";
 import { exportPlanningGuide } from "./guides/exportPlanningGuide";
 import { importPlanningGuide } from "./guides/importPlanningGuide";
+import { productionOrderGuide } from "./guides/productionOrderGuide";
 import { materialStockGuide } from "./guides/materialStockGuide";
 import { packagingGuide } from "./guides/packagingGuide";
 import { qcGuide } from "./guides/qcGuide";
@@ -54,6 +55,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
   packaging: packagingGuide,
   qc: qcGuide,
   "planning-import": importPlanningGuide,
+  "planning-production": productionOrderGuide,
   "planning-export": exportPlanningGuide,
   "nxt-material": materialStockGuide,
   "nxt-warehouse": warehouseNxtGuide,

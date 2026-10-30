@@ -63,7 +63,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Làm các bước của chuyến",
     needs: ["export-plans", "update"],
     actors: KH,
-    text: "Mỗi chuyến làm Lệnh sản xuất, Bao bì, Đóng cont, Bộ chứng từ: đính file, ghi số và ngày. Bước 1 Hợp đồng tự xong.",
+    text: "Mỗi chuyến làm Lệnh sản xuất, Bao bì, Đóng cont, Bộ chứng từ: đính file, ghi số và ngày. Bước 1 tự xong; bước Lệnh sản xuất tự xong khi có lệnh đã phát hành gắn chuyến.",
     done: "Đủ 5 bước bắt buộc",
     result: { label: "Đủ hồ sơ", tone: "done" },
   },

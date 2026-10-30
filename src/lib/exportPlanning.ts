@@ -241,6 +241,11 @@ export interface ExportData {
   activities: readonly ExportActivity[];
   /** Danh mục loại chứng từ (mig 0081) — đổi tên loại hệ thống + loại tự thêm. Bỏ trống ⇒ 10 loại gốc. */
   documentKinds?: readonly ExportDocumentKindRow[];
+  /**
+   * Chuyến có ≥ 1 Lệnh sản xuất "Đã phát hành" gắn kèm (mig 0088, ba-spec 48 R6) — bước 2 của chuyến
+   * xong. Tính bằng `issuedShipmentIds` (lib/productionOrder.ts). Bỏ trống ⇒ chỉ luật cũ (file / dùng chung).
+   */
+  issuedOrderShipmentIds?: ReadonlySet<string>;
 }
 
 export const EMPTY_EXPORT_DATA: ExportData = {
@@ -795,7 +800,13 @@ export function containerIdentityOk(s: Pick<ExportShipment, "kind" | "containerN
 const settled = (st: ExportItemState) => st === "done" || st === "not-applicable";
 
 /** Trạng thái một mục con (bước 2, 3, 4a–4d). 4a / 4b tự xong khi có file (R10). */
-export function subStepState(d: Pick<ExportData, "items" | "shipments" | "files">, shipmentId: string, step: ExportStep): ExportItemState {
+export function subStepState(
+  d: Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds">,
+  shipmentId: string,
+  step: ExportStep,
+): ExportItemState {
+  // R6 (ba-spec 48, Q6 = A): Lệnh sản xuất đã phát hành gắn chuyến ⇒ xong; không thì luật cũ (file / dùng chung).
+  if (step === "production-order" && d.issuedOrderShipmentIds?.has(shipmentId)) return "done";
   const item = stepItem(d, shipmentId, step);
   if (step === "loading-plan" || step === "loading-photos") {
     if (filesOfStep(d, shipmentId, step).length) return "done";

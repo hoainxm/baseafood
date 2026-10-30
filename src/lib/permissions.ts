@@ -137,6 +137,10 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   // lượng thực nhập (đọc dòng hàng + lần nhập, KHÔNG thấy giá / chứng từ). RLS riêng của 0082.
   { id: "import-plans", label: "Kế hoạch · Nhập khẩu", group: "planning", navId: "planning-import", actions: [...CRUD, "export", "view-price"] },
   { id: "import-plans.receiving", label: "Nhập khẩu · Số lượng thực nhập", group: "planning", navId: "planning-import", actions: ["view", "create", "update"] },
+  // Phòng Kế hoạch · Lệnh sản xuất (mig 0088, ba-spec docs/app-map/48-production-order.ba-spec.md R9).
+  // Ghi = lập / phát hành / sửa / hủy lệnh. Chỉ `view` (quản đốc, thủ kho, BGĐ, kế toán) ⇒ chỉ đọc lệnh
+  // ĐÃ phát hành (RLS 0088). Lệnh không chứa giá.
+  { id: "production-orders", label: "Kế hoạch · Lệnh sản xuất", group: "planning", navId: "planning-production", actions: CRUD },
 
   { id: "catalog.suppliers", label: "Danh mục · Đại lý", group: "catalog", navId: "catalog", actions: CRUD },
   // NCC nhập khẩu (mig 0083, ba-spec 45 v2) — danh mục RIÊNG của Phòng Kế hoạch, khác Đại lý. Không nằm
@@ -220,9 +224,9 @@ export const LEGACY_ROLE_PERMISSIONS: RolePermissionMatrix = {
   "dried-workshop-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
   "vice-manager": grantAll(byNav(PRODUCTION_DEPARTMENT_NAV)),
   // Vai trò mới (0075) — đường lùi khẩn vẫn giữ đúng module của Phòng Kế hoạch.
-  planner: grantAll(byNav(["planning-export", "planning-import", "catalog"])),
-  "planning-head": grantAll(byNav(["planning-export", "planning-import", "catalog"])),
-  "planning-deputy": grantAll(byNav(["planning-export", "planning-import", "catalog"])),
+  planner: grantAll(byNav(["planning-export", "planning-import", "planning-production", "catalog"])),
+  "planning-head": grantAll(byNav(["planning-export", "planning-import", "planning-production", "catalog"])),
+  "planning-deputy": grantAll(byNav(["planning-export", "planning-import", "planning-production", "catalog"])),
 };
 
 type RoleSpec = Readonly<Record<string, readonly PermissionAction[]>>;
@@ -348,6 +352,7 @@ const DIRECTOR: RoleSpec = {
   "export-plans.payments": VIEW,
   "import-plans": ["view", "export", "view-price"],
   "import-plans.receiving": VIEW,
+  "production-orders": VIEW,
   "catalog.import-suppliers": VIEW,
   ...catalogAll(VIEW),
 };
@@ -381,6 +386,7 @@ const CHIEF_ACCOUNTANT: RoleSpec = {
   "export-plans.payments": ["view", "create", "update", "delete"],
   "import-plans": ["view", "export", "view-price"],
   "import-plans.receiving": VIEW,
+  "production-orders": VIEW,
   "catalog.import-suppliers": VIEW,
   ...catalogAll(["view", "create", "update", "delete"]),
 };
@@ -413,6 +419,7 @@ const ACCOUNTANT: RoleSpec = {
   "export-plans.payments": ["view", "create", "update"],
   "import-plans": ["view", "export", "view-price"],
   "import-plans.receiving": VIEW,
+  "production-orders": VIEW,
   "catalog.import-suppliers": VIEW,
   ...catalogAll(["view", "create", "update"]),
 };
@@ -433,6 +440,8 @@ const WAREHOUSE_KEEPER: RoleSpec = {
   "export-plans.loading": ["view", "create"],
   // Nhập khẩu: ghi số lượng thực nhập theo invoice (ba-spec 45 NI6) — không thấy giá / chứng từ.
   "import-plans.receiving": ["view", "create", "update"],
+  // Lệnh sản xuất: nơi nhận — đọc lệnh đã phát hành, NL nhập khẩu dự kiến (ba-spec 48 LS4).
+  "production-orders": VIEW,
 };
 
 /** Quản đốc xưởng: toàn quyền khâu sản xuất, MỞ LẠI ngày SX (xưởng mình — phạm vi là Đợt 5). Không thấy giá. */
@@ -453,6 +462,7 @@ const MANAGER: RoleSpec = {
   "catalog.products": ["view", "create", "update"],
   "catalog.batters": ["view", "create", "update"],
   "export-plans.loading": ["view", "create"],
+  "production-orders": VIEW,
 };
 
 /** Phó quản đốc: ghi thành phẩm hằng ngày; được XÓA dòng ghi nhầm (chủ dự án 2026-10-15), không chốt / mở lại. */
@@ -467,6 +477,7 @@ const VICE_MANAGER: RoleSpec = {
   "production-report": VIEW_EXPORT,
   "export-report": VIEW_EXPORT,
   "export-plans.loading": ["view", "create"],
+  "production-orders": VIEW,
   ...catalogAll(VIEW),
 };
 
@@ -492,6 +503,7 @@ const PLANNER: RoleSpec = {
   "export-plans.payments": ["view", "create", "update", "delete"],
   "import-plans": ["view", "create", "update", "delete", "export", "view-price"],
   "import-plans.receiving": ["view", "create", "update"],
+  "production-orders": ["view", "create", "update", "delete"],
   orders: VIEW,
   "export-report": VIEW_EXPORT,
   qr: VIEW,

@@ -13,6 +13,7 @@ const ROOT = new URL("../../", import.meta.url).pathname; // src/
 /** Miễn sắp — mỗi dòng phải nói rõ vì sao. Thêm vào đây là quyết định có chủ đích. */
 const EXEMPT: Record<string, string> = {
   "features/shared/BlankSlipPrint.tsx": "bản in phiếu trắng A4",
+  "features/production-orders/OrderPrint.tsx": "bản in lệnh sản xuất A4 — thứ tự dòng như mẫu QTI-KH-01-04",
   "features/imports/DailyImportInvoice.tsx": "bản in phiếu nhập trong ngày — thứ tự như tờ phiếu giấy",
   "features/balancing/BalancingTable.tsx": "bản in A4 bảng cân đối — thứ tự 3 khối cố định",
   "features/reports/WarehouseNxtScreen.tsx": "bảng tự dựng chỉ là bản in A4 + dòng tổng của lưới; bảng xem là SummaryTable (tự sắp)",

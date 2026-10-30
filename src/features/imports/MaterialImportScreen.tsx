@@ -93,6 +93,9 @@ import { BulkTypeChangeDialog } from "./BulkTypeChange";
 
 import { ImportLinesTable } from "./ImportLinesTable";
 import { DayShipmentList } from "./ImportSteps";
+import { SupplierInvoicePanel } from "./SupplierInvoicePanel";
+import { useSupplierInvoiceStore } from "@/lib/catalogRepo";
+import { TRIP_INVOICE_STATUS_LABELS, buildCodeMaps, indexLinesByTripLine, tripInvoiceInfo, type TripInvoiceStatus } from "@/lib/supplierInvoice";
 import { DailyScrapSection } from "./DailyScrapSection";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useFormDraft } from "@/lib/formDraft";
@@ -134,6 +137,8 @@ export default function MaterialImportScreen() {
   // Phân quyền lớp 2 (spec role-permissions §5): nút không có quyền thì ẩn hẳn.
   const allowed = useCan("imports");
   const canViewPrice = allowed["view-price"];
+  // Hóa đơn đại lý (ba-spec 51): tab riêng cho kế toán; mọi người xem Nhập hàng thấy nhãn HĐ trên chuyến.
+  const invoiceAllowed = useCan("imports.invoices");
   const isReadOnly = !allowed.create && !allowed.update;
   // kỳ xem sổ: ngày/tuần/tháng/năm/khoảng tự chọn
   const [rows, persist, { status }] = useMaterialImports();
@@ -161,7 +166,7 @@ export default function MaterialImportScreen() {
   /* Ghi chuyến: đầu chuyến ở trên, cả BẢNG loại hàng điền một lượt rồi lưu. */
   const [session, setSession] = useState<ShipmentHeader | null>(null);
   /** Ba chế độ phẳng: "nhap" = form ghi (mặc định); "so" = sổ ngày; "bao-cao" = báo cáo tổng hợp. */
-  const [mode, setMode] = useState<"entry" | "ledger" | "report">("entry");
+  const [mode, setMode] = useState<"entry" | "ledger" | "report" | "invoices">("entry");
   const [ocrMo, setOcrMo] = useState(false); // modal nhận diện ảnh phiếu (OCR)
   const [labelShipment, setLabelShipment] = useState<ImportShipment | null>(null);
   const [sessionShipmentId, setSessionShipmentId] = useState<string | null>(null);
@@ -1619,17 +1624,27 @@ export default function MaterialImportScreen() {
     </div>
   );
 
+  // Nhãn HĐ trên chuyến (ba-spec 51 R11) — chỉ đọc; xưởng không thấy file / tiền.
+  const invoiceStore = useSupplierInvoiceStore();
+  const tripInvoiceOf = useMemo(() => {
+    const byTrip = indexLinesByTripLine(invoiceStore.lines);
+    const invById = new Map(invoiceStore.invoices.map((x) => [x.id, x]));
+    const mapped = new Set(buildCodeMaps(invoiceStore.codeMaps).materialByCode.values());
+    return (lines: MaterialImportItem[]) => (mapped.size ? tripInvoiceInfo(lines, byTrip, invById, mapped) : null);
+  }, [invoiceStore.lines, invoiceStore.invoices, invoiceStore.codeMaps]);
+  const INVOICE_TAG: Record<TripInvoiceStatus, "done" | "pending" | "warning"> = { awaiting: "pending", partial: "pending", mismatch: "warning", complete: "done" };
+
   // Hướng dẫn thao tác (ba-spec 43): bước chỉ đổi chế độ xem, không ghi. Tour dựng lại khi đổi
   // chế độ ⇒ bản chụp lúc bắt đầu nhớ đúng chế độ để bước cuối trả trang về (R5).
   const tour = useMemo(
     () =>
       buildImportsTour({
-        can: { create: allowed.create, update: allowed.update, lock: allowed.lock, unlock: allowed.unlock },
+        can: { create: allowed.create, update: allowed.update, lock: allowed.lock, unlock: allowed.unlock, invoices: invoiceAllowed.view, invoicesWrite: invoiceAllowed.create || invoiceAllowed.update },
         hasOcr,
         startView: mode,
         showView: setMode,
       }),
-    [allowed.create, allowed.update, allowed.lock, allowed.unlock, mode]
+    [allowed.create, allowed.update, allowed.lock, allowed.unlock, invoiceAllowed.view, invoiceAllowed.create, invoiceAllowed.update, mode]
   );
   usePageTour(isLoading ? null : tour);
 
@@ -1663,19 +1678,35 @@ export default function MaterialImportScreen() {
             onClick={() => setMode("report")}
             className={cn(
               "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              mode !== "entry"
+              mode === "report" || mode === "ledger"
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted"
             )}
           >
             📊 Báo cáo
           </button>
+          {invoiceAllowed.view && (
+            <button
+              title="Gắn hóa đơn đại lý vào chuyến: nạp sổ chi tiết NL của kế toán + PDF hóa đơn, xử chỗ lệch."
+              type="button"
+              data-tour="imports-invoice-tab"
+              onClick={() => setMode("invoices")}
+              className={cn(
+                "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
+                mode === "invoices"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:bg-muted"
+              )}
+            >
+              🧾 Hóa đơn
+            </button>
+          )}
         </div>
       </div>
 
       {/* Trong "Báo cáo": tổng hợp theo kỳ ⇄ sổ chi tiết các chuyến (tab "Sổ ngày" cũ —
           việc xem/sửa chuyến TRONG NGÀY đã nằm ở cột phải của "Ghi nhập"). */}
-      {mode !== "entry" && (
+      {(mode === "report" || mode === "ledger") && (
         <div className="flex w-full overflow-hidden rounded-lg border-2 border-border sm:w-fit">
           {(
             [
@@ -1732,6 +1763,28 @@ export default function MaterialImportScreen() {
       {mode === "entry" && <DraftRestoredNotice savedAt={importDraft.restoredAt} onDiscard={discardImportDraft} />}
 
       {mode === "entry" && entryForm}
+
+      {mode === "invoices" && (
+        <SupplierInvoicePanel
+          trips={rows}
+          persistTrips={persist}
+          shipments={shipments}
+          persistShipments={persistShipments}
+          locks={locks}
+          suppliers={suppliers}
+          materialTypes={materialTypes}
+          supplierOptions={supplierOptions}
+          materialTypeOptions={materialTypeOptions}
+          onCreateSupplier={supplierEditor.canCreate ? addSupplier : undefined}
+          onCreateMaterialType={materialTypeEditor.canCreate ? (name) => addMaterialType(name) : undefined}
+          supplierEditor={supplierEditor}
+          materialTypeEditor={materialTypeEditor}
+          canViewPrice={canViewPrice}
+          canCreateTrip={allowed.create}
+          canUpdateTrip={allowed.update}
+          operator={operator}
+        />
+      )}
 
       {mode === "ledger" && (
         <>
@@ -1974,6 +2027,16 @@ export default function MaterialImportScreen() {
                         {!n.shipment && (
                           <Tag variant="source">Dữ liệu cũ</Tag>
                         )}
+                        {(() => {
+                          const inv = n.shipment ? tripInvoiceOf(n.rows) : null;
+                          if (!inv) return null;
+                          const nos = inv.invoiceNos.length ? `HĐ ${inv.invoiceNos.join(", ")}` : "";
+                          return (
+                            <Tag variant={INVOICE_TAG[inv.status]} className="tnum" title={TRIP_INVOICE_STATUS_LABELS[inv.status]}>
+                              {inv.status === "awaiting" ? "Chờ HĐ" : inv.status === "complete" ? nos : `${nos} · ${TRIP_INVOICE_STATUS_LABELS[inv.status].toLowerCase()}`}
+                            </Tag>
+                          );
+                        })()}
                         {n.shipment && (
                           <Tag variant="muted" className="tnum">
                             Lô {formatMaterialLotLabel(n.shipment)}

@@ -75,6 +75,7 @@
    - **Tên màn cũ "Sản xuất BTP"** còn ở empty state / lời nhắc (`ReserveWarehouseScreen`, `NxtReportScreen`, `QrLookupScreen`, `guideContent`) — menu là "Sản xuất thành phẩm".
    - Chú thích `filterRetailSales` (`lib/inventory.ts`) còn ghi handoff Đơn đặt là `"Lưu trữ"` — giá trị thật `"Đơn đặt"` (`SalesOrderScreen`).
    - Chế độ demo: tham chiếu nằm TRONG jsonb (`production_wips.batter_kg` khóa theo id bột) chưa mang tiền tố `demo:`.
+10. **Gắn hóa đơn đại lý vào chuyến nhập** — ba-spec [51](app-map/51-supplier-invoice-matching.ba-spec.md) ĐÃ CHỐT 2026-10-30 (Q1–Q11). Kế toán nạp "sổ chi tiết NL" + PDF HĐ, ghép theo đại lý + ngày hàng về (cột "Ngày HĐ") + loại + kg; lệch giá/kg báo, không tự sửa. **Build P1 XONG 2026-10-30** (design-spec [52](app-map/52-supplier-invoice-ui.design-spec.md), tab 🧾 Hóa đơn ở Nhập hàng). Việc kế tiếp: tạo bucket `supplier-invoice-files` + chạy mig `0090`; đợt sau: nhãn HĐ ở cột "Đã ghi ngày", nhắc lệch ở Việc của tôi (NV8). Dọn dữ liệu đã thấy khi đối chiếu tháng 10: MST Hồng Phú trong danh mục gõ sai (…848, HĐ …838); lệch giá Hương Pháp 06/10 (HĐ 229) và Hưng Vũng Tàu 13/10 (HĐ 86); thiếu chuyến Bé 3 ngày 01/10 (HĐ 242).
 
 ## 5. Cạm bẫy cần nhớ
 - `useBang` ghi CẢ LÔ, offline có hàng chờ — sửa `repo.ts` phải giữ `patchLegacy` + không nuốt dòng chưa đẩy.

@@ -26,6 +26,9 @@ import type {
   ProductionOrderLine,
   ProductionOrderMaterial,
   ProductionOrderShipment,
+  SupplierInvoice,
+  SupplierInvoiceLine,
+  AccountingCodeMap,
   ImportReceipt,
   ImportReceiptLine,
   ImportSupplier,
@@ -84,6 +87,7 @@ import { listDatesInRange, subtractDays } from "@/lib/dataFlow";
 import { buildExportDemo, type ExportDemoPack } from "@/lib/exportPlanningDemo";
 import { buildImportDemo } from "@/lib/importPlanningDemo";
 import { buildProductionOrderDemo } from "@/lib/productionOrderDemo";
+import { buildSupplierInvoiceDemo } from "@/lib/supplierInvoiceDemo";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 
 /** Sổ thật đưa vào để quét tham số (chỉ ĐỌC). */
@@ -167,6 +171,11 @@ export interface DemoBundle {
   productionOrderLines: ProductionOrderLine[];
   productionOrderMaterials: ProductionOrderMaterial[];
   productionOrderShipments: ProductionOrderShipment[];
+  /** Hóa đơn đại lý gắn chuyến (mig 0090, ba-spec 51) — dựng từ chuyến demo (lib/supplierInvoiceDemo.ts):
+   *  khớp, HĐ gộp 2 chuyến, lệch giá, HĐ không có chuyến, chuyến chờ HĐ; file là đường dẫn GIỮ CHỖ. */
+  supplierInvoices: SupplierInvoice[];
+  supplierInvoiceLines: SupplierInvoiceLine[];
+  accountingCodeMaps: AccountingCodeMap[];
   labelPrints: LabelPrint[];
   qcChecklists: QcChecklistItem[];
   qcLocks: DailyLock[];
@@ -706,6 +715,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
 
   const importDemo = buildImportDemo(tc.today, n.products);
   const orderDemo = buildProductionOrderDemo(tc.today, exportDemo, importDemo, n.products, [...customers, ...exportDemo.extraCustomers]);
+  const invoiceDemo = buildSupplierInvoiceDemo(imports, tc.today);
 
   return {
     products: n.products.map((p) => ({ ...p })),
@@ -765,6 +775,9 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     productionOrderLines: orderDemo.lines,
     productionOrderMaterials: orderDemo.materials,
     productionOrderShipments: orderDemo.shipments,
+    supplierInvoices: invoiceDemo.invoices,
+    supplierInvoiceLines: invoiceDemo.lines,
+    accountingCodeMaps: invoiceDemo.codeMaps,
     labelPrints,
     qcChecklists,
     qcLocks,

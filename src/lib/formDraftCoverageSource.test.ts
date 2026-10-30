@@ -19,6 +19,7 @@ const EXEMPT: Record<string, string> = {
   "features/balancing/gridDialogs.tsx": "hộp chọn tên dòng / dòng nhập — chọn một bước, không có số gõ dở",
   "features/balancing/DepositTargetDialog.tsx": "hộp chọn chỗ gửi một bước, mở từ dòng Gửi đông đã lưu",
   "features/imports/BulkTypeChange.tsx": "đổi loại hàng loạt — một bước xác nhận",
+  "features/imports/SupplierInvoicePanel.tsx": "gắn hóa đơn chạy trên file tải lên (sổ chi tiết + PDF) — file là nguồn, nạp lại được; hộp gõ lý do ở supplierInvoiceParts.tsx có nháp",
   "features/production-orders/ShipmentOrders.tsx": "hộp Gắn lệnh có sẵn — chỉ tick chọn lệnh, một bước, không có ô gõ",
   "features/imports/DailyScrapSection.tsx": "phế liệu đang gõ nằm trong nháp form Nhập hàng (scrapEdit)",
   "features/reconciliation/ReconciliationScreen.tsx": "đối soát chạy trên file tải lên — file là nguồn, chạy lại được",

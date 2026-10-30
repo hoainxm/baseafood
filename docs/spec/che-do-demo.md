@@ -1,6 +1,7 @@
 > Load khi: làm chế độ DEMO (bật/tắt), sinh bộ dữ liệu demo, gỡ màn DEMO dữ liệu mẫu, thêm chức năng mới cần có mặt trong demo.
 > Trạng thái: **ĐÃ CHỐT hướng (2026-10-12)** — chủ dự án chọn **phương án B `site-demo` trong DB thật** · ẩn danh mặc định có công tắc · xóa hẳn `/production` + `/reports` · **chỉ admin** bật demo. Chưa build. Đọc §4b (rào chắn bắt buộc của B) trước khi code.
 last_verified: 2026-10-30
+<!-- updated: 2026-10-30 (c) — 3 bảng MỚI mig 0090 vào `DemoBundle` (`supplierInvoices` · `supplierInvoiceLines` · `accountingCodeMaps`), dựng từ chuyến demo (`lib/supplierInvoiceDemo.ts`): HĐ khớp, HĐ gộp 2 chuyến có một dòng lệch giá 2.000 đ, HĐ không có chuyến, chuyến chờ HĐ; file là đường dẫn GIỮ CHỖ. Checklist §5 dòng 23b. -->
 <!-- updated: 2026-10-30 (b) — bảng MỚI `goods_types` (mig 0089) vào `DemoBundle` (`goodsTypes`, 5 loại mẫu ở demoGenerator) + `DemoPackLoader` (`useGoodsTypes`); khóa ngoại `import_contract_lines.goods_type_id` khai `refColumns`. -->
 <!-- updated: 2026-10-29 — bảng MỚI `export_document_kinds` (mig 0081) vào `DemoBundle` (`exportDocumentKinds`, demoGenerator: 1 loại tự thêm "Giấy chứng nhận Halal") + `DemoPackLoader` (DemoMode.tsx). -->
 <!-- updated: 2026-10-27 (b) — rà commit: §4c ghi NGƯỢC về hàm gộp mặt hàng — bản vá refColumns làm hàm 0069 bỏ sót dòng demo mới ⇒ thêm `0078` (bắt cả id thô lẫn `demo:`), §4c ghi thứ tự: chạy 0078 trước lệnh thêm tiền tố. -->
@@ -135,6 +136,7 @@ Mỗi dòng = mở màn THẬT trong chế độ demo phải có số và làm �
 | 21 | Người dùng `/users` · Nhật ký `/audit` | Xem vai trò; nhật ký demo ghi cục bộ (không lên `audit_log` thật) | S |
 | 21b | Vai trò & quyền `/roles` · `/admin` | **KHÔNG vào demo (có chủ đích, 2026-10-15):** `app_roles` / `role_permissions` / `user_permissions` (0062) là cấu hình THẬT như `user_profiles` ⇒ không thêm vào `DemoBundle`/`DemoPackLoader`; `/roles` hiện "Đang ở chế độ demo" như `/users`; chế độ demo chỉ admin bật mà admin không đọc ma trận | — |
 | 22 | Xuyên suốt | Tô màu dòng "đã dò" · thanh cuộn ngang trên+dưới · Cài đặt hiển thị · phân quyền 2 bộ phận (xem như tổ trưởng / thủ kho) · đèn kết nối | — |
+| 23b | Nhập hàng · Hóa đơn đại lý | Tab Hóa đơn: 4 thẻ việc còn lại, HĐ gộp 2 chuyến, dòng lệch giá → Cập nhật theo HĐ / Giữ số xưởng, HĐ không có chuyến → Tạo chuyến từ HĐ / Không thuộc chuyến; nhãn HĐ trên chuyến ở Sổ chi tiết | S |
 | 23 | Kịch bản trọn chuỗi | NL vào (chuyến, lô) → SX (gắn lô) → kho → đóng gói → xuất/bán → quét QR trên tem ra đủ đường đi | S |
 
 Gỡ khỏi demo (vì đã có màn thật thay): `/traceability` → `/qr` · `/quality` → `/qc` · `/cold-storage` → `/warehouse`. Còn `/production` (lệnh SX) và `/reports` (báo cáo tổng) là **ý tưởng chưa có thật** — xem câu 3 §7.

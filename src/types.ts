@@ -202,6 +202,82 @@ export interface ImportShipment {
   operator?: string;
 }
 
+/**
+ * Hóa đơn GTGT của đại lý (mig 0090, ba-spec 51). Một HĐ gom nhiều dòng sổ chi tiết NL của kế toán,
+ * gắn được nhiều chuyến. Khóa = đại lý (mã kế toán) + năm + số HĐ (R1) ⇒ id cố định `supplierInvoiceId`.
+ */
+export interface SupplierInvoice {
+  id: string;
+  /** Tên ngắn đại lý trong danh mục (sổ Nhập hàng lưu theo TÊN). "" = mã kế toán chưa ánh xạ. */
+  supplierName: string;
+  /** Mã đại lý của phần mềm kế toán (cột MADM, vd "HONG-PHU"). */
+  accountingCode: string;
+  invoiceNo: string;
+  invoiceYear: number;
+  /** Ký hiệu HĐ (vd "1C26THP") — chỉ có khi đã đọc PDF. */
+  invoiceSymbol: string;
+  /** Ngày lập trên PDF (yyyy-mm-dd), "" = chưa có PDF. */
+  issueDate: string;
+  /** Ngày kế toán hạch toán (cột NGAY). */
+  postingDate: string;
+  /** Số phiếu nhập kho của kế toán (cột PHIEU). */
+  voucherNo: string;
+  sellerTaxId: string;
+  subtotal: number | null;
+  vatAmount: number | null;
+  totalAmount: number | null;
+  /** `not-trip` = hàng không qua Nhập hàng (hàng đông gửi kho lạnh — Q5). */
+  classification: "trip" | "not-trip";
+  classificationNote: string;
+  /** Dòng hàng đọc từ PDF (R10). */
+  pdfLines: SupplierInvoicePdfLine[];
+  filePath: string;
+  fileName: string;
+  note: string;
+}
+
+export interface SupplierInvoicePdfLine {
+  name: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
+/** Một dòng sổ chi tiết NL = một loại NL của một chuyến trên một HĐ; gắn tối đa một dòng chuyến (R5). */
+export interface SupplierInvoiceLine {
+  id: string;
+  invoiceId: string;
+  /** Cột "Ngày HĐ" của kế toán = ngày HÀNG VỀ của chuyến (Q1). */
+  deliveryDate: string;
+  /** Mã vật tư kế toán (cột "DM nợ", vd "BT-1DANL"). */
+  materialCode: string;
+  quantityKg: number;
+  unitPrice: number;
+  amount: number;
+  driverName: string;
+  licensePlate: string;
+  /** Khóa dòng khi nạp lại (R9). */
+  rowKey: string;
+  /** `material_imports.id` đã gắn; "" = chưa gắn chuyến. */
+  tripLineId: string;
+  /** Quyết định khi lệch: "" chưa xử · `updated` đã cập nhật theo HĐ · `explained` giữ số xưởng có lý do. */
+  resolution: "" | "updated" | "explained";
+  resolutionReason: string;
+  resolvedBy: string;
+  resolvedAt: string;
+  /** Lần nạp sau không còn dòng này trong file (R9) — liên kết GIỮ tới khi kế toán gỡ. */
+  missingFromFile: boolean;
+}
+
+/** Ánh xạ mã kế toán → tên trong danh mục (đại lý / loại NL) — NV2, nhớ cho các lần nạp sau. */
+export interface AccountingCodeMap {
+  id: string;
+  kind: "supplier" | "material";
+  code: string;
+  targetName: string;
+}
+
 export function isBackdatedImport(c: Pick<ImportShipment, "deliveryDate" | "postingDate">): boolean {
   return Boolean(c.postingDate) && c.postingDate > c.deliveryDate;
 }

@@ -63,6 +63,9 @@ import type {
   ProductionOrderMaterial,
   ProductionOrderRequirements,
   ProductionOrderShipment,
+  SupplierInvoice,
+  SupplierInvoiceLine,
+  AccountingCodeMap,
   ImportReceipt,
   ImportReceiptLine,
   ImportSupplier,
@@ -3085,6 +3088,111 @@ export const PRODUCTION_ORDER_SHIPMENT_TABLE: TableMapping<ProductionOrderShipme
   fromRow: (r) => ({ id: s(r.id), orderId: s(r.order_id), shipmentId: s(r.shipment_id), createdAt: s(r.created_at) }),
 };
 
+/* ---------- Hóa đơn đại lý gắn chuyến (mig 0090, ba-spec 51) ---------- */
+
+export const SUPPLIER_INVOICE_TABLE: TableMapping<SupplierInvoice> = {
+  table: "supplier_invoices",
+  localKey: "bsf.supplier-invoices.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    supplier_name: x.supplierName,
+    accounting_code: x.accountingCode,
+    invoice_no: x.invoiceNo,
+    invoice_year: x.invoiceYear,
+    invoice_symbol: x.invoiceSymbol,
+    issue_date: x.issueDate || null,
+    posting_date: x.postingDate || null,
+    voucher_no: x.voucherNo,
+    seller_tax_id: x.sellerTaxId,
+    subtotal: x.subtotal,
+    vat_amount: x.vatAmount,
+    total_amount: x.totalAmount,
+    classification: x.classification,
+    classification_note: x.classificationNote,
+    pdf_lines: x.pdfLines,
+    file_path: x.filePath,
+    file_name: x.fileName,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    supplierName: s(r.supplier_name),
+    accountingCode: s(r.accounting_code),
+    invoiceNo: s(r.invoice_no),
+    invoiceYear: Number(r.invoice_year ?? 0),
+    invoiceSymbol: s(r.invoice_symbol),
+    issueDate: s(r.issue_date).slice(0, 10),
+    postingDate: s(r.posting_date).slice(0, 10),
+    voucherNo: s(r.voucher_no),
+    sellerTaxId: s(r.seller_tax_id),
+    subtotal: numOrNull(r.subtotal),
+    vatAmount: numOrNull(r.vat_amount),
+    totalAmount: numOrNull(r.total_amount),
+    classification: s(r.classification) === "not-trip" ? "not-trip" : "trip",
+    classificationNote: s(r.classification_note),
+    pdfLines: Array.isArray(r.pdf_lines) ? (r.pdf_lines as SupplierInvoice["pdfLines"]) : [],
+    filePath: s(r.file_path),
+    fileName: s(r.file_name),
+    note: s(r.note),
+  }),
+};
+
+export const SUPPLIER_INVOICE_LINE_TABLE: TableMapping<SupplierInvoiceLine> = {
+  table: "supplier_invoice_lines",
+  localKey: "bsf.supplier-invoice-lines.v1",
+  getKey: theoId,
+  // trip_line_id → material_imports.id (mềm). row_key là khóa dòng trong file, không trỏ bảng nào.
+  refColumns: ["invoice_id", "trip_line_id"],
+  toRow: (x) => ({
+    id: x.id,
+    invoice_id: x.invoiceId,
+    delivery_date: x.deliveryDate || null,
+    material_code: x.materialCode,
+    quantity_kg: x.quantityKg,
+    unit_price: x.unitPrice,
+    amount: x.amount,
+    driver_name: x.driverName,
+    license_plate: x.licensePlate,
+    row_key: x.rowKey,
+    trip_line_id: x.tripLineId,
+    resolution: x.resolution,
+    resolution_reason: x.resolutionReason,
+    resolved_by: x.resolvedBy,
+    resolved_at: x.resolvedAt,
+    missing_from_file: x.missingFromFile,
+  }),
+  fromRow: (r) => {
+    const resolution = s(r.resolution);
+    return {
+      id: s(r.id),
+      invoiceId: s(r.invoice_id),
+      deliveryDate: s(r.delivery_date).slice(0, 10),
+      materialCode: s(r.material_code),
+      quantityKg: Number(r.quantity_kg ?? 0),
+      unitPrice: Number(r.unit_price ?? 0),
+      amount: Number(r.amount ?? 0),
+      driverName: s(r.driver_name),
+      licensePlate: s(r.license_plate),
+      rowKey: s(r.row_key),
+      tripLineId: s(r.trip_line_id),
+      resolution: resolution === "updated" || resolution === "explained" ? resolution : "",
+      resolutionReason: s(r.resolution_reason),
+      resolvedBy: s(r.resolved_by),
+      resolvedAt: s(r.resolved_at),
+      missingFromFile: Boolean(r.missing_from_file),
+    };
+  },
+};
+
+export const ACCOUNTING_CODE_MAP_TABLE: TableMapping<AccountingCodeMap> = {
+  table: "accounting_code_maps",
+  localKey: "bsf.accounting-code-maps.v1",
+  getKey: theoId,
+  toRow: (x) => ({ id: x.id, kind: x.kind, code: x.code, target_name: x.targetName }),
+  fromRow: (r) => ({ id: s(r.id), kind: s(r.kind) === "material" ? "material" : "supplier", code: s(r.code), targetName: s(r.target_name) }),
+};
+
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
 const TABLE_LABELS: Record<string, string> = {
   material_imports: "Nhập nguyên liệu",
@@ -3146,6 +3254,9 @@ const TABLE_LABELS: Record<string, string> = {
   production_order_lines: "Dòng lệnh sản xuất",
   production_order_materials: "NL nhập khẩu dự kiến của lệnh sản xuất",
   production_order_shipments: "Lệnh sản xuất gắn chuyến xuất",
+  supplier_invoices: "Hóa đơn đại lý",
+  supplier_invoice_lines: "Dòng hóa đơn đại lý",
+  accounting_code_maps: "Ánh xạ mã kế toán",
   row_marks: "Tô màu dòng",
   app_roles: "Vai trò",
   role_permissions: "Quyền của vai trò",

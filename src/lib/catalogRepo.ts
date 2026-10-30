@@ -21,6 +21,9 @@ import {
   PRODUCTION_ORDER_LINE_TABLE,
   PRODUCTION_ORDER_MATERIAL_TABLE,
   PRODUCTION_ORDER_SHIPMENT_TABLE,
+  SUPPLIER_INVOICE_TABLE,
+  SUPPLIER_INVOICE_LINE_TABLE,
+  ACCOUNTING_CODE_MAP_TABLE,
   SUPPLIER_TABLE,
   SALES_ORDER_TABLE,
   ORDER_ITEM_TABLE,
@@ -410,6 +413,23 @@ export const useProductionOrders = () => useTable(PRODUCTION_ORDER_TABLE);
 export const useProductionOrderLines = () => useTable(PRODUCTION_ORDER_LINE_TABLE);
 export const useProductionOrderMaterials = () => useTable(PRODUCTION_ORDER_MATERIAL_TABLE);
 export const useProductionOrderShipments = () => useTable(PRODUCTION_ORDER_SHIPMENT_TABLE);
+/** Hóa đơn đại lý gắn chuyến (mig 0090, ba-spec 51) — luật ở lib/supplierInvoice.ts. */
+export const useSupplierInvoices = () => useTable(SUPPLIER_INVOICE_TABLE);
+export const useSupplierInvoiceLines = () => useTable(SUPPLIER_INVOICE_LINE_TABLE);
+export const useAccountingCodeMaps = () => useTable(ACCOUNTING_CODE_MAP_TABLE);
+/**
+ * Ba bảng HĐ + cờ `isAvailable`: có máy chủ mà chưa chạy 0090 ⇒ không ghi (tab Hóa đơn báo
+ * "chưa chạy 0090") — khỏi kẹt hàng chờ. Nhãn HĐ trên chuyến vẫn đọc (rỗng).
+ */
+export function useSupplierInvoiceStore() {
+  const [invoices, setInvoices, invMeta] = useSupplierInvoices();
+  const [lines, setLines, lineMeta] = useSupplierInvoiceLines();
+  const [codeMaps, setCodeMaps, mapMeta] = useAccountingCodeMaps();
+  const metas = [invMeta, lineMeta, mapMeta];
+  const isAvailable = !isServerConnected || metas.every((m) => m.status !== "loading" && !isMissingTableError(m.error));
+  const isLoading = metas.some((m) => m.status === "loading");
+  return { invoices, setInvoices, lines, setLines, codeMaps, setCodeMaps, isAvailable, isLoading };
+}
 /** Tô màu dòng "đã dò" kiểu Excel — MỘT bảng dùng chung mọi bảng (mig 0055).
  *  Màn hình KHÔNG gọi thẳng: đi qua `RowMarkProvider` (features/shared) gắn một lần
  *  ở ShellLayout, bảng bật bằng prop `rowMarkKey` của design-system. */

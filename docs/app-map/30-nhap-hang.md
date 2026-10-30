@@ -1,6 +1,7 @@
 > Load khi: sửa bất cứ thứ gì ở màn Nhập hàng — chuyến, ngày, ghi bù, chốt ngày, phế liệu ngày, phiếu báo cáo ngày.
-covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/ImportSteps.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/ImportSlipOcr.tsx, src/features/imports/importHelpers.ts, src/features/imports/ImportLinesTable.tsx, src/features/imports/DailyScrapSection.tsx, src/lib/ocr.ts, src/lib/ocrCloud.ts, src/types.ts
-last_verified: 2026-10-27
+covers: src/features/imports/MaterialImportScreen.tsx, src/features/imports/ImportSteps.tsx, src/features/imports/DailyImportInvoice.tsx, src/features/imports/ImportReport.tsx, src/features/imports/ImportSlipOcr.tsx, src/features/imports/importHelpers.ts, src/features/imports/ImportLinesTable.tsx, src/features/imports/DailyScrapSection.tsx, src/lib/ocr.ts, src/lib/ocrCloud.ts, src/types.ts, src/features/imports/SupplierInvoicePanel.tsx, src/features/imports/supplierInvoiceParts.tsx, src/lib/supplierInvoice.ts, src/lib/supplierInvoiceFiles.ts
+last_verified: 2026-10-30
+<!-- updated: 2026-10-30 — tab thứ ba "🧾 Hóa đơn" (`mode="invoices"`, chỉ hiện khi có `imports.invoices` Xem): nạp sổ chi tiết NL + PDF, ghép hóa đơn vào chuyến — luật ở ba-spec [51](51-supplier-invoice-matching.ba-spec.md), giao diện [52](52-supplier-invoice-ui.design-spec.md). Sổ chi tiết các chuyến thêm nhãn HĐ (Chờ HĐ · HĐ 936 · … lệch HĐ). "Cập nhật theo HĐ" ghi vết `[Sửa theo HĐ …]` vào Ghi chú dòng như sửa từ Cân đối. Nút Báo cáo sáng khi `mode` là report / ledger (không còn `!== "entry"`). -->
 <!-- re-verified: 2026-10-27 10:00 — §1 ghi/sửa chuyến bằng form inline chế độ Ghi nhập (MaterialImportScreen: openShipmentEdit → setMode("entry"); Dialog còn lại chỉ là hộp Chốt ngày + nhắc lưu), rời form giữa chừng giữ nháp (useFormDraft), không còn dongKhongLuu -->
 <!-- updated: 2026-10-19 — link mở thẳng một ngày `/imports?date=yyyy-mm-dd&workshop=…` (từ Việc của tôi / Tổng quan): sang "Sổ chi tiết các chuyến" đúng ngày + xưởng sau khi nháp mở lại xong; nháp đang dở giữ nguyên, không có nháp thì "Ghi nhập" mở phiếu đúng ngày link; tham số gỡ khỏi URL. Xem 39-my-tasks.md. -->
 <!-- updated: 2026-10-16 (b) — Tự lưu NHÁP phiếu chuyến đang gõ (quy tắc 17): đầu chuyến + bảng loại hàng + chuyến đang sửa + phế liệu đang gõ; quay lại trang / đăng nhập lại ⇒ phiếu mở lại kèm dải "Đã mở lại phiếu đang gõ dở" (nút Bỏ bản nháp). Tự mở phiếu trống đợi `importDraft.isReady`. -->
@@ -55,7 +56,7 @@ Số hóa sổ giấy *"Báo cáo tổng hợp nguyên liệu hàng ngày"*. Đ�
 
 ## State hiện tại
 
-Đã có: chuyến thật · tách ngày giao / ngày ghi sổ + ghi bù có lý do · chốt ngày theo (ngày + phân xưởng) · phế liệu cân gộp cuối ngày · lọc theo ngày/khoảng ngày/xưởng/đại lý/loại NL/thiếu đơn giá · sổ nhóm theo chuyến · sửa đầu chuyến áp cho cả chuyến · **phiếu báo cáo tổng hợp NL ngày (in A4 ngang)**.
+Đã có: **gắn hóa đơn đại lý vào chuyến** (tab Hóa đơn, [51](51-supplier-invoice-matching.ba-spec.md)) · chuyến thật · tách ngày giao / ngày ghi sổ + ghi bù có lý do · chốt ngày theo (ngày + phân xưởng) · phế liệu cân gộp cuối ngày · lọc theo ngày/khoảng ngày/xưởng/đại lý/loại NL/thiếu đơn giá · sổ nhóm theo chuyến · sửa đầu chuyến áp cho cả chuyến · **phiếu báo cáo tổng hợp NL ngày (in A4 ngang)**.
 
 Bố cục lọc: **toolbar một hàng** (Kỳ xem sổ · Ngày/khoảng · Phân xưởng + nhóm nút Xem báo cáo / Ghi chuyến); lọc ít dùng (đại lý / loại NL / đơn giá) gom trong nút **"Bộ lọc thêm"**. Khối chốt ngày nằm **cuối cột ngày** của "Ghi nhập" (xem §Bố cục).
 
@@ -200,3 +201,4 @@ Số hóa đúng tờ giấy *"Báo cáo tổng hợp nguyên liệu hàng ngày
 - Cách ghi dữ liệu, hàng chờ: [04-tang-du-lieu.md](04-tang-du-lieu.md)
 - Phế liệu phía kỳ cân đối: [31-can-doi-ky.md](31-can-doi-ky.md)
 - Nghiệp vụ gốc (Q21, sổ giấy, quy ước "80 trên/80 dưới"): [`docs/trien-khai/bang-cau-hoi-xac-nhan-truoc-plan.md`](../trien-khai/bang-cau-hoi-xac-nhan-truoc-plan.md)
+- Gắn hóa đơn đại lý vào chuyến (nạp sổ chi tiết NL + PDF, trạng thái HĐ của chuyến, lệch giá/kg, tạo chuyến từ HĐ): ba-spec [51](51-supplier-invoice-matching.ba-spec.md) · design-spec [52](52-supplier-invoice-ui.design-spec.md)

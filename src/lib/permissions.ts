@@ -95,6 +95,10 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   { id: "my-tasks", label: "Việc của tôi", group: "overview", navId: "my-tasks", actions: CRUD },
 
   { id: "imports", label: "Nhập hàng", group: "imports", navId: "imports", actions: [...CRUD, "lock", "unlock", "export", "view-price"] },
+  // Hóa đơn đại lý gắn vào chuyến (mig 0090, ba-spec docs/app-map/51-supplier-invoice-matching.ba-spec.md R12):
+  // nạp sổ chi tiết NL + PDF, ánh xạ mã kế toán, xử lệch, xếp "Không thuộc chuyến". Xem = mở tab Hóa đơn,
+  // file + tiền HĐ. Không có ⇒ chỉ thấy nhãn trạng thái HĐ trên chuyến. RLS riêng của 0090.
+  { id: "imports.invoices", label: "Nhập hàng · Hóa đơn đại lý", group: "imports", navId: "imports", actions: CRUD },
 
   { id: "wip", label: "Sản xuất thành phẩm", group: "production", navId: "wip", actions: [...CRUD, "lock", "unlock", "export"] },
   { id: "packaging", label: "Đóng gói", group: "production", navId: "packaging", actions: CRUD },
@@ -332,6 +336,7 @@ const catalogAll = (actions: readonly PermissionAction[]) =>
 const DIRECTOR: RoleSpec = {
   dashboard: VIEW_EXPORT,
   imports: ["view", "export", "view-price"],
+  "imports.invoices": VIEW,
   wip: VIEW_EXPORT,
   packaging: VIEW,
   qc: VIEW,
@@ -362,6 +367,7 @@ const CHIEF_ACCOUNTANT: RoleSpec = {
   dashboard: VIEW_EXPORT,
   "my-tasks": ["view", "create", "update", "delete"],
   imports: ["view", "update", "delete", "lock", "unlock", "export", "view-price"],
+  "imports.invoices": ["view", "create", "update", "delete"],
   wip: ["view", "unlock", "export"],
   packaging: VIEW,
   qc: VIEW,
@@ -399,6 +405,7 @@ const ACCOUNTANT: RoleSpec = {
   dashboard: VIEW_EXPORT,
   "my-tasks": ["view", "create", "update"],
   imports: ["view", "create", "update", "lock", "export", "view-price"],
+  "imports.invoices": ["view", "create", "update"],
   wip: ["view", "create", "update", "lock", "export"],
   packaging: VIEW,
   qr: VIEW_EXPORT,

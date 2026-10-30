@@ -211,6 +211,30 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
             <b>ghi bù</b> hoặc <b>mở lại ngày</b> — cả hai đều bắt ghi lý do.
           </p>
         </Section>
+        <Section title="Hóa đơn đại lý (kế toán)">
+          <p>
+            Tab <b>Hóa đơn</b> gắn hóa đơn GTGT của đại lý vào đúng chuyến đã ghi. Chọn một lượt file Excel{" "}
+            <b>sổ chi tiết NL</b> (xuất từ phần mềm kế toán) và các <b>PDF hóa đơn</b>; máy ghép theo đại lý + ngày
+            hàng về (cột "Ngày HĐ") + loại + số kg, xem trước rồi chọn <b>Gắn hóa đơn vào chuyến</b>. Mã kế toán lạ
+            chọn đại lý / loại một lần. Máy <b>không tự đổi số chuyến</b>.
+          </p>
+          <Y>
+            <li><b>Khớp</b> · <b>Đã cập nhật theo HĐ</b>: xong.</li>
+            <li>
+              <b>Lệch giá / Lệch kg</b>: chọn <b>Cập nhật theo HĐ</b> (ghi vết "[Sửa theo HĐ …]", có Hoàn tác) hoặc{" "}
+              <b>Giữ số xưởng</b> kèm lý do ⇒ <b>Lệch đã giải trình</b>.
+            </li>
+            <li>
+              <b>Không có chuyến</b>: <b>Tạo chuyến từ HĐ</b> (ghi bù, lý do điền sẵn) hoặc <b>Không thuộc chuyến</b>{" "}
+              (hàng đông gửi kho lạnh).
+            </li>
+            <li><b>Chưa ánh xạ</b>: chọn đại lý / loại cho mã kế toán rồi nạp lại.</li>
+          </Y>
+          <p>
+            Một khoảng ngày xong chứng từ khi bốn thẻ <b>Chuyến chờ HĐ · HĐ chưa có file · Lệch chưa xử · HĐ không có
+            chuyến</b> đều về 0. Trên Sổ chi tiết, mỗi chuyến có nhãn "Chờ HĐ" hoặc "HĐ 936".
+          </p>
+        </Section>
         <Section title="Xem báo cáo">
           <p>
             Chế độ <b>Báo cáo</b> có <b>Tổng hợp theo kỳ</b> (tổng nhập theo đại lý và loại nguyên liệu, kg chờ giá) và{" "}

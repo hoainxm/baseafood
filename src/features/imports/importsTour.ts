@@ -9,7 +9,7 @@
 import type { PageTour, PageTourSpec, TourStep } from "@/lib/guidedTour";
 
 /** Chế độ xem của màn Nhập hàng (state `mode` của MaterialImportScreen). */
-export type ImportsView = "entry" | "report" | "ledger";
+export type ImportsView = "entry" | "report" | "ledger" | "invoices";
 
 export interface ImportsTourContext {
   can: {
@@ -21,6 +21,10 @@ export interface ImportsTourContext {
     lock: boolean;
     /** Mở lại ngày đã chốt. */
     unlock: boolean;
+    /** Tab Hóa đơn đại lý (imports.invoices Xem) — ba-spec 51. */
+    invoices?: boolean;
+    /** Nạp / gắn / xử lệch hóa đơn (imports.invoices Thêm hoặc Sửa). */
+    invoicesWrite?: boolean;
   };
   /** Máy có bộ đọc ảnh phiếu (nút Đọc ảnh phiếu hiện). */
   hasOcr: boolean;
@@ -37,10 +41,12 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
   const toEntry = () => ctx.showView("entry");
   const toReport = () => ctx.showView("report");
   const toLedger = () => ctx.showView("ledger");
+  const toInvoices = () => ctx.showView("invoices");
   const restore = () => ctx.showView(ctx.startView);
   const entry = (s: TourStep): TourStep => ({ ...s, prepare: toEntry });
   const report = (s: TourStep): TourStep => ({ ...s, prepare: toReport });
   const ledger = (s: TourStep): TourStep => ({ ...s, prepare: toLedger });
+  const invoices = (s: TourStep): TourStep => ({ ...s, prepare: toInvoices });
 
   const steps: TourStep[] = [
     {
@@ -275,6 +281,42 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
         "• Lô …, SSCC …: mã lô của chuyến và mã SSCC nếu có. Dòng Người ghi cho biết ai ghi chuyến.\n" +
         "Bảng dòng hàng chỉ đọc; đơn giá trống hiện Chưa có giá. Sửa chuyến đưa chuyến về Ghi nhập để sửa; In tem QR in mỗi loại một tem. Cuối sổ là Tổng khối lượng (và Tổng tiền hàng) theo bộ lọc. Tick ô đầu dòng để tô màu các dòng đã dò.",
     }),
+  );
+  if (can.invoices) {
+    steps.push(
+      invoices({
+        id: "invoice-cards",
+        target: "imports-invoice-cards",
+        title: "Hóa đơn đại lý — việc còn lại",
+        body:
+          "Tab Hóa đơn (dành cho kế toán) gắn hóa đơn GTGT của đại lý vào đúng chuyến xưởng đã ghi. Hóa đơn có thể xuất cùng ngày hoặc vài ngày sau, một hóa đơn có thể gộp 2–3 chuyến. Máy ghép theo đại lý + ngày hàng về (cột “Ngày HĐ” của sổ chi tiết, không phải cột NGAY) + loại + số kg, và KHÔNG tự đổi số chuyến.\n" +
+          "Chọn khoảng Ngày hàng về. Bốn thẻ đếm việc còn lại; chọn một thẻ để lọc bảng dưới, chọn lại để bỏ lọc:\n" +
+          "• Chuyến chờ HĐ: chuyến đã ghi mà chưa gắn hóa đơn (hoặc mới gắn một phần loại).\n" +
+          "• HĐ chưa có file: có số trong sổ kế toán, chưa nạp PDF.\n" +
+          "• Lệch chưa xử: kg hoặc đơn giá trên hóa đơn khác sổ xưởng, chưa chọn cách xử.\n" +
+          "• HĐ không có chuyến: sổ xưởng không có chuyến nào khớp.\n" +
+          "Một khoảng ngày xong chứng từ khi cả bốn thẻ về 0.",
+      }),
+    );
+    steps.push(
+      invoices({
+        id: "invoice-saved",
+        target: "imports-invoice-saved",
+        title: "Nạp file, kết quả từng dòng, cách xử",
+        body:
+          (can.invoicesWrite
+            ? "Nạp ở khối Nạp sổ chi tiết NL + hóa đơn: chọn một lượt file Excel sổ chi tiết (xuất từ phần mềm kế toán) và các PDF hóa đơn; PDF nạp sau cũng được. Mã kế toán chưa biết (vd HONG-PHU, BT-1DANL) chọn đại lý / loại một lần. Xem trước rồi chọn Gắn hóa đơn vào chuyến; nạp lại không nhân đôi. Cảnh báo PDF: MST danh mục khác hóa đơn · PDF lệch sổ kế toán · PDF chưa có trong sổ kế toán. File đọc ngay trên máy này.\n"
+            : "") +
+          "Mỗi dòng là một loại hàng của một chuyến trên một hóa đơn. Cột Kết quả:\n" +
+          "• Khớp — kg và giá bằng sổ xưởng. Đã cập nhật theo HĐ — đã đổi sổ xưởng theo hóa đơn.\n" +
+          "• Lệch giá / Lệch kg — chọn Cập nhật theo HĐ (đổi số chuyến, Ghi chú dòng ghi vết “[Sửa theo HĐ …]”, ngày đã chốt ghi thêm “SAU KHI CHỐT NGÀY”, có Hoàn tác) hoặc Giữ số xưởng (bắt ghi lý do ⇒ Lệch đã giải trình).\n" +
+          "• Không có chuyến — chọn Tạo chuyến từ HĐ (chuyến ghi bù, lý do điền sẵn “Theo HĐ …”) hoặc Không thuộc chuyến (hàng đông gửi kho lạnh, không đi qua Nhập hàng; Bỏ xếp để ghép lại).\n" +
+          "• Chưa ánh xạ — mã kế toán chưa chọn đại lý / loại, nạp lại sau khi chọn.\n" +
+          "Nhãn Không còn trong file: lần nạp sau không còn dòng đó, liên kết vẫn giữ. Mở file để xem PDF hóa đơn.",
+      }),
+    );
+  }
+  steps.push(
     {
       id: "outro",
       prepare: restore,
@@ -294,7 +336,7 @@ export const tourSpec: PageTourSpec = {
   pageId: "imports",
   build: () =>
     buildImportsTour({
-      can: { create: true, update: true, lock: true, unlock: true },
+      can: { create: true, update: true, lock: true, unlock: true, invoices: true, invoicesWrite: true },
       hasOcr: true,
       startView: "entry",
       showView: () => {},

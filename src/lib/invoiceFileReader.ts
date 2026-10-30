@@ -22,7 +22,8 @@ async function rowsFromExcel(data: ArrayBuffer): Promise<InvoiceCell[][]> {
   return sheets.find((s) => has(s, /commercial\s+invoice/i)) ?? sheets.find((s) => has(s, /description/i)) ?? sheets[0] ?? [];
 }
 
-async function rowsFromPdf(data: ArrayBuffer): Promise<InvoiceCell[][] | "scan"> {
+/** Chữ của PDF (≤ 5 trang đầu) gom theo dòng — dùng chung cho hóa đơn đại lý (lib/supplierInvoiceFiles.ts). */
+export async function rowsFromPdf(data: ArrayBuffer): Promise<InvoiceCell[][] | "scan"> {
   const [pdfjs, worker] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")]);
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
   const task = pdfjs.getDocument({ data: new Uint8Array(data) });

@@ -166,6 +166,10 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   import_documents: null,
   import_files: null,
   import_sample_checks: null,
+  // Hóa đơn đại lý gắn chuyến (mig 0090): RLS riêng theo imports.invoices (đọc thêm cho ai xem Nhập hàng).
+  supplier_invoices: null,
+  supplier_invoice_lines: null,
+  accounting_code_maps: null,
   // Lệnh sản xuất (mig 0088): RLS riêng theo production-orders (chỉ Xem ⇒ chỉ lệnh đã phát hành).
   production_orders: null,
   production_order_lines: null,

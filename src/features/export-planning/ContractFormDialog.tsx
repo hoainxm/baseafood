@@ -33,6 +33,8 @@ import {
   INCOTERMS,
   PAYMENT_METHODS,
   computedLineKg,
+  copyContractLine,
+  insertCopiedLine,
   contractTotals,
   emptyTerms,
   lineAmount,
@@ -46,9 +48,11 @@ import {
 import { formatMoney } from "@/lib/format";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import { findCustomerName, lineTextAfterPick } from "@/lib/customerProductNames";
-import type { Customer, CustomerProductName, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, Product } from "@/types";
-import { FileSignature, Plus, Save, Trash2 } from "lucide-react";
+import type { Customer, CustomerProductName, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, ExportFile, Product } from "@/types";
+import { Copy, FileSignature, Plus, Save, Trash2 } from "lucide-react";
 import { FilePicker } from "./parts";
+import { useGoodsTypePicker } from "./goodsTypePicker";
+import { uploadExtraContractFiles } from "./RecordDialogs";
 
 export type ContractFormTarget =
   | { mode: "create" }
@@ -155,6 +159,8 @@ export interface ContractSavePayload {
   mode: ContractFormTarget["mode"];
   contract: ExportContract;
   revision: ExportContractRevision;
+  /** File thứ 2 trở đi chọn ở ô file HĐ (phụ lục…) ⇒ Hồ sơ đính kèm cấp HĐ (2026-10-30). */
+  attachments: ExportFile[];
 }
 
 export function ContractFormDialog({
@@ -200,6 +206,8 @@ export function ContractFormDialog({
   const draft = useDialogDraft({ form: "export-contract", value: form, setValue: setForm, isEmpty: (f) => snapshot(f) === f.initial });
   const customerEditor = useQuickCatalogEdit("customer", customers, (rows) => void setCustomers(rows));
   const productEditor = useQuickCatalogEdit("product", products, (rows) => void setProducts(rows));
+  // Loại hàng (mig 0089) — chưa chạy ⇒ ẩn ô.
+  const goodsPicker = useGoodsTypePicker();
   const kindPicker = useDocumentKindPicker(documentKindSource);
   /** Dòng vừa được tự gợi ý mặt hàng (chỉ để hiện dòng nhắc "kiểm lại", không lưu). */
   const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
@@ -287,23 +295,32 @@ export function ContractFormDialog({
     );
     const errs: FieldError[] = issues.map((i) => ({ field: i.label, message: i.message }));
     if (form.mode === "revise" && !form.changeSummary.trim()) errs.push({ field: "Nội dung sửa", message: "Ghi bản sửa đổi gì (VD: giảm dòng 1 còn 180 thùng)" });
-    const fileErr = file[0] ? checkExportFile(file[0]) : null;
-    if (fileErr) errs.push({ field: "File hợp đồng", message: fileErr });
+    for (const f of file) {
+      const fileErr = checkExportFile(f);
+      if (fileErr) errs.push({ field: f.name, message: fileErr });
+    }
     setErrors(errs);
     if (errs.length) return;
 
     setIsUploading(true);
-    let uploaded = "";
+    const done: string[] = [];
     try {
       let filePath = form.filePath;
       let fileName = form.fileName;
       if (file[0] && hasExportStorage) {
         const r = await uploadExportFile(exportFilePath(form.contractId, "contract", form.revisionId, file[0].name), file[0]);
         if ("error" in r) throw new Error(r.error);
-        uploaded = r.path;
+        done.push(r.path);
         filePath = r.path;
         fileName = r.fileName;
       }
+      const attachments = await uploadExtraContractFiles(
+        file.slice(1),
+        form.contractId,
+        `Phụ lục / file kèm HĐ ${form.contractNo.trim()}${form.revisionNo ? ` bản sửa ${form.revisionNo}` : ""}`,
+        recordedBy,
+        done,
+      );
       const lines = form.lines.filter((l) => l.description.trim() || l.quantity != null || l.kg != null);
       const prev = contracts.find((c) => c.id === form.contractId);
       const ok = onSave({
@@ -334,14 +351,15 @@ export function ContractFormDialog({
           recordedBy,
           createdAt: new Date().toISOString(),
         },
+        attachments,
       });
       if (!ok) {
-        if (uploaded) void removeExportFiles([uploaded]);
+        void removeExportFiles(done);
         return;
       }
       draft.done();
     } catch (e) {
-      if (uploaded) void removeExportFiles([uploaded]);
+      void removeExportFiles(done);
       notify.error(e instanceof Error ? e.message : "Không tải được file lên máy chủ");
     } finally {
       setIsUploading(false);
@@ -567,6 +585,20 @@ export function ContractFormDialog({
                       </span>
                       <Button
                         size="sm"
+                        variant="outline"
+                        data-tour={i === 0 ? "export-line-copy" : undefined}
+                        onClick={() => {
+                          const copy = copyContractLine(l, newId());
+                          setForm((f) => (f ? { ...f, lines: insertCopiedLine(f.lines, l.id, copy) } : f));
+                          if (openLines.has(l.id)) setOpenLines((s) => new Set(s).add(copy.id));
+                        }}
+                        title={`Chép dòng ${i + 1} thành dòng mới ngay dưới: giữ mọi thông tin, để trống Size để gõ size khác.`}
+                      >
+                        <Copy className="mr-1 h-4 w-4" aria-hidden />
+                        Chép dòng
+                      </Button>
+                      <Button
+                        size="sm"
                         variant="danger"
                         onClick={() => setForm((f) => (f ? { ...f, lines: f.lines.filter((x) => x.id !== l.id) } : f))}
                         title={`Bỏ dòng ${i + 1} khỏi hợp đồng.`}
@@ -575,7 +607,9 @@ export function ContractFormDialog({
                         Bỏ dòng
                       </Button>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_minmax(0,0.9fr)_minmax(0,1.2fr)]">
+                    <div
+                      className={`grid gap-3 sm:grid-cols-2 ${goodsPicker.isAvailable ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_minmax(0,1.1fr)]" : "lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_minmax(0,0.9fr)_minmax(0,1.2fr)]"}`}
+                    >
                       <Field label="Tên hàng (như trên HĐ)" required>
                         <Input value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} onBlur={() => suggestFor(l.id)} aria-required />
                       </Field>
@@ -608,6 +642,21 @@ export function ContractFormDialog({
                       <Field label="Size">
                         <Input value={l.size} onChange={(e) => setLine(l.id, { size: e.target.value })} />
                       </Field>
+                      {goodsPicker.isAvailable && (
+                        <div data-tour={i === 0 ? "export-line-goods-type" : undefined} className="min-w-0">
+                          <Combobox
+                            label="Loại hàng"
+                            value={l.goodsTypeId ?? ""}
+                            onChange={(v) => setLine(l.id, { goodsTypeId: v || undefined })}
+                            options={goodsPicker.options}
+                            onCreate={goodsPicker.onCreate}
+                            emptyText="Chưa có loại hàng nào — gõ tên để thêm mới."
+                            onEditItem={goodsPicker.onEditItem}
+                            canEdit={goodsPicker.canEdit}
+                            editLabel={goodsPicker.editLabel}
+                          />
+                        </div>
+                      )}
                       <Field label="Quy cách đóng gói">
                         <Input value={l.packing} onChange={(e) => setLine(l.id, { packing: e.target.value })} />
                       </Field>
@@ -673,10 +722,13 @@ export function ContractFormDialog({
 
           <FormSection no={5} title="File & ghi chú">
             {hasExportStorage ? (
-              <Field label="File hợp đồng đã ký">
-                <div className="grid gap-2">
-                  {form.fileName && <span className="text-sm text-muted-foreground">Đang có: {form.fileName} — chọn file mới để thay</span>}
-                  <FilePicker files={file} onChange={setFile} multiple={false} label={form.fileName ? "Chọn file khác" : "Chọn file"} />
+              <Field
+                label="File hợp đồng đã ký + phụ lục"
+                hint="Chọn được nhiều file: file ĐẦU là hợp đồng của bản này (thay file đang có); các file sau (phụ lục, file kèm) lưu vào Hồ sơ đính kèm của hợp đồng."
+              >
+                <div className="grid gap-2" data-tour="export-contract-files">
+                  {form.fileName && <span className="text-sm text-muted-foreground">Đang có: {form.fileName}</span>}
+                  <FilePicker files={file} onChange={setFile} label={form.fileName ? "Chọn file khác / thêm phụ lục" : "Chọn file"} />
                 </div>
               </Field>
             ) : (
@@ -690,6 +742,7 @@ export function ContractFormDialog({
       )}
       {customerEditor.dialog}
       {productEditor.dialog}
+      {goodsPicker.dialog}
       {kindPicker.dialog}
     </FormDialog>
   );

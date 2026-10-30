@@ -4,6 +4,9 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_EXPORT_DATA,
+  copyContractLine,
+  lineGoodsTypeNames,
+  insertCopiedLine,
   extractCustomerNamesFromContracts,
   rankProductsForLine,
   blankItem,
@@ -609,7 +612,7 @@ describe("NV11 · tháng, tra cứu, Excel (AC-24…AC-26)", () => {
     ];
     const d2 = { ...d, shipments: [...d.shipments, ...extra] };
     const xl = buildMonthExcel(buildMonthPlan("2026-10", d2, customers, today), d2);
-    expect(xl.header).toEqual(["CONT", "Khách hàng", "Mặt hàng", "Lượng (kg)", "MSL", "Cảng đến", "Số booking", "Ngày đóng cont", "ETD", "Đơn giá", "Bao bì", "Thực xuất (kg)", "Giá trị (USD)", "Ghi chú"]);
+    expect(xl.header).toEqual(["CONT", "Khách hàng", "Mặt hàng", "Lượng (kg)", "MSL", "Cảng đến", "Số booking", "Ngày đóng cont", "ETD", "Đơn giá", "Bao bì", "Thực xuất (kg)", "Giá trị (USD)", "Ghi chú", "Loại hàng"]);
     const ships = xl.rows.filter((r) => r.kind === "shipment");
     expect(ships).toHaveLength(4);
     expect(ships.some((r) => r.cells[0] === "40+20")).toBe(true);
@@ -858,5 +861,37 @@ describe("v9.1 · danh mục loại chứng từ (mig 0081, R37)", () => {
     const d = data({ shipments: [shipment("s1", "c1")], items: [it5] });
     expect(canMarkDone(it5, d)).toMatchObject({ ok: false, missing: ["number", "issuedOn", "file"] });
     expect(documentKindLabel("doc-x9")).toBe("Chứng từ khác");
+  });
+});
+
+describe("chép dòng hàng HĐ (2026-10-30)", () => {
+  const base = {
+    id: "l1", description: "Frozen octopus", hsCode: "0307", size: "1-2kg", packing: "10kg/ctn", unitKind: "carton" as const,
+    cartonsPerUnit: 1, netKgPerCarton: 10, quantity: 100, kg: null, unitPrice: 5.2, microSpec: "TPC<1e5", productId: "p1",
+  };
+  it("giữ mọi thông tin, chỉ đổi id và để trống size", () => {
+    const c = copyContractLine(base, "l9");
+    expect(c).toEqual({ ...base, id: "l9", size: "" });
+    expect(base.size).toBe("1-2kg");
+  });
+  it("bản chép nằm ngay dưới dòng gốc", () => {
+    const lines = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    expect(insertCopiedLine(lines, "b", { id: "x" }).map((l) => l.id)).toEqual(["a", "b", "x", "c"]);
+    expect(insertCopiedLine(lines, "zz", { id: "x" }).map((l) => l.id)).toEqual(["a", "b", "c", "x"]);
+  });
+});
+
+describe("cột Loại hàng trong Excel (mig 0089)", () => {
+  const g = [
+    { id: "one-skin", name: "1 da", sortOrder: 10, note: "" },
+    { id: "mada", name: "Mada", sortOrder: 30, note: "" },
+  ];
+  const line = (id: string, goodsTypeId?: string) => ({
+    id, description: "x", hsCode: "", size: "", packing: "", unitKind: "carton" as const, cartonsPerUnit: 1,
+    netKgPerCarton: null, quantity: null, kg: null, unitPrice: null, microSpec: "", ...(goodsTypeId ? { goodsTypeId } : {}),
+  });
+  it("tên theo thứ tự dòng, không lặp; dòng chưa chọn / loại đã xóa bỏ qua", () => {
+    expect(lineGoodsTypeNames([line("a", "mada"), line("b", "one-skin"), line("c", "mada"), line("d"), line("e", "gone")], g)).toBe("Mada; 1 da");
+    expect(lineGoodsTypeNames([], g)).toBe("");
   });
 });

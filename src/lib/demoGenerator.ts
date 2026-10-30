@@ -70,6 +70,7 @@ import type {
   ExportActivity,
   CustomerProductName,
   ExportDocumentKindRow,
+  GoodsType,
   ExportShipment,
   ExportStepItem,
 } from "@/types";
@@ -144,6 +145,7 @@ export interface DemoBundle {
   customerProductNames: CustomerProductName[];
   /** Danh mục loại chứng từ (mig 0081) — một loại tự thêm để trình diễn thêm / sửa tại chỗ. */
   exportDocumentKinds: ExportDocumentKindRow[];
+  goodsTypes: GoodsType[];
   /** Nhập khẩu (mig 0082) — bộ nhỏ dựng sẵn (lib/importPlanningDemo.ts): 3 HĐ, 4 lần nhập đủ trạng thái;
    *  file là đường dẫn GIỮ CHỖ. NCC nước ngoài của bộ được thêm vào `suppliers`. */
   /** Danh mục NCC nhập khẩu (mig 0083) — riêng, không thêm vào Đại lý. */
@@ -733,6 +735,13 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     exportActivities: exportDemo.activities,
     customerProductNames: demoCustomerNames(exportDemo),
     exportDocumentKinds: [{ id: "doc-demo-halal", name: "Giấy chứng nhận Halal", sortOrder: 100, note: "Khách Malaysia yêu cầu" }],
+    goodsTypes: [
+      { id: "one-skin", name: "1 da", sortOrder: 10, note: "" },
+      { id: "two-skin", name: "2 da", sortOrder: 20, note: "" },
+      { id: "mada", name: "Mada", sortOrder: 30, note: "" },
+      { id: "dried-fish", name: "Cá khô", sortOrder: 40, note: "" },
+      { id: "frozen-fish", name: "Cá đông", sortOrder: 70, note: "" },
+    ],
     importSuppliers: importDemo.suppliers,
     importContracts: importDemo.contracts,
     importContractLines: importDemo.lines,

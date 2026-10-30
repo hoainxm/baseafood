@@ -8,6 +8,8 @@ import { useEffect, useState } from "react";
 import { Button, Popover, PopoverContent, PopoverTrigger, RecordTable, Tag, formatNumber, type RecordTableColumn } from "@/design-system";
 import { CollapsibleSection } from "@/features/export-planning/parts";
 import { formatDateVN, formatMoney } from "@/lib/format";
+import { useGoodsTypeStore } from "@/lib/catalogRepo";
+import { goodsTypeName } from "@/lib/goodsTypes";
 import {
   canDeleteContract,
   canDeleteDocument,
@@ -124,6 +126,8 @@ export function ImportDossier({
     document.getElementById(`import-receipt-${focusReceiptId}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [focusReceiptId]);
 
+  // Loại hàng (mig 0089) — chưa chạy ⇒ không hiện cột.
+  const goodsStore = useGoodsTypeStore();
   const lineColumns: RecordTableColumn<{ line: ImportContractLine; receivedKg: number; remainingKg: number }>[] = [
     { key: "name", header: "Tên hàng", primary: true, getSortValue: (x) => x.line.productName, render: (x) => <span className="break-words">{x.line.productName}</span> },
     ...(data.productLinkAvailable !== false
@@ -133,6 +137,16 @@ export function ImportDossier({
             header: "Mặt hàng (danh mục)",
             getSortValue: (x) => lineProduct(data, x.line)?.name || null,
             render: (x) => <LineProductLabel data={data} line={x.line} />,
+          },
+        ] satisfies RecordTableColumn<{ line: ImportContractLine; receivedKg: number; remainingKg: number }>[])
+      : []),
+    ...(goodsStore.isAvailable
+      ? ([
+          {
+            key: "goods-type",
+            header: "Loại hàng",
+            getSortValue: (x) => goodsTypeName(goodsStore.goodsTypes, x.line.goodsTypeId) || null,
+            render: (x) => goodsTypeName(goodsStore.goodsTypes, x.line.goodsTypeId) || "—",
           },
         ] satisfies RecordTableColumn<{ line: ImportContractLine; receivedKg: number; remainingKg: number }>[])
       : []),

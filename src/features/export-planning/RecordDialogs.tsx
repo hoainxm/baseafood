@@ -43,6 +43,44 @@ async function uploadOne(file: File | undefined, contractId: string, area: Expor
   return uploadExportFile(exportFilePath(contractId, area, id, file.name), file);
 }
 
+/**
+ * File THỨ HAI trở đi của một ô đính kèm (phụ lục HĐ, thư bổ sung, giấy báo có thêm) — chủ dự án 2026-10-30:
+ * "hợp đồng cho chọn nhiều file". Bản ghi gốc (bản HĐ, lần gia hạn, lần tiền về) chỉ giữ MỘT file như cũ;
+ * các file thêm vào Hồ sơ đính kèm cấp HĐ (`step: "contract"`, loại "Khác") với chú thích nguồn, nên xem / tải /
+ * gỡ được ở cùng chỗ với hồ sơ khác. Đường file đã tải ghi vào `done` để gỡ khi lưu hụt.
+ */
+export async function uploadExtraContractFiles(
+  files: readonly File[],
+  contractId: string,
+  caption: string,
+  uploadedBy: string,
+  done: string[],
+): Promise<ExportFile[]> {
+  const rows: ExportFile[] = [];
+  for (const f of files) {
+    const id = newId();
+    const up = await uploadOne(f, contractId, "contract", id);
+    if (up && "error" in up) throw new Error(up.error);
+    if (!up) continue;
+    done.push(up.path);
+    rows.push({
+      id,
+      contractId,
+      shipmentId: "",
+      stepItemId: "",
+      step: "contract",
+      attachmentKind: "other",
+      path: up.path,
+      fileName: up.fileName,
+      layerNo: null,
+      caption,
+      uploadedBy,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return rows;
+}
+
 export interface FinalReviewTarget {
   contractId: string;
   contractNo: string;
@@ -367,7 +405,8 @@ export function ExtensionDialog({
   target: ExtensionTarget | null;
   recordedBy: string;
   onClose: () => void;
-  onSave: (e: ExportDeadlineExtension) => boolean;
+  /** `extraFiles`: file thứ 2 trở đi (thư bổ sung) ⇒ hồ sơ đính kèm cấp HĐ. */
+  onSave: (e: ExportDeadlineExtension, extraFiles: ExportFile[]) => boolean;
 }) {
   const today = todayIso();
   const [form, setForm] = useState<ExtensionForm | null>(null);
@@ -396,17 +435,26 @@ export function ExtensionDialog({
     else if (form.currentDeadline && form.newDeadline <= form.currentDeadline)
       errs.push({ field: "Hạn giao mới", message: "Hạn mới phải sau hạn đang có" });
     if (!form.note.trim() && !file[0]) errs.push({ field: "Xác nhận của khách", message: "Đính email / thư khách xác nhận, hoặc ghi chú nội dung xác nhận" });
-    const fe = file[0] ? checkExportFile(file[0]) : null;
-    if (fe) errs.push({ field: "File", message: fe });
+    for (const f of file) {
+      const fe = checkExportFile(f);
+      if (fe) errs.push({ field: f.name, message: fe });
+    }
     setErrors(errs);
     if (errs.length) return;
     setBusy(true);
     const id = newId();
-    let uploaded = "";
+    const done: string[] = [];
     try {
       const up = await uploadOne(file[0], form.contractId, "contract", id);
       if (up && "error" in up) throw new Error(up.error);
-      if (up) uploaded = up.path;
+      if (up) done.push(up.path);
+      const extras = await uploadExtraContractFiles(
+        file.slice(1),
+        form.contractId,
+        `Gia hạn giao hàng tới ${form.newDeadline.split("-").reverse().join("/")} — xác nhận của khách (file thêm)`,
+        recordedBy,
+        done,
+      );
       const ok = onSave({
         id,
         contractId: form.contractId,
@@ -417,14 +465,14 @@ export function ExtensionDialog({
         fileName: up?.fileName ?? "",
         recordedBy,
         createdAt: new Date().toISOString(),
-      });
+      }, extras);
       if (!ok) {
-        if (uploaded) void removeExportFiles([uploaded]);
+        void removeExportFiles(done);
         return;
       }
       draft.done();
     } catch (e) {
-      if (uploaded) void removeExportFiles([uploaded]);
+      void removeExportFiles(done);
       notify.error(e instanceof Error ? e.message : "Không tải được file lên máy chủ");
     } finally {
       setBusy(false);
@@ -475,8 +523,8 @@ export function ExtensionDialog({
             <Textarea rows={2} value={form.note} onChange={(e) => set("note", e.target.value)} />
           </Field>
           {hasExportStorage && (
-            <Field label="Email / thư xác nhận của khách">
-              <FilePicker files={file} onChange={setFile} multiple={false} />
+            <Field label="Email / thư xác nhận của khách" hint="Chọn được nhiều file; file thứ 2 trở đi lưu vào Hồ sơ đính kèm của hợp đồng.">
+              <FilePicker files={file} onChange={setFile} />
             </Field>
           )}
         </div>
@@ -524,7 +572,8 @@ export function PaymentDialog({
   target: PaymentTarget | null;
   recordedBy: string;
   onClose: () => void;
-  onSave: (p: ExportPayment) => boolean;
+  /** `extraFiles`: file thứ 2 trở đi ⇒ hồ sơ đính kèm cấp HĐ. */
+  onSave: (p: ExportPayment, extraFiles: ExportFile[]) => boolean;
 }) {
   const today = todayIso();
   const [form, setForm] = useState<PaymentForm | null>(null);
@@ -567,16 +616,25 @@ export function PaymentDialog({
     const errs: FieldError[] = [];
     if (!form.date) errs.push({ field: "Ngày", message: "Chọn ngày" });
     if (form.kind === "payment" && !(form.amount != null && form.amount > 0)) errs.push({ field: "Số tiền", message: "Ghi số tiền về (lớn hơn 0)" });
-    const fe = file[0] ? checkExportFile(file[0]) : null;
-    if (fe) errs.push({ field: "File", message: fe });
+    for (const f of file) {
+      const fe = checkExportFile(f);
+      if (fe) errs.push({ field: f.name, message: fe });
+    }
     setErrors(errs);
     if (errs.length) return;
     setBusy(true);
-    let uploaded = "";
+    const done: string[] = [];
     try {
       const up = await uploadOne(file[0], form.contractId, "payment", form.id);
       if (up && "error" in up) throw new Error(up.error);
-      if (up) uploaded = up.path;
+      if (up) done.push(up.path);
+      const extras = await uploadExtraContractFiles(
+        file.slice(1),
+        form.contractId,
+        `${form.kind === "payment" ? "Giấy báo có" : "Email / biên nhận gửi bộ chứng từ"} ngày ${form.date.split("-").reverse().join("/")} (file thêm)`,
+        recordedBy,
+        done,
+      );
       const ok = onSave({
         id: form.id,
         contractId: form.contractId,
@@ -591,14 +649,14 @@ export function PaymentDialog({
         fileName: up?.fileName ?? form.fileName,
         recordedBy,
         createdAt: target?.existing?.createdAt ?? new Date().toISOString(),
-      });
+      }, extras);
       if (!ok) {
-        if (uploaded) void removeExportFiles([uploaded]);
+        void removeExportFiles(done);
         return;
       }
       draft.done();
     } catch (e) {
-      if (uploaded) void removeExportFiles([uploaded]);
+      void removeExportFiles(done);
       notify.error(e instanceof Error ? e.message : "Không tải được file lên máy chủ");
     } finally {
       setBusy(false);
@@ -675,8 +733,8 @@ export function PaymentDialog({
             <Textarea rows={2} value={form.note} onChange={(e) => set("note", e.target.value)} />
           </Field>
           {hasExportStorage && (
-            <Field label={form.kind === "payment" ? "Giấy báo có" : "Email / biên nhận gửi"} hint={form.fileName ? `Đang có: ${form.fileName}` : undefined}>
-              <FilePicker files={file} onChange={setFile} multiple={false} />
+            <Field label={form.kind === "payment" ? "Giấy báo có" : "Email / biên nhận gửi"} hint={`${form.fileName ? `Đang có: ${form.fileName}. ` : ""}Chọn được nhiều file; file thứ 2 trở đi lưu vào Hồ sơ đính kèm của hợp đồng.`}>
+              <FilePicker files={file} onChange={setFile} />
             </Field>
           )}
         </div>

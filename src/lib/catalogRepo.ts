@@ -61,6 +61,7 @@ import {
   EXPORT_ACTIVITY_TABLE,
   CUSTOMER_PRODUCT_NAME_TABLE,
   EXPORT_DOCUMENT_KIND_TABLE,
+  GOODS_TYPE_TABLE,
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
   DOMESTIC_SALE_TABLE,
@@ -365,6 +366,18 @@ export function useExportDocumentKindStore() {
   const [kinds, setKinds, meta] = useExportDocumentKinds();
   const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
   return { kinds, setKinds, isAvailable, isLoading: meta.status === "loading" && kinds.length === 0 };
+}
+/** Danh mục Loại hàng (mig 0089) — dùng qua `useGoodsTypeStore`. */
+export const useGoodsTypes = () => useTable(GOODS_TYPE_TABLE);
+
+/**
+ * Loại hàng + cờ `isAvailable`: có máy chủ mà chưa chạy 0089 ⇒ không ghi (ẩn ô ở phiếu HĐ, tab Danh mục
+ * báo chưa chạy) — khỏi kẹt hàng chờ.
+ */
+export function useGoodsTypeStore() {
+  const [goodsTypes, setGoodsTypes, meta] = useGoodsTypes();
+  const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
+  return { goodsTypes, setGoodsTypes, isAvailable, isLoading: meta.status === "loading" && goodsTypes.length === 0 };
 }
 /**
  * Phòng Kế hoạch · Nhập khẩu (mig 0082) — luật ở lib/importPlanning.ts. Màn đọc qua

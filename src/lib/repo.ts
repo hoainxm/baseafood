@@ -75,6 +75,7 @@ import type {
   ExportPayment,
   CustomerProductName,
   ExportDocumentKindRow,
+  GoodsType,
   ExportShipment,
   ExportStepItem,
   BatterType,
@@ -2188,6 +2189,8 @@ function parseLines(v: unknown): ExportContractLine[] {
     microSpec: s(l.microSpec),
     // Mặt hàng đã nối (R16) — thiếu dòng này thì tải lại trang mọi dòng thành "chưa nối" dù máy chủ đã lưu.
     ...(l.productId ? { productId: s(l.productId) } : {}),
+    // Loại hàng (mig 0089) — như productId: thiếu dòng này thì tải lại trang mất loại đã chọn.
+    ...(l.goodsTypeId ? { goodsTypeId: s(l.goodsTypeId) } : {}),
   }));
 }
 
@@ -2535,6 +2538,25 @@ export const CUSTOMER_PRODUCT_NAME_TABLE: TableMapping<CustomerProductName> = {
 };
 
 /** Danh mục loại chứng từ xuất khẩu (mig 0081) — đổi tên loại hệ thống + loại tự thêm. */
+/** Loại hàng (mig 0089) — danh mục dùng chung dòng hàng HĐ xuất + nhập. */
+export const GOODS_TYPE_TABLE: TableMapping<GoodsType> = {
+  table: "goods_types",
+  localKey: "bsf.goods-types.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    name: x.name,
+    sort_order: Math.round(Number(x.sortOrder) || 0),
+    note: x.note ?? "",
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    name: s(r.name),
+    sortOrder: Number(r.sort_order) || 0,
+    note: s(r.note),
+  }),
+};
+
 export const EXPORT_DOCUMENT_KIND_TABLE: TableMapping<ExportDocumentKindRow> = {
   table: "export_document_kinds",
   localKey: "bsf.export-document-kinds.v1",
@@ -2674,13 +2696,15 @@ export const IMPORT_CONTRACT_LINE_TABLE: TableMapping<ImportContractLine> = {
   localKey: "bsf.import-contract-lines.v1",
   getKey: theoId,
   // product_id → products.id (mig 0084): chỉ gửi khi dòng có trường (máy chủ chưa có cột ⇒ không kẹt hàng chờ).
-  refColumns: ["contract_id", "product_id"],
+  // goods_type_id → goods_types.id (mig 0089): như product_id, chỉ gửi khi dòng có trường.
+  refColumns: ["contract_id", "product_id", "goods_type_id"],
   toRow: (x) => ({
     id: x.id,
     contract_id: x.contractId,
     line_no: x.lineNo,
     product_name: x.productName,
     ...(x.productId !== undefined ? { product_id: x.productId || null } : {}),
+    ...(x.goodsTypeId !== undefined ? { goods_type_id: x.goodsTypeId || null } : {}),
     kg: x.kg,
     note: x.note,
   }),
@@ -2690,6 +2714,7 @@ export const IMPORT_CONTRACT_LINE_TABLE: TableMapping<ImportContractLine> = {
     lineNo: numOrNull(r.line_no) ?? 0,
     productName: s(r.product_name),
     ...("product_id" in r ? { productId: r.product_id == null ? "" : s(r.product_id) } : {}),
+    ...("goods_type_id" in r ? { goodsTypeId: r.goods_type_id == null ? "" : s(r.goods_type_id) } : {}),
     kg: numOrNull(r.kg),
     note: s(r.note),
   }),
@@ -2940,6 +2965,7 @@ const TABLE_LABELS: Record<string, string> = {
   customer_product_names: "Tên hàng theo khách",
   export_document_kinds: "Loại chứng từ xuất khẩu",
   import_suppliers: "NCC nhập khẩu",
+  goods_types: "Loại hàng",
   import_contracts: "Hợp đồng nhập khẩu",
   import_contract_lines: "Dòng hàng hợp đồng nhập khẩu",
   import_receipts: "Lần nhập khẩu",

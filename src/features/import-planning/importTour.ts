@@ -63,6 +63,7 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
         body:
           "Chọn Lập hợp đồng nhập, chọn đối tác trong danh mục NCC nhập khẩu (khác Đại lý của Nhập hàng; thêm mới ngay trong ô được), ghi số hợp đồng, ngày ký, loại hình (sản xuất xuất khẩu, kinh doanh hoặc gia công) và từng dòng hàng.\n" +
           "Mỗi dòng hàng chọn Mặt hàng (danh mục) để mọi khu cùng gọi một tên. Gõ tên hàng xong app tự gợi ý khi tên đã nối ở hợp đồng trước. Chưa nối vẫn lưu được.\n" +
+          "Dòng gần giống dòng trước thì chọn Chép dòng: dòng mới nằm ngay dưới, giữ mọi ô, chỉ sửa ô khác.\n" +
           "Hàng gia công không ghi giá thì để trống đơn giá. Lưu xong hợp đồng ở trạng thái Chưa có lần nhập.",
       }),
     );

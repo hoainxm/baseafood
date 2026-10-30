@@ -95,6 +95,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Lập hợp đồng",
         body:
           "Khi có hợp đồng giấy mới, chọn Lập hợp đồng và nhập đúng như bản giấy. Phiếu gồm 5 phần: 1 Hợp đồng · 2 Điều khoản và thanh toán · 3 Chứng từ khách yêu cầu · 4 Dòng hàng · 5 File và ghi chú.\n" +
+          "Ở phần 4, dòng chỉ khác size thì chọn Chép dòng: dòng mới nằm ngay dưới, giữ mọi ô, để trống Size để gõ size khác. Phần 5 chọn được nhiều file: file đầu là hợp đồng, các file sau (phụ lục) vào Hồ sơ đính kèm.\n" +
           "Sau khi lưu, hồ sơ hợp đồng mở ra ở trạng thái Chờ đính kèm: việc tiếp là đính kèm hợp đồng đã ký (và L/C nếu thanh toán L/C).",
       }),
     );

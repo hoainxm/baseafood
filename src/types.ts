@@ -1139,6 +1139,17 @@ export type ExportDocumentKind = SystemExportDocumentKind | (string & {});
  * Một dòng danh mục loại chứng từ (mig 0081): `id` trùng loại hệ thống = đổi tên hiển thị loại đó;
  * id khác = loại tự thêm (luật như "Chứng từ khác").
  */
+/**
+ * Loại hàng (mig 0089) — danh mục dùng chung cho dòng hàng HĐ xuất + nhập: 1 da, 2 da, mada, cá khô…
+ * Dòng lưu `id` ⇒ đổi tên ở Danh mục không tách sổ; Excel ghi tên để lọc.
+ */
+export interface GoodsType {
+  id: string;
+  name: string;
+  sortOrder: number;
+  note: string;
+}
+
 export interface ExportDocumentKindRow {
   id: string;
   name: string;
@@ -1170,6 +1181,8 @@ export interface ExportContractLine {
   /** Mặt hàng ở danh mục `products` (không bắt buộc lúc lập HĐ; bắt buộc trước khi Lệnh SX xong).
    *  Tên tiếng Anh của HĐ giữ ở `description`. Bản ghi cũ không có ⇒ coi như chưa nối. */
   productId?: string;
+  /** Loại hàng (`goods_types.id`, mig 0089) — để lọc Excel. Không có / "" = chưa chọn. */
+  goodsTypeId?: string;
 }
 
 /** Điều khoản của MỘT bản hợp đồng (bản 0 hoặc bản sửa). */
@@ -1479,6 +1492,8 @@ export interface ImportContractLine {
    * undefined = máy chủ chưa có cột (chưa chạy 0084) ⇒ không gửi.
    */
   productId?: string;
+  /** Loại hàng (`goods_types.id`, mig 0089); "" = chưa chọn; undefined = máy chủ chưa có cột ⇒ không gửi. */
+  goodsTypeId?: string;
   kg: number | null;
   note: string;
 }

@@ -15,6 +15,7 @@ import type {
   ExportContractApproval,
   ExportContractAttachmentKind,
   ExportContractLine,
+  GoodsType,
   ExportContractRevision,
   ExportContractTerms,
   ExportDeadlineExtension,
@@ -292,6 +293,20 @@ export function lineCartons(l: ExportContractLine): number {
 }
 
 /** kg tự tính = số thùng × kg tịnh/thùng (null khi chưa đủ số). */
+/**
+ * Chép một dòng hàng HĐ (chủ dự án 2026-10-30: "mọi thông tin như cũ, chỉ khác mỗi size" — khỏi gõ lại).
+ * Id mới; ô Size để trống cho người gõ size mới; mặt hàng, quy cách, số lượng, đơn giá… giữ nguyên.
+ */
+export function copyContractLine(l: ExportContractLine, id: string): ExportContractLine {
+  return { ...l, id, size: "" };
+}
+
+/** Chèn bản chép ngay dưới dòng gốc (giữ thứ tự dòng như trên HĐ). */
+export function insertCopiedLine<T extends { id: string }>(lines: readonly T[], sourceId: string, copy: T): T[] {
+  const i = lines.findIndex((l) => l.id === sourceId);
+  return i < 0 ? [...lines, copy] : [...lines.slice(0, i + 1), copy, ...lines.slice(i + 1)];
+}
+
 export function computedLineKg(l: ExportContractLine): number | null {
   if (l.quantity == null || l.netKgPerCarton == null) return null;
   return round2(lineCartons(l) * l.netKgPerCarton);
@@ -1355,7 +1370,15 @@ export const MONTH_EXCEL_HEADER = [
   "Thực xuất (kg)",
   "Giá trị (USD)",
   "Ghi chú",
+  // Thêm 2026-10-30 (mig 0089) — CUỐI bảng để cột sổ cũ giữ đúng vị trí; lọc Excel theo "chứa".
+  "Loại hàng",
 ] as const;
+
+/** Tên các loại hàng của một bản HĐ (theo thứ tự dòng, không lặp) — cột Loại hàng của Excel. */
+export function lineGoodsTypeNames(lines: readonly ExportContractLine[], goodsTypes: readonly GoodsType[]): string {
+  const names = lines.map((l) => goodsTypes.find((g) => g.id === l.goodsTypeId)?.name.trim() ?? "").filter(Boolean);
+  return [...new Set(names)].join("; ");
+}
 
 export type ExcelCell = string | number | null;
 export interface MonthExcelRow {
@@ -1377,7 +1400,7 @@ function weekOf(date: string): { key: string; label: string } {
 
 const stateWord = (s: ExportItemState) => (s === "done" ? "Đã xong" : s === "not-applicable" ? "Không áp dụng" : s === "in-progress" ? "Đang làm" : "");
 
-export function buildMonthExcel(plan: MonthPlan, d: ExportData): { header: string[]; rows: MonthExcelRow[] } {
+export function buildMonthExcel(plan: MonthPlan, d: ExportData, goodsTypes: readonly GoodsType[] = []): { header: string[]; rows: MonthExcelRow[] } {
   type Bucket = { rows: MonthShipmentRow[]; customerName: string };
   const merged = new Map<string, Bucket>();
   for (const g of plan.groups) {
@@ -1412,6 +1435,7 @@ export function buildMonthExcel(plan: MonthPlan, d: ExportData): { header: strin
       round2(rs.reduce((t, r) => t + r.actuals.kg, 0)) || null,
       round2(rs.reduce((t, r) => t + r.actuals.amount, 0)) || null,
       uniq(rs.map((r) => r.shipment.note)).join("; "),
+      uniq(rs.map((r) => lineGoodsTypeNames(workingRevision(d, r.contract.id)?.lines ?? [], goodsTypes))).join("; "),
     ];
     return { date, cells };
   });
@@ -1450,6 +1474,7 @@ export function buildMonthExcel(plan: MonthPlan, d: ExportData): { header: strin
           null,
           null,
           `Hạn giao ${formatDateVN(p.deadline)}${p.overdue ? " — đã quá hạn" : ""}`,
+          lineGoodsTypeNames(rev?.lines ?? [], goodsTypes),
         ],
       });
     }

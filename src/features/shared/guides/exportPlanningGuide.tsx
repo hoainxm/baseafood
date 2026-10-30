@@ -163,6 +163,8 @@ export const exportPlanningGuide: PageGuide = {
       <GuideSection title="Mẹo">
         <GuideList>
           <li>Việc ít dùng nằm ở <b>Thao tác khác</b>: Sửa hợp đồng (khi chưa có chuyến), Ghi bản sửa (khi đã có chuyến), Gia hạn giao hàng, hủy.</li>
+          <li>Dòng hàng chỉ khác size: chọn <b>Chép dòng</b>, dòng mới giữ mọi ô và để trống Size.</li>
+          <li>Ô file hợp đồng, thư gia hạn, giấy báo có chọn được <b>nhiều file</b>: file đầu gắn vào bản ghi, các file sau (phụ lục) vào <b>Hồ sơ đính kèm</b>.</li>
           <li>Cuối hồ sơ có <b>Nhật ký thao tác</b>: ai làm gì, lúc nào. Chỉ thêm, không sửa hay xóa được.</li>
           <li>Rê chuột hoặc chạm vào chữ gạch chấm như <b>ETD</b>, <b>L/C</b>, <b>B/L</b> để xem nghĩa.</li>
         </GuideList>

@@ -52,6 +52,8 @@ import {
   type ExportData,
 } from "@/lib/exportPlanning";
 import { formatDateVN, formatMoney } from "@/lib/format";
+import { useGoodsTypeStore } from "@/lib/catalogRepo";
+import { goodsTypeName } from "@/lib/goodsTypes";
 import type { ExportContract, ExportContractLine, ExportFile, ExportPayment, ExportShipment, Product } from "@/types";
 import {
   ArrowLeft,
@@ -177,6 +179,8 @@ export function ContractDossier({
   const contractPayments = data.payments.filter((p) => p.contractId === contract.id && !p.shipmentId && p.kind === "payment").sort((a, b) => a.date.localeCompare(b.date));
   const isOverdue = isOpen && !!deadline && deadline < today && state !== "closed" && (!shipments.some((s) => s.status === "open") || !coverage.covered);
 
+  // Loại hàng (mig 0089) — chưa chạy ⇒ không hiện cột.
+  const goodsStore = useGoodsTypeStore();
   const lineColumns: RecordTableColumn<ExportContractLine>[] = [
     { key: "description", header: "Tên hàng (như HĐ)", primary: true, render: (l) => <span className="font-semibold">{l.description}</span> },
     {
@@ -186,6 +190,16 @@ export function ContractDossier({
       getSortValue: (l) => productName(l.productId),
     },
     { key: "size", header: "Size", render: (l) => l.size || "—" },
+    ...(goodsStore.isAvailable
+      ? ([
+          {
+            key: "goods-type",
+            header: "Loại hàng",
+            getSortValue: (l) => goodsTypeName(goodsStore.goodsTypes, l.goodsTypeId) || null,
+            render: (l) => goodsTypeName(goodsStore.goodsTypes, l.goodsTypeId) || "—",
+          },
+        ] satisfies RecordTableColumn<ExportContractLine>[])
+      : []),
     { key: "packing", header: "Quy cách", render: (l) => l.packing || "—", hideOnMobile: true },
     {
       key: "qty",

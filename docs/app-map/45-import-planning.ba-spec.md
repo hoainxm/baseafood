@@ -2,7 +2,9 @@
 
 > Load khi: xây hoặc sửa mảng Nhập khẩu của Phòng Kế hoạch: hợp đồng nhập (đối tác nước ngoài, dòng hàng tên · kg · đơn giá), lần nhập (cont / hàng lẻ, ngày về kho), bộ chứng từ đính kèm (Invoice, Packing List, tờ khai nhập, C/O, kiểm dịch…), số lượng thực nhập theo dòng hàng, đóng hợp đồng, quyền `import-plans`.
 covers: src/features/import-planning/**, src/lib/importPlanning.ts, supabase/migrations/0083_import_suppliers.sql, supabase/migrations/0084_import_line_products.sql, supabase/migrations/0085_import_sample_checks.sql, src/lib/importSampleChecks.ts, src/lib/importSampleFile.ts, src/lib/importPlanningDemo.ts, src/lib/importFileStorage.ts, supabase/migrations/0082_import_planning.sql
-last_verified: 2026-10-29
+last_verified: 2026-10-30
+<!-- updated: 2026-10-30 (b) — LOẠI HÀNG mỗi dòng hàng HĐ nhập (cột `import_contract_lines.goods_type_id`, danh mục `goods_types`, mig 0089): ô Loại hàng ở phiếu HĐ (thêm mới + bút chì), bảng dòng hàng ở hồ sơ có cột Loại hàng. Sửa kèm: phiếu HĐ nhập trước đây KHÔNG render hộp sửa nhanh ⇒ bút chì NCC / mặt hàng không mở — nay render cả 3. Chưa chạy 0089 ⇒ ẩn ô + cột. -->
+<!-- updated: 2026-10-30 — CHÉP DÒNG HÀNG ở phiếu HĐ nhập: nút Chép dòng, bản chép ngay dưới dòng gốc, giữ tên hàng · mặt hàng · kg · đơn giá (dòng nhập chưa có size). File chứng từ / thực nhập vốn đã nhiều file; nạp báo cáo kiểm mẫu giữ 1 file (đọc một báo cáo). -->
 ttl_days: 90
 status: ba-spec v4 ĐÃ BUILD (2026-10-29) — **chỉ số kiểm mẫu của kho đi theo từng invoice** (§0d, mig `0085` ⏳ CHƯA chạy DB thật) · v3 (2026-10-29 khuya) — **dòng hàng nối mặt hàng danh mục** (§0c, mig `0084` ⏳ CHƯA chạy DB thật) · v2 (2026-10-29 tối) — **danh mục Nhà cung cấp nhập khẩu RIÊNG** (§0b, ĐÃ BUILD 2026-10-29 — mig `0083` ⏳ CHƯA chạy DB thật) · v1.1 ĐÃ BUILD 2026-10-29 (commit 91b8f14, `0082` ✅ chạy DB thật 2026-10-29 theo chủ dự án). Giao diện: design-spec [46](46-import-planning-ui.design-spec.md).
 

@@ -137,6 +137,13 @@ export const importPlanningGuide: PageGuide = {
           </li>
         </GuideList>
       </GuideSection>
+      <GuideSection title="Chép dòng hàng">
+        <GuideList>
+          <li>
+            Dòng gần giống dòng trước thì chọn <b>Chép dòng</b>: dòng mới nằm ngay dưới, giữ tên hàng, mặt hàng, số lượng, đơn giá. Chỉ sửa ô khác.
+          </li>
+        </GuideList>
+      </GuideSection>
       <GuideSection title="Kiểm mẫu của kho">
         <GuideList>
           <li>

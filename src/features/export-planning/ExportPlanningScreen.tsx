@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
-import { useCustomerProductNameStore, useCustomers, useProducts } from "@/lib/catalogRepo";
+import { useCustomerProductNameStore, useCustomers, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNamesDialog";
 import { useAuth } from "@/lib/auth";
@@ -48,7 +48,7 @@ import {
   workingRevision,
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
-import { ROLES, type ExportActivity, type ExportContract, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportStepItem } from "@/types";
+import { ROLES, type ExportActivity, type ExportContract, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportStepItem } from "@/types";
 import { BarChart3, CalendarDays, FilePlus2, FileText, FolderLock, Route } from "lucide-react";
 import { ContractDossier } from "./ContractDossier";
 import { ContractFormDialog, type ContractFormTarget, type ContractSavePayload } from "./ContractFormDialog";
@@ -107,6 +107,7 @@ export default function ExportPlanningScreen() {
   const store = useExportData();
   const d = store.data;
   const [customers, setCustomers] = useCustomers();
+  const goodsTypeStore = useGoodsTypeStore(); // cột Loại hàng của Excel (mig 0089)
   const [products, setProducts] = useProducts();
   // Tên hàng theo khách (mig 0077, ba-spec 41 v6): điền dòng hàng, gợi ý nối, trích xuất khi lưu.
   const nameStore = useCustomerProductNameStore();
@@ -231,6 +232,12 @@ export default function ExportPlanningScreen() {
       store.saveContracts(prevC);
       return false;
     }
+    const undoFiles = saveExtraFiles(p.attachments);
+    if (!undoFiles) {
+      store.saveRevisions(prevR);
+      store.saveContracts(prevC);
+      return false;
+    }
     const learned = learnNames(p.contract.customerId, p.revision.lines, p.contract.contractNo);
     // Bản vừa ghi có hiệu lực ngay (không còn bước duyệt HĐ) ⇒ chuyến còn mở nhận thêm mục chứng từ bản mới yêu cầu (R6).
     const prevI = d.items;
@@ -255,6 +262,7 @@ export default function ExportPlanningScreen() {
         store.saveRevisions(prevR);
         if (added.length) store.saveItems(prevI);
         learned.undo();
+        undoFiles();
       }),
     );
     setContractForm(null);
@@ -262,12 +270,28 @@ export default function ExportPlanningScreen() {
     return true;
   };
 
-  const saveExtension = (e: Parameters<React.ComponentProps<typeof ExtensionDialog>["onSave"]>[0]): boolean => {
+  /** File thêm của một ô đính kèm (phụ lục, thư bổ sung) ⇒ Hồ sơ đính kèm cấp HĐ. Trả hàm lùi (null = ghi hụt). */
+  const saveExtraFiles = (extra: readonly ExportFile[]): (() => void) | null => {
+    const prevF = d.files;
+    if (!extra.length) return () => {};
+    if (!store.saveFiles([...prevF, ...extra])) return null;
+    return () => store.saveFiles(prevF);
+  };
+
+  const saveExtension = (e: ExportDeadlineExtension, extra: ExportFile[]): boolean => {
     const prev = d.extensions;
     if (!store.saveExtensions([...prev, e])) return false;
+    const undoFiles = saveExtraFiles(extra);
+    if (!undoFiles) {
+      store.saveExtensions(prev);
+      return false;
+    }
     const what = `Gia hạn giao hàng tới ${e.newDeadline.split("-").reverse().join("/")}${e.note ? ` — ${e.note}` : ""}`;
     track(e.contractId, "", "update", what);
-    notify.saved(`Đã gia hạn giao hàng tới ${e.newDeadline.split("-").reverse().join("/")}`, undoTracked(e.contractId, "", what, () => store.saveExtensions(prev)));
+    notify.saved(`Đã gia hạn giao hàng tới ${e.newDeadline.split("-").reverse().join("/")}`, undoTracked(e.contractId, "", what, () => {
+        store.saveExtensions(prev);
+        undoFiles();
+      }));
     setExtensionTarget(null);
     return true;
   };
@@ -365,15 +389,23 @@ export default function ExportPlanningScreen() {
     setItemTarget(null);
   };
 
-  const savePayment = (p: ExportPayment): boolean => {
+  const savePayment = (p: ExportPayment, extra: ExportFile[]): boolean => {
     const prev = d.payments;
     const next = prev.some((x) => x.id === p.id) ? prev.map((x) => (x.id === p.id ? p : x)) : [...prev, p];
     if (!store.savePayments(next)) return false;
+    const undoFiles = saveExtraFiles(extra);
+    if (!undoFiles) {
+      store.savePayments(prev);
+      return false;
+    }
     const cid = p.contractId || contractIdOfShipment(p.shipmentId);
     const isEdit = prev.some((x) => x.id === p.id);
     const what = `${isEdit ? "Sửa" : "Ghi"} ${p.kind === "payment" ? `tiền về ${formatNumber(p.amount)} ${p.currency}` : "ngày gửi bộ chứng từ"} ${p.date.split("-").reverse().join("/")}${p.shipmentId ? ` — chuyến ${shipName(d.shipments.find((x) => x.id === p.shipmentId))}` : ""}`;
     track(cid, p.shipmentId, isEdit ? "update" : "create", what);
-    notify.saved(p.kind === "payment" ? "Đã ghi tiền về" : "Đã ghi ngày gửi bộ chứng từ", undoTracked(cid, p.shipmentId, what, () => store.savePayments(prev)));
+    notify.saved(p.kind === "payment" ? "Đã ghi tiền về" : "Đã ghi ngày gửi bộ chứng từ", undoTracked(cid, p.shipmentId, what, () => {
+        store.savePayments(prev);
+        undoFiles();
+      }));
     setPaymentTarget(null);
     return true;
   };
@@ -532,7 +564,7 @@ export default function ExportPlanningScreen() {
 
   const exportExcel = async (p: Period, customerId: string) => {
     const plan = buildPeriodPlan(p, d, customers, today, opts, customerId);
-    const xl = buildMonthExcel(plan, d);
+    const xl = buildMonthExcel(plan, d, goodsTypeStore.goodsTypes);
     const { exportAoaToXlsx } = await import("@/lib/reportXlsx"); // nạp động — xlsx không vào chunk chính
     const slug = p.kind === "month" ? p.from.slice(0, 7) : `${p.from}_${p.to}`;
     const who = customerId ? ` — ${customerName(customerId)}` : "";

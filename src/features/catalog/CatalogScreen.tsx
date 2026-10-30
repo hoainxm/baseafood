@@ -38,6 +38,8 @@ const TAB_RESOURCE: Record<string, string> = {
   "storage-locations": "catalog.storage-locations",
   // Loại chứng từ xuất khẩu (mig 0081) — thuộc khu Xuất khẩu, quyền theo export-plans.
   "document-kinds": "export-plans",
+  // Loại hàng (mig 0089) — dòng hàng HĐ xuất / nhập, quyền theo export-plans.
+  "goods-types": "export-plans",
   "finished-goods": "catalog.finished-goods",
 };
 
@@ -114,6 +116,7 @@ export default function CatalogScreen() {
           {canViewTab("batters") && <TabsTrigger value="batters" title="Các loại bột tẩm (24V, 18V, 220H, 232, 20802…) — gắn vào mặt hàng tẩm bột để ghi kg bột theo từng loại.">Bột tẩm</TabsTrigger>}
           {canViewTab("storage-locations") && <TabsTrigger value="storage-locations" title="Nơi hàng đang nằm: kho nhà và các kho lạnh thuê ngoài.">Kho lưu trữ</TabsTrigger>}
           {canViewTab("document-kinds") && <TabsTrigger value="document-kinds" title="Loại chứng từ xuất khẩu (Commercial Invoice, B/L, H/C, C/O…) — thêm loại khách mới yêu cầu, đổi tên loại có sẵn.">Loại chứng từ</TabsTrigger>}
+          {canViewTab("goods-types") && <TabsTrigger value="goods-types" title="Loại hàng của dòng hàng hợp đồng (1 da, 2 da, mada, cá khô…) — để lọc khi xuất Excel.">Loại hàng</TabsTrigger>}
           {canViewTab("finished-goods") && <TabsTrigger value="finished-goods" title="141 mã thành phẩm kế toán (TK 1551) — chỉ đọc, không sửa ở đây.">Thành phẩm (141 mã)</TabsTrigger>}
         </TabsList>
 
@@ -168,6 +171,10 @@ export default function CatalogScreen() {
 
         <TabsContent value="document-kinds" data-tour="catalog-document-kinds" className="pt-6">
           <CatalogCrudFor cfg={c.documentKind} rowMarkKey="export-document-kinds" resource={TAB_RESOURCE["document-kinds"]} />
+        </TabsContent>
+
+        <TabsContent value="goods-types" data-tour="catalog-goods-types" className="pt-6">
+          <CatalogCrudFor cfg={c.goodsType} rowMarkKey="goods-types" resource={TAB_RESOURCE["goods-types"]} />
         </TabsContent>
 
         <TabsContent value="finished-goods" data-tour="catalog-finished-goods" className="pt-6">

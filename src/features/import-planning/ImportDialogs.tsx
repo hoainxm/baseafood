@@ -27,6 +27,8 @@ import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { FilePicker } from "@/features/export-planning/parts";
 import { LineProductLabel } from "./parts";
 import { useDialogDraft } from "@/lib/formDraft";
+import { useGoodsTypePicker } from "@/features/export-planning/goodsTypePicker";
+import { insertCopiedLine } from "@/lib/exportPlanning";
 import { newId } from "@/lib/store";
 import { formatMoney } from "@/lib/format";
 import {
@@ -62,7 +64,7 @@ import type {
   ImportType,
   Product,
 } from "@/types";
-import { FileCheck2, FileSignature, Lock, PackageCheck, Plus, Save, Ship, Trash2 } from "lucide-react";
+import { Copy, FileCheck2, FileSignature, Lock, PackageCheck, Plus, Save, Ship, Trash2 } from "lucide-react";
 
 /** Tên ô của từng mã lỗi (lib/importPlanning) — ErrorSummary chỉ đúng ô cần sửa. */
 const ISSUE_FIELD: Record<string, string> = {
@@ -107,6 +109,8 @@ interface LineForm {
   productName: string;
   /** Mặt hàng danh mục (R20); "" = chưa nối. */
   productId: string;
+  /** Loại hàng (mig 0089); "" = chưa chọn. */
+  goodsTypeId: string;
   kg: number | null;
   unitPrice: number | null;
 }
@@ -124,7 +128,7 @@ interface ContractForm {
   initial: string;
 }
 const contractSnap = (f: ContractForm) => JSON.stringify([f.supplierId, f.contractNo, f.signedDate, f.importType, f.currency, f.note, f.lines]);
-const blankLine = (): LineForm => ({ id: newId(), productName: "", productId: "", kg: null, unitPrice: null });
+const blankLine = (): LineForm => ({ id: newId(), productName: "", productId: "", goodsTypeId: "", kg: null, unitPrice: null });
 
 export interface ContractSavePayload {
   contract: ImportContract;
@@ -163,6 +167,8 @@ export function ContractFormDialog({
   const draft = useDialogDraft({ form: "import-contract", value: form, setValue: setForm, isEmpty: (f) => contractSnap(f) === f.initial });
   const supplierEditor = useQuickCatalogEdit("importSupplier", [...suppliers], (rows) => setSuppliers(rows));
   const productEditor = useQuickCatalogEdit("product", products, (rows) => void setProducts(rows));
+  // Loại hàng (mig 0089) — chưa chạy ⇒ ẩn ô.
+  const goodsPicker = useGoodsTypePicker();
   const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
   // R22: máy chủ chưa chạy 0084 ⇒ không nối (không gửi product_id, khỏi kẹt hàng chờ).
   const canLink = data.productLinkAvailable !== false;
@@ -177,13 +183,13 @@ export function ContractFormDialog({
       const lines = data.lines
         .filter((l) => l.contractId === c.id)
         .sort((a, b) => a.lineNo - b.lineNo)
-        .map((l) => ({ id: l.id, productName: l.productName, productId: l.productId ?? "", kg: l.kg, unitPrice: c.linePrices[l.id] ?? null }));
+        .map((l) => ({ id: l.id, productName: l.productName, productId: l.productId ?? "", goodsTypeId: l.goodsTypeId ?? "", kg: l.kg, unitPrice: c.linePrices[l.id] ?? null }));
       f = { key: c.id, mode: "edit", id: c.id, supplierId: c.supplierId, contractNo: c.contractNo, signedDate: c.signedDate, importType: c.importType, currency: c.currency, note: c.note, lines, initial: "" };
     }
     const fresh = { ...f, initial: contractSnap(f) };
     const kept = draft.takeKept();
     // Nháp lưu trước v3 không có mặt hàng của dòng ⇒ coi là chưa nối.
-    setForm(kept && kept.key === fresh.key ? { ...kept, lines: kept.lines.map((l) => ({ ...l, productId: l.productId ?? "" })) } : fresh);
+    setForm(kept && kept.key === fresh.key ? { ...kept, lines: kept.lines.map((l) => ({ ...l, productId: l.productId ?? "", goodsTypeId: l.goodsTypeId ?? "" })) } : fresh);
     setFiles([]);
     setErrors([]);
     setSuggestedLines(new Set());
@@ -245,6 +251,8 @@ export function ContractFormDialog({
       lineNo: i + 1,
       productName: l.productName.trim(),
       ...(canLink ? { productId: l.productId } : {}),
+      // Loại hàng: bảng 0089 có ⇒ cột dòng HĐ nhập cũng có (cùng migration).
+      ...(goodsPicker.isAvailable ? { goodsTypeId: l.goodsTypeId } : {}),
       kg: l.kg,
       note: "",
     }));
@@ -292,6 +300,7 @@ export function ContractFormDialog({
   const totals = form ? contractTotals(form.lines, Object.fromEntries(form.lines.map((l) => [l.id, l.unitPrice]))) : null;
 
   return (
+    <>
     <FormDialog
       open={!!form}
       onOpenChange={(o) => {
@@ -370,7 +379,17 @@ export function ContractFormDialog({
               return (
                 <div key={l.id} className="grid gap-3 rounded-lg border border-border bg-card p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">Dòng {i + 1}</span>
+                    <span className="min-w-0 flex-1 font-medium">Dòng {i + 1}</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      data-tour={i === 0 ? "import-line-copy" : undefined}
+                      onClick={() => set("lines", insertCopiedLine(form.lines, l.id, { ...l, id: newId() }))}
+                      title={`Chép dòng ${i + 1} thành dòng mới ngay dưới (giữ tên hàng, mặt hàng, số lượng, đơn giá) — chỉ sửa ô khác.`}
+                    >
+                      <Copy className="mr-1 h-4 w-4" aria-hidden />
+                      Chép dòng
+                    </Button>
                     {form.lines.length > 1 && (
                       <Button
                         size="sm"
@@ -420,7 +439,22 @@ export function ContractFormDialog({
                       </Field>
                     )}
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className={`grid gap-3 ${goodsPicker.isAvailable ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
+                    {goodsPicker.isAvailable && (
+                      <div data-tour={i === 0 ? "import-line-goods-type" : undefined} className="min-w-0">
+                        <Combobox
+                          label="Loại hàng"
+                          value={l.goodsTypeId}
+                          onChange={(v) => setLine(l.id, { goodsTypeId: v })}
+                          options={goodsPicker.options}
+                          onCreate={goodsPicker.onCreate}
+                          emptyText="Chưa có loại hàng nào — gõ tên để thêm mới."
+                          onEditItem={goodsPicker.onEditItem}
+                          canEdit={goodsPicker.canEdit}
+                          editLabel={goodsPicker.editLabel}
+                        />
+                      </div>
+                    )}
                     <NumberField label="Số lượng" unit="kg" required value={l.kg} onChange={(v) => setLine(l.id, { kg: v })} />
                     <NumberField label="Đơn giá" unit={`${form.currency || "USD"}/kg`} value={l.unitPrice} onChange={(v) => setLine(l.id, { unitPrice: v })} />
                     <Field label="Thành tiền">
@@ -451,6 +485,11 @@ export function ContractFormDialog({
         </div>
       )}
     </FormDialog>
+      {/* Hộp sửa nhanh của các ô danh mục (bút chì) — trước 2026-10-30 quên render ⇒ bút chì NCC / mặt hàng không mở. */}
+      {supplierEditor.dialog}
+      {productEditor.dialog}
+      {goodsPicker.dialog}
+    </>
   );
 }
 

@@ -56,7 +56,11 @@ export function OrderPrint({ order, allLines, onClose }: { order: ProductionOrde
             {lines.map((l, i) => (
               <tr key={l.id}>
                 <PrintTd right>{i + 1}</PrintTd>
-                <PrintTd bold>{l.productName || l.description}</PrintTd>
+                <PrintTd bold>
+                  {l.productName || l.description}
+                  {/* R17: ghi chú dòng chép từ dòng HĐ — chữ thường dưới tên hàng. */}
+                  {l.note && <span className="block font-normal">Ghi chú: {l.note}</span>}
+                </PrintTd>
                 <PrintTd>{l.spec}</PrintTd>
                 <PrintTd right>{formatNumber(lineCartons(l) ?? 0)}</PrintTd>
                 <PrintTd right>{formatNumber(orderLineKg(l))}</PrintTd>

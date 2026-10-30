@@ -65,13 +65,29 @@ export function lineKg(l: Pick<ProductionOrderLine, "units" | "unitKind" | "cart
 /** kg dòng dùng để tính: ô kg đã lưu, trống thì tự tính. */
 export const orderLineKg = (l: ProductionOrderLine): number => l.kg ?? lineKg(l) ?? 0;
 
+/** Quy cách dòng lệnh từ dòng HĐ (R17): Size · Dài · Số miếng · Tỉ lệ · Packing — như ô Quy cách của LSX giấy. */
+export function contractLineSpec(cl: Pick<ExportContractLine, "size" | "packing" | "pieceLength" | "partRatio" | "piecesPerKg">): string {
+  const t = (v: string | undefined) => (v ?? "").trim();
+  const pieces = t(cl.piecesPerKg);
+  return [
+    t(cl.size) && `Size ${t(cl.size)}`,
+    t(cl.pieceLength) && `Dài ${t(cl.pieceLength)}`,
+    // Đã ghi đơn vị (VD "590 – 770 pcs/kg") thì giữ nguyên, chỉ gõ số thì thêm "miếng/kg".
+    pieces && (/\/\s*kg/i.test(pieces) ? pieces : `${pieces} miếng/kg`),
+    t(cl.partRatio) && `Tỉ lệ ${t(cl.partRatio)}`,
+    t(cl.packing),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /** Dòng lệnh mới chép từ dòng HĐ xuất (tên tiếng Việt từ mặt hàng danh mục). */
 export function lineFromContract(
   cl: ExportContractLine,
   productName: string,
   ids: { id: string; orderId: string; lineNo: number },
 ): ProductionOrderLine {
-  const spec = [cl.size && `Size ${cl.size}`, cl.packing].filter(Boolean).join(" · ");
+  const spec = contractLineSpec(cl);
   return {
     ...ids,
     contractLineId: cl.id,
@@ -84,7 +100,7 @@ export function lineFromContract(
     netKgPerCarton: cl.netKgPerCarton,
     units: null,
     kg: null,
-    note: "",
+    note: (cl.note ?? "").trim(),
   };
 }
 

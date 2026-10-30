@@ -116,6 +116,7 @@ export const productionOrderGuide: PageGuide = {
       <GuideSection title="Mẹo">
         <GuideList>
           <li>Hợp đồng phải có bản hiệu lực, dòng hàng phải đã nối mặt hàng danh mục thì mới lập lệnh được.</li>
+          <li>Quy cách dòng lệnh lấy từ dòng hàng hợp đồng theo thứ tự: Size · Dài · Số miếng / kg · Tỉ lệ râu / thân / cổ · packing. Ghi chú dòng của hợp đồng in dưới tên hàng. Muốn đổi thì sửa ở hợp đồng xuất rồi mở lệnh ra lưu lại.</li>
           <li>Hạn sử dụng = tháng của ngày sản xuất đầu + số tháng, về ngày 01. VD sản xuất 02/11/2026, 24 tháng: 01/11/2028.</li>
           <li>Lệnh xếp vào tháng theo ngày sản xuất đầu. Ô tra tìm số lệnh, mã số lô, số hợp đồng, tên hàng ở mọi tháng.</li>
           <li>Lập lệnh mới chép được yêu cầu bao bì, Nafi, lưu ý từ lệnh gần nhất cùng khách và mặt hàng (nút Chép từ lệnh …). Chọn Nafi <b>Khác</b> thì phải ghi Chỉ tiêu Khác.</li>

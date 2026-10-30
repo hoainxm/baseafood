@@ -33,6 +33,7 @@ import {
   DEFAULT_SHELF_LIFE_MONTHS,
   canCreateOrder,
   contractLineCoverage,
+  contractLineSpec,
   emptyRequirements,
   expiryDate,
   lineFromContract,
@@ -358,6 +359,13 @@ export function OrderFormDialog({
                     </Button>
                   ) : (
                     <span />
+                  )}
+                  {/* R17: quy cách + ghi chú dòng chép từ dòng HĐ — xem trước, sửa ở hợp đồng. */}
+                  {cl && (contractLineSpec(cl) || cl.note) && (
+                    <p className="text-sm break-words text-muted-foreground sm:col-span-4">
+                      {contractLineSpec(cl) && <>Quy cách: {contractLineSpec(cl)}</>}
+                      {cl.note && <span className="block">Ghi chú: {cl.note}</span>}
+                    </p>
                   )}
                 </div>
               );

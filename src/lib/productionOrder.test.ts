@@ -16,6 +16,7 @@ import {
   canCreateOrder,
   cancelOrder,
   contractLineCoverage,
+  contractLineSpec,
   emptyRequirements,
   expiryDate,
   issueOrder,
@@ -160,7 +161,21 @@ describe("AC-1 — kg tự tính từ thùng (R2)", () => {
   });
   test("dòng mới chép tên, quy cách, đơn vị từ dòng HĐ", () => {
     const l = lineFromContract(cLine("l2"), "Bạch tuộc 1 da cắt hạt lựu", { id: "n1", orderId: "o1", lineNo: 1 });
-    expect(l).toMatchObject({ contractLineId: "l2", productId: "p-hat-luu", productName: "Bạch tuộc 1 da cắt hạt lựu", spec: "Size 2 gr · IQF, 1kg/PE x 12/ctn", netKgPerCarton: 12, units: null });
+    expect(l).toMatchObject({ contractLineId: "l2", productId: "p-hat-luu", productName: "Bạch tuộc 1 da cắt hạt lựu", spec: "Size 2 gr · IQF, 1kg/PE x 12/ctn", netKgPerCarton: 12, units: null, note: "" });
+  });
+});
+
+describe("AC-16 — yêu cầu NL của dòng HĐ chép sang dòng lệnh (R17)", () => {
+  // Phụ lục 01 HĐ 01-26-HAT, dòng 3 cut.
+  const hat = cLine("l3", { size: "3 gr cut", pieceLength: "1.5 - 3.5 cm/pc", piecesPerKg: "330 – 370", partRatio: "80% râu 20% thân", note: " Không dùng hàng da giấy " });
+  test("Quy cách = Size · Dài · Số miếng · Tỉ lệ · Packing; ghi chú dòng chép sang", () => {
+    const l = lineFromContract(hat, "Râu bạch tuộc cắt", { id: "n3", orderId: "o1", lineNo: 1 });
+    expect(l.spec).toBe("Size 3 gr cut · Dài 1.5 - 3.5 cm/pc · 330 – 370 miếng/kg · Tỉ lệ 80% râu 20% thân · IQF, 1kg/PE x 12/ctn");
+    expect(l.note).toBe("Không dùng hàng da giấy");
+  });
+  test("số miếng đã ghi đơn vị /kg thì giữ nguyên; ô trống thì bỏ", () => {
+    expect(contractLineSpec({ size: "", packing: "", piecesPerKg: "590-770 pcs/kg", partRatio: "  " })).toBe("590-770 pcs/kg");
+    expect(contractLineSpec({ size: "1.5 gr cut", packing: "" })).toBe("Size 1.5 gr cut");
   });
 });
 

@@ -396,6 +396,8 @@ export function OrderDossier({
                 <span className="grid">
                   <span className="font-semibold break-words">{l.productName || l.description}</span>
                   {l.description && l.productName && <span className="text-sm text-muted-foreground break-words">{l.description}</span>}
+                  {/* R17: ghi chú dòng chép từ dòng HĐ. */}
+                  {l.note && <span className="text-sm break-words">Ghi chú: {l.note}</span>}
                 </span>
               ),
             },

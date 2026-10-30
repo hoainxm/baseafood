@@ -448,7 +448,7 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
   /* ---- 3. 2 cont theo LXH 02.01: 40RF + 20RF cùng booking, cont 20 dùng chung ---- */
   {
     const lines = [
-      line(id("dong"), "Tako neck boiled cut 1-2g", 200, 10, price(4.05)),
+      { ...line(id("dong"), "Tako neck boiled cut 1-2g", 200, 10, price(4.05)), pieceLength: "1.5 – 3.0 cm/pc", partRatio: "100% cổ", piecesPerKg: "590 – 770" },
       line(id("dong"), "Tako tip raw", 50, 12, price(2.15)),
       line(id("dong"), "Iwadako blanched cut 5g", 200, 10, price(10.5)),
       line(id("dong"), "Iwadako blanched cut 2-3g bulk", 505, 10, price(10.15)),
@@ -466,7 +466,7 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
 
   /* ---- 4. CIF · L/C · cọc 30 % · xe tải + đóng ghép · trễ hạn · 1 dòng chưa nối ---- */
   {
-    const { c, r } = contract("07.26/BSF-HTC.2026", kh(2), T(-40), T(-10), 1, [line(id("dong"), "Boiled octopus cut 10-15g", 2160, 10, price(11.05)), line(id("dong"), "Samples (consolidated)", 10, 10, 0)], {
+    const { c, r } = contract("07.26/BSF-HTC.2026", kh(2), T(-40), T(-10), 1, [{ ...line(id("dong"), "Boiled octopus cut 10-15g", 2160, 10, price(11.05)), pieceLength: "2.0 – 3.5 cm/pc", partRatio: "80% râu 20% thân", piecesPerKg: "70 – 100", note: "Không dùng hàng da giấy" }, line(id("dong"), "Samples (consolidated)", 10, 10, 0)], {
       incoterm: "CIF",
       pod: "Hakata, Japan",
       tolerance: 5,

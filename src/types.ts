@@ -1183,6 +1183,16 @@ export interface ExportContractLine {
   productId?: string;
   /** Loại hàng (`goods_types.id`, mig 0089) — để lọc Excel. Không có / "" = chưa chọn. */
   goodsTypeId?: string;
+  /** Yêu cầu NL như cột trên HĐ (2026-10-30, ba-spec 41 R38) — chữ tự do vì HĐ ghi khoảng; tự chép sang
+   *  Quy cách / ghi chú của dòng Lệnh SX. Bản ghi cũ không có ⇒ trống. */
+  /** Chiều dài miếng — "Length max cm/pc", VD "1.5 – 3.0 cm/pc". */
+  pieceLength?: string;
+  /** Tỉ lệ râu / thân / cổ — "Ratio tentacle and body", VD "80% râu 20% thân". */
+  partRatio?: string;
+  /** Số miếng mỗi kg — "Number pcs/kg", VD "590 – 770". */
+  piecesPerKg?: string;
+  /** Ghi chú của dòng — chép sang ghi chú dòng Lệnh SX. */
+  note?: string;
 }
 
 /** Điều khoản của MỘT bản hợp đồng (bản 0 hoặc bản sửa). */

@@ -576,7 +576,7 @@ export function ContractFormDialog({
           <FormSection
             no={4}
             title="Dòng hàng"
-            hint="Tên hàng ghi đúng chữ trên HĐ (tiếng Anh); Mặt hàng (danh mục) nối dòng với danh mục của xưởng — lập HĐ chưa bắt buộc, nhưng Lệnh sản xuất chỉ xong khi mọi dòng đã nối. Kg tự tính = số thùng × kg tịnh mỗi thùng (theo kiện thì nhân thêm số thùng mỗi kiện); gõ đè nếu HĐ ghi khác."
+            hint="Tên hàng ghi đúng chữ trên HĐ (tiếng Anh); Mặt hàng (danh mục) nối dòng với danh mục của xưởng — lập HĐ chưa bắt buộc, nhưng Lệnh sản xuất chỉ xong khi mọi dòng đã nối. Kg tự tính = số thùng × kg tịnh mỗi thùng (theo kiện thì nhân thêm số thùng mỗi kiện); gõ đè nếu HĐ ghi khác. Chiều dài, tỉ lệ râu / thân / cổ, số miếng / kg và ghi chú dòng tự chép sang Lệnh sản xuất khi lập lệnh."
           >
             <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
               {form.lines.map((l, i) => {
@@ -690,6 +690,21 @@ export function ContractFormDialog({
                         onChange={(v) => setLine(l.id, { kg: v != null && auto != null && Math.abs(v - auto) < 0.005 ? null : v })}
                       />
                       {canSeePrice && <NumberField label="Đơn giá" unit={`${currency}/kg`} value={l.unitPrice} onChange={(v) => setLine(l.id, { unitPrice: v })} />}
+                    </div>
+                    {/* R38: yêu cầu NL như cột trên HĐ — tự chép sang dòng Lệnh sản xuất (Quy cách + ghi chú). */}
+                    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,2fr)]">
+                      <Field label="Chiều dài">
+                        <Input value={l.pieceLength ?? ""} onChange={(e) => setLine(l.id, { pieceLength: e.target.value || undefined })} />
+                      </Field>
+                      <Field label="Tỉ lệ râu / thân / cổ">
+                        <Input value={l.partRatio ?? ""} onChange={(e) => setLine(l.id, { partRatio: e.target.value || undefined })} />
+                      </Field>
+                      <Field label="Số miếng / kg">
+                        <Input value={l.piecesPerKg ?? ""} onChange={(e) => setLine(l.id, { piecesPerKg: e.target.value || undefined })} />
+                      </Field>
+                      <Field label="Ghi chú dòng" className="sm:col-span-3 lg:col-span-1">
+                        <Input value={l.note ?? ""} onChange={(e) => setLine(l.id, { note: e.target.value || undefined })} />
+                      </Field>
                     </div>
                     {isOpen ? (
                       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">

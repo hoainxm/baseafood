@@ -2197,6 +2197,11 @@ function parseLines(v: unknown): ExportContractLine[] {
     ...(l.productId ? { productId: s(l.productId) } : {}),
     // Loại hàng (mig 0089) — như productId: thiếu dòng này thì tải lại trang mất loại đã chọn.
     ...(l.goodsTypeId ? { goodsTypeId: s(l.goodsTypeId) } : {}),
+    // Yêu cầu NL của dòng (ba-spec 41 R38) — nằm trong JSON lines, không cần cột; bản cũ không có ⇒ bỏ qua.
+    ...(l.pieceLength ? { pieceLength: s(l.pieceLength) } : {}),
+    ...(l.partRatio ? { partRatio: s(l.partRatio) } : {}),
+    ...(l.piecesPerKg ? { piecesPerKg: s(l.piecesPerKg) } : {}),
+    ...(l.note ? { note: s(l.note) } : {}),
   }));
 }
 

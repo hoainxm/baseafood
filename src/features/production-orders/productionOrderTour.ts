@@ -43,7 +43,7 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
         optional: true,
         title: "Lập lệnh sản xuất",
         body:
-          "Chọn hợp đồng xuất (phải có bản hiệu lực), rồi chọn dòng hàng và gõ số thùng: tên, quy cách lấy sẵn từ hợp đồng, kg tự tính.\n" +
+          "Chọn hợp đồng xuất (phải có bản hiệu lực), rồi chọn dòng hàng và gõ số thùng: tên, quy cách (size, chiều dài, số miếng / kg, tỉ lệ râu / thân / cổ, packing) và ghi chú dòng lấy sẵn từ hợp đồng, kg tự tính. Muốn đổi quy cách thì sửa dòng hàng ở hợp đồng xuất.\n" +
           "Ghi số lệnh, mã số lô, các ngày sản xuất, ngày giao. Hạn sử dụng tự tính từ tháng sản xuất đầu. Lưu xong lệnh ở trạng thái Nháp.",
       }),
     );

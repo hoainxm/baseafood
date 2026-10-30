@@ -3,6 +3,8 @@
 > Load khi: xây hoặc sửa module Xuất khẩu của Phòng Kế hoạch đợt 1: hồ sơ hợp đồng (dòng hàng, bản sửa, gia hạn, file ký, kết quả duyệt giấy), chuyến (mã lô MSL, booking, cont, seal, ngày đóng/ETD), 6 bước dạng checklist tay kèm file, thực xuất lấy từ invoice, khép kín chuyến/hợp đồng theo dung sai, tiền về, vai trò Phòng Kế hoạch, mở rộng danh mục khách.
 covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql, supabase/migrations/0079_export_approval_workflow.sql, src/lib/abbreviations.ts, supabase/migrations/0081_export_document_kinds.sql
 last_verified: 2026-10-30
+<!-- re-verified: 2026-10-30 15:40 — R38 / AC-73: preview demo ghi bản sửa HĐ 21.26 với 4 ô → tải lại ⇒ hồ sơ hiện Chiều dài · Tỉ lệ · Số miếng / kg đúng chữ; nháp hộp HĐ giữ 4 ô; 360 px × 130 % hộp không tràn; bsf.* trước == sau. -->
+<!-- updated: 2026-10-30 (NL dòng) — §0c v9.2: R38 bốn ô yêu cầu NL của dòng hàng (Chiều dài · Tỉ lệ râu / thân / cổ · Số miếng / kg · Ghi chú dòng) trong JSON lines, `repo.parseLines` giữ, Chép dòng chép theo; tự chép sang Lệnh sản xuất (48 R17). AC-73. -->
 <!-- updated: 2026-10-30 (khác) — Thanh toán = Khác ⇒ bắt ghi `terms.paymentOther` (JSON terms, không cột mới; `validateContract` lỗi `paymentOther`, test exportPlanning); hồ sơ đính kèm "Hồ sơ khác" ⇒ bắt ghi Tên hồ sơ (vào caption). -->
 <!-- updated: 2026-10-30 (lsx) — bước 2 Lệnh sản xuất của chuyến còn xong khi chuyến gắn ≥ 1 Lệnh sản xuất ĐÃ PHÁT HÀNH (ba-spec [48](48-production-order.ba-spec.md) R6, Q6 = A: HOẶC luật cũ file / dùng chung). Luật ở `exportPlanning.subStepState` qua `ExportData.issuedOrderShipmentIds`; test `productionOrderExport.test.ts`. -->
 
@@ -24,6 +26,21 @@ status: ba-spec v9.1 (2026-10-29: danh mục Loại chứng từ — §0b) · v9
 > **Mục đích:** oracle HÀNH VI cho đợt 1. Định nghĩa ai làm nghiệp vụ gì, vào gì ra gì, thế nào là đúng (AC). **Không** mô tả giao diện (việc của design-spec).
 > **Nguồn đã chốt:** kế hoạch [`spec/xuat-khau-phong-ke-hoach.md`](../spec/xuat-khau-phong-ke-hoach.md) (§9 chốt 11 câu 2026-10-20) · quy trình [`QTI-KH-01`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (luật KH-R1…R16) · phân quyền [`spec/role-permissions.md`](../spec/role-permissions.md) · tài liệu công ty [`40-documents.md`](40-documents.md) (khuôn file + RLS).
 
+
+## 0c. v9.2 (2026-10-30) — yêu cầu nguyên liệu của dòng hàng, tự chép sang Lệnh sản xuất
+
+Chủ dự án yêu cầu (theo phụ lục 01 HĐ 01-26-HAT, khách Hyakusaibou): mỗi dòng hàng thêm **chiều dài, tỉ lệ, số miếng, ghi chú** để "nhảy vào lệnh sản xuất luôn". Chốt 2026-10-30: tỉ lệ = **tỉ lệ râu / thân / cổ** (cột "Ratio tentacle and body"; có mặt hàng có cổ); số miếng = **chỉ pcs/kg** (gr/pc trung bình, dao động ghi ở ghi chú nếu cần); trên lệnh **gộp vào Quy cách** (như LSX giấy 19.10). Assortment % KHÔNG lưu (app tính được từ kg — đề xuất để sau).
+
+**Nghiệp vụ** thuộc NV lập / sửa HĐ · owner U1 Nhân viên KH. Không thêm user, không thêm cross-user: nơi nhận lệnh (quản đốc, Phòng Kỹ thuật) đọc qua Lệnh sản xuất như cũ (ba-spec [48](48-production-order.ba-spec.md) R17).
+
+**Luật:**
+- **R38 — Yêu cầu NL của dòng hàng.** Bốn ô chữ tự do, không bắt buộc, nằm trong JSON `lines` của bản HĐ (không cột mới, không migration): `pieceLength` Chiều dài (cột "Length max cm/pc") · `partRatio` Tỉ lệ râu / thân / cổ ("Ratio tentacle and body") · `piecesPerKg` Số miếng / kg ("Number pcs/kg") · `note` Ghi chú dòng. Chữ tự do vì HĐ ghi khoảng ("590 – 770", "80% râu 20% thân"). Chép dòng (R-chép dòng) giữ cả bốn ô. Bản ghi cũ không có ⇒ trống. Sửa / ghi bản sửa theo luồng hiện có, không thêm luật duyệt.
+
+### AC-73 — Yêu cầu NL đi theo dòng hàng · Maps to: R38, 48 R17 · Test: unit + manual
+- **Given** dòng HĐ 01-26-HAT "3 gr cut", Chiều dài "1.5 - 3.5 cm/pc", Số miếng / kg "330 – 370", Tỉ lệ "80% râu 20% thân", Ghi chú "Không dùng hàng da giấy"
+- **When** lưu HĐ, tải lại trang, rồi lập Lệnh sản xuất từ dòng đó
+- **Then** hồ sơ HĐ còn đủ 4 ô; dòng lệnh có Quy cách và ghi chú chép từ dòng HĐ
+- **Assert** `productionOrder.test.ts` AC-16: spec == "Size 3 gr cut · Dài 1.5 - 3.5 cm/pc · 330 – 370 miếng/kg · Tỉ lệ 80% râu 20% thân · IQF, 1kg/PE x 12/ctn", note == "Không dùng hàng da giấy"; thử tay: tải lại ⇒ 4 ô khác trống == 4
 
 ## 0b. v9.1 (2026-10-29) — danh mục Loại chứng từ: thêm / sửa ngay trong ô chọn
 

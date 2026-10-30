@@ -3,6 +3,8 @@
 > Load khi: xây hoặc sửa Lệnh sản xuất của Phòng Kế hoạch: lập lệnh từ dòng hàng hợp đồng xuất, gắn nguyên liệu nhập khẩu dự kiến, phát hành tới phân xưởng / kho, gắn chuyến xuất (bước 2 của chuyến), in mẫu QTI-KH-01-04.
 covers: src/features/production-orders/**, src/lib/productionOrder.ts, src/lib/productionOrderDemo.ts, supabase/migrations/0088_production_orders.sql, src/lib/exportPlanning.ts
 last_verified: 2026-10-30
+<!-- re-verified: 2026-10-30 15:40 — R17 / AC-16: test productionOrder (31) xanh; preview demo lập lệnh 1.10 từ dòng HĐ 21.26 ⇒ xem trước + hồ sơ + bản in có "Dài 1.5 - 3.5 cm/pc · 330 – 370 miếng/kg · Tỉ lệ 80% râu 20% thân · 4kg/CTN x 2/Bundle" và "Ghi chú: Không dùng hàng da giấy"; dữ liệu thử đã gỡ. -->
+<!-- updated: 2026-10-30 (NL dòng) — R17 / AC-16: Quy cách dòng lệnh gồm chiều dài · số miếng / kg · tỉ lệ từ dòng HĐ (`contractLineSpec`), ghi chú dòng HĐ ⇒ `note` dòng lệnh. -->
 <!-- updated: 2026-10-30 (lọc + khác) — bỏ bộ lọc trạng thái 5 lựa chọn (chỉ còn Xem / Ẩn lệnh đã hủy, design-spec 49); Nafi chọn "Khác" ⇒ bắt ghi chỉ tiêu (nafiNote). -->
 ttl_days: 90
 <!-- re-verified: 2026-10-30 — P1 + P2 build: AC-1…5, 9, 10, 12…14 = test `src/lib/productionOrder.test.ts` (29, cả R6 `issuedShipmentIds`, A4 `nextOrderNumber`, Q10 `previousOrderFor`); AC-11 PGlite (chuỗi 0001→0088 + chạy lại 0088: planner thấy 3 lệnh gồm nháp, quản đốc / thủ kho / kế toán / GĐ thấy 2 lệnh đã phát hành, tổ trưởng 0, chỉ planner ghi); ma trận = `writePermissionsSql.test.ts`. AC-7, 8 = `productionOrderExport.test.ts` (P4); AC-15 thử tay (P3); AC-6 = vòng P6 ở sandbox (dưới). -->
@@ -187,6 +189,7 @@ Không có handoff nào tới tổ trưởng trong đợt này (Q8).
 | R10 | Phát hành không qua duyệt (Q5 = A). Sửa sau phát hành bắt lý do, tăng số lần sửa, ghi nhật ký | — |
 | R11 | Hủy LSX bắt lý do. Gỡ khỏi chuyến, nhả kg dành (R5). Không xóa cứng | — |
 | R12 | HĐ có bản hiệu lực mới sau giờ phát hành LSX ⇒ cờ "Theo bản HĐ trước" (LS6). Không tự đổi dòng LSX | — |
+| R17 | Dòng LSX lập từ dòng HĐ (2026-10-30): **Quy cách** = Size · Dài (chiều dài) · Số miếng / kg · Tỉ lệ (râu / thân / cổ) · packing, bỏ ô trống, nối bằng " · "; số miếng chỉ gõ số ⇒ thêm "miếng/kg", đã ghi "/kg" ⇒ giữ nguyên (`contractLineSpec`). **Ghi chú dòng** HĐ ⇒ `note` của dòng LSX, hiện dưới tên hàng ở hồ sơ lệnh và bản in. Đổi ở HĐ ⇒ lệnh đã lưu đổi theo khi mở ra lưu lại (R12 vẫn áp cho bản HĐ mới) | phụ lục 01 HĐ 01-26-HAT dòng 3 gr cut ⇒ "Size 3 gr cut · Dài 1.5 - 3.5 cm/pc · 330 – 370 miếng/kg · Tỉ lệ 80% râu 20% thân · IQF, 1kg/PE x 12/ctn" |
 
 ## 10. Acceptance Criteria — ORACLE
 
@@ -280,6 +283,12 @@ Không có handoff nào tới tổ trưởng trong đợt này (Q8).
 - **Then** bản in có đủ các khối của mẫu QTI-KH-01-04
 - **Assert** bản in có mã "QTI-KH-01-04", số "19.10", "1.000" thùng, "12.000" kg, MSL "205", NSX "02, 03, 04/11/2026", ngày giao "15/11/2026"; vừa 1 trang A4
 
+### AC-16 — Yêu cầu NL của dòng HĐ chép sang dòng lệnh · Maps to flow: LS1 · R17 · Test: unit
+- **Given** dòng HĐ có Size "3 gr cut", Chiều dài "1.5 - 3.5 cm/pc", Số miếng / kg "330 – 370", Tỉ lệ "80% râu 20% thân", Ghi chú "Không dùng hàng da giấy"
+- **When** U1 lập LSX từ dòng đó
+- **Then** Quy cách và ghi chú dòng LSX chép từ dòng HĐ theo thứ tự R17
+- **Assert** `productionOrder.test.ts` "AC-16": spec == "Size 3 gr cut · Dài 1.5 - 3.5 cm/pc · 330 – 370 miếng/kg · Tỉ lệ 80% râu 20% thân · IQF, 1kg/PE x 12/ctn"; note == "Không dùng hàng da giấy"; "590-770 pcs/kg" giữ nguyên (không thêm "miếng/kg")
+
 ## 11. Đã chốt + giả định
 
 **Chủ dự án chốt 2026-10-29: cả 10 câu theo đề xuất (phương án in đậm).** Luật R1–R12 và AC-1…AC-15 ở trên đã viết theo đúng các phương án này.
@@ -323,6 +332,7 @@ Thứ tự theo phụ thuộc. Mỗi pha xanh cổng `build` + `lint` + `test` +
 **Ước lượng:** P1 + P2 một phiên; P3 một phiên; P4 + P5 + P6 một phiên. Mỗi phiên đọc 48 + 49 trước, không cần đọc lại hai file mẫu (số liệu đã chép ở §0).
 
 ## History
+- v1.5 2026-10-30 — R17 + AC-16: chiều dài, tỉ lệ râu / thân / cổ, số miếng / kg của dòng HĐ (41 R38) gộp vào Quy cách dòng lệnh; ghi chú dòng HĐ ⇒ ghi chú dòng lệnh (hiện ở hồ sơ, bản in, xem trước trong hộp lập lệnh). Không migration (cột `note` có sẵn ở 0088).
 - v1.4 2026-10-30 — P6 kiểm cuối ở sandbox: AC-6 (19 bảng sổ khác không đổi) + demo §4b (28 khóa số thật không đổi). Kiểm `site_id` bằng SQL làm sau khi 0088 chạy trên DB thật.
 - v1.3 2026-10-30 — build P4: `ExportData.issuedOrderShipmentIds` + `subStepState` (R6), nạp ở `useExportData`; bước 2 của chuyến có khối `ShipmentOrders` (lệnh đã gắn, Lập lệnh, Gắn lệnh có sẵn); cột "Đã ra lệnh (kg)" ở hồ sơ HĐ (`useOrderCoverage`); chữ tour / hộp "?" Xuất khẩu nói luật mới. AC-7, AC-8 (+ nháp, đã hủy) = `productionOrderExport.test.ts` (5). Thử preview demo: chuyến 142 bước 2 "Chưa làm" → lập lệnh 4.10 từ bước 2 → phát hành (chuyến tick sẵn) → bước 2 "Xong"; cột Đã ra lệnh 500 / còn 21.100; 360 px × 130 % không tràn.
 - v1.2 2026-10-30 — build P3: trang `/planning-production` (danh sách tháng, hồ sơ, hộp lập / sửa / NL dự kiến / phát hành · gắn chuyến / giữ bản cũ / hủy, bản in A4 dọc QTI-KH-01-04), nav nhóm Kế hoạch (navId quyền đổi về `planning-production`), tour + hộp "?" (P5 làm luôn vì QT 18 chặn máy). Thử preview demo: lập 3.10 (200 thùng ⇒ 2.400 kg), thiếu ngày ⇒ ErrorSummary 2 ô, phát hành gắn chuyến có MSL 006 ⇒ giữ 006 + Lệch MSL + bước 2 xong, sửa sau phát hành bắt lý do ⇒ lần sửa 1, hủy ⇒ chuyến hết bước 2; 360 px × 130 % không tràn. AC-15 (in) thử tay: đủ khối, A4 dọc.

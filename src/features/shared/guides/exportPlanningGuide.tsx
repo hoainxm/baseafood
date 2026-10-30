@@ -173,6 +173,7 @@ export const exportPlanningGuide: PageGuide = {
           <li>Thanh toán <b>Khác</b> thì ghi Hình thức thanh toán; L/C thì ghi Số L/C. Đính <b>Hồ sơ khác</b> thì ghi Tên hồ sơ.</li>
           <li>Dòng hàng chép được (Chép dòng — chỉ đổi size); có ô Loại hàng (danh mục) khi máy chủ đã bật.</li>
           <li>Dòng hàng chỉ khác size: chọn <b>Chép dòng</b>, dòng mới giữ mọi ô và để trống Size.</li>
+          <li>Ghi <b>Chiều dài</b>, <b>Tỉ lệ râu / thân / cổ</b>, <b>Số miếng / kg</b>, <b>Ghi chú dòng</b> đúng như cột trên hợp đồng. Lập Lệnh sản xuất từ dòng này thì các ô tự chép sang: ba ô đầu vào Quy cách, ghi chú dòng in dưới tên hàng. Lệnh đã lưu chỉ đổi theo khi mở lệnh ra lưu lại.</li>
           <li>Ô file hợp đồng, thư gia hạn, giấy báo có chọn được <b>nhiều file</b>: file đầu gắn vào bản ghi, các file sau (phụ lục) vào <b>Hồ sơ đính kèm</b>.</li>
           <li>Cuối hồ sơ có <b>Nhật ký thao tác</b>: ai làm gì, lúc nào. Chỉ thêm, không sửa hay xóa được.</li>
           <li>Rê chuột hoặc chạm vào chữ gạch chấm như <b>ETD</b>, <b>L/C</b>, <b>B/L</b> để xem nghĩa.</li>

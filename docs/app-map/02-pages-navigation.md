@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/my-tasks/MyTasksScreen.tsx, src/features/shared/AccountMenu.tsx, src/features/admin/AdminHomeScreen.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts, src/lib/permissions.ts, src/features/shared/PermissionProvider.tsx
 last_verified: 2026-10-30
+<!-- updated: 2026-10-30 (thứ tự) — nhóm nav "Kế hoạch" xếp theo dòng việc: Nhập khẩu → Lệnh sản xuất → Xuất khẩu (+ Tra cứu NCC nhập khẩu); danh sách phẳng của AppShell cùng thứ tự. Trang chủ của planner vẫn là Xuất khẩu. -->
 <!-- updated: 2026-10-30 (báo cáo) — `/planning-import` có thêm tab `?view=reports` (Báo cáo), `/planning-production` có tab `?view=reports`; kỳ ở `&report=` (2026-10 · 2026-Q4 · 2026). Không thêm route. -->
 <!-- updated: 2026-10-30 — THÊM route `/planning-production` "Lệnh sản xuất" (features/production-orders, icon ClipboardList) vào nhóm nav "Kế hoạch" sau Nhập khẩu; thấy được khi có `production-orders:view` (Phòng KH, 3 quản đốc, phó QĐ, thủ kho, BGĐ, kế toán). -->
 <!-- updated: 2026-10-29 (d) — nhóm nav "Kế hoạch" còn ĐÚNG 1 mục Tra cứu → `catalog?tab=import-suppliers` (bỏ Tra cứu Khách hàng + Đại lý ở nhóm này, ba-spec 45 v2 R19); `import-suppliers` thêm vào CATALOG_TABS (lib/legacyUrls). -->

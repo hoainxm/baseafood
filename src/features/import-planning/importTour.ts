@@ -50,7 +50,7 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
       title: "Lô nhập, Hợp đồng và Báo cáo",
       body:
         "Lô nhập: các lần hàng về trong tháng đang xem, gom theo đối tác. Dùng hằng ngày để biết lô nào còn thiếu giấy.\n" +
-        "Hợp đồng: mọi hợp đồng nhập, lọc theo Đang mở, Đã đóng, Đã hủy. Mỗi hợp đồng hiện số kg đã về so với hợp đồng.\n" +
+        "Hợp đồng: mọi hợp đồng nhập, lọc theo Đang mở, Đã đóng, Đã hủy hoặc Tất cả, tra theo số HĐ, tên đối tác. Mỗi hợp đồng hiện số kg đã về so với hợp đồng.\n" +
         "Báo cáo: số theo tháng, quý hoặc năm — lần nhập, kg thực nhập, trị giá theo tiền tệ, theo đối tác, mặt hàng, loại hình, lần nhập còn thiếu chứng từ. Xuất Excel được.",
     }),
   ];
@@ -128,7 +128,7 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
         body:
           "Mỗi lần nhập có sẵn 3 chứng từ bắt buộc: Commercial Invoice, Packing List, tờ khai nhập khẩu. Một chứng từ xong khi đã đính file; tờ khai cần thêm số tờ khai và loại hình.\n" +
           "Lô không có một chứng từ bắt buộc thì chọn Không áp dụng và ghi lý do.\n" +
-          "C/O, giấy kiểm dịch, B/L và chứng từ khác: có thì chọn Thêm chứng từ, không bắt buộc.",
+          "C/O, giấy kiểm dịch, B/L và chứng từ khác: có thì chọn Thêm chứng từ, không bắt buộc. Chọn Chứng từ khác thì phải ghi Tên chứng từ.",
       }),
       dossier({
         id: "quantity",
@@ -146,7 +146,7 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
         title: "Kiểm mẫu của kho",
         body:
           "Kho gửi báo cáo kiểm mẫu (Excel) thì chọn Nạp báo cáo kiểm mẫu. App đọc file, chọn sẵn các cột của lần nhập này theo nhà xuất khẩu và ngày về kho, gợi ý dòng hàng theo size. Kiểm lại rồi lưu.\n" +
-          "Ảnh chụp báo cáo chỉ đính kèm, số gõ tay. App chỉ lưu số như báo cáo, không tính lại và không đổi trạng thái lô.",
+          "Ảnh chụp báo cáo chỉ đính kèm, số gõ tay. App chỉ lưu số như báo cáo, không tính lại và không đổi trạng thái lô; số tự mâu thuẫn (tổng % khác 100, định mức lệch) thì có ô vàng cảnh báo, vẫn lưu được.",
       }),
     );
   }

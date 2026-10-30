@@ -61,7 +61,7 @@ export const IMPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Ghi thực nhập",
     needs: ["import-plans.receiving", "create"],
     actors: ["keeper", "planning"],
-    text: "Hàng về kho: chọn Ghi thực nhập, ghi số kg từng dòng hàng theo invoice.",
+    text: "Hàng về kho: chọn Ghi thực nhập, ghi số kg từng dòng hàng theo invoice. Có thực nhập thì Lệnh sản xuất mới chọn được lần nhập này làm NL.",
     done: "Đủ chứng từ và đã có thực nhập",
     result: { label: RECEIPT_STATE_LABELS.complete, tone: "done" },
   },
@@ -70,7 +70,7 @@ export const IMPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Đóng hợp đồng",
     needs: ["import-plans", "update"],
     actors: ["planning"],
-    text: "Nhập xong: Thao tác khác → Đóng hợp đồng. Mọi dòng hàng phải đã nối mặt hàng; còn dòng chưa về đủ thì ghi lý do.",
+    text: "Nhập xong: Thao tác khác → Đóng hợp đồng. Cần ít nhất một lần nhập, mọi dòng đã nối mặt hàng; còn dòng chưa về đủ thì ghi lý do.",
     done: "Không cần ai duyệt",
     result: { label: CONTRACT_STATE_LABELS.closed, tone: "done" },
   },
@@ -124,6 +124,7 @@ export const importPlanningGuide: PageGuide = {
           <li>Đã đính ít nhất một file. Tờ khai nhập khẩu cần thêm số tờ khai và loại hình.</li>
           <li>Lô không có chứng từ bắt buộc đó: chọn <b>Không áp dụng</b> và ghi lý do (VD hàng mẫu).</li>
           <li>Chứng từ bắt buộc không xóa được. Chứng từ thêm xóa được, có Hoàn tác.</li>
+          <li>Thêm <b>Chứng từ khác</b> thì phải ghi <b>Tên chứng từ</b> (VD L/C, giấy ATTP).</li>
         </GuideList>
       </GuideSection>
       <GuideSection title="Nối dòng hàng với mặt hàng">
@@ -154,6 +155,12 @@ export const importPlanningGuide: PageGuide = {
             Số không khớp nhau thì app báo để hỏi lại kho: tổng 1 da + 2 da + Mada hoặc tổng size khác 100%, thiếu net lệch so với packing và NW, ĐM NL–TP lệch tích 5 định mức quá 0,02. Vẫn lưu được.
           </li>
           <li>App chỉ lưu số như báo cáo, không tính lại, không đổi trạng thái lô. Kho gửi bản sửa thì nạp lại và chọn <b>Thay bằng mẫu mới</b>.</li>
+        </GuideList>
+      </GuideSection>
+      <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">
+        <GuideList>
+          <li>Nhập khẩu là bước đầu: số <b>thực nhập</b> của từng lần nhập là NL mà trang <b>Lệnh sản xuất</b> chọn để dành cho lệnh (chỉ dành, không trừ kho).</li>
+          <li>Kg đã dành cho các lệnh xem ở Lệnh sản xuất → Báo cáo → NL nhập khẩu đã dành.</li>
         </GuideList>
       </GuideSection>
       <GuideSection title="Ai làm gì">

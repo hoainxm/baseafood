@@ -44,7 +44,7 @@ export const ORDER_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Gắn NL nhập khẩu dự kiến",
     needs: ["production-orders", "update"],
     actors: ["planning"],
-    text: "Mỗi dòng lệnh chọn lần nhập khẩu và số kg NL dự kiến. Chỉ dành cho lệnh, không trừ kho.",
+    text: "Mỗi dòng lệnh chọn lần nhập khẩu đã ghi thực nhập và số kg NL dự kiến. Chỉ dành cho lệnh, không trừ kho.",
     done: "Không bắt buộc, dành vượt thực nhập thì có cảnh báo",
   },
   {
@@ -52,8 +52,8 @@ export const ORDER_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Phát hành, gắn chuyến",
     needs: ["production-orders", "update"],
     actors: ["planning"],
-    text: "Chọn Phát hành và chọn các chuyến xuất của hợp đồng mà lệnh lo. In lệnh A4 gửi Phòng Kỹ thuật.",
-    done: "Quản đốc, thủ kho đọc được lệnh; bước Lệnh sản xuất của chuyến tự xong",
+    text: "Chọn Phát hành và tick các chuyến xuất mà lệnh lo; chưa có chuyến thì gắn sau. In lệnh A4 gửi Phòng Kỹ thuật.",
+    done: "Quản đốc, thủ kho đọc được lệnh; chuyến đã gắn xong bước Lệnh sản xuất",
     result: { label: ORDER_STATUS_LABELS.issued, tone: "done" },
   },
   {
@@ -97,6 +97,12 @@ export const productionOrderGuide: PageGuide = {
           <li>Dòng hàng đã ra lệnh vượt số kg hợp đồng quá dung sai: có cảnh báo, vẫn lưu được.</li>
         </GuideList>
       </GuideSection>
+      <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">
+        <GuideList>
+          <li>NL lấy từ trang <b>Nhập khẩu</b>: chỉ lần nhập đã ghi thực nhập mới chọn được.</li>
+          <li>Lệnh phát hành và gắn chuyến thì bước <b>Lệnh sản xuất</b> của chuyến ở trang <b>Xuất khẩu</b> tự xong. Hồ sơ lệnh có lối mở hồ sơ hợp đồng xuất.</li>
+        </GuideList>
+      </GuideSection>
       <GuideSection title="Ai làm gì">
         <GuideActors steps={ORDER_GUIDE_STEPS} actors={ORDER_GUIDE_ACTORS} />
       </GuideSection>
@@ -112,7 +118,10 @@ export const productionOrderGuide: PageGuide = {
           <li>Hợp đồng phải có bản hiệu lực, dòng hàng phải đã nối mặt hàng danh mục thì mới lập lệnh được.</li>
           <li>Hạn sử dụng = tháng của ngày sản xuất đầu + số tháng, về ngày 01. VD sản xuất 02/11/2026, 24 tháng: 01/11/2028.</li>
           <li>Lệnh xếp vào tháng theo ngày sản xuất đầu. Ô tra tìm số lệnh, mã số lô, số hợp đồng, tên hàng ở mọi tháng.</li>
-          <li>Lập lệnh mới chép được yêu cầu bao bì, Nafi, lưu ý từ lệnh gần nhất cùng khách và mặt hàng.</li>
+          <li>Lập lệnh mới chép được yêu cầu bao bì, Nafi, lưu ý từ lệnh gần nhất cùng khách và mặt hàng (nút Chép từ lệnh …). Chọn Nafi <b>Khác</b> thì phải ghi Chỉ tiêu Khác.</li>
+          <li>Không lưu được khi: số lệnh trùng, ngày giao trước ngày sản xuất cuối, hợp đồng đã đóng / hủy. Trùng MSL với lệnh đang phát hành chỉ cảnh báo.</li>
+          <li>Tab Lệnh: lọc theo khách; lệnh đã hủy ẩn sẵn, chọn <b>Xem n lệnh đã hủy</b> để hiện. Ô tra luôn tìm cả lệnh đã hủy.</li>
+          <li>Tab Báo cáo xuất Excel được.</li>
         </GuideList>
       </GuideSection>
     </>

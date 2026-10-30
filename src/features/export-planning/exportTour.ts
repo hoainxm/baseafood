@@ -223,7 +223,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Hồ sơ đính kèm",
         body:
           "Chặng Đính kèm của hợp đồng. Thẻ đầu khối ghi từng loại hồ sơ bắt buộc: Hợp đồng đã ký (luôn có), L/C (khi thanh toán bằng L/C) — \"đã có\" hoặc \"còn thiếu\".\n" +
-          "Nhân viên Kế hoạch chọn Đính kèm file, chọn loại hồ sơ rồi chọn một hay nhiều file. Proforma invoice và hồ sơ khác đính được nhưng không bắt buộc.\n" +
+          "Nhân viên Kế hoạch chọn Đính kèm file, chọn loại hồ sơ rồi chọn một hay nhiều file. Proforma invoice và hồ sơ khác đính được nhưng không bắt buộc; chọn Hồ sơ khác thì phải ghi Tên hồ sơ.\n" +
           "Đủ hồ sơ bắt buộc thì hợp đồng chuyển Đang ghi chuyến và nút Ghi chuyến mới hiện. Gỡ file nhầm bằng nút thùng rác, có Hoàn tác.",
       }),
       dossier({
@@ -255,7 +255,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           "Mỗi mục có một thẻ trạng thái: Chưa làm · Đang làm · Xong · Không áp dụng.\n" +
           "Mục chỉ được đánh dấu Xong khi đủ giấy tờ:\n" +
           "• Bước 1 Hợp đồng: tự Xong khi hợp đồng đủ hồ sơ đính kèm bắt buộc.\n" +
-          "• Lệnh sản xuất: tự Xong khi có lệnh đã phát hành gắn chuyến (trang Lệnh sản xuất); không thì có file và mọi dòng hàng của hợp đồng đã nối danh mục.\n" +
+          "• Lệnh sản xuất: tự Xong khi có lệnh đã phát hành gắn chuyến — ngay tại bước chọn Lập lệnh sản xuất hoặc Gắn lệnh có sẵn (lệnh nháp chưa tính); không thì có file và mọi dòng hàng của hợp đồng đã nối danh mục.\n" +
           "• Bao bì: có file hoặc ghi chú.\n" +
           "• Sơ đồ container, Hình ảnh đóng cont: tự Xong khi có file.\n" +
           "• Tờ khai: có số tờ khai và file. Lệnh xuất: có file đã có chữ ký Ban Giám đốc.\n" +

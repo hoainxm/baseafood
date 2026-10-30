@@ -78,7 +78,7 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
       title: "Danh sách lệnh",
       body:
         "Mỗi dòng là một lệnh: khách, mặt hàng, thùng, kg, mã số lô, ngày sản xuất, ngày giao và trạng thái.\n" +
-        "Trạng thái: Nháp (chưa gửi ai) → Đã phát hành (quản đốc, thủ kho đọc được). Đã hủy: có lý do, không tính vào số đã ra lệnh, mặc định ẩn — chọn Xem lệnh đã hủy để hiện. Chọn Mở để xem hồ sơ lệnh.",
+        "Trạng thái: Nháp (chưa gửi ai) → Đã phát hành (quản đốc, thủ kho đọc được). Đã hủy: có lý do, không tính vào số đã ra lệnh, ẩn sẵn — tháng có lệnh hủy thì chọn Xem n lệnh đã hủy để hiện; ô tra luôn tìm cả lệnh đã hủy. Chọn Mở để xem hồ sơ lệnh.",
     }),
     dossier({
       id: "status",
@@ -95,7 +95,7 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
         id: "next",
         target: "order-next-step",
         title: "Việc tiếp",
-        body: "Nút này nói việc tiếp của lệnh: Phát hành khi còn nháp, Gắn chuyến khi đã phát hành mà chưa gắn chuyến nào, Sửa theo bản mới khi có cờ Theo bản HĐ trước.",
+        body: "Nút này nói việc tiếp của lệnh: Phát hành khi còn nháp, Sửa theo bản mới khi có cờ Theo bản HĐ trước, Gắn chuyến khi đã phát hành mà chưa gắn chuyến nào.",
       }),
     );
   steps.push(
@@ -116,7 +116,7 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
       target: "order-materials",
       title: "NL nhập khẩu dự kiến",
       body:
-        "Mỗi dòng lệnh chọn lần nhập khẩu và số kg NL dự kiến dùng. App hiện đã dành bao nhiêu so với thực nhập của lần nhập đó.\n" +
+        "Mỗi dòng lệnh chọn lần nhập khẩu (trang Nhập khẩu, chỉ lần đã ghi thực nhập) và số kg NL dự kiến dùng. App hiện đã dành bao nhiêu so với thực nhập của lần nhập đó.\n" +
         "Đây chỉ là dành cho lệnh: không trừ kho, không ghi vào Nhập khẩu hay sổ kho.",
     }),
     dossier({
@@ -124,7 +124,7 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
       target: "order-shipments",
       title: "Chuyến xuất",
       body:
-        "Lệnh gắn một hoặc nhiều chuyến của cùng hợp đồng. Lệnh đã phát hành thì bước Lệnh sản xuất của các chuyến đó tự xong.\n" +
+        "Lệnh gắn một hoặc nhiều chuyến của cùng hợp đồng. Lệnh đã phát hành thì bước Lệnh sản xuất của các chuyến đã gắn tự xong ở trang Xuất khẩu; phát hành chưa tick chuyến thì gắn sau.\n" +
         "Chuyến chưa có mã số lô nhận mã của lệnh; chuyến có mã khác thì hiện Lệch MSL. Hủy lệnh thì chuyến được nhả.",
     }),
   );

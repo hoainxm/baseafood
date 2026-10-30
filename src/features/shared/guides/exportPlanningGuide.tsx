@@ -157,12 +157,21 @@ export const exportPlanningGuide: PageGuide = {
           <li>Thẻ <b>Trễ hạn</b>: chuyến quá hạn giao. Thẻ <b>Chờ booking</b>: chưa có số booking và số container.</li>
         </GuideList>
       </GuideSection>
+      <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">
+        <GuideList>
+          <li>Bước <b>Lệnh sản xuất</b> của chuyến: chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng và chuyến) hoặc <b>Gắn lệnh có sẵn</b>. Lệnh nháp chưa tính; phát hành thì bước tự xong.</li>
+          <li>Dòng hàng hợp đồng có cột <b>Đã ra lệnh (kg)</b>: còn bao nhiêu kg chưa ra lệnh, vượt dung sai thì báo.</li>
+          <li>NL của lệnh lấy từ các lần <b>Nhập khẩu</b> đã ghi thực nhập.</li>
+        </GuideList>
+      </GuideSection>
       <GuideSection title="Ai làm gì">
         <GuideActors steps={EXPORT_GUIDE_STEPS} actors={EXPORT_GUIDE_ACTORS} />
       </GuideSection>
       <GuideSection title="Mẹo">
         <GuideList>
           <li>Việc ít dùng nằm ở <b>Thao tác khác</b>: Sửa hợp đồng (khi chưa có chuyến), Ghi bản sửa (khi đã có chuyến), Gia hạn giao hàng, hủy.</li>
+          <li>Thanh toán <b>Khác</b> thì ghi Hình thức thanh toán; L/C thì ghi Số L/C. Đính <b>Hồ sơ khác</b> thì ghi Tên hồ sơ.</li>
+          <li>Dòng hàng chép được (Chép dòng — chỉ đổi size); có ô Loại hàng (danh mục) khi máy chủ đã bật.</li>
           <li>Dòng hàng chỉ khác size: chọn <b>Chép dòng</b>, dòng mới giữ mọi ô và để trống Size.</li>
           <li>Ô file hợp đồng, thư gia hạn, giấy báo có chọn được <b>nhiều file</b>: file đầu gắn vào bản ghi, các file sau (phụ lục) vào <b>Hồ sơ đính kèm</b>.</li>
           <li>Cuối hồ sơ có <b>Nhật ký thao tác</b>: ai làm gì, lúc nào. Chỉ thêm, không sửa hay xóa được.</li>

@@ -40,6 +40,7 @@ import {
   suggestLineForSize,
   suggestSampleColumns,
   type SampleMetric,
+  sampleConsistencyWarnings,
 } from "@/lib/importSampleChecks";
 import { isReadableSampleFile, readSampleReportFile } from "@/lib/importSampleFile";
 import type { ImportContractLine, ImportFile, ImportReceipt, ImportSampleCheck } from "@/types";
@@ -384,6 +385,8 @@ export function SampleCheckDialog({
 
   const shown = form?.columns ?? [];
   const flagged = shown.flatMap((c, i) => (c.selected ? c.needsReview.map((n) => `Mẫu ${c.sample.sampleNo || i + 1} · ${n}`) : []));
+  // Số trên báo cáo không khớp nhau (tổng %, thiếu net, ĐM NL–TP) — chỉ cảnh báo, vẫn lưu đúng số kho ghi.
+  const inconsistent = shown.flatMap((c, i) => (c.selected ? sampleConsistencyWarnings(c.sample).map((w) => `Mẫu ${c.sample.sampleNo || i + 1}: ${w}`) : []));
 
   return (
     <FormDialog
@@ -429,6 +432,16 @@ export function SampleCheckDialog({
             <div role="alert" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
               <p className="font-medium">Ô không đọc được, để trống — soát lại theo báo cáo:</p>
               <p>{flagged.join(" · ")}</p>
+            </div>
+          )}
+          {inconsistent.length > 0 && (
+            <div role="alert" data-tour="import-sample-consistency" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
+              <p className="font-medium">Số trên báo cáo không khớp nhau — hỏi lại kho (vẫn lưu được, app lưu đúng số đã ghi):</p>
+              <ul className="list-disc pl-5">
+                {inconsistent.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-2">

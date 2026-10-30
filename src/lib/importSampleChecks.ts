@@ -428,3 +428,71 @@ export function mergeSamples(rows: readonly ImportSampleCheck[], receiptId: stri
 
 /** Giá trị của chỉ số để hiển thị / sửa (khóa đơn). */
 export const metricValue = (s: ImportSampleCheck, key: SampleMetricKey): string | number | null => (s as unknown as Record<string, string | number | null>)[key];
+
+/* ---------- Cảnh báo số tự mâu thuẫn (chủ dự án 2026-10-30) — KHÔNG chặn lưu, app vẫn lưu đúng số kho ghi ---------- */
+
+const localeNumber = (n: number, digits = 2) => n.toLocaleString("vi-VN", { maximumFractionDigits: digits });
+/** Lệch cho phép: tổng % ±0,5 điểm; thiếu net ±0,5 điểm; ĐM NL–TP ±0,02 (kho làm tròn 2 số lẻ). */
+const PCT_TOLERANCE = 0.5;
+const NORM_TOLERANCE = 0.02;
+
+/**
+ * Gram tịnh danh nghĩa của một thùng theo quy cách: "4kg/BL x 5/CTN" ⇒ 20.000 · "20kg/CTN" ⇒ 20.000 ·
+ * "500g x 20" ⇒ 10.000. Lấy số kg (hoặc g) đầu tiên rồi nhân các thừa số "x N". Không đọc được ⇒ null.
+ */
+export function packingNetGrams(packing: string): number | null {
+  const t = packing.toLowerCase().replace(/,/g, ".");
+  const m = t.match(/(\d+(?:\.\d+)?)\s*(kg|g)\b/);
+  if (!m) return null;
+  let grams = Number(m[1]) * (m[2] === "kg" ? 1000 : 1);
+  for (const x of t.slice((m.index ?? 0) + m[0].length).matchAll(/[x×*]\s*(\d+(?:\.\d+)?)/g)) grams *= Number(x[1]);
+  return grams > 0 ? grams : null;
+}
+
+type ConsistencyInput = Pick<
+  ImportSampleCheck,
+  | "packing"
+  | "netWeightG"
+  | "netShortagePct"
+  | "oneSkinPct"
+  | "twoSkinPct"
+  | "madaPct"
+  | "sizeDistribution"
+  | "thawingNorm"
+  | "preprocessingNorm"
+  | "blanchingNorm"
+  | "cuttingNorm"
+  | "surplusNorm"
+  | "materialToFinishedNorm"
+>;
+
+/**
+ * Các con số trên báo cáo kiểm mẫu phải khớp nhau; lệch ⇒ có thể kho gõ nhầm. Mỗi dòng là một cảnh báo
+ * để người nạp hỏi lại kho — KHÔNG sửa số, KHÔNG chặn lưu (R23: app chỉ lưu, không tính lại). Ô trống ⇒ bỏ qua.
+ */
+export function sampleConsistencyWarnings(s: ConsistencyInput): string[] {
+  const out: string[] = [];
+  const skins = [s.oneSkinPct, s.twoSkinPct, s.madaPct].filter((v): v is number => v != null);
+  if (skins.length) {
+    const sum = skins.reduce((a, b) => a + b, 0);
+    if (Math.abs(sum - 100) > PCT_TOLERANCE) out.push(`Tổng 1 da + 2 da + Mada = ${localeNumber(sum, 1)}% (phải 100%)`);
+  }
+  const sizes = Object.values(s.sizeDistribution ?? {}).filter((v): v is number => v != null);
+  if (sizes.length) {
+    const sum = sizes.reduce((a, b) => a + b, 0);
+    if (Math.abs(sum - 100) > PCT_TOLERANCE) out.push(`Tổng phân bố size = ${localeNumber(sum, 1)}% (phải 100%)`);
+  }
+  const net = packingNetGrams(s.packing ?? "");
+  if (net != null && s.netWeightG != null && s.netShortagePct != null) {
+    const expected = ((net - s.netWeightG) / net) * 100;
+    if (Math.abs(expected - s.netShortagePct) > PCT_TOLERANCE)
+      out.push(`Thiếu net ghi ${localeNumber(s.netShortagePct, 1)}% nhưng theo packing (${localeNumber(net / 1000)} kg) và NW thì là ${localeNumber(expected, 1)}%`);
+  }
+  const norms = [s.thawingNorm, s.preprocessingNorm, s.blanchingNorm, s.cuttingNorm, s.surplusNorm];
+  if (s.materialToFinishedNorm != null && norms.every((v) => v != null)) {
+    const product = (norms as number[]).reduce((a, b) => a * b, 1);
+    if (Math.abs(product - s.materialToFinishedNorm) > NORM_TOLERANCE)
+      out.push(`ĐM NL–TP ghi ${localeNumber(s.materialToFinishedNorm)} nhưng tích 5 định mức là ${localeNumber(product)}`);
+  }
+  return out;
+}

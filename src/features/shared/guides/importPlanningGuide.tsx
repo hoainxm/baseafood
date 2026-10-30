@@ -150,6 +150,9 @@ export const importPlanningGuide: PageGuide = {
             Kho gửi báo cáo kiểm mẫu thì vào lần nhập, chọn <b>Nạp báo cáo kiểm mẫu</b>. File Excel được đọc tự động: app chọn sẵn các cột của invoice này theo nhà xuất khẩu và ngày về kho, gợi ý dòng hàng theo size.
           </li>
           <li>Ảnh chụp báo cáo chỉ đính kèm, số gõ tay. Ô không đọc được để trống và tô vàng để soát.</li>
+          <li>
+            Số không khớp nhau thì app báo để hỏi lại kho: tổng 1 da + 2 da + Mada hoặc tổng size khác 100%, thiếu net lệch so với packing và NW, ĐM NL–TP lệch tích 5 định mức quá 0,02. Vẫn lưu được.
+          </li>
           <li>App chỉ lưu số như báo cáo, không tính lại, không đổi trạng thái lô. Kho gửi bản sửa thì nạp lại và chọn <b>Thay bằng mẫu mới</b>.</li>
         </GuideList>
       </GuideSection>

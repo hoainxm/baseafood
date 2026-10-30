@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { ImportSampleCheck } from "@/types";
 import {
   emptySample,
+  packingNetGrams,
+  sampleConsistencyWarnings,
   exporterMatches,
   mergeSamples,
   parseSampleNumber,
@@ -180,5 +182,39 @@ describe("AC-39 — nạp lại thay, không cộng đôi", () => {
   });
   it("giữ thêm ⇒ 6 mẫu", () => {
     expect(mergeSamples(old, "r1", fresh, false).filter((x) => x.receiptId === "r1")).toHaveLength(6);
+  });
+});
+
+describe("cảnh báo số tự mâu thuẫn khi nạp kiểm mẫu (2026-10-30)", () => {
+  // Mẫu 1 của báo cáo thật 25/10/2026 — mọi số khớp nhau.
+  const ok = {
+    packing: "4kg/BL x 5/CTN", netWeightG: 19000, netShortagePct: 5,
+    oneSkinPct: 30, twoSkinPct: 70, madaPct: null, sizeDistribution: { "50/70": 16, "70/100": 84 },
+    thawingNorm: 1.05, preprocessingNorm: 1.49, blanchingNorm: 1.21, cuttingNorm: 1.08, surplusNorm: 1.03, materialToFinishedNorm: 2.11,
+  };
+  it("đọc gram tịnh theo quy cách", () => {
+    expect(packingNetGrams("4kg/BL x 5/CTN")).toBe(20000);
+    expect(packingNetGrams("5 kg/BL × 4/CTN")).toBe(20000);
+    expect(packingNetGrams("20kg/CTN")).toBe(20000);
+    expect(packingNetGrams("500g x 20")).toBe(10000);
+    expect(packingNetGrams("1,5kg x 8")).toBe(12000);
+    expect(packingNetGrams("BL")).toBeNull();
+  });
+  it("báo cáo khớp nhau ⇒ không cảnh báo (lệch làm tròn 0,01 vẫn qua)", () => {
+    expect(sampleConsistencyWarnings(ok)).toEqual([]);
+    expect(sampleConsistencyWarnings({ ...ok, materialToFinishedNorm: 2.12 })).toEqual([]);
+  });
+  it("lệch ⇒ đúng 4 loại cảnh báo, kèm số để hỏi lại kho", () => {
+    const w = sampleConsistencyWarnings({
+      ...ok, twoSkinPct: 60, sizeDistribution: { "50/70": 16, "70/100": 74 }, netShortagePct: 2, materialToFinishedNorm: 2.2,
+    });
+    expect(w).toHaveLength(4);
+    expect(w[0]).toMatch(/Tổng 1 da \+ 2 da \+ Mada = 90%/);
+    expect(w[1]).toMatch(/Tổng phân bố size = 90%/);
+    expect(w[2]).toMatch(/Thiếu net ghi 2% .*20 kg.* 5%/);
+    expect(w[3]).toMatch(/ĐM NL–TP ghi 2,2 .*tích 5 định mức là 2,11/);
+  });
+  it("ô trống ⇒ bỏ qua phép kiểm đó", () => {
+    expect(sampleConsistencyWarnings({ ...ok, packing: "", oneSkinPct: null, twoSkinPct: null, sizeDistribution: {}, cuttingNorm: null })).toEqual([]);
   });
 });

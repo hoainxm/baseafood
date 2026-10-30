@@ -107,11 +107,17 @@ export function ProductionLinesTable({
           <thead>
             <tr>
               <th className={th}>
-                Thành phẩm <span className="text-destructive">*</span>
+                Thành phẩm
+                <span aria-hidden className="ml-1 font-bold text-destructive">
+                  *
+                </span>
               </th>
               <th className={`${th} w-[11rem]`}>Số block × kg/khối</th>
               <th className={`${th} w-[8.25rem]`}>
-                Số lượng (kg) <span className="text-destructive">*</span>
+                Số lượng (kg)
+                <span aria-hidden className="ml-1 font-bold text-destructive">
+                  *
+                </span>
               </th>
               <th className={`${th} w-[5.75rem]`} aria-label="Tách · bỏ dòng" />
             </tr>

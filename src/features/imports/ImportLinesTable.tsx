@@ -80,7 +80,7 @@ export function ImportLinesTable({
           <div
             key={d.key}
             className={cn(
-              "grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-3 lg:items-end",
+              "grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-3",
               showPrice
                 ? "lg:grid-cols-[1.1fr_1.6fr_0.9fr_0.9fr_auto]"
                 : "lg:grid-cols-[1.1fr_1.6fr_0.9fr_auto]"
@@ -133,7 +133,7 @@ export function ImportLinesTable({
                 title="Bỏ dòng loại hàng này khỏi chuyến đang gõ (chưa lưu nên không đụng sổ)."
                 variant="danger"
                 aria-label={`Bỏ dòng ${d.materialTypeName || "loại hàng"}`}
-                className="col-span-2 justify-center lg:col-span-1"
+                className="col-span-2 justify-center lg:col-span-1 lg:self-end"
                 onClick={() => onBo(d.key)}
               >
                 <X />

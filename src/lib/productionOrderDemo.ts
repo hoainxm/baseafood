@@ -16,6 +16,7 @@ import type {
 } from "@/types";
 import { effectiveRevision, type ExportData } from "./exportPlanning";
 import type { ImportData } from "./importPlanning";
+import { formatDateVN } from "./format";
 import { emptyRequirements, lineFromContract, lineKg, nextOrderNumber } from "./productionOrder";
 
 export interface ProductionOrderDemoSet {
@@ -131,7 +132,7 @@ export function buildProductionOrderDemo(
             orderLineId: l1.id,
             receiptId: rl.receiptId,
             importLineId: rl.contractLineId,
-            label: [`HĐ nhập ${receipt.contractNo}`, receipt.supplierName, receipt.arrivalDate, receipt.containerNo].filter(Boolean).join(" · "),
+            label: [`HĐ nhập ${receipt.contractNo}`, receipt.supplierName, formatDateVN(receipt.arrivalDate), receipt.containerNo].filter(Boolean).join(" · "),
             kg: Math.round((rl.kg ?? 0) / 2),
           },
         ]

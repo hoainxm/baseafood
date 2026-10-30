@@ -159,6 +159,13 @@ export const importPlanningGuide: PageGuide = {
       <GuideSection title="Ai làm gì">
         <GuideActors steps={IMPORT_GUIDE_STEPS} actors={IMPORT_GUIDE_ACTORS} />
       </GuideSection>
+      <GuideSection title="Báo cáo">
+        <GuideList>
+          <li>Tab <b>Báo cáo</b>: chọn Tháng / Quý / Năm và đối tác. Số gồm lần nhập (cont, hàng lẻ), kg thực nhập, trị giá (chỉ người được xem giá), theo đối tác, mặt hàng, loại hình.</li>
+          <li>Trị giá = kg thực nhập × đơn giá dòng HĐ, tách theo tiền tệ; dòng gia công không giá không cộng. Lần nhập đã hủy không tính.</li>
+          <li>HĐ còn chưa về = kg các hợp đồng đang mở còn chưa nhập, không theo kỳ. Lần nhập cần chú ý: thiếu chứng từ, hoặc đã về kho mà chưa ghi thực nhập.</li>
+        </GuideList>
+      </GuideSection>
       <GuideSection title="Mẹo">
         <GuideList>
           <li><b>Còn lại</b> của dòng hàng = kg hợp đồng − tổng thực nhập các lần nhập chưa hủy. Về nhiều hơn thì hiện <b>vượt x kg</b>, vẫn lưu được.</li>

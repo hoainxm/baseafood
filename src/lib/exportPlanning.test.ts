@@ -240,6 +240,11 @@ describe("R9 · kiểm hợp đồng (AC-6)", () => {
     expect(validateContract({ ...base, contractNo: " 18.26/bsf-scm.2026 ", terms: terms() }, existing).map((e) => e.key)).toEqual(["contractNo"]);
     expect(validateContract({ ...base, terms: terms() }, existing)).toEqual([]);
   });
+  it("thanh toán Khác phải ghi hình thức (2026-10-30)", () => {
+    const base = { id: "c2", customerId: "scm", contractNo: "19.26", signedOn: "2026-08-01", lines: LINES_1826 };
+    expect(validateContract({ ...base, terms: terms({ paymentMethod: "other", paymentOther: " " }) }, existing).map((e) => e.key)).toEqual(["paymentOther"]);
+    expect(validateContract({ ...base, terms: terms({ paymentMethod: "other", paymentOther: "D/P 30 ngày" }) }, existing)).toEqual([]);
+  });
 });
 
 describe("R3 · bản + duyệt gắn bản (AC-5, AC-7…AC-10)", () => {

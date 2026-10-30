@@ -1191,6 +1191,8 @@ export interface ExportContractTerms {
   portOfLoading: string;
   portOfDischarge: string;
   paymentMethod: ExportPaymentMethod;
+  /** Thanh toán = Khác: ghi hình thức (VD D/P, nhờ thu, tiền mặt) — bắt buộc khi chọn Khác (2026-10-30). Nằm trong JSON terms, không cần cột. */
+  paymentOther?: string;
   depositPct: number | null;
   lcNo: string;
   lcExpiry: string;

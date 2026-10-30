@@ -49,6 +49,14 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
     );
   steps.push(
     list({
+      id: "tabs",
+      target: "order-tabs",
+      title: "Lệnh và Báo cáo",
+      body:
+        "Lệnh: danh sách lệnh của tháng đang xem.\n" +
+        "Báo cáo: số theo tháng, quý hoặc năm — số lệnh, thùng, kg, theo khách và mặt hàng, NL nhập khẩu đã dành, lệnh cần chú ý. Lệnh đã hủy chỉ đếm, không cộng kg. Xuất Excel được.",
+    }),
+    list({
       id: "stats",
       target: "order-stats",
       optional: true,
@@ -70,7 +78,7 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
       title: "Danh sách lệnh",
       body:
         "Mỗi dòng là một lệnh: khách, mặt hàng, thùng, kg, mã số lô, ngày sản xuất, ngày giao và trạng thái.\n" +
-        "Trạng thái: Nháp (chưa gửi ai) → Đã phát hành (quản đốc, thủ kho đọc được). Đã hủy: có lý do, không tính vào số đã ra lệnh. Chọn Mở để xem hồ sơ lệnh.",
+        "Trạng thái: Nháp (chưa gửi ai) → Đã phát hành (quản đốc, thủ kho đọc được). Đã hủy: có lý do, không tính vào số đã ra lệnh, mặc định ẩn — chọn Xem lệnh đã hủy để hiện. Chọn Mở để xem hồ sơ lệnh.",
     }),
     dossier({
       id: "status",

@@ -14,12 +14,14 @@ import {
   ErrorSummary,
   Field,
   FormDialog,
+  FormSection,
   Input,
   NumberField,
   Textarea,
   formatNumber,
   type ComboboxOption,
   type FieldError,
+  GroupLabel,
 } from "@/design-system";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { DialogFooter } from "@/features/import-planning/ImportDialogs";
@@ -242,6 +244,8 @@ export function OrderFormDialog({
     const prev = old ? { order: old, lines: linesOfOrder(data.lines, old.id) } : { order, lines: [] };
     const res = reviseOrder(prev, { order, lines }, form.revisionReason);
     if (!res.ok) errs.push({ field: "Lý do sửa", message: res.message });
+    if (form.req.nafiTests.includes("Khác") && !form.req.nafiNote.trim())
+      errs.push({ field: "Chỉ tiêu Khác", message: "Đã chọn kiểm Nafi Khác thì ghi rõ chỉ tiêu" });
     setErrors(errs);
     if (errs.length || !res.ok) return;
     if (onSave({ order: res.order, lines, isNew: form.isNew, changes: res.changes, shipmentId: form.shipmentId })) draft.done();
@@ -276,8 +280,7 @@ export function OrderFormDialog({
       <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
       <div className="grid gap-5 py-2">
         <ErrorSummary errors={errors} />
-        <section className="grid gap-4">
-          <h3 className="font-semibold">Lệnh</h3>
+        <FormSection no={1} title="Lệnh" hint="Số lệnh gợi ý theo tháng; hạn sử dụng tính từ tháng của ngày sản xuất đầu.">
           <Combobox
             label="Hợp đồng xuất"
             required
@@ -296,15 +299,18 @@ export function OrderFormDialog({
               <Input value={form.lotCode} onChange={(e) => set("lotCode", e.target.value)} />
             </Field>
           </div>
+          {/* Nhãn chuẩn của DateField (không tự dựng nhãn nhóm): ngày 1 là "Ngày sản xuất *", ngày thêm đánh số. */}
           <div className="grid gap-2">
-            <p className="font-medium">
-              Ngày sản xuất <span className="text-destructive">*</span>
-            </p>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-3">
               {form.productionDates.map((d, i) => (
                 <div key={i} className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
-                    <DateField label={`Ngày ${i + 1}`} value={d} onChange={(v) => set("productionDates", form.productionDates.map((x, j) => (j === i ? v : x)))} />
+                    <DateField
+                      label={i === 0 ? "Ngày sản xuất" : `Ngày sản xuất ${i + 1}`}
+                      required={i === 0}
+                      value={d}
+                      onChange={(v) => set("productionDates", form.productionDates.map((x, j) => (j === i ? v : x)))}
+                    />
                   </div>
                   {form.productionDates.length > 1 && (
                     <Button variant="danger" size="icon" onClick={() => set("productionDates", form.productionDates.filter((_, j) => j !== i))} title="Bỏ ngày sản xuất này.">
@@ -328,17 +334,15 @@ export function OrderFormDialog({
               <Input value={form.market} onChange={(e) => set("market", e.target.value)} />
             </Field>
           </div>
-        </section>
+        </FormSection>
 
-        <section className="grid gap-3">
-          <h3 className="font-semibold">Dòng hàng</h3>
-          {!rev && <p className="text-sm text-muted-foreground">Chọn hợp đồng xuất trước — dòng hàng lấy từ bản hiệu lực của hợp đồng.</p>}
+        <FormSection no={2} title="Dòng hàng" hint={rev ? "Gõ số thùng (hoặc kiện), kg tự tính theo kg tịnh mỗi thùng của hợp đồng." : "Chọn hợp đồng xuất trước — dòng hàng lấy từ bản hiệu lực của hợp đồng."}>
           {rev &&
             form.lines.map((lf, i) => {
               const cl = contractLine(lf.contractLineId);
               const auto = cl ? lineKg({ units: lf.units, unitKind: cl.unitKind, cartonsPerUnit: cl.cartonsPerUnit, netKgPerCarton: cl.netKgPerCarton }) : null;
               return (
-                <div key={lf.id} className="grid gap-3 rounded-lg border border-border px-3 py-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+                <div key={lf.id} className="grid gap-3 rounded-lg border border-border bg-background px-3 py-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
                   <Combobox label={`Dòng hàng ${i + 1}`} required value={lf.contractLineId} onChange={(v) => setLine(lf.id, { contractLineId: v })} options={lineOptions} />
                   <NumberField label={cl?.unitKind === "bundle" ? "Số kiện" : "Số thùng"} required value={lf.units} onChange={(v) => setLine(lf.id, { units: v })} />
                   {cl && cl.netKgPerCarton == null ? (
@@ -349,7 +353,7 @@ export function OrderFormDialog({
                     </Field>
                   )}
                   {form.lines.length > 1 ? (
-                    <Button variant="danger" size="icon" onClick={() => set("lines", form.lines.filter((x) => x.id !== lf.id))} title="Bỏ dòng này.">
+                    <Button variant="danger" size="icon" className="sm:self-end" onClick={() => set("lines", form.lines.filter((x) => x.id !== lf.id))} title="Bỏ dòng này.">
                       <Trash2 className="h-4 w-4" aria-hidden />
                     </Button>
                   ) : (
@@ -366,18 +370,21 @@ export function OrderFormDialog({
               </Button>
             </div>
           )}
-        </section>
+        </FormSection>
 
-        <section className="grid gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold">Yêu cầu bao bì · kiểm Nafi · lưu ý</h3>
-            {previous && (
+        <FormSection
+          no={3}
+          title="Yêu cầu bao bì · kiểm Nafi · lưu ý"
+          hint="Không bắt buộc. Ô trống thì bản in để trống."
+          action={
+            previous && (
               <Button variant="outline" size="sm" onClick={() => setForm((f) => (f ? { ...f, req: { ...previous.requirements }, note: f.note || previous.note } : f))} title="Chép yêu cầu bao bì, Nafi, lưu ý từ lệnh gần nhất cùng khách và mặt hàng.">
                 <Copy className="mr-1 h-4 w-4" aria-hidden />
                 Chép từ lệnh {previous.orderNo}
               </Button>
-            )}
-          </div>
+            )
+          }
+        >
           <ChoiceGroup
             label="Dự kiến có bao bì"
             hideRequiredMark
@@ -409,8 +416,9 @@ export function OrderFormDialog({
               <Input value={form.req.bagMarking} onChange={(e) => setReq("bagMarking", e.target.value)} />
             </Field>
           </div>
-          <div className="grid gap-2">
-            <p className="font-medium">Kiểm Nafi</p>
+          {/* Nhóm nút chọn nhiều: nhãn cùng khuôn legend của ChoiceGroup (min-h-9, chữ đậm nhỏ) — không tự dựng cỡ chữ khác. */}
+          <fieldset className="grid min-w-0 gap-2">
+            <GroupLabel as="legend">Kiểm Nafi (chọn nhiều)</GroupLabel>
             <div className="flex flex-wrap gap-2">
               {NAFI_TESTS.map((t) => {
                 const on = form.req.nafiTests.includes(t);
@@ -428,17 +436,21 @@ export function OrderFormDialog({
                 );
               })}
             </div>
-            <Field label="Chỉ tiêu thêm / lấy kết quả vi sinh">
+            <Field
+              label={form.req.nafiTests.includes("Khác") ? "Chỉ tiêu Khác / lấy kết quả vi sinh" : "Chỉ tiêu thêm / lấy kết quả vi sinh"}
+              required={form.req.nafiTests.includes("Khác")}
+              hint={form.req.nafiTests.includes("Khác") ? "Đã chọn Khác: ghi rõ chỉ tiêu cần kiểm." : undefined}
+            >
               <Input value={form.req.nafiNote} onChange={(e) => setReq("nafiNote", e.target.value)} />
             </Field>
-          </div>
+          </fieldset>
           <Field label="Quy trình sản xuất">
             <Input value={form.req.processNote} onChange={(e) => setReq("processNote", e.target.value)} />
           </Field>
           <Field label="Các lưu ý khác">
             <Textarea value={form.note} onChange={(e) => set("note", e.target.value)} rows={2} />
           </Field>
-        </section>
+        </FormSection>
 
         {form.wasIssued && (
           <Field label="Lý do sửa" required hint="Lệnh đã phát hành: lý do ghi vào lần sửa, quản đốc và thủ kho thấy dấu Đã sửa.">
@@ -645,7 +657,7 @@ export function IssueDialog({
           </dl>
         )}
         <fieldset className="grid gap-2">
-          <legend className="mb-1 font-medium">Chuyến xuất của hợp đồng {o.contractNo}</legend>
+          <GroupLabel as="legend">Chuyến xuất của hợp đồng {o.contractNo}</GroupLabel>
           {shipments.length === 0 && <p className="text-sm text-muted-foreground">Hợp đồng chưa có chuyến đang mở. Phát hành được, gắn chuyến sau.</p>}
           {shipments.map((s) => (
             <label key={s.id} className="flex min-h-10 items-center gap-3 rounded-md border border-border px-3 py-2">

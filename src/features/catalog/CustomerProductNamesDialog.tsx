@@ -13,6 +13,7 @@ import {
   Button,
   Combobox,
   ErrorSummary,
+  FormSection,
   Field,
   FormDialog,
   InlineConfirmDelete,
@@ -263,8 +264,7 @@ export function CustomerProductNamesDialog({
         )}
 
         {form && (
-          <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 rounded-xl bg-muted/40 p-4">
-            <h3 className="font-semibold">{form.isNew ? "Thêm tên hàng" : `Sửa tên hàng · ${productName(form.row.productId)}`}</h3>
+          <FormSection title={form.isNew ? "Thêm tên hàng" : `Sửa tên hàng · ${productName(form.row.productId)}`}>
             <ErrorSummary errors={errors} />
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Combobox
@@ -310,7 +310,7 @@ export function CustomerProductNamesDialog({
                 Lưu tên hàng
               </Button>
             </div>
-          </section>
+          </FormSection>
         )}
 
         {all.length ? (

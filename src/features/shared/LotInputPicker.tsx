@@ -29,7 +29,7 @@ import {
   type TraceData,
   type LotNode,
 } from "@/lib/lotTraceability";
-import { Button, EmptyState, Field, FormDialog, Input, Tag, NumberField, CloseButton, notify } from "@/design-system";
+import { Button, EmptyState, Field, FormDialog, Input, Tag, NumberField, CloseButton, notify, GroupLabel } from "@/design-system";
 import { Camera, CameraOff, Link2, Plus, Trash2 } from "lucide-react";
 import { QrScanner } from "./QrScanner";
 import { useTraceData } from "./useTraceData";
@@ -208,7 +208,7 @@ function LotInputDialog({
 
           {choices.length > 0 && (
             <div className="space-y-2">
-              <p className="font-medium">{pickPrompt}:</p>
+              <GroupLabel>{pickPrompt}</GroupLabel>
               <ul className="space-y-2">
                 {choices.map((n) =>
                   lotRow(

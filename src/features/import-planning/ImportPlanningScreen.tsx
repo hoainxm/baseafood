@@ -20,7 +20,7 @@ import { hasImportStorage } from "@/lib/importFileStorage";
 import type { ImportContract, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, ImportSampleCheck } from "@/types";
 import { mergeSamples } from "@/lib/importSampleChecks";
 import { SampleCheckDialog, type SampleDialogTarget, type SampleSavePayload } from "./SampleChecks";
-import { FilePlus2, FileText, FolderLock, Route, Ship } from "lucide-react";
+import { BarChart3, FilePlus2, FileText, FolderLock, Route, Ship } from "lucide-react";
 import { ImportDossier } from "./ImportDossier";
 import {
   CloseContractDialog,
@@ -36,6 +36,9 @@ import {
   type ReceiptFormTarget,
 } from "./ImportDialogs";
 import { ImportContractList, ImportMonthView, ReceivingView } from "./ImportViews";
+import { ImportReportView } from "./ImportReportView";
+import { parseReportPeriod, type ReportPeriod } from "@/lib/exportReports";
+import { buildImportReport, buildImportReportExcel } from "@/lib/importReports";
 import { ImportFilePreview, type ImportPreviewTarget } from "./parts";
 import { buildImportTour, pickTourContract } from "./importTour";
 import { useImportData } from "./useImportData";
@@ -57,7 +60,9 @@ export default function ImportPlanningScreen() {
   const supplierStore = useImportSupplierStore();
   const [params, setParams] = useSearchParams();
 
-  const view = params.get("view") === "contracts" ? "contracts" : "month";
+  const view = params.get("view") === "contracts" ? "contracts" : params.get("view") === "reports" ? "reports" : "month";
+  // Tab Báo cáo (ba-spec 50): kỳ trong `?report=` (tháng / quý / năm), mặc định tháng hiện tại.
+  const reportPeriod = parseReportPeriod(params.get("report"), today, "month");
   const month = /^\d{4}-\d{2}$/.test(params.get("month") ?? "") ? (params.get("month") as string) : today.slice(0, 7);
   const contractId = params.get("contract") ?? "";
   const focusReceiptId = params.get("receipt") ?? "";
@@ -94,6 +99,15 @@ export default function ImportPlanningScreen() {
     dataRef.current = d;
   }, [d]);
   const upsert = <T extends { id: string }>(rows: readonly T[], row: T) => (rows.some((x) => x.id === row.id) ? rows.map((x) => (x.id === row.id ? row : x)) : [...rows, row]);
+
+  /* ---------- Báo cáo: xuất Excel (không toast — QT 13) ---------- */
+
+  const exportReportExcel = async (p: ReportPeriod, supplierId: string, supplierName: string) => {
+    const report = buildImportReport(dataRef.current, p, { supplierId, today });
+    const aoa = buildImportReportExcel(report, { periodLabel: p.label, supplierName, viewPrice: can["view-price"] });
+    const { exportAoaToXlsx } = await import("@/lib/reportXlsx"); // nạp động — xlsx không vào chunk chính
+    exportAoaToXlsx({ sheetName: `Báo cáo NK ${p.key}`, aoa, colWidths: [32, 12, 10, 10, 16, 22, 16, 16, 16], fileName: `bao-cao-nhap-khau-${p.key}${supplierId ? `-${supplierId}` : ""}.xlsx` });
+  };
 
   /* ---------- Ghi (mọi lượt ghi có Hoàn tác — luật 6 / 13) ---------- */
 
@@ -378,8 +392,8 @@ export default function ImportPlanningScreen() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
               <p className="max-w-3xl text-muted-foreground">Hợp đồng nhập, chứng từ từng lô hàng về và số lượng thực nhập. Khác Nhập hàng nguyên liệu trong nước.</p>
-              <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" ? v : "" }, true)}>
-                <TabsList data-tour="import-tabs" className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
+              <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" ? v : "" }, true)}>
+                <TabsList data-tour="import-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
                   <TabsTrigger value="month" className={TAB_TRIGGER} title="Lô nhập của tháng, gom theo đối tác, kèm chứng từ còn thiếu.">
                     <Ship className="mr-2 h-4 w-4" aria-hidden />
                     Lô nhập
@@ -387,6 +401,10 @@ export default function ImportPlanningScreen() {
                   <TabsTrigger value="contracts" className={TAB_TRIGGER} title="Danh sách mọi hợp đồng nhập, lọc theo trạng thái.">
                     <FileText className="mr-2 h-4 w-4" aria-hidden />
                     Hợp đồng
+                  </TabsTrigger>
+                  <TabsTrigger value="reports" className={TAB_TRIGGER} title="Số nhập khẩu theo tháng / quý / năm: lần nhập, kg thực nhập, trị giá, đối tác, mặt hàng, lần nhập cần chú ý.">
+                    <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
+                    Báo cáo
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -410,6 +428,17 @@ export default function ImportPlanningScreen() {
             <TableSkeleton />
           ) : store.loadError ? (
             <EmptyState icon={Ship} title="Chưa đọc được số Nhập khẩu" description={`Lỗi đồng bộ với máy chủ: ${store.loadError}. Kiểm đèn kết nối rồi tải lại trang.`} />
+          ) : view === "reports" ? (
+            <ImportReportView
+              data={d}
+              period={reportPeriod}
+              today={today}
+              canSeePrice={can["view-price"]}
+              canExport={can.export}
+              onPeriodChange={(p) => setParam({ report: p.key === today.slice(0, 7) ? "" : p.key }, true)}
+              onOpenReceipt={(cid, rid) => setParam({ contract: cid, receipt: rid })}
+              onExportExcel={(p, sid, sname) => void exportReportExcel(p, sid, sname)}
+            />
           ) : view === "contracts" ? (
             <ImportContractList data={d} canSeePrice={can["view-price"]} onOpen={(cid) => setParam({ contract: cid, receipt: "" })} />
           ) : (

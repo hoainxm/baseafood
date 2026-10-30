@@ -2163,6 +2163,7 @@ function parseTerms(v: unknown): ExportContractTerms {
     portOfLoading: s(t.portOfLoading),
     portOfDischarge: s(t.portOfDischarge),
     paymentMethod: (PAYMENT_METHOD_VALUES.has(s(t.paymentMethod)) ? s(t.paymentMethod) : "ttr") as ExportContractTerms["paymentMethod"],
+    paymentOther: s(t.paymentOther),
     depositPct: numOrNull(t.depositPct),
     lcNo: s(t.lcNo),
     lcExpiry: s(t.lcExpiry).slice(0, 10),

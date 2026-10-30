@@ -3,6 +3,8 @@
 > Load khi: chỉnh giao diện Lệnh sản xuất `/planning-production` (danh sách lệnh, hồ sơ lệnh, hộp lập / sửa / phát hành / hủy, NL nhập khẩu dự kiến, bản in QTI-KH-01-04, phần nơi nhận) hoặc chỗ lệnh hiện ở Xuất khẩu (dòng hàng HĐ, bước 2 của chuyến).
 covers: src/features/production-orders/**, src/features/export-planning/ShipmentPanel.tsx, src/features/export-planning/ContractDossier.tsx
 last_verified: 2026-10-30
+<!-- updated: 2026-10-30 (báo cáo) — đầu trang có Tabs **Lệnh · Báo cáo** (`?view=reports&report=<kỳ>`, ba-spec [50](50-planning-reports.ba-spec.md) RP2): `ReportPeriodBar` + lọc Khách hàng + Xuất Excel (ai xem được lệnh đều xuất được — không có giá); 4 thẻ (lệnh · kg ra lệnh · NL nhập khẩu đã dành · cần chú ý); bảng Theo tháng · Theo khách · Theo mặt hàng · NL nhập khẩu đã dành (thẻ "vượt") · Lệnh cần chú ý. -->
+<!-- updated: 2026-10-30 (lọc) — bỏ bộ lọc trạng thái 5 lựa chọn; thay bằng nút Xem / Ẩn lệnh đã hủy (chủ dự án: "5 cái đang hơi nhiều và thừa thãi"). -->
 <!-- updated: 2026-10-30 — ĐÃ BUILD theo file này (P3). Lệch so với bản viết: không có tab; nơi nhận dùng cùng trang (không cột HĐ, không lọc trạng thái); chọn chuyến ở hộp Phát hành / Gắn chuyến bằng ô tick; Nafi chọn nhiều bằng nút bật / tắt; bản in qua `PrintSheet landscape={false}`. Chỗ hiện ở Xuất khẩu làm ở P4 (2026-10-30): khối `ShipmentOrders` trong bước 2, cột "Đã ra lệnh (kg)" (dòng phụ "còn x" / "vượt dung sai") — xem 42. -->
 ttl_days: 90
 
@@ -36,7 +38,7 @@ Một trang cho mọi vai trò: ai không có `production-orders:create` thì kh
 **Đầu trang.** Mô tả 1 câu ("Lệnh sản xuất ra từ dòng hàng hợp đồng xuất, gửi Ban quản đốc phân xưởng và Thủ kho."). Bên phải: `outline` "Hướng dẫn thao tác" + nút chính "Lập lệnh sản xuất" (chỉ người có quyền ghi). Không có tab ở đợt này.
 
 **Danh sách.**
-- Thanh lọc: ‹ tháng › + "Nay" · Khách (lọc) · Trạng thái (Nháp · Đã phát hành · Đã hủy · Tất cả; mặc định bỏ Đã hủy) · ô "Tra số lệnh" (số lệnh / MSL / số HĐ / tên hàng, tra mọi tháng).
+- Thanh lọc: ‹ tháng › + "Nay" · Khách (lọc) · ô "Tra số lệnh" (số lệnh / MSL / số HĐ / tên hàng, tra mọi tháng, kết quả gồm cả lệnh đã hủy). **Không có bộ lọc trạng thái** (bỏ 2026-10-30 — 5 lựa chọn cho 3 trạng thái là thừa: Nháp / Đã phát hành đã có ở thẻ số + cột Trạng thái sắp được). Lệnh đã hủy mặc định ẩn; tháng có lệnh hủy thì hiện nút `ghost` "Xem n lệnh đã hủy" / "Ẩn lệnh đã hủy" ngay trên bảng.
 - 3 `StatCard`: Lệnh của tháng · Đã phát hành · Cần xử lý. Dòng phụ bắt buộc: "nháp x · theo bản HĐ trước y · chưa gắn chuyến z".
 - `RecordTable` (`rowMarkKey`, sắp cột): Số lệnh · Ngày lệnh · Khách · HĐ · Mặt hàng (dòng đầu + "+n dòng") · Thùng · Kg · MSL · Ngày SX · Ngày giao · Chuyến (số cont / "Chưa gắn") · Trạng thái (thẻ + cờ) · Mở.
 - Trạng thái và cờ khai `sortValue` + `sortKind`.

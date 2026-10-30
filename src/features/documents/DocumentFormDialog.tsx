@@ -18,6 +18,7 @@ import {
   Textarea,
   type ComboboxOption,
   type FieldError,
+  GroupLabel,
 } from "@/design-system";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useDialogDraft } from "@/lib/formDraft";
@@ -268,7 +269,7 @@ export function DocumentFormDialog({
           />
           {form.visibility === "departments" && (
             <fieldset className="space-y-2">
-              <legend className="text-sm font-medium text-foreground">Phòng được xem thêm</legend>
+              <GroupLabel as="legend">Phòng được xem thêm</GroupLabel>
               <div className="grid gap-2 sm:grid-cols-2">
                 {DEPARTMENTS.filter((d) => d.id !== "board").map((d) => {
                   const isOwner = d.id === form.ownerDepartment;

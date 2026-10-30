@@ -276,6 +276,7 @@ export function emptyTerms(): ExportContractTerms {
     portOfLoading: "",
     portOfDischarge: "",
     paymentMethod: "ttr",
+    paymentOther: "",
     depositPct: null,
     lcNo: "",
     lcExpiry: "",
@@ -378,6 +379,8 @@ export function validateContract(
     out.push({ key: "latestShipmentDate", label: "Hạn giao muộn nhất", message: "Chưa chọn hạn giao — hợp đồng không có hạn sẽ không hiện ở tháng nào" });
   const t = input.terms.tolerancePct;
   if (t != null && (t < 0 || t > 100)) out.push({ key: "tolerancePct", label: "Dung sai", message: "Dung sai phải từ 0 đến 100%" });
+  if (input.terms.paymentMethod === "other" && !(input.terms.paymentOther ?? "").trim())
+    out.push({ key: "paymentOther", label: "Hình thức thanh toán", message: "Thanh toán Khác thì ghi hình thức (VD D/P, nhờ thu)" });
   if (input.terms.paymentMethod === "lc" && !input.terms.lcNo.trim())
     out.push({ key: "lcNo", label: "Số L/C", message: "Thanh toán L/C thì ghi số L/C" });
   const filled = input.lines.filter((l) => l.description.trim() || l.quantity != null || l.kg != null);

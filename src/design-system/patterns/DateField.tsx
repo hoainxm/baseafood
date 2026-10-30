@@ -220,7 +220,10 @@ export function DateField({
 }) {
   const id = React.useId();
   return (
-    <div className={cn("min-w-0 space-y-2", className)}>
+    /* flex-col + mt-auto ở hàng nút lịch: là ô trực tiếp của lưới thì ô giãn theo hàng (stretch) và ô ngày
+       thẳng hàng dưới cùng với ô bên cạnh có dòng gợi ý / lỗi (lệch 29 px ở form Lập lệnh sản xuất,
+       2026-10-30). KHÔNG `h-full`: trong hàng flex tự xuống dòng (thanh chọn kỳ báo cáo) nó làm sai chiều cao. */
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
       <LabelBlock
         label={label}
         required={required}
@@ -230,7 +233,7 @@ export function DateField({
         htmlFor={id}
         hideRequiredMark={hideRequiredMark}
       />
-      <div className="flex items-center gap-2">
+      <div className="mt-auto flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <CalendarButton
             id={id}

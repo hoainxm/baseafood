@@ -141,7 +141,7 @@ export function Combobox({
   return (
     /* min-w-0: ô này thường nằm trong grid/flex — mặc định min-width:auto lấy
        theo chữ dài nhất trong nút, ở cỡ chữ 130% sẽ đẩy rộng cả trang. */
-    <div className={cn("min-w-0", hideLabel ? "space-y-0" : "space-y-2", className)}>
+    <div className={cn("flex min-w-0 flex-col", hideLabel ? "gap-0" : "gap-2", className)}>
       {/* min-h-9 = chiều cao nút ⓘ: hàng nhãn luôn cao bằng nhau dù có/không ⓘ,
          hai ô cùng lưới không lệch. */}
       {/* anNhan: BỎ HẲN hàng nhãn, tên ô đi bằng aria-label trên nút. Không dùng
@@ -169,7 +169,8 @@ export function Combobox({
         </p>
       )}
 
-      <div className="flex items-center gap-2">
+      {/* mt-auto: ô chọn thẳng hàng dưới cùng như Field khi ô cùng hàng lưới có dòng gợi ý (2026-10-30). */}
+      <div className="mt-auto flex items-center gap-2">
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button

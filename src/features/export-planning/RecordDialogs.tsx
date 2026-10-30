@@ -272,6 +272,8 @@ export function AttachmentDialog({
     if (!form || !target || busy) return;
     const errs: FieldError[] = [];
     if (!files.length) errs.push({ field: "File", message: "Chọn ít nhất một file" });
+    // "Hồ sơ khác" phải nói là hồ sơ gì — không thì hồ sơ HĐ chỉ ghi "Hồ sơ khác" (rà ô Khác 2026-10-30).
+    if (form.kind === "other" && !form.caption.trim()) errs.push({ field: "Tên hồ sơ", message: "Hồ sơ khác thì ghi đây là hồ sơ gì" });
     if (!hasExportStorage) errs.push({ field: "Máy chủ", message: "Đang chạy không nối máy chủ — chưa tải file lên được" });
     for (const f of files) {
       const fe = checkExportFile(f);
@@ -364,7 +366,11 @@ export function AttachmentDialog({
             }))}
             columns={2}
           />
-          <Field label="Ghi chú (nếu có)" hint="VD: bản ký hai bên ngày 12/10, L/C tu chỉnh lần 1.">
+          <Field
+            label={form.kind === "other" ? "Tên hồ sơ" : "Ghi chú (nếu có)"}
+            required={form.kind === "other"}
+            hint={form.kind === "other" ? "VD: Giấy ủy quyền, bảng giá đính kèm, thư xác nhận của khách." : "VD: bản ký hai bên ngày 12/10, L/C tu chỉnh lần 1."}
+          >
             <Input value={form.caption} onChange={(e) => setForm((f) => (f ? { ...f, caption: e.target.value } : f))} />
           </Field>
           <Field label="File" required nestedInput>

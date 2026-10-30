@@ -100,6 +100,13 @@ export const productionOrderGuide: PageGuide = {
       <GuideSection title="Ai làm gì">
         <GuideActors steps={ORDER_GUIDE_STEPS} actors={ORDER_GUIDE_ACTORS} />
       </GuideSection>
+      <GuideSection title="Báo cáo">
+        <GuideList>
+          <li>Tab <b>Báo cáo</b>: chọn Tháng / Quý / Năm và khách. Lệnh xếp vào kỳ theo ngày sản xuất đầu; lệnh đã hủy chỉ đếm, không cộng thùng / kg.</li>
+          <li>NL nhập khẩu đã dành: kg dự kiến của lệnh trong kỳ theo từng lần nhập; có cột vượt khi tổng đã dành lớn hơn thực nhập.</li>
+          <li>Lệnh cần chú ý: nháp đã tới ngày sản xuất, theo bản HĐ trước, đã phát hành mà chưa gắn chuyến.</li>
+        </GuideList>
+      </GuideSection>
       <GuideSection title="Mẹo">
         <GuideList>
           <li>Hợp đồng phải có bản hiệu lực, dòng hàng phải đã nối mặt hàng danh mục thì mới lập lệnh được.</li>

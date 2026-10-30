@@ -3,6 +3,8 @@
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
 last_verified: 2026-10-30
+<!-- updated: 2026-10-30 (khác) — hộp HĐ: chọn Thanh toán Khác hiện ô "Hình thức thanh toán *" (hồ sơ HĐ hiện chữ đã ghi thay "Khác"); hộp Đính kèm hồ sơ: loại "Hồ sơ khác" đổi ô Ghi chú thành "Tên hồ sơ *". -->
+<!-- updated: 2026-10-30 (form) — khối đánh số của hộp Hợp đồng (`FormSection`) đưa lên design-system dùng chung (README § bảng chọn component); giao diện không đổi. Ô ngày / ô chọn giờ dồn đáy như Field (README "Ô nhập dồn đáy"). -->
 <!-- updated: 2026-10-30 (lsx) — Lệnh sản xuất (design-spec [49](49-production-order-ui.design-spec.md)): bước 2 của chuyến có khối `ShipmentOrders` dưới hàng mục — lệnh đã gắn (số · thẻ trạng thái · kg, mở sang /planning-production), `default` "Lập lệnh sản xuất" (mở trang lệnh với `?new=1&contract&shipment`, phát hành xong gắn sẵn chuyến) + `outline` "Gắn lệnh có sẵn" (hộp tick lệnh cùng HĐ); chỉ người có `production-orders` ghi thấy nút. Hồ sơ HĐ, bảng Dòng hàng: cột "Đã ra lệnh (kg)" sau Kg (dòng phụ "còn x" / "vượt dung sai"), chỉ khi xem được Lệnh sản xuất. -->
 ttl_days: 90
 <!-- updated: 2026-10-22 (c) — v7 (ba-spec 41 v7 NV17): khối "Đọc invoice" trong hộp mục Commercial Invoice (hộp cỡ xl), nút "Trích xuất từ chứng từ" quét thêm invoice. -->

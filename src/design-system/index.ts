@@ -38,6 +38,8 @@ export { ConfirmDelete } from "./patterns/ConfirmDelete";
 export { InlineConfirmDelete } from "./patterns/InlineConfirmDelete";
 export { ConfirmAction } from "./patterns/ConfirmAction";
 export { StepForm, type FormStep } from "./patterns/StepForm";
+export { FormSection } from "./patterns/FormSection";
+export { GroupLabel } from "./patterns/GroupLabel";
 export { ContextBar, type ContextBarItem } from "./patterns/ContextBar";
 export { ErrorSummary, type FieldError } from "./patterns/ErrorSummary";
 export { EmptyState } from "./patterns/EmptyState";

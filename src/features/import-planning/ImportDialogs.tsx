@@ -14,6 +14,7 @@ import {
   ErrorSummary,
   Field,
   FormDialog,
+  FormSection,
   Input,
   NumberField,
   Textarea,
@@ -331,8 +332,7 @@ export function ContractFormDialog({
       {form && (
         <div className="grid gap-5 py-2">
           <ErrorSummary errors={errors} />
-          <section className="grid gap-4 rounded-lg bg-muted/40 p-4">
-            <h3 className="font-semibold">1 · Hợp đồng</h3>
+          <FormSection no={1} title="Hợp đồng">
             <div className="grid gap-4 sm:grid-cols-2">
               <Combobox
                 label="Đối tác (NCC nhập khẩu)"
@@ -365,14 +365,12 @@ export function ContractFormDialog({
             <Field label="Ghi chú">
               <Textarea rows={2} value={form.note} onChange={(e) => set("note", e.target.value)} />
             </Field>
-          </section>
-          <section className="grid gap-4 rounded-lg bg-muted/40 p-4">
-            <div className="grid gap-1">
-              <h3 className="font-semibold">2 · Dòng hàng</h3>
-              <p className="text-sm text-muted-foreground">
-                Số lượng tính bằng kg. Hàng gia công không ghi giá thì để trống đơn giá. Mỗi dòng nối một mặt hàng trong danh mục; chưa nối vẫn lưu được nhưng phải nối đủ trước khi đóng hợp đồng.
-              </p>
-            </div>
+          </FormSection>
+          <FormSection
+            no={2}
+            title="Dòng hàng"
+            hint="Số lượng tính bằng kg. Hàng gia công không ghi giá thì để trống đơn giá. Mỗi dòng nối một mặt hàng trong danh mục; chưa nối vẫn lưu được nhưng phải nối đủ trước khi đóng hợp đồng."
+          >
             {form.lines.map((l, i) => {
               const amount = lineAmount({ id: l.id, kg: l.kg }, { [l.id]: l.unitPrice });
               const locked = receivedKg(data, l.id) > 0;
@@ -476,7 +474,7 @@ export function ContractFormDialog({
                 </span>
               )}
             </div>
-          </section>
+          </FormSection>
           {hasImportStorage && (
             <Field label="File hợp đồng đã ký">
               <FilePicker files={files} onChange={setFiles} accept={IMPORT_FILE_ACCEPT} />

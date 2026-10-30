@@ -487,6 +487,18 @@ Hàng nhãn của `Field` (và `NumberField`), `DateField`, `ChoiceGroup`, `Comb
 thẳng hàng. Nút × bỏ chọn của `Combobox` (`data-slot="combobox-clear"`) cao theo
 `--h-control` như ô nhập. Đừng thêm `min-h` khác hay tự kê `pt-*` để "chỉnh tay" nhãn.
 
+**Ô nhập dồn đáy (2026-10-30).** Cả bốn component cùng một khuôn: `flex flex-col gap-2` (riêng `Field` có
+thêm `h-full`; ba component kia KHÔNG — `h-full` làm sai chiều cao trong hàng flex tự xuống dòng như thanh
+chọn kỳ báo cáo; là ô trực tiếp của lưới thì đã tự giãn theo hàng),
+phần nhập (`Field` ô nhập · nút lịch của `DateField` · nút chọn của `Combobox` · lưới nút của
+`ChoiceGroup`) mang `mt-auto`. Trong một hàng lưới, ô nào có thêm dòng gợi ý (`hint`) / lỗi thì
+hàng cao lên, nhưng MỌI ô nhập vẫn thẳng hàng dưới cùng và mọi nhãn thẳng hàng trên cùng. Trước đó
+chỉ `Field` dồn đáy ⇒ `Field` có `hint` đứng cạnh `DateField` lệch 29 px (form Lập lệnh sản xuất,
+Báo cáo NXT, hộp lần ban hành tài liệu, hộp duyệt / gửi chứng từ Xuất khẩu). Không cần `items-end`
+ở lưới để bù nữa: nút không nhãn đứng cuối hàng (VD "Bỏ dòng") tự `self-end` (VD lưới dòng
+Nhập hàng). `items-end` còn hợp lệ khi căn ô chọn với đáy một KHỐI CHỮ (hộp nối mặt hàng, đọc
+invoice). Nhãn của một NHÓM ô / nút: `GroupLabel` — không `<p className="font-medium">`.
+
 ## 8b. Màu NÚT theo chức năng — `Button variant` (từ 2026-10-14)
 
 Người dùng xưởng phải nhìn màu là biết nút làm gì (yêu cầu 2026-10-14: "xóa, sửa,
@@ -537,6 +549,9 @@ theo màu**, không tự viết class màu lên nút.
 | Thao tác hệ trọng không phải xóa (đăng xuất · chốt sổ · ghi đè · lệnh xuất) | `ConfirmAction` — nêu đích danh việc sắp làm + hệ quả, nút an toàn đứng trước |
 | Form > 5 ô, nhập không thường xuyên | `StepForm` |
 | Form > 5 ô, nhập lặp nhiều lần/ngày | `Dialog` + nhóm ô, phần phụ gập lại |
+| Đầu KHỐI trong form / hộp thoại dài (VD "1 Hợp đồng", "2 Dòng hàng") | `FormSection` (2026-10-30) — nền nhạt bo góc, `no` = vòng số khi form đi theo trình tự, `hint` ngắn, `action` = nút phụ của khối. **Không** viết `<h3 className="font-semibold">` trần: cùng độ đậm với nhãn ô, người dùng không phân được tầng khối / ô. Đang dùng: Hợp đồng xuất khẩu, Hợp đồng nhập khẩu, Lập lệnh sản xuất, Tên hàng theo khách. |
+| Lựa chọn **"Khác"** trong `ChoiceGroup` / nhóm nút (2026-10-30) | Chọn "Khác" ⇒ hiện ô chữ ghi rõ là gì, **bắt buộc** (thiếu ⇒ `ErrorSummary`), và nơi hiển thị / bản in dùng chữ đã ghi thay cho chữ "Khác". VD Thanh toán Khác ⇒ "Hình thức thanh toán"; Hồ sơ khác ⇒ "Tên hồ sơ"; Chứng từ khác (Nhập khẩu) ⇒ "Tên chứng từ"; Nafi Khác ⇒ "Chỉ tiêu Khác". Ô là danh mục thì dùng `Combobox` có Thêm mới thay vì "Khác". Danh sách cố định (Loài `CATEGORIES`…) giữ "Khác" làm nhóm gom, không bắt ghi. |
+| Nhãn của một NHÓM ô / nút không có ô nhập riêng (nhóm nút chọn nhiều, danh sách lô để chọn, danh sách phòng ban) | `GroupLabel` (2026-10-30) — cùng khuôn nhãn `Field` / legend `ChoiceGroup` (`text-sm` đậm, hàng `min-h-9`, dấu * `ml-1 font-bold`); trong `<fieldset>` dùng `as="legend"`. **Không** `<p className="font-medium">` tự dựng. |
 | Báo lỗi cả form | `ErrorSummary` (đầu form, có link nhảy tới ô) |
 | Cho biết đang làm cho ngày/xưởng nào | `ContextBar` |
 | Danh sách rỗng | `EmptyState` (phải nói việc tiếp theo) |

@@ -11,7 +11,7 @@
 import { useMemo, useState } from "react";
 import type { LotInput, Workshop } from "@/types";
 import { TRACE_KIND_LABELS, parseQrCode, listSelectableMaterialLots, explainMultipleLots, buildLotNode, findLots, type TraceData, type LotNode } from "@/lib/lotTraceability";
-import { Button, Combobox, Field, InfoTip, Input, Tag, notify } from "@/design-system";
+import { Button, Combobox, Field, InfoTip, Input, Tag, notify, GroupLabel } from "@/design-system";
 import { QrScanner } from "@/features/shared";
 import { Camera, CameraOff, Link2, Plus, X } from "lucide-react";
 import { kg, formatDateVN } from "@/lib/format";
@@ -164,7 +164,7 @@ export function SessionLotsSection({
 
       {choices.length > 0 && (
         <div className="space-y-1">
-          <p className="font-medium">{pickPrompt}:</p>
+          <GroupLabel>{pickPrompt}</GroupLabel>
           <ul className="space-y-1">
             {choices.map((n) => (
               <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">

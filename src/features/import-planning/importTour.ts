@@ -47,10 +47,11 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
     list({
       id: "tabs",
       target: "import-tabs",
-      title: "Lô nhập và Hợp đồng",
+      title: "Lô nhập, Hợp đồng và Báo cáo",
       body:
         "Lô nhập: các lần hàng về trong tháng đang xem, gom theo đối tác. Dùng hằng ngày để biết lô nào còn thiếu giấy.\n" +
-        "Hợp đồng: mọi hợp đồng nhập, lọc theo Đang mở, Đã đóng, Đã hủy. Mỗi hợp đồng hiện số kg đã về so với hợp đồng.",
+        "Hợp đồng: mọi hợp đồng nhập, lọc theo Đang mở, Đã đóng, Đã hủy. Mỗi hợp đồng hiện số kg đã về so với hợp đồng.\n" +
+        "Báo cáo: số theo tháng, quý hoặc năm — lần nhập, kg thực nhập, trị giá theo tiền tệ, theo đối tác, mặt hàng, loại hình, lần nhập còn thiếu chứng từ. Xuất Excel được.",
     }),
   ];
   if (can.create)

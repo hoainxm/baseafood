@@ -9,7 +9,7 @@
 import { useId } from "react";
 import type { BatterType } from "@/types";
 import { getProductBatterIds } from "@/lib/batter";
-import { Combobox, Label } from "@/design-system";
+import { Combobox, GroupLabel } from "@/design-system";
 import { X } from "lucide-react";
 
 export function BatterPicker({
@@ -36,7 +36,7 @@ export function BatterPicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label>Bột đi kèm</Label>
+      <GroupLabel>Bột đi kèm</GroupLabel>
       <p id={hintId} className="text-sm text-muted-foreground">
         Các loại bột tẩm dùng cho mặt hàng này — màn ghi thành phẩm sẽ hiện sẵn một
         ô kg cho từng loại. Mặt hàng không tẩm bột thì để trống.

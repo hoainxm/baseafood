@@ -547,7 +547,9 @@ export function ContractDossier({
             <Info
               label="Thanh toán"
               value={[
-                PAYMENT_METHODS.find((p) => p.value === terms.paymentMethod)?.label,
+                terms.paymentMethod === "other" && terms.paymentOther?.trim()
+                  ? terms.paymentOther.trim()
+                  : PAYMENT_METHODS.find((p) => p.value === terms.paymentMethod)?.label,
                 terms.depositPct != null && `cọc ${formatNumber(terms.depositPct)}%`,
                 terms.paymentMethod === "lc" && terms.lcNo && `L/C ${terms.lcNo}`,
                 terms.lcExpiry && `hết hạn ${formatDateVN(terms.lcExpiry)}`,

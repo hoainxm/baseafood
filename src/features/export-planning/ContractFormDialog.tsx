@@ -14,6 +14,7 @@ import {
   DateField,
   ErrorSummary,
   Field,
+  FormSection,
   FormDialog,
   Input,
   NumberField,
@@ -505,6 +506,11 @@ export function ContractFormDialog({
               options={PAYMENT_METHODS}
               columns={3}
             />
+            {form.terms.paymentMethod === "other" && (
+              <Field label="Hình thức thanh toán" required hint="VD D/P, nhờ thu, tiền mặt, trả sau 30 ngày.">
+                <Input value={form.terms.paymentOther ?? ""} onChange={(e) => setTerm("paymentOther", e.target.value)} aria-required />
+              </Field>
+            )}
             {form.terms.paymentMethod === "lc" && (
               <div className="grid gap-4 sm:grid-cols-3">
                 <Field label="Số L/C" required>
@@ -745,24 +751,5 @@ export function ContractFormDialog({
       {goodsPicker.dialog}
       {kindPicker.dialog}
     </FormDialog>
-  );
-}
-
-/** Một khối đánh số của form (design-spec 42): nền nhạt, tiêu đề + câu ví dụ, nút phụ bên phải. */
-function FormSection({ no, title, hint, action, children }: { no: number; title: string; hint?: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 rounded-xl bg-muted/40 p-4">
-      <div className="flex flex-wrap items-start gap-3">
-        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary font-semibold text-primary-foreground" aria-hidden>
-          {no}
-        </span>
-        <div className="grid min-w-0 flex-1 basis-48 gap-0.5">
-          <h3 className="font-semibold">{title}</h3>
-          {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
-        </div>
-        {action}
-      </div>
-      {children}
-    </section>
   );
 }

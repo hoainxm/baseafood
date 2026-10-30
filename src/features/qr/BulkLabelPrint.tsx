@@ -11,7 +11,7 @@ import { LotQrLabels, useTraceData } from "@/features/shared";
 import { kg, formatDateVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, listLotsToPrint, lotKey, summarizeLabelPrints, type LotNode } from "@/lib/lotTraceability";
 import { useLabelPrints } from "@/lib/catalogRepo";
-import { Button, ChoiceGroup, DateRangeField, EmptyState, Tag, addDays, todayIso, notify, toneByName } from "@/design-system";
+import { Button, ChoiceGroup, DateRangeField, EmptyState, Tag, addDays, todayIso, notify, toneByName, GroupLabel } from "@/design-system";
 import { Printer } from "lucide-react";
 
 const LOT_KINDS: { kind: LotKind; description: string }[] = [
@@ -77,7 +77,7 @@ export function BulkLabelPrint() {
           />
         </div>
         <div className="space-y-2">
-          <p className="font-medium">Loại lô</p>
+          <GroupLabel>Loại lô</GroupLabel>
           <div className="flex flex-wrap gap-2">
             {LOT_KINDS.map(({ kind, description }) => (
               <Button

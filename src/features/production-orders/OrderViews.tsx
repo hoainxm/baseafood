@@ -7,7 +7,6 @@
 import { useState } from "react";
 import {
   Button,
-  ChoiceGroup,
   Combobox,
   EmptyState,
   Field,
@@ -56,14 +55,6 @@ const datesText = (ds: readonly string[]) => [...ds].sort().map((d) => formatDat
 const unitWord = (kind: "carton" | "bundle") => (kind === "bundle" ? "kiện" : "thùng");
 
 
-type Filter = "live" | ProductionOrder["status"] | "all";
-const FILTERS = [
-  { value: "live", label: "Nháp + đã phát hành" },
-  { value: "draft", label: ORDER_STATUS_LABELS.draft },
-  { value: "issued", label: ORDER_STATUS_LABELS.issued },
-  { value: "cancelled", label: ORDER_STATUS_LABELS.cancelled },
-  { value: "all", label: "Tất cả" },
-];
 
 /* ---------- Danh sách theo tháng ---------- */
 
@@ -85,7 +76,9 @@ export function OrderListView({
   onMonthChange: (m: string) => void;
   onOpen: (orderId: string) => void;
 }) {
-  const [filter, setFilter] = useState<Filter>("live");
+  // Không lọc theo trạng thái (2026-10-30): lệnh chỉ có 3 trạng thái, Nháp / Đã phát hành đã có thẻ số + cột
+  // Trạng thái (sắp được). Chỉ cần: mặc định ẩn lệnh đã hủy, xem khi cần; ô tra luôn tìm cả lệnh đã hủy.
+  const [showCancelled, setShowCancelled] = useState(false);
   const [customer, setCustomer] = useState("");
   const [query, setQuery] = useState("");
   const linked = new Set(data.links.map((l) => l.orderId));
@@ -94,11 +87,12 @@ export function OrderListView({
     [o.orderNo, o.lotCode, o.contractNo, o.customerName, ...linesOfOrder(data.lines, o.id).map((l) => `${l.productName} ${l.description}`)].join(" ").toLowerCase();
   const inMonth = orders.filter((o) => orderMonth(o) === month);
   const rows = (q ? orders.filter((o) => searchText(o).includes(q)) : inMonth)
-    .filter((o) => (filter === "all" ? true : filter === "live" ? o.status !== "cancelled" : o.status === filter))
+    .filter((o) => q || showCancelled || o.status !== "cancelled")
     .filter((o) => !customer || o.customerName === customer)
     .sort((a, b) => orderMonth(a).localeCompare(orderMonth(b)) || (a.productionDates[0] ?? "").localeCompare(b.productionDates[0] ?? ""));
 
   const live = inMonth.filter((o) => o.status !== "cancelled");
+  const cancelledInMonth = inMonth.length - live.length;
   const drafts = live.filter((o) => o.status === "draft").length;
   const stale = live.filter((o) => staleRevision(o, data.exportData)).length;
   const unlinked = live.filter((o) => o.status === "issued" && !linked.has(o.id)).length;
@@ -157,7 +151,6 @@ export function OrderListView({
           </Field>
         </div>
       </div>
-      {!isRecipient && <ChoiceGroup label="Trạng thái" hideRequiredMark value={filter} onChange={(v) => setFilter(v as Filter)} options={FILTERS} columns={3} />}
       {!q && (
         <div data-tour="order-stats">
           <StatCardGrid
@@ -173,6 +166,13 @@ export function OrderListView({
               },
             ]}
           />
+        </div>
+      )}
+      {!q && cancelledInMonth > 0 && (
+        <div>
+          <Button variant="ghost" size="sm" onClick={() => setShowCancelled((v) => !v)} title={showCancelled ? "Ẩn các lệnh đã hủy của tháng." : "Hiện cả các lệnh đã hủy của tháng (có lý do hủy)."}>
+            {showCancelled ? "Ẩn lệnh đã hủy" : `Xem ${cancelledInMonth} lệnh đã hủy`}
+          </Button>
         </div>
       )}
       {rows.length === 0 && !q ? (

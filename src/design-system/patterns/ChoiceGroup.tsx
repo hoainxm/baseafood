@@ -66,7 +66,7 @@ export function ChoiceGroup({
   }
 
   return (
-    <fieldset className={cn("min-w-0 space-y-2", className)}>
+    <fieldset className={cn("flex min-w-0 flex-col gap-2", className)}>
       <div className="flex min-h-9 flex-wrap items-center gap-2">
         <legend className="text-sm leading-snug font-semibold text-foreground">
           {label}
@@ -89,7 +89,8 @@ export function ChoiceGroup({
           giãn hết chiều ngang (lỗi cũ của flex-wrap + flex-1 — "Khô" chiếm cả hàng). */}
       <div
         className={cn(
-          "grid gap-3",
+          // mt-auto: các nút chọn dồn đáy như ô nhập của Field khi ô cùng hàng có dòng gợi ý (2026-10-30).
+          "mt-auto grid gap-3",
           columns === 2 && "grid-cols-1 sm:grid-cols-2",
           columns === 3 && "grid-cols-2 sm:grid-cols-3",
           columns === 4 && "grid-cols-2 sm:grid-cols-4"

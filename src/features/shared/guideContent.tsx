@@ -229,6 +229,10 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
               (hàng đông gửi kho lạnh).
             </li>
             <li><b>Chưa ánh xạ</b>: chọn đại lý / loại cho mã kế toán rồi nạp lại.</li>
+            <li>
+              Lọc: <b>Đại lý</b> · <b>Phân xưởng</b> · <b>Trạng thái dòng</b> · ô tra số HĐ, ký hiệu, số phiếu nhập, mã đại lý / vật tư,
+              biển số. Bốn thẻ đếm theo bộ lọc; <b>Bỏ hết bộ lọc</b> để về cả khoảng ngày.
+            </li>
           </Y>
           <p>
             Một khoảng ngày xong chứng từ khi bốn thẻ <b>Chuyến chờ HĐ · HĐ chưa có file · Lệch chưa xử · HĐ không có
@@ -753,7 +757,7 @@ const FILTER_NOTES: Record<string, string> = {
   packaging: "Kho thành phẩm (khi có từ hai kho) · ô Tra mặt hàng, quy cách, kho, ghi chú.",
   nxt: "Ô Tra mã, tên hàng, quy cách. Xuất Excel vẫn xuất đủ mọi mặt hàng của kỳ.",
   "nxt-warehouse": "Kho lưu · ô Tra mã, tên hàng · Dòng (Tất cả mã · Có phát sinh / còn tồn).",
-  imports: "Sổ chi tiết: ô Tra biển số, tài xế, đại lý, loại NL, mã lô + Bộ lọc thêm (Đại lý · Loại NL · Trạng thái giá). Tổng hợp kỳ: Đại lý · Loại NL (phế liệu vẫn theo cả kỳ).",
+  imports: "Sổ chi tiết: ô Tra biển số, tài xế, đại lý, loại NL, mã lô + Bộ lọc thêm (Đại lý · Loại NL · Trạng thái giá). Tổng hợp kỳ: Đại lý · Loại NL (phế liệu vẫn theo cả kỳ). Hóa đơn: Đại lý · Phân xưởng · Trạng thái dòng · ô Tra số HĐ, ký hiệu, số phiếu nhập, mã đại lý / vật tư, biển số.",
   "planning-import": "Lô nhập: Đối tác · Trạng thái lần nhập (kèm số lô) · ô Tra số chứng từ ở mọi tháng.",
   "planning-export": "Hợp đồng: Trạng thái · Khách hàng · ô Tra hợp đồng (số HĐ · số PO · tên khách).",
   "export-report": "Khách hàng · Trạng thái đơn (kèm số đơn) · ô Tra mặt hàng, quy cách, khách. Xuất Excel theo phần đang lọc.",

@@ -292,7 +292,8 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
         title: "Hóa đơn đại lý — việc còn lại",
         body:
           "Tab Hóa đơn (dành cho kế toán) gắn hóa đơn GTGT của đại lý vào đúng chuyến xưởng đã ghi. Hóa đơn có thể xuất cùng ngày hoặc vài ngày sau, một hóa đơn có thể gộp 2–3 chuyến. Máy ghép theo đại lý + ngày hàng về (cột “Ngày HĐ” của sổ chi tiết, không phải cột NGAY) + loại + số kg, và KHÔNG tự đổi số chuyến.\n" +
-          "Chọn khoảng Ngày hàng về. Bốn thẻ đếm việc còn lại; chọn một thẻ để lọc bảng dưới, chọn lại để bỏ lọc:\n" +
+          "Chọn khoảng Ngày hàng về, rồi lọc thêm nếu cần: Đại lý · Phân xưởng · Trạng thái dòng (kèm số dòng) · ô Tra số HĐ, ký hiệu, số phiếu nhập, mã đại lý / vật tư, biển số (không cần dấu). Đang lọc thì bốn thẻ đếm theo bộ lọc (ghi \"theo bộ lọc\"); Bỏ hết bộ lọc để về cả khoảng ngày.\n" +
+          "Bốn thẻ đếm việc còn lại; chọn một thẻ để lọc bảng dưới, chọn lại để bỏ lọc:\n" +
           "• Chuyến chờ HĐ: chuyến đã ghi mà chưa gắn hóa đơn (hoặc mới gắn một phần loại).\n" +
           "• HĐ chưa có file: có số trong sổ kế toán, chưa nạp PDF.\n" +
           "• Lệch chưa xử: kg hoặc đơn giá trên hóa đơn khác sổ xưởng, chưa chọn cách xử.\n" +

@@ -13,9 +13,11 @@ import {
   DateRangeField,
   EmptyState,
   ErrorSummary,
+  FilterBar,
   FormSection,
   Input,
   Label,
+  SearchField,
   StatCardGrid,
   SummaryTable,
   Tag,
@@ -29,6 +31,7 @@ import type { AccountingCodeMap, DailyLock, ImportShipment, MaterialImportItem, 
 import { useSupplierInvoiceStore } from "@/lib/catalogRepo";
 import { newId } from "@/lib/store";
 import { formatDateVN, num, todayISO } from "@/lib/format";
+import { ALL, activeFilterCount, countedLabel, matchesSearch, matchesValue, statusOptions } from "@/lib/recordFilters";
 import {
   IMPORT_CHANGE_LABELS,
   PDF_WARNING_LABELS,
@@ -65,7 +68,7 @@ import {
   type PdfRead,
 } from "@/lib/supplierInvoiceFiles";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { DEFAULT_CATEGORY, generateLotCode } from "./importHelpers";
+import { DEFAULT_CATEGORY, WORKSHOPS, generateLotCode } from "./importHelpers";
 import { CreateTripDialog, ExplainMismatchDialog, type CreateTripTarget, type ExplainTarget } from "./supplierInvoiceParts";
 
 const STATE_TAG: Record<InvoiceLineState, TagVariant> = {
@@ -139,6 +142,11 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
   const [fromDate, setFromDate] = useState(monthStart(todayISO()));
   const [toDate, setToDate] = useState(todayISO());
   const [cardFilter, setCardFilter] = useState<CardFilter>("all");
+  // Bộ lọc (ba-spec 53, bổ sung 2026-10-31): đại lý · phân xưởng · trạng thái dòng · ô tra.
+  const [supplierFilter, setSupplierFilter] = useState(ALL);
+  const [workshopFilter, setWorkshopFilter] = useState(ALL);
+  const [stateFilter, setStateFilter] = useState(ALL);
+  const [query, setQuery] = useState("");
   const [ledger, setLedger] = useState<{ fileName: string; parse: LedgerParse } | null>(null);
   const [pdfs, setPdfs] = useState<LoadedPdf[]>([]);
   const [isReading, setIsReading] = useState(false);
@@ -276,10 +284,47 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.trips, p.shipments, lines, invoiceById, mappedMaterials, fromDate, toDate]);
 
-  const invoicesNoFile = new Set(savedRows.filter((r) => !r.invoice.filePath && r.invoice.classification === "trip").map((r) => r.invoice.id));
-  const mismatchRows = savedRows.filter((r) => isOpenMismatch(r.state));
-  const noTripInvoices = new Set(savedRows.filter((r) => r.state === "no-trip").map((r) => r.invoice.id));
-  const shownRows = savedRows.filter((r) =>
+  /** Đại lý của hóa đơn: tên danh mục, chưa ánh xạ thì mã kế toán. */
+  const supplierOf = (inv: SupplierInvoice) => inv.supplierName || `(mã ${inv.accountingCode || "?"})`;
+  const filterCount = activeFilterCount([supplierFilter, workshopFilter, stateFilter, query]);
+  const clearFilters = () => {
+    setSupplierFilter(ALL);
+    setWorkshopFilter(ALL);
+    setStateFilter(ALL);
+    setQuery("");
+    setCardFilter("all");
+  };
+  const supplierChoices = [
+    { value: ALL, label: "Tất cả đại lý" },
+    ...[...new Set([...savedRows.map((r) => supplierOf(r.invoice)), ...awaitingTrips.map((x) => x.shipment.supplierName)])]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, "vi"))
+      .map((v) => ({ value: v, label: v })),
+  ];
+  // Dòng HĐ qua bộ lọc (chưa tính thẻ) — thẻ số đếm trên đây (R5).
+  const filteredRows = savedRows.filter(
+    (r) =>
+      matchesValue(supplierFilter, supplierOf(r.invoice)) &&
+      matchesValue(workshopFilter, r.trip?.workshop) &&
+      matchesValue(stateFilter, r.state) &&
+      matchesSearch(query, r.invoice.invoiceNo, r.invoice.invoiceSymbol, r.invoice.voucherNo, r.invoice.accountingCode, r.invoice.supplierName, r.invoice.sellerTaxId, r.line.materialCode, r.materialName, r.line.licensePlate, r.line.driverName, r.invoice.note),
+  );
+  const stateChoices = statusOptions(
+    savedRows.filter((r) => matchesValue(supplierFilter, supplierOf(r.invoice)) && matchesValue(workshopFilter, r.trip?.workshop)),
+    (r) => r.state,
+    (Object.keys(SUPPLIER_INVOICE_LINE_STATE_LABELS) as InvoiceLineState[]).map((v) => ({ value: v, label: SUPPLIER_INVOICE_LINE_STATE_LABELS[v] })),
+    "Mọi trạng thái",
+  ).filter((o) => o.value === ALL || o.count > 0 || o.value === stateFilter);
+  const shownAwaiting = awaitingTrips.filter(
+    (x) =>
+      matchesValue(supplierFilter, x.shipment.supplierName) &&
+      matchesValue(workshopFilter, x.shipment.workshop) &&
+      matchesSearch(query, x.shipment.supplierName, x.shipment.licensePlate, x.shipment.driverName, x.shipment.lotCode, x.shipment.note),
+  );
+  const invoicesNoFile = new Set(filteredRows.filter((r) => !r.invoice.filePath && r.invoice.classification === "trip").map((r) => r.invoice.id));
+  const mismatchRows = filteredRows.filter((r) => isOpenMismatch(r.state));
+  const noTripInvoices = new Set(filteredRows.filter((r) => r.state === "no-trip").map((r) => r.invoice.id));
+  const shownRows = filteredRows.filter((r) =>
     cardFilter === "no-file" ? invoicesNoFile.has(r.invoice.id) : cardFilter === "mismatch" ? isOpenMismatch(r.state) : cardFilter === "no-trip" ? noTripInvoices.has(r.invoice.id) : true,
   );
   const toggleCard = (f: CardFilter) => setCardFilter((cur) => (cur === f ? "all" : f));
@@ -508,16 +553,47 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
       )}
 
       <div data-tour="imports-invoice-cards" className="space-y-3">
-        <div className="max-w-md">
-          <DateRangeField label="Ngày hàng về" startDate={fromDate} endDate={toDate} onChange={(a, b) => { setFromDate(a); setToDate(b); }} />
-        </div>
+        <FilterBar
+          data-tour="imports-invoice-filters"
+          activeCount={filterCount}
+          onClearAll={clearFilters}
+          resultText={`Đang hiện ${filteredRows.length.toLocaleString("vi-VN")} / ${savedRows.length.toLocaleString("vi-VN")} dòng hóa đơn · ${shownAwaiting.length.toLocaleString("vi-VN")} chuyến chờ HĐ`}
+        >
+          <div className="min-w-[16rem] flex-1">
+            <DateRangeField label="Ngày hàng về" startDate={fromDate} endDate={toDate} onChange={(a, b) => { setFromDate(a); setToDate(b); }} />
+          </div>
+          <div className="min-w-[14rem] flex-1">
+            <Combobox label="Đại lý" hideRequiredMark clearable={false} value={supplierFilter} onChange={(v) => setSupplierFilter(v || ALL)} options={supplierChoices} />
+          </div>
+          <div className="min-w-[10rem]">
+            <Combobox
+              label="Phân xưởng"
+              hideRequiredMark
+              clearable={false}
+              value={workshopFilter}
+              onChange={(v) => setWorkshopFilter(v || ALL)}
+              options={[{ value: ALL, label: "Tất cả xưởng" }, ...WORKSHOPS.map((w) => ({ value: w, label: w }))]}
+            />
+          </div>
+          <div className="min-w-[14rem] flex-1">
+            <Combobox
+              label="Trạng thái dòng"
+              hideRequiredMark
+              clearable={false}
+              value={stateFilter}
+              onChange={(v) => setStateFilter(v || ALL)}
+              options={stateChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
+            />
+          </div>
+          <SearchField label="Tra số HĐ, ký hiệu, số phiếu nhập, mã đại lý / vật tư, biển số" value={query} onChange={setQuery} />
+        </FilterBar>
         <StatCardGrid
           columns={4}
           cards={[
-            { label: "Chuyến chờ HĐ", value: num(awaitingTrips.length), numeric: true, color: awaitingTrips.length ? "warning" : "success", onSelect: () => toggleCard("awaiting"), selectHint: "Xem các chuyến chưa có hóa đơn" },
-            { label: "HĐ chưa có file", value: num(invoicesNoFile.size), numeric: true, color: invoicesNoFile.size ? "warning" : "success", onSelect: () => toggleCard("no-file"), selectHint: "Lọc hóa đơn chưa nạp PDF" },
-            { label: "Lệch chưa xử", value: num(mismatchRows.length), numeric: true, color: mismatchRows.length ? "danger" : "success", onSelect: () => toggleCard("mismatch"), selectHint: "Lọc dòng lệch giá / kg chưa quyết" },
-            { label: "HĐ không có chuyến", value: num(noTripInvoices.size), numeric: true, color: noTripInvoices.size ? "danger" : "success", onSelect: () => toggleCard("no-trip"), selectHint: "Lọc hóa đơn chưa tìm thấy chuyến" },
+            { label: filterCount ? "Chuyến chờ HĐ · theo bộ lọc" : "Chuyến chờ HĐ", value: num(shownAwaiting.length), numeric: true, color: shownAwaiting.length ? "warning" : "success", onSelect: () => toggleCard("awaiting"), selectHint: "Xem các chuyến chưa có hóa đơn" },
+            { label: filterCount ? "HĐ chưa có file · theo bộ lọc" : "HĐ chưa có file", value: num(invoicesNoFile.size), numeric: true, color: invoicesNoFile.size ? "warning" : "success", onSelect: () => toggleCard("no-file"), selectHint: "Lọc hóa đơn chưa nạp PDF" },
+            { label: filterCount ? "Lệch chưa xử · theo bộ lọc" : "Lệch chưa xử", value: num(mismatchRows.length), numeric: true, color: mismatchRows.length ? "danger" : "success", onSelect: () => toggleCard("mismatch"), selectHint: "Lọc dòng lệch giá / kg chưa quyết" },
+            { label: filterCount ? "HĐ không có chuyến · theo bộ lọc" : "HĐ không có chuyến", value: num(noTripInvoices.size), numeric: true, color: noTripInvoices.size ? "danger" : "success", onSelect: () => toggleCard("no-trip"), selectHint: "Lọc hóa đơn chưa tìm thấy chuyến" },
           ]}
         />
       </div>
@@ -604,7 +680,7 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
       {cardFilter === "awaiting" ? (
         <FormSection title="Chuyến chờ hóa đơn" hint="Chuyến của khoảng ngày đang xem chưa gắn hóa đơn (hoặc mới gắn một phần). Nạp sổ chi tiết có hóa đơn của chuyến để gắn.">
           <SummaryTable
-            rows={awaitingTrips}
+            rows={shownAwaiting}
             getKey={(x) => x.shipment.id}
             rowMarkKey="supplier-invoice-awaiting"
             emptyText="Không có chuyến nào chờ hóa đơn."
@@ -619,7 +695,13 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
           />
         </FormSection>
       ) : (
-        <FormSection title="Hóa đơn đã gắn" hint={cardFilter === "all" ? "Mọi dòng hóa đơn có ngày hàng về trong khoảng đang xem." : "Đang lọc theo thẻ đã chọn — chọn lại thẻ đó để bỏ lọc."}>
+        <FormSection title="Hóa đơn đã gắn" hint={
+          cardFilter !== "all"
+            ? "Đang lọc theo thẻ đã chọn — chọn lại thẻ đó để bỏ lọc."
+            : filterCount
+              ? "Dòng hóa đơn khớp bộ lọc trong khoảng ngày đang xem — Bỏ hết bộ lọc để xem đủ."
+              : "Mọi dòng hóa đơn có ngày hàng về trong khoảng đang xem."
+        }>
           <div data-tour="imports-invoice-saved">
             {invoices.length === 0 ? (
               <EmptyState title="Chưa có hóa đơn nào" description="Nạp file sổ chi tiết NL ở khối trên để gắn hóa đơn vào chuyến." />

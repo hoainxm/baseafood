@@ -2,7 +2,8 @@
 
 > Load khi: sửa giao diện phần gắn hóa đơn đại lý vào chuyến (tab "Hóa đơn" của Nhập hàng, nhãn trạng thái HĐ trên chuyến, ánh xạ mã kế toán). Hành vi ở ba-spec [51](51-supplier-invoice-matching.ba-spec.md).
 covers: src/features/imports/SupplierInvoicePanel.tsx, src/features/imports/supplierInvoiceParts.tsx, src/features/imports/MaterialImportScreen.tsx, src/features/imports/importsTour.ts
-last_verified: 2026-10-30
+last_verified: 2026-10-31
+<!-- updated: 2026-10-31 (bộ lọc) — khối đầu tab Hóa đơn thành `FilterBar` (ba-spec 53): Ngày hàng về · Đại lý (tên danh mục, chưa ánh xạ thì "(mã …)") · Phân xưởng (theo chuyến đã gắn) · Trạng thái dòng (8 trạng thái, kèm số dòng, ẩn trạng thái 0 dòng) · ô Tra số HĐ, ký hiệu, số phiếu nhập (PHIEU), mã đại lý / vật tư, MST, biển số, tài xế. Bốn thẻ đếm theo bộ lọc ("theo bộ lọc"); bảng Chuyến chờ HĐ lọc theo đại lý / xưởng / ô tra; Bỏ hết bộ lọc bỏ cả thẻ đang chọn. -->
 ttl_days: 90
 
 > **Oracle giao diện** cho ba-spec 51. Luật UI chung: [`src/design-system/README.md`](../../src/design-system/README.md). Màn hình nằm TRONG Nhập hàng (không thêm mục menu): kế toán đã vào Nhập hàng để xem sổ, chứng từ nằm cạnh chuyến.

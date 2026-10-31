@@ -20,6 +20,7 @@ const SCREENS = [
   "features/reports/WarehouseNxtScreen.tsx",
   "features/imports/MaterialImportScreen.tsx",
   "features/imports/ImportReport.tsx",
+  "features/imports/SupplierInvoicePanel.tsx",
   "features/import-planning/ImportViews.tsx",
   "features/export-planning/ContractListView.tsx",
   "features/reports/OrderExportReport.tsx",

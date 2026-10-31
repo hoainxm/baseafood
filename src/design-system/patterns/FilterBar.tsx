@@ -29,9 +29,10 @@ export function FilterBar({
   className?: string;
 } & Omit<React.HTMLAttributes<HTMLDivElement>, "children" | "className">) {
   return (
-    // grid-cols-[minmax(0,1fr)] + max-w-full: ô lọc có min-w cố định không đẩy khung tràn ngang ở 360 px × 130 %.
+    // grid-cols-[minmax(0,1fr)] + max-w-full: ô lọc không đẩy khung tràn ngang. Điện thoại: mỗi ô một hàng, bỏ
+    // min-w cố định (min-width thắng max-width — ô min-w-[16rem] = 333 px ở 130 % vẫn tràn nếu chỉ chặn max-w).
     <div className={cn("grid grid-cols-[minmax(0,1fr)] gap-3 rounded-xl border-2 border-border p-4", className)} {...rest}>
-      <div className="flex min-w-0 flex-wrap items-end gap-4 [&>*]:max-w-full">{children}</div>
+      <div className="flex min-w-0 flex-wrap items-end gap-4 [&>*]:max-w-full max-sm:[&>*]:w-full max-sm:[&>*]:min-w-0">{children}</div>
       {activeCount > 0 && (
         <div className="flex flex-wrap items-center gap-3">
           {resultText && <span className="tnum text-sm text-muted-foreground">{resultText}</span>}

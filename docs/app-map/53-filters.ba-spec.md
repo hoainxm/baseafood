@@ -71,6 +71,7 @@ Rà 2026-10-31 (~45 màn / tab có bảng): nhiều sổ dài chỉ lọc đư�
 | 1 | `/nxt` NXT thành phẩm | U2 | M | Tra mã / tên hàng |
 | 1 | `/nxt-warehouse` NXT kho | U2 | M/L | Tra mã / tên hàng · "Chỉ dòng có phát sinh hoặc còn tồn" |
 | 1 | `/imports` Sổ chi tiết chuyến | U1 | L | Tra (biển số, số phiếu, đại lý) — giữ "Bộ lọc thêm" sẵn có |
+| 1+ | `/imports` tab Hóa đơn (bổ sung 2026-10-31, chủ dự án: "chưa có lọc theo đại lý, mã hồ sơ") | U2 | L | Đại lý · Phân xưởng · Trạng thái dòng · Tra số HĐ, ký hiệu, số phiếu nhập (mã hồ sơ kế toán), mã đại lý / vật tư, biển số |
 | 2 | `/planning-production` Lệnh | U3 | L | Trạng thái (Nháp / Đã phát hành / Đã hủy) thay nút Xem / Ẩn lệnh đã hủy |
 | 2 | `/planning-import` Lịch tháng | U3 | L | Trạng thái lần nhập (theo cột Trạng thái, gồm "còn thiếu chứng từ") |
 | 2 | `/planning-export` Hợp đồng | U3 | L | Khách hàng |
@@ -157,5 +158,6 @@ Giả định: không lưu bộ lọc (R8) · AND (R4) · ô tra bỏ dấu (R3)
 - **Assert** số màn §6 thiếu `FilterBar|SearchField` == 0; `pageTourCoverage.test.ts` xanh; 360 px × 130 % mỗi màn: `scrollWidth == clientWidth`
 
 ## History
+- v1.2 2026-10-31 — bổ sung tab Hóa đơn (Nhập hàng): Đại lý · Phân xưởng · Trạng thái dòng · ô tra số HĐ / ký hiệu / số phiếu nhập / mã kế toán; thẻ số theo bộ lọc; thêm vào `filterCoverage.test.ts`.
 - v1.1 2026-10-31 — BUILD P0–P3: `lib/recordFilters.ts` (+ test AC-1…3), `FilterBar` · `SearchField` · `NoMatchState` (+ `CatalogFilter` của `CatalogCrud`), README § Bộ lọc; 15 màn / tab §6 (trừ Lệnh SX — §6b); tour 12 bước + mục "Bộ lọc" ở hộp "?" 13 trang (`FILTER_NOTES` trong guideContent); test quét `filterCoverage.test.ts` (AC-7).
 - v1 2026-10-31 — rà 45 màn / tab, chủ dự án chốt Q1–Q3 (cả 3 đợt · tổng theo dòng đang hiện · có FilterBar + SearchField). Chưa build.

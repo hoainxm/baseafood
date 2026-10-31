@@ -11,6 +11,7 @@ import { isServerConnected, useAppRoles, useUserProfiles } from "@/lib/catalogRe
 import { DISPLAY_NAME_MAX, checkDisplayName, isDisplayNameAvailable, personSearchText } from "@/lib/personName";
 import { listRoleOptions, roleNames } from "@/lib/permissions";
 import { fullNameToUsername, normalizeUsername } from "@/lib/username";
+import { ALL, activeFilterCount, countedLabel, filterRows, matchesSearch, matchesValue, statusOptions } from "@/lib/recordFilters";
 import {
   generateTemporaryPassword,
   useAccountAdmin,
@@ -44,7 +45,10 @@ import {
   EmptyState,
   ErrorSummary,
   Field,
+  FilterBar,
   FormDialog,
+  NoMatchState,
+  SearchField,
   ProcessingState,
   Input,
   RecordTable,
@@ -77,7 +81,6 @@ import {
   Warehouse,
   ShieldCheck,
   UserRound,
-  Search,
   type LucideIcon,
 } from "lucide-react";
 
@@ -707,6 +710,8 @@ export default function UserManagementScreen({
   const [editing, setEditing] = useState<UserProfile | null>(null);
   const [editErrors, setEditErrors] = useState<FieldError[]>([]);
   const [q, setQ] = useState("");
+  const [stateFilter, setStateFilter] = useState(ALL);
+  const [roleFilter, setRoleFilter] = useState(ALL);
   // Tên gọi (ba-spec 47): máy chủ chưa chạy 0086 ⇒ ẩn ô, không gửi cột.
   const hasDisplayName = isDisplayNameAvailable(items, isServerConnected);
 
@@ -824,10 +829,31 @@ export default function UserManagementScreen({
   ];
 
   // Gom theo phòng ban, trong phòng Trưởng → Phó → Nhân viên (quy tắc ở lib/userDirectory.ts).
-  const query = q.trim().toLowerCase();
-  const filtered = query
-    ? items.filter((u) => `${personSearchText(u)} ${roleLabel(u.roles)}`.toLowerCase().includes(query))
-    : items;
+  // Bộ lọc (ba-spec 53 đợt 3): ô tra · trạng thái tài khoản · vai trò.
+  const accountStateOf = (u: UserProfile) => {
+    const st = accounts.statuses[u.id];
+    return !st ? "" : st.isDisabled ? "disabled" : st.mustChangePassword ? "temp-password" : "active";
+  };
+  const stateChoices = statusOptions(items, accountStateOf, [
+    { value: "active", label: "Đang dùng" },
+    { value: "temp-password", label: "Chờ đổi mật khẩu tạm" },
+    { value: "disabled", label: "Tạm ngưng" },
+  ]);
+  const roleChoices = [
+    { value: ALL, label: "Tất cả vai trò" },
+    ...[...new Set(items.flatMap((u) => rolesList(u.roles)))].map((r) => ({ value: r, label: roleLabel([r]) })).sort((a, b) => a.label.localeCompare(b.label, "vi")),
+  ];
+  const filterCount = activeFilterCount([q, stateFilter, roleFilter]);
+  const clearFilters = () => {
+    setQ("");
+    setStateFilter(ALL);
+    setRoleFilter(ALL);
+  };
+  const filtered = filterRows(items, [
+    (u) => matchesSearch(q, personSearchText(u), roleLabel(u.roles)),
+    (u) => matchesValue(stateFilter, accountStateOf(u)),
+    (u) => roleFilter === ALL || rolesList(u.roles).includes(roleFilter as Role),
+  ]);
   const visibleGroups = groupUsersByDepartment(
     filtered.map((u) => ({ ...u, roles: rolesList(u.roles) })),
     appRoles
@@ -890,22 +916,27 @@ export default function UserManagementScreen({
         />
       ) : (
         <div className="space-y-6">
-          <div className="relative max-w-md">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Tìm theo tên đăng nhập / họ tên / vai trò…"
-              aria-label="Tìm người dùng"
-              className="pl-10"
-            />
-          </div>
+          <FilterBar
+            activeCount={filterCount}
+            onClearAll={clearFilters}
+            resultText={`Đang hiện ${filtered.length.toLocaleString("vi-VN")} / ${items.length.toLocaleString("vi-VN")} tài khoản`}
+          >
+            <SearchField label="Tra tên đăng nhập, họ tên, vai trò" value={q} onChange={setQ} />
+            <Combobox label="Vai trò" hideRequiredMark clearable={false} value={roleFilter} onChange={(v) => setRoleFilter(v || ALL)} options={roleChoices} className="min-w-[14rem] flex-1" />
+            {accounts.isAvailable && (
+              <ChoiceGroup
+                label="Trạng thái tài khoản"
+                hideRequiredMark
+                value={stateFilter}
+                onChange={setStateFilter}
+                options={stateChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
+                columns={4}
+              />
+            )}
+          </FilterBar>
 
           {visibleGroups.length === 0 ? (
-            <p className="text-muted-foreground">Không tìm thấy người dùng nào khớp “{q}”.</p>
+            <NoMatchState onClearAll={clearFilters} />
           ) : (
             visibleGroups.map((group) => {
               const Icon = group.icon;

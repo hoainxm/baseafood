@@ -4,7 +4,7 @@
 // Description: Contract list across months with state filter, coverage / tolerance hints.
 // ============================================================
 import { useState } from "react";
-import { Button, ChoiceGroup, Field, Input, RecordTable, Tag, formatNumber, type RecordTableColumn } from "@/design-system";
+import { Button, ChoiceGroup, Combobox, RecordTable, SearchField, Tag, formatNumber, type RecordTableColumn } from "@/design-system";
 import {
   contractClosure,
   contractStateLabel,
@@ -21,6 +21,7 @@ import {
   type ExportData,
 } from "@/lib/exportPlanning";
 import { formatDateVN, formatMoney } from "@/lib/format";
+import { ALL, matchesSearch, matchesValue } from "@/lib/recordFilters";
 import type { Customer, ExportContract } from "@/types";
 import { Eye } from "lucide-react";
 import { CONTRACT_STATE_TAG } from "./progress";
@@ -54,6 +55,12 @@ export function ContractListView({
   const opts = { filesAvailable };
   const [filter, setFilter] = useState<Filter>("open");
   const [query, setQuery] = useState("");
+  // Lọc khách (ba-spec 53 đợt 2) — chỉ khách có hợp đồng.
+  const [customerId, setCustomerId] = useState(ALL);
+  const customerChoices = [
+    { value: ALL, label: "Tất cả khách" },
+    ...[...new Set(data.contracts.map((c) => c.customerId))].filter(Boolean).map((id) => ({ value: id, label: customers.find((c) => c.id === id)?.name || "(khách chưa rõ)" })).sort((a, b) => a.label.localeCompare(b.label, "vi")),
+  ];
   const nameOf = (id: string) => customers.find((c) => c.id === id)?.name || "(khách chưa rõ)";
   const stateOf = (c: ExportContract) => contractState(data, c.id, opts);
   const rows = data.contracts
@@ -61,10 +68,8 @@ export function ContractListView({
       const st = stateOf(c);
       return filter === "all" || (filter === "open" ? isLiveContractState(st) : st === filter);
     })
-    .filter((c) => {
-      const q = query.trim().toLowerCase();
-      return !q || `${c.contractNo} ${c.orderRef} ${nameOf(c.customerId)}`.toLowerCase().includes(q);
-    })
+    .filter((c) => matchesValue(customerId, c.customerId))
+    .filter((c) => matchesSearch(query, c.contractNo, c.orderRef, nameOf(c.customerId)))
     .sort((a, b) => effectiveDeadline(data, b.id).localeCompare(effectiveDeadline(data, a.id)));
 
   const columns: RecordTableColumn<ExportContract>[] = [
@@ -126,10 +131,11 @@ export function ContractListView({
   return (
     <div className="grid min-w-0 gap-4">
       <ChoiceGroup label="Trạng thái" hideRequiredMark value={filter} onChange={(v) => setFilter(v as Filter)} options={FILTERS} columns={3} />
-      {/* Nhãn luôn hiện (luật 5) — ô tìm mặc định của bảng chỉ có chữ mờ. */}
-      <Field label="Tra hợp đồng (số HĐ · số PO · tên khách)">
-        <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} title="Gõ một phần số hợp đồng, số PO của khách hoặc tên khách — lọc ngay danh sách." />
-      </Field>
+      <div className="flex flex-wrap items-end gap-4">
+        <Combobox label="Khách hàng" hideRequiredMark clearable={false} value={customerId} onChange={(v) => setCustomerId(v || ALL)} options={customerChoices} className="min-w-[14rem] flex-1" />
+        {/* Nhãn luôn hiện (luật 5) — ô tìm mặc định của bảng chỉ có chữ mờ. */}
+        <SearchField label="Tra hợp đồng (số HĐ · số PO · tên khách)" value={query} onChange={setQuery} />
+      </div>
       <RecordTable
         columns={columns}
         rows={rows}

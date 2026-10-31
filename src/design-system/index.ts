@@ -25,7 +25,7 @@ export {
   addDays,
   todayIso,
 } from "./patterns/DateField";
-export { CatalogCrud, CatalogEditDialog, type CatalogField } from "./patterns/CatalogCrudModal";
+export { CatalogCrud, CatalogEditDialog, type CatalogField, type CatalogFilter } from "./patterns/CatalogCrudModal";
 export { Logo } from "./patterns/Logo";
 export { RecordTable, type RecordTableColumn } from "./patterns/RecordTable";
 export {
@@ -43,6 +43,7 @@ export { GroupLabel } from "./patterns/GroupLabel";
 export { ContextBar, type ContextBarItem } from "./patterns/ContextBar";
 export { ErrorSummary, type FieldError } from "./patterns/ErrorSummary";
 export { EmptyState } from "./patterns/EmptyState";
+export { FilterBar, SearchField, NoMatchState } from "./patterns/FilterBar";
 export { ReadOnlyBadge } from "./patterns/ReadOnlyBadge";
 export { InfoTip } from "./patterns/InfoTip";
 export { Abbr, AbbrHint } from "./patterns/AbbrHint";

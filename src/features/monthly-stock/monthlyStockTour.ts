@@ -35,11 +35,12 @@ export function buildMonthlyStockTour(ctx: MonthlyStockTourContext): PageTour {
     {
       id: "filters",
       target: "monthly-stock-filters",
-      title: "Tháng, kho và tìm mặt hàng",
+      title: "Tháng, kho, nhóm hàng và ô tra",
       body:
         "• Kỳ (tháng): mặc định là tháng hiện tại. Hai nút mũi tên hai bên để sang tháng trước, tháng sau.\n" +
         "• Kho: Tất cả kho cộng sổ của mọi kho; chọn một kho để xem riêng sổ của kho đó.\n" +
-        "• Tìm mặt hàng: lọc theo tên, size, invoice, nhóm, kho hoặc vị trí trong tháng đang xem. Không dòng nào khớp thì trang báo và có Hiện tất cả để bỏ lọc.\n" +
+        "• Nhóm hàng: chỉ xem một nhóm (mục) của sổ.\n" +
+        "• Ô Tra tên, size, invoice, kho, vị trí: gõ một phần (không cần dấu). Không dòng nào khớp thì trang báo và có Hiện tất cả để bỏ lọc; Bỏ hết bộ lọc xóa cả nhóm lẫn ô tra.\n" +
         "Đổi tháng hoặc kho thì các dòng đang tick được bỏ chọn, tránh cộng nhầm dòng của kỳ khác.",
     },
   ];

@@ -48,6 +48,7 @@ import {
   RequiredLegend,
   Button,
   ConfirmDelete,
+  ChoiceGroup,
   Combobox,
   DateField,
   DateRangeField,
@@ -58,6 +59,9 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  FilterBar,
+  NoMatchState,
+  SearchField,
   TableSkeleton,
   ErrorSummary,
   Field,
@@ -77,6 +81,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { appendAuditEntries } from "@/lib/audit";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { ALL, activeFilterCount, countedLabel, filterRows, matchesSearch, matchesValue, statusOptions } from "@/lib/recordFilters";
 import { DailyTaskReminder, LotInputPicker, LotDispatchPicker, BlankDailyWipSlip, LotQrLabels } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useQuickProductDelete } from "@/features/catalog/QuickProductDelete";
@@ -436,7 +441,7 @@ export default function WipProductionScreen() {
       .map(([name, v]) => `${toShortBatterLabel(name)} ${num(v)}`)
       .join(" · ");
 
-  const view = useMemo(
+  const periodView = useMemo(
     () =>
       rows
         .filter(
@@ -452,12 +457,37 @@ export default function WipProductionScreen() {
         ),
     [rows, effectiveFrom, effectiveTo, workshop]
   );
+  // Bộ lọc sổ (ba-spec 53 đợt 1): nhập kho · khách · ô tra. Bảng + thẻ số + tổng theo dòng đang hiện (R5);
+  // báo cáo ngày gửi lên và bột tẩm (số kế toán chép sang Cân đối) giữ theo cả kỳ.
+  const [stockFilter, setStockFilter] = useState(ALL);
+  const [customerFilter, setCustomerFilter] = useState(ALL);
+  const [query, setQuery] = useState("");
+  const filterCount = activeFilterCount([stockFilter, customerFilter, query]);
+  const clearFilters = () => {
+    setStockFilter(ALL);
+    setCustomerFilter(ALL);
+    setQuery("");
+  };
+  const view = filterRows(periodView, [
+    (r) => matchesValue(stockFilter, r.status === "pending" ? "pending" : "stocked"),
+    (r) => matchesValue(customerFilter, (r.customerName ?? "").trim()),
+    (r) => matchesSearch(query, productNameOf(r.productId), r.customerName, r.spec, r.operator, r.note),
+  ]);
+  const stockChoices = statusOptions(periodView, (r) => (r.status === "pending" ? "pending" : "stocked"), [
+    { value: "pending", label: "Chờ nhập kho" },
+    { value: "stocked", label: "Đã nhập kho" },
+  ]);
+  const customerChoices = [
+    { value: ALL, label: "Tất cả khách" },
+    ...[...new Set(periodView.map((r) => (r.customerName ?? "").trim()))].filter(Boolean).sort((a, b) => a.localeCompare(b, "vi")).map((c) => ({ value: c, label: c })),
+  ];
+  const periodTotal = periodView.reduce((s, r) => s + (r.quantityKg || 0), 0);
 
   const total = view.reduce((s, r) => s + (r.quantityKg || 0), 0);
   const totalBlocks = view.reduce((s, r) => s + (r.blocksCount || 0), 0);
   const pendingInCount = view.filter((r) => r.status === "pending").length;
   /** Bột tẩm đã dùng trong phạm vi đang xem, cộng theo loại (mig 0051). */
-  const batterByType = useMemo(() => sumBatterByType(view.map((r) => r.batterKg)), [view]);
+  const batterByType = useMemo(() => sumBatterByType(periodView.map((r) => r.batterKg)), [periodView]);
   const batterViewTotal = batterByType.reduce((s, b) => s + b.kg, 0);
   /** Bán nội địa (mig 0054) trong phạm vi đang xem — sổ riêng, không vào tổng sản lượng. */
   const bndView = useMemo(
@@ -486,7 +516,7 @@ export default function WipProductionScreen() {
       string,
       { workshop: Workshop; operator: string; rowCount: number; kg: number }
     >();
-    for (const r of view) {
+    for (const r of periodView) {
       const op = (r.operator ?? "").trim() || "(không rõ)";
       const k = `${r.workshop}·${op}`;
       const cur = m.get(k) ?? { workshop: r.workshop, operator: op, rowCount: 0, kg: 0 };
@@ -498,7 +528,7 @@ export default function WipProductionScreen() {
       (a, b) =>
         a.workshop.localeCompare(b.workshop) || a.operator.localeCompare(b.operator)
     );
-  }, [view]);
+  }, [periodView]);
 
   const rangeDescription = isSingleDay
     ? formatDateVN(effectiveFrom)
@@ -1089,7 +1119,7 @@ export default function WipProductionScreen() {
         action: "submit",
         entity: "production_report",
         entityKey: reportKey,
-        summary: `Gửi báo cáo thành phẩm ${rangeDescription} · ${workshop} — tổng ${kg(total)} (${view.length} dòng). ${row}`,
+        summary: `Gửi báo cáo thành phẩm ${rangeDescription} · ${workshop} — tổng ${kg(periodTotal)} (${periodView.length} dòng). ${row}`,
         diff: {
           sender: operator,
           total,
@@ -1592,14 +1622,27 @@ export default function WipProductionScreen() {
           cards={[
             { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
             { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "neutral" },
-            { label: "Số dòng", value: view.length, numeric: true, icon: ClipboardList, color: "brand" },
-            { label: "Chờ nhập kho", value: pendingInCount, numeric: true, icon: Hourglass, color: "warning" },
-            { label: "Tổng sản lượng", value: kg(total), numeric: true, icon: Scale, color: "success" },
+            { label: filterCount ? "Số dòng · theo bộ lọc" : "Số dòng", value: view.length, numeric: true, icon: ClipboardList, color: "brand" },
+            {
+              label: filterCount ? "Chờ nhập kho · theo bộ lọc" : "Chờ nhập kho",
+              value: pendingInCount,
+              numeric: true,
+              icon: Hourglass,
+              color: "warning",
+              onSelect: () => setStockFilter((f) => (f === "pending" ? ALL : "pending")),
+              selectHint: stockFilter === "pending" ? "Bỏ lọc Chờ nhập kho, về mọi dòng." : "Chỉ hiện các dòng còn Chờ nhập kho.",
+            },
+            { label: filterCount ? "Tổng sản lượng · theo bộ lọc" : "Tổng sản lượng", value: kg(total), numeric: true, icon: Scale, color: "success" },
           ]}
         />
       </div>
 
-      <div data-tour="wip-ledger-filter" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <FilterBar
+        data-tour="wip-ledger-filter"
+        activeCount={filterCount}
+        onClearAll={clearFilters}
+        resultText={`Đang hiện ${view.length.toLocaleString("vi-VN")} / ${periodView.length.toLocaleString("vi-VN")} dòng của kỳ`}
+      >
         <Combobox
           label="Kỳ xem sổ"
           hideRequiredMark
@@ -1648,10 +1691,30 @@ export default function WipProductionScreen() {
           ]}
           className="min-w-[220px] flex-1"
         />
-      </div>
+        <ChoiceGroup
+          label="Nhập kho"
+          hideRequiredMark
+          value={stockFilter}
+          onChange={setStockFilter}
+          options={stockChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
+          columns={3}
+        />
+        <Combobox
+          label="Khách hàng"
+          hideRequiredMark
+          clearable={false}
+          value={customerFilter}
+          onChange={(v) => setCustomerFilter(v || ALL)}
+          options={customerChoices}
+          className="min-w-[220px] flex-1"
+        />
+        <SearchField label="Tra thành phẩm, khách, quy cách, người ghi" value={query} onChange={setQuery} />
+      </FilterBar>
 
       {isLoading ? (
         <TableSkeleton />
+      ) : view.length === 0 && periodView.length > 0 ? (
+        <NoMatchState onClearAll={clearFilters} />
       ) : view.length === 0 ? (
         <EmptyState
           icon={Factory}
@@ -1675,8 +1738,6 @@ export default function WipProductionScreen() {
               rows={view}
               getKey={(r) => r.id}
               rowMarkKey="san-xuat-tp"
-              getSearchText={(r) => `${productNameOf(r.productId)} ${r.customerName ?? ""}`}
-              searchLabel="Tìm theo thành phẩm / khách…"
               actions={wipRowActions}
             />
           </div>
@@ -1939,7 +2000,7 @@ export default function WipProductionScreen() {
 
       {/* A4 — Báo cáo công việc ngày: gom theo (xưởng × người thao tác) + Gửi lên
           hệ thống (lưu vết audit), TÁCH khỏi "Chốt ngày" (khoá sửa). */}
-      {view.length > 0 && (
+      {periodView.length > 0 && (
         <div data-tour="wip-daily-report" className="space-y-3 rounded-xl border-2 border-border p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">

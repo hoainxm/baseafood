@@ -47,6 +47,7 @@ import {
   notify,
   type FieldError,
   type CatalogField,
+  type CatalogFilter,
 } from "@/design-system";
 import { BatterPicker } from "./BatterPicker";
 
@@ -67,6 +68,8 @@ export interface CatalogConfig<T extends { id: string }> {
   getRecordDescription: (r: T) => string;
   validate?: (editing: T, rows: T[], isAdding: boolean) => FieldError[];
   loading: boolean;
+  /** Ô lọc theo nhóm trên bảng (ba-spec 53 đợt 3). */
+  filters?: CatalogFilter<T>[];
   /** Trường TÊN của bản ghi. */
   nameField: keyof T & string;
   /**
@@ -632,6 +635,10 @@ export function buildCatalogConfigs(
         ...(hasTradeNameColumn(n.product.rows) ? { tradeName: "" } : {}),
       }),
       getSearchText: (r) => `${r.code} ${r.name} ${r.finishedGoodCode} ${r.tradeName ?? ""}`,
+      filters: [
+        { key: "category", label: "Nhóm loài", allLabel: "Tất cả nhóm loài", valueOf: (r) => r.category ?? "" },
+        { key: "processing", label: "Kiểu chế biến", allLabel: "Tất cả kiểu chế biến", valueOf: (r) => r.processingType ?? "" },
+      ],
       getRecordDescription: (r) => `${r.name}${r.code ? ` (mã ${r.code})` : ""}`,
       nameField: "name",
       linkedByName: false,
@@ -649,6 +656,7 @@ export function buildCatalogConfigs(
       validate: (editing, rows) => checkDuplicateCode(editing, rows, "khách hàng"),
       createEmpty: () => ({ id: uid(), code: "", name: "", market: "" }),
       getSearchText: (r) => `${r.code} ${r.name} ${r.market}`,
+      filters: [{ key: "market", label: "Thị trường", allLabel: "Tất cả thị trường", valueOf: (r) => r.market }],
       getRecordDescription: (r) => `${r.name}${r.market ? ` — thị trường ${r.market}` : ""}`,
       nameField: "name",
       // Bán hàng/đơn đặt nối theo id, nhưng sản lượng /wip lưu customerName.
@@ -700,6 +708,10 @@ export function buildCatalogConfigs(
       ],
       createEmpty: () => emptyImportSupplier(uid()),
       getSearchText: (r) => `${r.code} ${r.shortName} ${r.fullName} ${r.country} ${r.contactName} ${r.email} ${r.mainProducts}`,
+      filters: [
+        { key: "status", label: "Trạng thái", allLabel: "Tất cả trạng thái", valueOf: (r) => r.status, labelOf: (v) => (v === "inactive" ? "Ngừng giao dịch" : v === "active" ? "Đang giao dịch" : v) },
+        { key: "country", label: "Nước", allLabel: "Tất cả nước", valueOf: (r) => r.country },
+      ],
       getRecordDescription: (r) => `${r.shortName}${r.country ? ` (${r.country})` : ""}`,
       nameField: "shortName",
       linkedByName: false, // HĐ nhập nối theo id, giữ chữ tên lúc ghi
@@ -714,6 +726,7 @@ export function buildCatalogConfigs(
       fields: fields.materialType,
       loading: n.materialType.loading,
       createEmpty: () => ({ id: uid(), name: "", category: "", note: "" }),
+      filters: [{ key: "category", label: "Nhóm", allLabel: "Tất cả nhóm", valueOf: (r) => r.category }],
       getSearchText: (r) => `${r.name} ${r.category}`,
       getRecordDescription: (r) => `${r.name}${r.category ? ` (${r.category})` : ""}`,
       nameField: "name",

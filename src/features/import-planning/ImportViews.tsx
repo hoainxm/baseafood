@@ -12,13 +12,16 @@ import {
   EmptyState,
   Field,
   Input,
+  NoMatchState,
   RecordTable,
+  SearchField,
   StatCardGrid,
   Tag,
   formatNumber,
   type RecordTableColumn,
 } from "@/design-system";
 import { formatDateVN, formatMoney } from "@/lib/format";
+import { ALL, countedLabel, statusOptions } from "@/lib/recordFilters";
 import {
   RECEIPT_STATE_LABELS,
   contractProgress,
@@ -92,7 +95,17 @@ export function ImportMonthView({
 }) {
   const [supplierId, setSupplierId] = useState("");
   const [query, setQuery] = useState("");
+  // Lọc trạng thái lần nhập (ba-spec 53 đợt 2) — số đếm theo lô của tháng; thẻ số giữ của cả tháng.
+  const [stateFilter, setStateFilter] = useState(ALL);
   const view = monthView(data, month, supplierId);
+  const stateChoices = statusOptions(
+    view.groups.flatMap((g) => g.receipts),
+    (x) => x.state,
+    (Object.keys(RECEIPT_STATE_LABELS) as ReceiptState[]).map((v) => ({ value: v, label: RECEIPT_STATE_LABELS[v] })),
+  );
+  const shownGroups = view.groups
+    .map((g) => ({ ...g, receipts: stateFilter === ALL ? g.receipts : g.receipts.filter((x) => x.state === stateFilter) }))
+    .filter((g) => g.receipts.length > 0);
   const awaiting = view.groups.flatMap((g) => g.receipts).filter((x) => x.state === "awaiting-quantity").length;
   const supplierOptions = [...new Map(data.contracts.map((c) => [c.supplierId, c.supplierName])).entries()]
     .filter(([id]) => id)
@@ -141,10 +154,18 @@ export function ImportMonthView({
           <Combobox label="Đối tác" hideRequiredMark value={supplierId} onChange={setSupplierId} options={[{ value: "", label: "Mọi đối tác" }, ...supplierOptions]} />
         </div>
         <div data-tour="import-search" className="min-w-56 flex-1 basis-56">
-          <Field label="Tra số chứng từ (số HĐ · invoice · tờ khai · cont · B/L)">
-            <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} title="Gõ một phần số — tra ở mọi tháng." />
-          </Field>
+          <SearchField label="Tra số chứng từ (số HĐ · invoice · tờ khai · cont · B/L)" hint="Gõ một phần số — tra ở mọi tháng." value={query} onChange={setQuery} />
         </div>
+        {!query.trim() && view.groups.length > 0 && (
+          <ChoiceGroup
+            label="Trạng thái lần nhập"
+            hideRequiredMark
+            value={stateFilter}
+            onChange={setStateFilter}
+            options={stateChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
+            columns={3}
+          />
+        )}
       </div>
       {query.trim() ? (
         <SearchResults data={data} hits={hits} onOpen={onOpen} />
@@ -165,11 +186,13 @@ export function ImportMonthView({
               ]}
             />
           </div>
-          {view.groups.length === 0 ? (
+          {view.groups.length > 0 && shownGroups.length === 0 ? (
+            <NoMatchState onClearAll={() => setStateFilter(ALL)} />
+          ) : view.groups.length === 0 ? (
             <EmptyState icon={Ship} title={`${monthText(month)} chưa có lô nhập nào`} description="Lập hợp đồng nhập, rồi ở hồ sơ hợp đồng chọn Ghi lần nhập khi hàng sắp về." />
           ) : (
             <div data-tour="import-receipts" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
-              {view.groups.map((g) => (
+              {shownGroups.map((g) => (
                 <section key={g.supplierName} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
                   <h3 className="font-semibold">
                     {g.supplierName} <span className="font-normal text-muted-foreground">· {g.receipts.length} lô</span>

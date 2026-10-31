@@ -32,10 +32,11 @@ export function buildPackagingTour(ctx: PackagingTourContext): PageTour {
     {
       id: "filter",
       target: "packaging-filter",
-      title: "Kỳ xem và phân xưởng",
+      title: "Kỳ xem, phân xưởng và bộ lọc",
       body:
         "Kỳ xem: Ngày · Tuần · Tháng · Năm · Khoảng tự chọn; chọn Ngày (hoặc khoảng ngày) và Phân xưởng (Tất cả, Đông, Cá, Khô).\n" +
-        "Các thẻ số và bảng phiếu bên dưới tính theo lựa chọn này. Phiếu mới mở sẵn ngày đang xem (kỳ nhiều ngày thì ngày cuối kỳ) và xưởng đang chọn.",
+        "Các thẻ số và bảng phiếu bên dưới tính theo lựa chọn này. Phiếu mới mở sẵn ngày đang xem (kỳ nhiều ngày thì ngày cuối kỳ) và xưởng đang chọn.\n" +
+        "Kho thành phẩm (khi có từ hai kho) và ô Tra mặt hàng, quy cách, kho, ghi chú để thu hẹp bảng. Đang lọc thì thẻ số và tổng tính theo dòng đang hiện (ghi \"theo bộ lọc\"); Bỏ hết bộ lọc để về sổ đầy đủ của kỳ. Lọc ra không dòng nào thì trang báo Không có dòng nào khớp bộ lọc.",
     },
   ];
 

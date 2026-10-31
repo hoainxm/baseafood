@@ -46,6 +46,9 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  FilterBar,
+  NoMatchState,
+  SearchField,
   ErrorSummary,
   Field,
   Input,
@@ -66,6 +69,7 @@ import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildPackagingTour } from "./packagingTour";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { ALL, activeFilterCount, filterRows, matchesSearch, matchesValue } from "@/lib/recordFilters";
 import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
 
 const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
@@ -150,7 +154,7 @@ export default function PackagingScreen() {
   /* Tồn TP đóng gói (chưa trừ bán TP ở đây — chỉ để xem đã đóng gói bao nhiêu còn kho). */
   const finishedGoodStock = useMemo(() => computeFinishedGoodStock(rows, filterRetailSales(salesItems, FG_WAREHOUSE)), [rows, salesItems]);
 
-  const view = useMemo(
+  const periodView = useMemo(
     () =>
       rows
         .filter(
@@ -162,6 +166,22 @@ export default function PackagingScreen() {
         .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)),
     [rows, effectiveFrom, effectiveTo, workshop]
   );
+  // Bộ lọc (ba-spec 53 đợt 1): kho TP · ô tra — bảng, thẻ số, tổng theo dòng đang hiện.
+  const [warehouseFilter, setWarehouseFilter] = useState(ALL);
+  const [query, setQuery] = useState("");
+  const filterCount = activeFilterCount([warehouseFilter, query]);
+  const clearFilters = () => {
+    setWarehouseFilter(ALL);
+    setQuery("");
+  };
+  const view = filterRows(periodView, [
+    (r) => matchesValue(warehouseFilter, r.warehouse),
+    (r) => matchesSearch(query, productNameOf(r.fromProductId), r.fromSpec, productNameOf(r.toProductId), r.toSpec, r.warehouse, r.note),
+  ]);
+  const warehouseChoices = [
+    { value: ALL, label: "Tất cả kho" },
+    ...[...new Set(periodView.map((r) => r.warehouse))].filter(Boolean).sort((a, b) => a.localeCompare(b, "vi")).map((w) => ({ value: w, label: w })),
+  ];
 
   const totalIn = view.reduce((s, r) => s + (r.inputKg || 0), 0);
   const totalOut = view.reduce((s, r) => s + (r.outputKg || 0), 0);
@@ -399,15 +419,20 @@ export default function PackagingScreen() {
           className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
           cards={[
             { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
-            { label: "Số phiếu", value: view.length, numeric: true, icon: Package, color: "brand" },
-            { label: "BTP vào", value: kg(totalIn), numeric: true, icon: Scale, color: "neutral" },
-            { label: "TP ra", value: kg(totalOut), numeric: true, icon: PackageCheck, color: "success" },
-            { label: "Hao hụt", value: kg(totalLoss), numeric: true, icon: Scale, color: totalLoss < 0 ? "warning" : "neutral" },
+            { label: filterCount ? "Số phiếu · theo bộ lọc" : "Số phiếu", value: view.length, numeric: true, icon: Package, color: "brand" },
+            { label: filterCount ? "BTP vào · theo bộ lọc" : "BTP vào", value: kg(totalIn), numeric: true, icon: Scale, color: "neutral" },
+            { label: filterCount ? "TP ra · theo bộ lọc" : "TP ra", value: kg(totalOut), numeric: true, icon: PackageCheck, color: "success" },
+            { label: filterCount ? "Hao hụt · theo bộ lọc" : "Hao hụt", value: kg(totalLoss), numeric: true, icon: Scale, color: totalLoss < 0 ? "warning" : "neutral" },
           ]}
         />
       </div>
 
-      <div data-tour="packaging-filter" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <FilterBar
+        data-tour="packaging-filter"
+        activeCount={filterCount}
+        onClearAll={clearFilters}
+        resultText={`Đang hiện ${view.length.toLocaleString("vi-VN")} / ${periodView.length.toLocaleString("vi-VN")} phiếu của kỳ`}
+      >
         <Combobox
           label="Kỳ xem"
           hideRequiredMark
@@ -442,7 +467,19 @@ export default function PackagingScreen() {
           options={[{ value: "Tất cả", label: "Tất cả" }, ...WORKSHOPS.map((p) => ({ value: p, label: p }))]}
           className="min-w-[12rem]"
         />
-      </div>
+        {warehouseChoices.length > 2 && (
+          <Combobox
+            label="Kho thành phẩm"
+            hideRequiredMark
+            clearable={false}
+            value={warehouseFilter}
+            onChange={(v) => setWarehouseFilter(v || ALL)}
+            options={warehouseChoices}
+            className="min-w-[12rem]"
+          />
+        )}
+        <SearchField label="Tra mặt hàng, quy cách, kho, ghi chú" value={query} onChange={setQuery} />
+      </FilterBar>
 
       {/* Tồn thành phẩm đóng gói còn kho */}
       {finishedGoodStock.some((t) => t.remainingKg > 0) && (
@@ -472,6 +509,8 @@ export default function PackagingScreen() {
 
       {isLoading ? (
         <TableSkeleton />
+      ) : view.length === 0 && periodView.length > 0 ? (
+        <NoMatchState onClearAll={clearFilters} />
       ) : view.length === 0 ? (
         <EmptyState
           icon={Package}

@@ -145,10 +145,11 @@ export function buildWipTour(ctx: WipTourContext): PageTour {
     ledger({
       id: "ledger-filter",
       target: "wip-ledger-filter",
-      title: "Kỳ xem sổ và phân xưởng",
+      title: "Kỳ xem sổ, phân xưởng và bộ lọc",
       body:
         "Kỳ xem sổ: Ngày · Tuần · Tháng · Năm · Khoảng tự chọn; chọn Ngày sản xuất (hoặc khoảng ngày) và Phân xưởng (Đông, Cá, Khô hoặc Tất cả).\n" +
         "Bảng, tổng, báo cáo và phần chốt ngày bên dưới đều tính theo lựa chọn này. Phần chốt ngày chỉ hiện khi xem MỘT ngày và MỘT xưởng.\n" +
+        "Lọc thêm: Nhập kho (Chờ nhập kho · Đã nhập kho, kèm số dòng — chọn thẻ Chờ nhập kho cũng lọc được) · Khách hàng · ô Tra thành phẩm, khách, quy cách, người ghi. Đang lọc thì thẻ số và tổng tính theo dòng đang hiện (ghi \"theo bộ lọc\"); Bỏ hết bộ lọc để về sổ đầy đủ của kỳ. Lọc ra không dòng nào thì trang báo Không có dòng nào khớp bộ lọc. Báo cáo ngày gửi lên và bột tẩm vẫn tính cả kỳ.\n" +
         "In phiếu trống (khi được cấp quyền): in tờ trống để ghi tay ngoài xưởng, sau đó nhập lại vào máy.",
     }),
     ledger({

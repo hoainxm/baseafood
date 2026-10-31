@@ -30,9 +30,11 @@ import {
   isServerConnected,
 } from "@/lib/catalogRepo";
 import { listLotsWithStock, computeWipStock, collectWipDeductions } from "@/lib/inventory";
+import { ALL, activeFilterCount, countedLabel, filterRows, matchesSearch, matchesValue, statusOptions } from "@/lib/recordFilters";
 import {
   RequiredLegend,
   Button,
+  ChoiceGroup,
   Combobox,
   Dialog,
   DialogContent,
@@ -41,6 +43,9 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  FilterBar,
+  NoMatchState,
+  SearchField,
   TableSkeleton,
   ErrorSummary,
   Field,
@@ -126,6 +131,27 @@ export default function SalesOrderScreen() {
 
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
   const tenKH = (id: string) => customers.find((k) => k.id === id)?.name || "—";
+
+  // Bộ lọc đơn (ba-spec 53 đợt 1): trạng thái · khách · ô tra — không lưu, không toast.
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const [customerFilter, setCustomerFilter] = useState(ALL);
+  const [query, setQuery] = useState("");
+  const filterCount = activeFilterCount([statusFilter, customerFilter, query]);
+  const clearFilters = () => {
+    setStatusFilter(ALL);
+    setCustomerFilter(ALL);
+    setQuery("");
+  };
+  const statusChoices = statusOptions(don, (d) => d.status, (Object.keys(STATUS_LABELS) as SalesOrder["status"][]).map((v) => ({ value: v, label: STATUS_LABELS[v] })));
+  const customerChoices = [
+    { value: ALL, label: "Tất cả khách" },
+    ...[...new Set(don.map((d) => d.customerId))].filter(Boolean).map((id) => ({ value: id, label: tenKH(id) })).sort((a, b) => a.label.localeCompare(b.label, "vi")),
+  ];
+  const shownOrders = filterRows(don, [
+    (d) => matchesValue(statusFilter, d.status),
+    (d) => matchesValue(customerFilter, d.customerId),
+    (d) => matchesSearch(query, tenKH(d.customerId), d.note, ...orderItems.filter((x) => x.orderId === d.id).flatMap((x) => [productNameOf(x.productId), x.spec])),
+  ]);
 
   const [packagings] = usePackagings();
   const [lotInputs] = useLotInputs();
@@ -432,12 +458,40 @@ export default function SalesOrderScreen() {
       <StatCardGrid
         className="grid-cols-1 sm:grid-cols-3"
         cards={[
-          { label: "Tổng số đơn", value: don.length, numeric: true, icon: ClipboardList, color: "neutral" },
-          { label: "Đang gom hàng", value: don.filter((d) => d.status === "collecting").length, numeric: true, icon: Package, color: "brand" },
-          { label: "Đã xuất xong", value: don.filter((d) => d.status === "closed").length, numeric: true, icon: CheckCircle, color: "success" },
+          { label: filterCount ? "Số đơn · theo bộ lọc" : "Tổng số đơn", value: shownOrders.length, numeric: true, icon: ClipboardList, color: "neutral" },
+          { label: filterCount ? "Đang gom · theo bộ lọc" : "Đang gom hàng", value: shownOrders.filter((d) => d.status === "collecting").length, numeric: true, icon: Package, color: "brand" },
+          { label: filterCount ? "Đã xuất · theo bộ lọc" : "Đã xuất xong", value: shownOrders.filter((d) => d.status === "closed").length, numeric: true, icon: CheckCircle, color: "success" },
         ]}
       />
       </div>
+
+      {don.length > 0 && (
+        <FilterBar
+          data-tour="orders-filter"
+          activeCount={filterCount}
+          onClearAll={clearFilters}
+          resultText={`Đang hiện ${shownOrders.length.toLocaleString("vi-VN")} / ${don.length.toLocaleString("vi-VN")} đơn`}
+        >
+          <ChoiceGroup
+            label="Trạng thái"
+            hideRequiredMark
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={statusChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
+            columns={4}
+          />
+          <Combobox
+            label="Khách hàng"
+            hideRequiredMark
+            clearable={false}
+            value={customerFilter}
+            onChange={(v) => setCustomerFilter(v || ALL)}
+            options={customerChoices}
+            className="min-w-[220px] flex-1"
+          />
+          <SearchField label="Tra khách, mặt hàng, quy cách, ghi chú" value={query} onChange={setQuery} />
+        </FilterBar>
+      )}
 
       <div data-tour="orders-table">
       {isLoading ? (
@@ -459,14 +513,14 @@ export default function SalesOrderScreen() {
             </Button>
           }
         />
+      ) : shownOrders.length === 0 ? (
+        <NoMatchState onClearAll={clearFilters} />
       ) : (
         <RecordTable
           columns={colsDon}
-          rows={don}
+          rows={shownOrders}
           getKey={(r) => r.id}
           rowMarkKey="don-dat"
-          getSearchText={(r) => tenKH(r.customerId)}
-          searchLabel="Tìm theo khách…"
           actions={(r) => (
             <div className="flex flex-wrap gap-2">
               <Button

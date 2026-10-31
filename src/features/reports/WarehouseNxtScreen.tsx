@@ -27,7 +27,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ChoiceGroup,
   EmptyState,
+  FilterBar,
+  NoMatchState,
+  SearchField,
   ErrorSummary,
   Field,
   Input,
@@ -53,6 +57,7 @@ import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { num, formatDateVN } from "@/lib/format";
 import { newId } from "@/lib/store";
+import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildWarehouseNxtTour } from "./warehouseNxtTour";
 import {
@@ -216,9 +221,26 @@ export default function WarehouseNxtScreen() {
     return [...m.entries()].sort((a, b) => b[1].closingKg - a[1].closingKg);
   }, [periodRows]);
 
+  // Bộ lọc (ba-spec 53 đợt 1): kho lưu (có sẵn) + ô tra mã / tên + chỉ dòng có phát sinh hoặc còn tồn.
+  const [query, setQuery] = useState("");
+  const [movingOnly, setMovingOnly] = useState("");
+  const filterCount = activeFilterCount([storageLocationFilter === ALL ? "" : storageLocationFilter, query, movingOnly]);
+  const clearFilters = () => {
+    setStorageLocationFilter(ALL);
+    setQuery("");
+    setMovingOnly("");
+    setSelected(new Set());
+  };
   const rows: ComputedRow[] = useMemo(
-    () => (storageLocationFilter === ALL ? periodRows : periodRows.filter((r) => storageLocationOf(r) === storageLocationFilter)),
-    [periodRows, storageLocationFilter]
+    () =>
+      periodRows.filter(
+        (r) =>
+          (storageLocationFilter === ALL || storageLocationOf(r) === storageLocationFilter) &&
+          matchesSearch(query, r.itemCode, r.itemName) &&
+          (!movingOnly || Math.abs(r.inKg) + Math.abs(r.outKg) + Math.abs(r.closingKg) > 0),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- storageLocationOf đọc danh mục cùng lần vẽ
+    [periodRows, storageLocationFilter, query, movingOnly]
   );
 
   const total = useMemo(() => {
@@ -627,7 +649,12 @@ export default function WarehouseNxtScreen() {
       </div>
 
       {hasData && (
-        <div data-tour="nxt-warehouse-filters" className="flex flex-wrap items-end gap-4">
+        <FilterBar
+          data-tour="nxt-warehouse-filters"
+          activeCount={filterCount}
+          onClearAll={clearFilters}
+          resultText={`Đang hiện ${rows.length.toLocaleString("vi-VN")} / ${periodRows.length.toLocaleString("vi-VN")} mã của kỳ`}
+        >
           <div className="min-w-0 sm:min-w-[16rem]">
             <Combobox
               label="Kho / chi nhánh"
@@ -669,7 +696,19 @@ export default function WarehouseNxtScreen() {
               options={[{ value: ALL, label: "Tất cả kho lưu" }, ...storageLocationOpts]}
             />
           </div>
-          {rows.length > 0 && canWrite && (
+          <SearchField label="Tra mã, tên hàng" value={query} onChange={(v) => { setQuery(v); setSelected(new Set()); }} />
+          <ChoiceGroup
+            label="Dòng"
+            hideRequiredMark
+            value={movingOnly}
+            onChange={(v) => { setMovingOnly(v); setSelected(new Set()); }}
+            options={[
+              { value: "", label: "Tất cả mã" },
+              { value: "moving", label: "Có phát sinh / còn tồn" },
+            ]}
+            columns={2}
+          />
+          {periodRows.length > 0 && canWrite && (
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 data-tour="nxt-warehouse-edit"
@@ -698,10 +737,12 @@ export default function WarehouseNxtScreen() {
               </Button>
             </div>
           )}
-        </div>
+        </FilterBar>
       )}
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && periodRows.length > 0 ? (
+        <NoMatchState onClearAll={clearFilters} />
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={FileSpreadsheet}
           title="Chưa có số liệu Xuất–Nhập–Tồn"

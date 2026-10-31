@@ -30,7 +30,7 @@ export function buildExportReportTour(ctx: ExportReportTourContext): PageTour {
       title: "Kỳ báo cáo và khách hàng",
       body:
         "Kỳ báo cáo: Ngày · Tuần · Tháng · Năm · Khoảng tự chọn. Kỳ Ngày thì chọn Ngày xuất; kỳ khác chọn Ngày bất kỳ trong kỳ (dòng nhỏ bên dưới ghi rõ Kỳ: từ ngày – đến ngày); Khoảng tự chọn thì chọn Khoảng ngày xuất.\n" +
-        "Khách hàng: Tất cả khách hoặc một khách.\n" +
+        "Khách hàng: Tất cả khách hoặc một khách. Trạng thái đơn (Đang gom · Đủ · Đã xuất, kèm số đơn) và ô Tra mặt hàng, quy cách, khách thu hẹp thêm; tổng và Xuất Excel theo phần đang lọc. Bỏ hết bộ lọc để về cả kỳ.\n" +
         "Đơn được tính vào kỳ theo NGÀY XUẤT của lệnh xuất, không theo ngày đặt. Kỳ chưa có lệnh xuất thì trang báo Chưa có đơn nào được xuất; tạo lệnh xuất ở màn Đơn đặt thì số tự về đây.",
     },
     {

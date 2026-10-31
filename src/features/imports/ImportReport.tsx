@@ -10,6 +10,7 @@ import {
   Button,
   Combobox,
   DateField,
+  FilterBar,
   DateRangeField,
   StatCardGrid,
   todayIso,
@@ -22,6 +23,7 @@ import { useMaterialImports, useScraps } from "@/lib/catalogRepo";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { calculateImportAmount } from "@/types";
+import { ALL, activeFilterCount, matchesValue } from "@/lib/recordFilters";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { CalendarRange, Coins, FileClock, FileSpreadsheet, Scale } from "lucide-react";
 
@@ -77,7 +79,19 @@ export default function ImportReport({
   const [customFrom, setCustomFrom] = useState(todayIso());
   const [customTo, setCustomTo] = useState(todayIso());
   const [workshop, setWorkshop] = useState("Tất cả");
+  // Bộ lọc (ba-spec 53 đợt 3): đại lý · loại NL — áp cho hàng MUA; phế liệu giữ theo kỳ + xưởng.
+  const [supplierFilter, setSupplierFilter] = useState(ALL);
+  const [typeFilter, setTypeFilter] = useState(ALL);
+  const filterCount = activeFilterCount([supplierFilter, typeFilter]);
   const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
+  const { supplierChoices, typeChoices } = useMemo(() => {
+    const inPeriod = rows.filter((r) => r.deliveryDate >= fromDate && r.deliveryDate <= toDate && (workshop === "Tất cả" || r.workshop === workshop));
+    const opts = (vals: string[], all: string) => [{ value: ALL, label: all }, ...[...new Set(vals)].sort((a, b) => a.localeCompare(b, "vi")).map((v) => ({ value: v, label: v }))];
+    return {
+      supplierChoices: opts(inPeriod.map((r) => r.supplierName || "(chưa có đại lý)"), "Tất cả đại lý"),
+      typeChoices: opts(inPeriod.map((r) => r.materialTypeName || "(chưa rõ loại)"), "Tất cả loại"),
+    };
+  }, [rows, fromDate, toDate, workshop]);
 
   const {
     purchaseRows,
@@ -93,7 +107,9 @@ export default function ImportReport({
       (r) =>
         r.deliveryDate >= fromDate &&
         r.deliveryDate <= toDate &&
-        (workshop === "Tất cả" || r.workshop === workshop)
+        (workshop === "Tất cả" || r.workshop === workshop) &&
+        matchesValue(supplierFilter, r.supplierName || "(chưa có đại lý)") &&
+        matchesValue(typeFilter, r.materialTypeName || "(chưa rõ loại)")
     );
     const filteredScraps = scraps.filter(
       (r) =>
@@ -203,16 +219,16 @@ export default function ImportReport({
       totalScrapKg: scrapRows.reduce((s, d) => s + d.quantityKg, 0),
       totalScrapAmount: scrapRows.reduce((s, d) => s + d.saleValue, 0),
     };
-  }, [rows, scraps, fromDate, toDate, workshop, showPrice]);
+  }, [rows, scraps, fromDate, toDate, workshop, showPrice, supplierFilter, typeFilter]);
 
   const cards: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
-    { label: "Nhập mua", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: filterCount ? "Nhập mua · theo bộ lọc" : "Nhập mua", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
     ...(showPrice
-      ? [{ label: "Giá trị mua", value: `${num(totalAmount)} đ`, numeric: true, icon: Coins, color: "success" } as StatCardData]
+      ? [{ label: filterCount ? "Giá trị mua · theo bộ lọc" : "Giá trị mua", value: `${num(totalAmount)} đ`, numeric: true, icon: Coins, color: "success" } as StatCardData]
       : []),
     {
-      label: "Chờ hóa đơn",
+      label: filterCount ? "Chờ hóa đơn · theo bộ lọc" : "Chờ hóa đơn",
       value: `${num(totalAwaitingPriceKg)} kg`,
       numeric: true,
       icon: FileClock,
@@ -279,7 +295,15 @@ export default function ImportReport({
   return (
     <div className="space-y-6">
       <div data-tour="imports-report-filters" className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-1 flex-wrap items-end gap-4">
+        <FilterBar
+          className="flex-1"
+          activeCount={filterCount}
+          onClearAll={() => {
+            setSupplierFilter(ALL);
+            setTypeFilter(ALL);
+          }}
+          resultText="Lọc đại lý / loại NL áp cho bảng hàng mua; phế liệu vẫn theo cả kỳ."
+        >
           <div className="min-w-[12rem]">
             <Combobox
               label="Kỳ báo cáo"
@@ -323,7 +347,13 @@ export default function ImportReport({
               options={WORKSHOP_OPTIONS}
             />
           </div>
-        </div>
+          <div className="min-w-[12rem] flex-1">
+            <Combobox label="Đại lý" hideRequiredMark clearable={false} value={supplierFilter} onChange={(v) => setSupplierFilter(v || ALL)} options={supplierChoices} />
+          </div>
+          <div className="min-w-[12rem] flex-1">
+            <Combobox label="Loại nguyên liệu" hideRequiredMark clearable={false} value={typeFilter} onChange={(v) => setTypeFilter(v || ALL)} options={typeChoices} />
+          </div>
+        </FilterBar>
         {canExport && (
           <Button
             title="Tải báo cáo nhập hàng đang xem (hàng mua + phế liệu) ra file Excel."
@@ -360,7 +390,7 @@ export default function ImportReport({
         rows={purchaseRows}
         columns={purchaseColumns}
         getKey={(r) => `${r.supplierName}|||${r.materialTypeName}`}
-        rowMarkKey={`bao-cao-nhap|${fromDate}|${toDate}|${workshop}`}
+        rowMarkKey={`bao-cao-nhap|${fromDate}|${toDate}|${workshop}${filterCount ? `|${supplierFilter}|${typeFilter}` : ""}`}
         emptyText="Không có nguyên liệu mua trong kỳ này."
       />
 

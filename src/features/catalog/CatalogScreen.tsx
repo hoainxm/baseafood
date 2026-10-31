@@ -220,6 +220,7 @@ function CatalogCrudFor<T extends { id: string }>({
       getSearchText={cfg.getSearchText}
       getRecordDescription={cfg.getRecordDescription}
       rowActions={rowActions}
+      filters={cfg.filters}
     />
   );
 }

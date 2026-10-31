@@ -846,6 +846,23 @@ không có lý do miễn ⇒ CI đỏ.
 `tableSort.test.ts`) · `patterns/SortableHeader.tsx` (`useTableSort`, `SortHeaderButton`,
 `ariaSort`).
 
+## Bộ lọc — `FilterBar` · `SearchField` · `NoMatchState` (từ 2026-10-31)
+
+Oracle hành vi: [ba-spec 53](../../docs/app-map/53-filters.ba-spec.md). Logic so khớp là hàm thuần ở `lib/recordFilters.ts` (có test) — màn KHÔNG tự viết so chuỗi.
+
+| Luật | Làm thế nào |
+|---|---|
+| Sổ dài (cỡ L) có **kỳ xem + ô tra + lọc đối tượng chính** (khách / đại lý / xưởng); bảng có cột trạng thái lọc được theo trạng thái | `FilterBar` bọc hàng ô lọc; ô tra = `SearchField` (nhãn "Tra …" nói rõ tra gì); trạng thái = `ChoiceGroup` / `Combobox` với `statusOptions` + `countedLabel` ("Đang gom (3)") |
+| Ô tra bỏ dấu, không phân hoa thường, mọi từ phải có | `matchesSearch(q, ...cộtChữ)` |
+| Nhiều điều kiện = AND | `filterRows(rows, [điềuKiện…])`, ô một giá trị dùng `matchesValue(chọn, giáTrị)` với `ALL` = "" là Tất cả |
+| Có điều kiện đang bật ⇒ "Bỏ hết bộ lọc (N)" + số dòng khớp | `FilterBar activeCount={activeFilterCount([...])} onClearAll resultText="Đang hiện 12 / 40 phiếu"` — KHÔNG đếm kỳ xem; bỏ lọc giữ kỳ |
+| Lọc ra 0 dòng ≠ kỳ trống | `NoMatchState onClearAll` khi kỳ có dòng mà lọc hết; `EmptyState` cũ khi kỳ trống |
+| Tổng / thẻ số tính theo **dòng đang hiện**, ghi "theo bộ lọc" khi đang lọc | Tính tổng từ mảng đã lọc |
+| Không lưu, không toast; ô lọc không có Thêm mới / bút chì, nhãn "Tất cả …", `hideRequiredMark` | Ngoại lệ ô lọc ở § Ô chọn danh mục |
+| Bảng gộp theo bộ lọc ⇒ ghép điều kiện vào `rowMarkKey` | § Tô màu dòng |
+
+Màn cũ đã đủ lọc (Nhật ký thao tác, Tài liệu, Sổ chuyến Nhập hàng…) giữ nguyên; màn THÊM lọc từ 2026-10-31 dùng khung này.
+
 ## Animation & Loading → "Thinking"
 
 Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn ào*.

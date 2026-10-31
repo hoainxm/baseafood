@@ -11,6 +11,8 @@ import { useNavigate } from "react-router-dom";
 import {
   Button,
   ChoiceGroup,
+  FilterBar,
+  SearchField,
   ConfirmAction,
   EmptyState,
   StatCardGrid,
@@ -45,6 +47,7 @@ import { buildDocumentWarnings, documentViewerFor } from "@/lib/documents";
 import { hasDocumentStorage } from "@/lib/documentStorage";
 import { TASKS_START_DATE, buildMyTasks, findResolvedAssignments, type MyTaskItem, type TaskUrgency } from "@/lib/myTasks";
 import { formatDateVN } from "@/lib/format";
+import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
 import { callName, recordName } from "@/lib/personName";
 import type { TaskAssignment } from "@/types";
 import { AlarmClock, ArrowRight, CalendarCheck, CheckCircle2, ClipboardList, Pencil, Send, UserPlus, Users, XCircle } from "lucide-react";
@@ -154,6 +157,8 @@ export default function MyTasksScreen() {
   const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null);
   const [revoking, setRevoking] = useState<TaskAssignment | null>(null);
   const [filter, setFilter] = useState<UrgencyFilter>("todo");
+  /** Ô tra (ba-spec 53 đợt 3): tiêu đề, chi tiết, người giao / nhận. */
+  const [query, setQuery] = useState("");
 
   // Hướng dẫn thao tác (ba-spec 43): chỉ dẫn, không ghi; chờ bảng giao việc nạp xong.
   const tour = useMemo(() => buildMyTasksTour({ can: { assign: canAssign.create, editAssigned: canAssign.update } }), [canAssign.create, canAssign.update]);
@@ -256,9 +261,10 @@ export default function MyTasksScreen() {
     },
   ];
 
-  const assigned = tasks.assigned.filter((x) => matchesFilter(x, filter));
-  const mine = tasks.mine.filter((x) => matchesFilter(x, filter));
-  const delegated = tasks.delegated.filter((x) => matchesFilter(x, filter));
+  const matchesQuery = (x: MyTaskItem) => matchesSearch(query, x.kindLabel, x.title, x.detail, x.assignment?.assigneeName, x.assignment?.assignedByName);
+  const assigned = tasks.assigned.filter((x) => matchesFilter(x, filter) && matchesQuery(x));
+  const mine = tasks.mine.filter((x) => matchesFilter(x, filter) && matchesQuery(x));
+  const delegated = tasks.delegated.filter((x) => matchesFilter(x, filter) && matchesQuery(x));
   const openDelegated = tasks.delegated.filter((x) => x.assignment?.status === "open" && !x.isResolved);
   const showDelegated = canAssign.create || tasks.delegated.length > 0;
 
@@ -336,9 +342,10 @@ export default function MyTasksScreen() {
         <StatCardGrid cards={cards} />
       </div>
 
-      <div data-tour="my-tasks-filter">
+      <FilterBar data-tour="my-tasks-filter" activeCount={activeFilterCount([query])} onClearAll={() => setQuery("")}>
         <ChoiceGroup label="Lọc theo hạn" hideRequiredMark value={filter} onChange={(v) => setFilter(v as UrgencyFilter)} options={FILTERS} columns={4} />
-      </div>
+        <SearchField label="Tra việc, người giao, người nhận" value={query} onChange={setQuery} />
+      </FilterBar>
 
       <Section id="assigned" tour="my-tasks-assigned" title={`Được giao cho tôi (${assigned.length})`} description="Việc người khác giao riêng cho bạn — làm theo hạn người giao đặt.">
         {table("assigned", assigned, "Không có việc nào được giao cho bạn.")}

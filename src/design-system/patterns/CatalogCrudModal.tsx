@@ -23,6 +23,21 @@ import { TableSkeleton } from "./Loading";
 import { ReadOnlyBadge } from "./ReadOnlyBadge";
 import { notify } from "./notify";
 import { Pencil, Plus } from "lucide-react";
+import { Combobox } from "./Combobox";
+import { FilterBar, NoMatchState } from "./FilterBar";
+
+/** Ô lọc theo nhóm của một danh mục (ba-spec 53 đợt 3) — VD nhóm hàng, thị trường, loài. */
+export interface CatalogFilter<T> {
+  key: string;
+  label: string;
+  /** Nhãn "Tất cả …" */
+  allLabel: string;
+  /** Giá trị nhóm của dòng ("" = chưa có — gom thành "(chưa ghi)"). */
+  valueOf: (row: T) => string;
+  /** Tên hiện của giá trị (VD id loài → tên loài). Bỏ trống = chính giá trị. */
+  labelOf?: (value: string) => string;
+}
+const NONE = "__none__";
 
 export interface CatalogField<T> {
   key: keyof T & string;
@@ -81,6 +96,7 @@ export function CatalogCrud<T extends { id: string }>({
   canDelete = true,
   canDeleteRow,
   rowActions,
+  filters,
 }: {
   title: string;
   description?: string;
@@ -113,8 +129,26 @@ export function CatalogCrud<T extends { id: string }>({
    * con). Nút phải có nhãn chữ + `title` (luật §9).
    */
   rowActions?: (row: T) => React.ReactNode;
+  /** Ô lọc theo nhóm, hiện trên bảng khi danh mục có ≥ 2 nhóm. Lọc là trình bày — không lưu. */
+  filters?: CatalogFilter<T>[];
 }) {
   const [editing, setEditing] = React.useState<T | null>(null);
+  const [filterValues, setFilterValues] = React.useState<Record<string, string>>({});
+  const groupOf = (f: CatalogFilter<T>, r: T) => f.valueOf(r).trim() || NONE;
+  const shownFilters = (filters ?? [])
+    .map((f) => {
+      const values = [...new Set(rows.map((r) => groupOf(f, r)))];
+      const labelOf = (v: string) => (v === NONE ? "(chưa ghi)" : (f.labelOf?.(v) ?? v));
+      return {
+        f,
+        options: [{ value: "", label: f.allLabel }, ...values.map((v) => ({ value: v, label: `${labelOf(v)} (${rows.filter((r) => groupOf(f, r) === v).length})` })).sort((a, b) => a.label.localeCompare(b.label, "vi"))],
+        count: values.length,
+      };
+    })
+    .filter((x) => x.count >= 2);
+  const activeFilters = shownFilters.filter((x) => filterValues[x.f.key]);
+  const shownRows = activeFilters.length ? rows.filter((r) => activeFilters.every((x) => groupOf(x.f, r) === filterValues[x.f.key])) : rows;
+  const clearFilters = () => setFilterValues({});
   const [isAdding, setIsAdding] = React.useState(false);
   const [errors, setErrors] = React.useState<FieldError[]>([]);
 
@@ -215,9 +249,33 @@ export function CatalogCrud<T extends { id: string }>({
           }
         />
       ) : (
+        <>
+        {shownFilters.length > 0 && (
+          <FilterBar
+            activeCount={activeFilters.length}
+            onClearAll={clearFilters}
+            resultText={`Đang hiện ${shownRows.length.toLocaleString("vi-VN")} / ${rows.length.toLocaleString("vi-VN")} ${entityName}`}
+          >
+            {shownFilters.map(({ f, options }) => (
+              <div key={f.key} className="min-w-[14rem] flex-1">
+                <Combobox
+                  label={f.label}
+                  hideRequiredMark
+                  clearable={false}
+                  value={filterValues[f.key] ?? ""}
+                  onChange={(v) => setFilterValues((m) => ({ ...m, [f.key]: v }))}
+                  options={options}
+                />
+              </div>
+            ))}
+          </FilterBar>
+        )}
+        {shownRows.length === 0 ? (
+          <NoMatchState onClearAll={clearFilters} />
+        ) : (
         <RecordTable
           columns={cols}
-          rows={rows}
+          rows={shownRows}
           getKey={(r) => r.id}
           getSearchText={getSearchText}
           searchLabel={`Tìm ${entityName}…`}
@@ -251,6 +309,8 @@ export function CatalogCrud<T extends { id: string }>({
               : undefined
           }
         />
+        )}
+        </>
       )}
 
       <CatalogEditDialog

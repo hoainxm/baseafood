@@ -56,7 +56,8 @@ export function buildMyTasksTour(ctx: MyTasksTourContext): PageTour {
         "Bộ lọc áp cho cả ba mục bên dưới:\n" +
         "• Cần làm (mặc định): mọi việc có hạn, bỏ việc Để biết. Ở mục Tôi đã giao vẫn giữ việc còn mở để đốc.\n" +
         "• Quá hạn · Hôm nay · Để biết: chỉ hiện việc đúng mức đó.\n" +
-        "• Tất cả: hiện mọi việc, kể cả việc đã xong hoặc đã thu hồi ở mục Tôi đã giao.",
+        "• Tất cả: hiện mọi việc, kể cả việc đã xong hoặc đã thu hồi ở mục Tôi đã giao.\n" +
+        "Ô Tra việc, người giao, người nhận: gõ một phần tên việc hoặc tên người (không cần dấu); Bỏ hết bộ lọc để xóa ô tra.",
     },
     {
       id: "assigned",

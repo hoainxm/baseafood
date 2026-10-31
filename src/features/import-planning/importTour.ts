@@ -88,8 +88,8 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
     list({
       id: "search",
       target: "import-search",
-      title: "Tra số chứng từ",
-      body: "Gõ số hợp đồng, số invoice, số tờ khai, số cont hoặc số B/L để tìm lô ở mọi tháng. Chọn Mở để vào hồ sơ hợp đồng, tới đúng lần nhập.",
+      title: "Tra số chứng từ và lọc trạng thái",
+      body: "Gõ số hợp đồng, số invoice, số tờ khai, số cont hoặc số B/L để tìm lô ở mọi tháng. Chọn Mở để vào hồ sơ hợp đồng, tới đúng lần nhập. Ô Trạng thái lần nhập (Thiếu chứng từ · Chờ thực nhập · Đủ hồ sơ · Đã hủy, kèm số lô) chỉ hiện lô ở trạng thái đó trong tháng; ba thẻ số vẫn của cả tháng.",
     }),
     list({
       id: "receipts",

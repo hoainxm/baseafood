@@ -45,6 +45,9 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  FilterBar,
+  NoMatchState,
+  SearchField,
   TableSkeleton,
   ErrorSummary,
   Field,
@@ -69,6 +72,7 @@ import { useCan } from "@/features/shared/PermissionProvider";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { sumSalesAmountByChannel } from "@/lib/salesTotals";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { ALL, activeFilterCount, filterRows, matchesSearch, matchesValue } from "@/lib/recordFilters";
 import {
   CalendarRange,
   CircleCheck,
@@ -225,6 +229,16 @@ export default function SalesScreen() {
   const [fromDate, setFromDate] = useState(todayISO());
   const [toDate, setToDate] = useState(todayISO());
   const [workshop, setWorkshop] = useState<Workshop | "Tất cả">("Đông");
+  // Bộ lọc sổ (ba-spec 53 đợt 1): khách · kênh · ô tra — không lưu, không toast.
+  const [customerFilter, setCustomerFilter] = useState(ALL);
+  const [channelFilter, setChannelFilter] = useState(ALL);
+  const [query, setQuery] = useState("");
+  const filterCount = activeFilterCount([customerFilter, channelFilter, query]);
+  const clearFilters = () => {
+    setCustomerFilter(ALL);
+    setChannelFilter(ALL);
+    setQuery("");
+  };
 
   /* Phiên ghi phiếu: đầu phiếu + đổ từng dòng mặt hàng. */
   const [session, setSession] = useState<InvoiceHeader | null>(null);
@@ -277,7 +291,7 @@ export default function SalesScreen() {
     products.find((m) => m.id === id)?.name || "—";
   const customerName = (id: string) => customers.find((k) => k.id === id)?.name || "";
 
-  const view = useMemo(
+  const periodRows = useMemo(
     () =>
       rows.filter((r) => {
         const p = salesInvoices.find((x) => x.id === r.invoiceId);
@@ -288,6 +302,24 @@ export default function SalesScreen() {
       }),
     [rows, salesInvoices, effectiveFrom, effectiveTo, workshop]
   );
+  // Dòng đang hiện = dòng của kỳ qua bộ lọc (AND). Tổng / thẻ số tính trên đây (R5).
+  const view = useMemo(() => {
+    const invoiceOf = new Map(salesInvoices.map((p) => [p.id, p]));
+    return filterRows(periodRows, [
+      (r) => matchesValue(customerFilter, invoiceOf.get(r.invoiceId)?.customerId),
+      (r) => matchesValue(channelFilter, invoiceOf.get(r.invoiceId)?.channel),
+      (r) => {
+        const p = invoiceOf.get(r.invoiceId);
+        return matchesSearch(query, customerName(p?.customerId ?? ""), productName(r.productId), r.spec, p?.note);
+      },
+    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- customerName / productName đọc danh mục cùng lần vẽ
+  }, [periodRows, salesInvoices, customerFilter, channelFilter, query, customers, products]);
+  const customerFilterOptions = useMemo(() => {
+    const ids = new Set(periodRows.map((r) => salesInvoices.find((p) => p.id === r.invoiceId)?.customerId ?? ""));
+    return [{ value: ALL, label: "Tất cả khách" }, ...[...ids].filter(Boolean).map((id) => ({ value: id, label: customerName(id) || id })).sort((a, b) => a.label.localeCompare(b.label, "vi"))];
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- customerName đọc danh mục cùng lần vẽ
+  }, [periodRows, salesInvoices, customers]);
 
   const groupedView = useMemo(() => groupByInvoice(view, salesInvoices), [view, salesInvoices]);
 
@@ -611,16 +643,20 @@ export default function SalesScreen() {
         cards={[
           { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
           { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "neutral" },
-          { label: "Số phiếu", value: groupedView.length, numeric: true, icon: Truck, color: "brand" },
-          { label: "Số dòng", value: view.length, numeric: true, icon: FileText, color: "brand" },
-          { label: "Tổng bán", value: kg(total), numeric: true, icon: Scale, color: "success" },
+          { label: filterCount ? "Số phiếu · theo bộ lọc" : "Số phiếu", value: groupedView.length, numeric: true, icon: Truck, color: "brand" },
+          { label: filterCount ? "Số dòng · theo bộ lọc" : "Số dòng", value: view.length, numeric: true, icon: FileText, color: "brand" },
+          { label: filterCount ? "Tổng bán · theo bộ lọc" : "Tổng bán", value: kg(total), numeric: true, icon: Scale, color: "success" },
         ]}
       />
       </div>
 
-      {/* Bộ lọc — toolbar một hàng */}
-      <div data-tour="sales-filter" className="rounded-xl border-2 border-border p-4">
-        <div className="flex flex-wrap items-end gap-4">
+      {/* Bộ lọc — kỳ + xưởng + khách / kênh / ô tra (ba-spec 53) */}
+      <FilterBar
+        data-tour="sales-filter"
+        activeCount={filterCount}
+        onClearAll={clearFilters}
+        resultText={`Đang hiện ${groupedView.length.toLocaleString("vi-VN")} phiếu · ${view.length.toLocaleString("vi-VN")} / ${periodRows.length.toLocaleString("vi-VN")} dòng của kỳ`}
+      >
           <Combobox
             label="Kỳ xem sổ"
             hideRequiredMark
@@ -679,12 +715,31 @@ export default function SalesScreen() {
             ]}
             className="min-w-[220px] flex-1"
           />
-        </div>
-      </div>
+          <Combobox
+            label="Khách hàng"
+            hideRequiredMark
+            clearable={false}
+            value={customerFilter}
+            onChange={(v) => setCustomerFilter(v || ALL)}
+            options={customerFilterOptions}
+            className="min-w-[220px] flex-1"
+          />
+          <ChoiceGroup
+            label="Kênh bán"
+            hideRequiredMark
+            value={channelFilter}
+            onChange={(v) => setChannelFilter(v)}
+            options={[{ value: ALL, label: "Tất cả" }, ...SALES_CHANNELS.map((k) => ({ value: k, label: k }))]}
+            columns={3}
+          />
+          <SearchField label="Tra khách, mặt hàng, quy cách, ghi chú" value={query} onChange={setQuery} />
+      </FilterBar>
 
       {/* Sổ: mỗi phiếu một cụm */}
       {isLoading ? (
         <TableSkeleton />
+      ) : groupedView.length === 0 && periodRows.length > 0 ? (
+        <NoMatchState onClearAll={clearFilters} />
       ) : groupedView.length === 0 ? (
         <EmptyState
           icon={ShoppingCart}

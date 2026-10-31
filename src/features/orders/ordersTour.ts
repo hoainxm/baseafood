@@ -102,7 +102,7 @@ export function buildOrdersTour(ctx: OrdersTourContext): PageTour {
         "• Đã xuất: lệnh xuất đã lấy đủ kg cần cho mọi dòng; đơn đóng, không lập lệnh xuất nữa.\n" +
         "Chọn Xem để mở chi tiết đơn" +
         (can.delete ? "; Bỏ để xóa đơn (có hỏi lại và Hoàn tác)." : ".") +
-        " Ô tìm lọc theo tên khách; ô vuông đầu dòng dùng để chọn dòng rồi tô màu.",
+        " Phía trên bảng: lọc Trạng thái (kèm số đơn), Khách hàng và ô Tra khách, mặt hàng, quy cách, ghi chú; ba thẻ số tính theo phần đang lọc. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu.",
     }),
   );
 

@@ -39,6 +39,8 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  NoMatchState,
+  SearchField,
   TableSkeleton,
   ErrorSummary,
   Field,
@@ -65,6 +67,7 @@ import { ImportSlipOcr } from "./ImportSlipOcr";
 import { hasOcr, type OcrCatalog, type OcrResult } from "@/lib/ocr";
 import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { matchesSearch } from "@/lib/recordFilters";
 import {
   CalendarRange,
   Camera,
@@ -154,6 +157,8 @@ export default function MaterialImportScreen() {
   const [workshop, setWorkshop] = useState<Workshop | "Tất cả">("Đông");
   const [supplierFilter, setSupplierFilter] = useState("");
   const [materialTypeFilter, setMaterialTypeFilter] = useState("");
+  /** Ô tra của Sổ chuyến (ba-spec 53 đợt 1): biển số, tài xế, đại lý, loại NL, mã lô, ghi chú. Chỉ áp ở chế độ Sổ. */
+  const [query, setQuery] = useState("");
   const [priceFilter, setPriceFilter] = useState<"all" | "unpriced">("all");
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const [isTypeChangeOpen, setIsTypeChangeOpen] = useState(false);
@@ -242,6 +247,7 @@ export default function MaterialImportScreen() {
   /** Kỳ chỉ gồm đúng một ngày ⇒ mới có nghĩa để chốt / phế liệu ngày. */
   const isSingleDay = effectiveFrom === effectiveTo;
 
+  const shipmentLot = new Map(shipments.map((c) => [c.id, c.lotCode ?? ""]));
   const view = useMemo(
     () =>
       rows
@@ -252,14 +258,18 @@ export default function MaterialImportScreen() {
           const matchesSupplier = !supplierFilter || r.supplierName === supplierFilter;
           const matchesType = !materialTypeFilter || r.materialTypeName === materialTypeFilter;
           const matchesPrice = priceFilter === "all" || r.unitPrice == null;
-          return matchesDate && matchesWorkshop && matchesSupplier && matchesType && matchesPrice;
+          const matchesQuery =
+            mode !== "ledger" ||
+            matchesSearch(query, r.licensePlate, r.driverName, r.supplierName, r.materialTypeName, r.note, shipmentLot.get(r.shipmentId));
+          return matchesDate && matchesWorkshop && matchesSupplier && matchesType && matchesPrice && matchesQuery;
         })
         .sort(
           (a, b) =>
             a.deliveryDate.localeCompare(b.deliveryDate) ||
             a.id.localeCompare(b.id)
         ),
-    [rows, effectiveFrom, effectiveTo, workshop, supplierFilter, materialTypeFilter, priceFilter]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- shipmentLot dựng từ `shipments` cùng lần vẽ
+    [rows, effectiveFrom, effectiveTo, workshop, supplierFilter, materialTypeFilter, priceFilter, mode, query, shipments]
   );
 
   const groupedView = useMemo(() => groupShipments(view, shipments), [view, shipments]);
@@ -288,6 +298,14 @@ export default function MaterialImportScreen() {
   /** Số bộ lọc phụ đang bật (đại lý / loại NL / đơn giá) — hiện lên nút gom. */
   const extraFilterCount =
     (supplierFilter ? 1 : 0) + (materialTypeFilter ? 1 : 0) + (priceFilter !== "all" ? 1 : 0);
+  /** Có lọc nào làm sổ thiếu dòng so với cả kỳ + xưởng (để báo "không khớp" thay vì "kỳ trống"). */
+  const hasNarrowingFilter = extraFilterCount > 0 || (mode === "ledger" && query.trim() !== "");
+  const clearLedgerFilters = () => {
+    setSupplierFilter("");
+    setMaterialTypeFilter("");
+    setPriceFilter("all");
+    setQuery("");
+  };
 
   /* ---- Chốt ngày ---- */
 
@@ -1885,6 +1903,8 @@ export default function MaterialImportScreen() {
             className="min-w-[220px] flex-1"
           />
 
+          <SearchField label="Tra biển số, tài xế, đại lý, loại NL, mã lô" value={query} onChange={setQuery} />
+
           <Button
             title="Mở thêm bộ lọc theo đại lý · loại nguyên liệu · đã có giá hay chưa."
             variant="outline"
@@ -1950,9 +1970,7 @@ export default function MaterialImportScreen() {
                   title="Xóa hết bộ lọc đang đặt, về lại danh sách đầy đủ của xưởng Đông."
                   variant="outline"
                   onClick={() => {
-                    setSupplierFilter("");
-                    setMaterialTypeFilter("");
-                    setPriceFilter("all");
+                    clearLedgerFilters();
                     setWorkshop("Đông");
                   }}
                 >
@@ -1968,6 +1986,8 @@ export default function MaterialImportScreen() {
       {/* Sổ: mỗi chuyến một cụm, đúng như sổ giấy đánh STT theo đại lý */}
       {isLoading ? (
         <TableSkeleton />
+      ) : groupedView.length === 0 && hasNarrowingFilter ? (
+        <NoMatchState onClearAll={clearLedgerFilters} />
       ) : groupedView.length === 0 ? (
         <EmptyState
           icon={Truck}

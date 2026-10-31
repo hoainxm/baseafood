@@ -48,13 +48,14 @@ export function buildWarehouseNxtTour(ctx: WarehouseNxtTourContext): PageTour {
       id: "filters",
       target: "nxt-warehouse-filters",
       optional: true,
-      title: "Kho, kỳ và kho lưu",
+      title: "Kho, kỳ, kho lưu và bộ lọc",
       body:
         "• Kho / chi nhánh: kho theo báo cáo của xí nghiệp (VD KHO TP - KHO 1000).\n" +
         "• Kỳ báo cáo: các kỳ đã nạp hoặc đã tạo của kho đó, kỳ mới nhất đứng đầu.\n" +
         "• Kho lưu: Tất cả kho lưu hoặc chỉ một kho (" +
         Object.values(STORAGE_KIND_LABELS).join(" hoặc ") +
         "). Lọc kho lưu chỉ để xem, không đổi số của kỳ.\n" +
+        "• Ô Tra mã, tên hàng và Dòng (Tất cả mã · Có phát sinh / còn tồn): thu hẹp bảng; tổng cộng tính theo dòng đang hiện. Bỏ hết bộ lọc để về đủ mã của kỳ.\n" +
         "Chưa nạp file nào thì ba ô này chưa hiện và trang báo Chưa có số liệu Xuất–Nhập–Tồn.",
     },
     {

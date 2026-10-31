@@ -49,7 +49,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export const PAGE_GUIDES: Record<string, PageGuide> = {
+const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
   // Trang viết hộp riêng ở ./guides (quy tắc 18 — ba-spec 43 v4 R14).
   wip: wipGuide,
   packaging: packagingGuide,
@@ -741,3 +741,56 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     ),
   },
 };
+
+/**
+ * Bộ lọc của từng trang (ba-spec 53 R12) — mỗi hộp "?" nói lọc được theo gì, tổng tính theo bộ lọc,
+ * cách bỏ lọc. Ghép vào cuối nội dung hộp để không phải sửa từng hộp viết tay.
+ */
+const FILTER_NOTES: Record<string, string> = {
+  sales: "Sổ bán: Khách hàng · Kênh bán · ô Tra khách, mặt hàng, quy cách, ghi chú. Báo cáo: Khách hàng · Kênh bán.",
+  orders: "Trạng thái (Đang gom · Đủ · Đã xuất, kèm số đơn) · Khách hàng · ô Tra khách, mặt hàng, quy cách, ghi chú.",
+  wip: "Sổ: Nhập kho (Chờ nhập kho · Đã nhập kho — chọn thẻ Chờ nhập kho cũng lọc được) · Khách hàng · ô Tra thành phẩm, khách, quy cách, người ghi. Báo cáo ngày gửi lên và bột tẩm vẫn tính cả kỳ.",
+  packaging: "Kho thành phẩm (khi có từ hai kho) · ô Tra mặt hàng, quy cách, kho, ghi chú.",
+  nxt: "Ô Tra mã, tên hàng, quy cách. Xuất Excel vẫn xuất đủ mọi mặt hàng của kỳ.",
+  "nxt-warehouse": "Kho lưu · ô Tra mã, tên hàng · Dòng (Tất cả mã · Có phát sinh / còn tồn).",
+  imports: "Sổ chi tiết: ô Tra biển số, tài xế, đại lý, loại NL, mã lô + Bộ lọc thêm (Đại lý · Loại NL · Trạng thái giá). Tổng hợp kỳ: Đại lý · Loại NL (phế liệu vẫn theo cả kỳ).",
+  "planning-import": "Lô nhập: Đối tác · Trạng thái lần nhập (kèm số lô) · ô Tra số chứng từ ở mọi tháng.",
+  "planning-export": "Hợp đồng: Trạng thái · Khách hàng · ô Tra hợp đồng (số HĐ · số PO · tên khách).",
+  "export-report": "Khách hàng · Trạng thái đơn (kèm số đơn) · ô Tra mặt hàng, quy cách, khách. Xuất Excel theo phần đang lọc.",
+  "my-tasks": "Lọc theo hạn · ô Tra việc, người giao, người nhận.",
+  "monthly-stock": "Kho · Nhóm hàng · ô Tra tên, size, invoice, kho, vị trí.",
+  catalog: "Mặt hàng: Nhóm loài · Kiểu chế biến. Khách hàng: Thị trường. Loại nguyên liệu: Nhóm. NCC nhập khẩu: Trạng thái · Nước. Ô lọc chỉ hiện khi danh mục có từ hai nhóm.",
+};
+
+function FilterNote({ text }: { text: string }) {
+  return (
+    <Section title="Bộ lọc">
+      <Y>
+        <li>{text}</li>
+        <li>
+          Đang lọc thì thẻ số và tổng tính theo dòng đang hiện (ghi <b>theo bộ lọc</b>). Ô tra không cần gõ dấu.
+        </li>
+        <li>
+          <b>Bỏ hết bộ lọc</b> để về sổ đầy đủ của kỳ; lọc ra không dòng nào thì trang báo <b>Không có dòng nào khớp bộ lọc</b>. Bộ lọc không lưu, rời trang là về mặc định.
+        </li>
+      </Y>
+    </Section>
+  );
+}
+
+export const PAGE_GUIDES: Record<string, PageGuide> = Object.fromEntries(
+  Object.entries(BASE_PAGE_GUIDES).map(([key, g]) => [
+    key,
+    FILTER_NOTES[key]
+      ? {
+          ...g,
+          content: (
+            <>
+              {g.content}
+              <FilterNote text={FILTER_NOTES[key]} />
+            </>
+          ),
+        }
+      : g,
+  ]),
+);

@@ -223,6 +223,7 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
       title: "Tổng hợp theo kỳ",
       body:
         "Báo cáo → Tổng hợp theo kỳ: chọn Kỳ báo cáo (Ngày, Tuần, Tháng, Năm, Khoảng tự chọn) và Phân xưởng (hoặc Tất cả xưởng).\n" +
+        "Lọc thêm theo Đại lý và Loại nguyên liệu: áp cho bảng hàng mua và thẻ số (ghi \"theo bộ lọc\"); phế liệu vẫn theo cả kỳ. Bỏ hết bộ lọc để về cả kỳ.\n" +
         "Báo cáo chỉ để xem, không sửa số. Xuất Excel (khi được cấp quyền) tải đúng bảng đang xem, gồm hàng mua và phế liệu.",
     }),
     report({
@@ -243,6 +244,7 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
         "Báo cáo → Sổ chi tiết các chuyến để tra từng chuyến đã ghi. Năm thẻ phía trên tính theo bộ lọc: Đang xem · Phân xưởng · Số chuyến · Số dòng · Tổng nhập.\n" +
         "• Kỳ xem sổ: Ngày, Tuần, Tháng, Năm hoặc Khoảng tự chọn; ngày lấy theo Ngày hàng về xưởng. Phân xưởng chọn Tất cả để xem cả ba xưởng.\n" +
         "• Bộ lọc thêm: Đại lý, Loại nguyên liệu, Trạng thái giá (Tất cả · Chưa có giá — khi được xem giá). Số trong ngoặc là số bộ lọc đang đặt; Bỏ hết bộ lọc để về đủ sổ.\n" +
+        "• Ô Tra biển số, tài xế, đại lý, loại NL, mã lô: gõ một phần (không cần dấu) để tìm chuyến. Lọc ra không chuyến nào thì trang báo Không có dòng nào khớp bộ lọc.\n" +
         "Chọn Chưa có giá để gom các dòng còn chờ hóa đơn mà đòi giá.",
     }),
     ledger({

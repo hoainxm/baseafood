@@ -36,6 +36,9 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  FilterBar,
+  NoMatchState,
+  SearchField,
   ErrorSummary,
   Field,
   Input,
@@ -52,6 +55,7 @@ import {
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { PERIOD_OPTIONS, getViewPeriodRange, startOfMonth, type ViewPeriod } from "@/lib/periodUtils";
+import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
 import { num, formatDateVN } from "@/lib/format";
 import { uid } from "@/lib/db";
 import {
@@ -133,7 +137,7 @@ export default function NxtReportScreen() {
 
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
-  const rows = useMemo(
+  const allRows = useMemo(
     () =>
       computeFinishedGoodNxt({
         wips,
@@ -148,6 +152,10 @@ export default function NxtReportScreen() {
       }),
     [wips, exportOrders, exportItems, salesItems, packagings, opening, products, fromDate, toDate]
   );
+  // Ô tra (ba-spec 53 đợt 1): bảng + thẻ số theo dòng đang hiện; Xuất Excel vẫn xuất đủ kỳ.
+  const [query, setQuery] = useState("");
+  const filterCount = activeFilterCount([query]);
+  const rows = useMemo(() => allRows.filter((r) => matchesSearch(query, r.productName, r.productCode, r.spec)), [allRows, query]);
   const total = useMemo(() => sumFinishedGoodNxt(rows), [rows]);
 
   const cards: StatCardData[] = [
@@ -230,11 +238,11 @@ export default function NxtReportScreen() {
 
   // ----- Xuất Excel (mẫu 10 cột) -----
   const exportExcel = () => {
-    if (!rows.length) {
+    if (!allRows.length) {
       notify.warning("Không có số liệu để xuất");
       return;
     }
-    const items: NxtExcelRow[] = rows.map((r) => ({
+    const items: NxtExcelRow[] = allRows.map((r) => ({
       code: r.productCode || r.productId,
       name: `${r.productName}${r.spec ? ` (${r.spec})` : ""}`,
       category: inferCategory(r.productCode, r.productName),
@@ -347,7 +355,7 @@ export default function NxtReportScreen() {
           {allowed.export && (
             <Button
               data-tour="nxt-export"
-              title="Tải báo cáo đang xem ra file Excel." onClick={exportExcel} disabled={!rows.length}>
+              title="Tải báo cáo của kỳ đang xem ra file Excel (đủ mọi mặt hàng, không theo ô tra)." onClick={exportExcel} disabled={!allRows.length}>
               <Download className="mr-2 h-4 w-4" />
               Xuất Excel
             </Button>
@@ -355,7 +363,12 @@ export default function NxtReportScreen() {
         </div>
       </div>
 
-      <div data-tour="nxt-period" className="flex flex-wrap items-end gap-4">
+      <FilterBar
+        data-tour="nxt-period"
+        activeCount={filterCount}
+        onClearAll={() => setQuery("")}
+        resultText={`Đang hiện ${rows.length.toLocaleString("vi-VN")} / ${allRows.length.toLocaleString("vi-VN")} mặt hàng`}
+      >
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -389,7 +402,8 @@ export default function NxtReportScreen() {
             />
           )}
         </div>
-      </div>
+        <SearchField label="Tra mã, tên hàng, quy cách" value={query} onChange={setQuery} />
+      </FilterBar>
 
       <div data-tour="nxt-stats">
         <StatCardGrid cards={cards} />
@@ -405,7 +419,9 @@ export default function NxtReportScreen() {
         </div>
       )}
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && allRows.length > 0 ? (
+        <NoMatchState onClearAll={() => setQuery("")} />
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={Snowflake}
           title="Chưa có số liệu thành phẩm trong khoảng ngày này"

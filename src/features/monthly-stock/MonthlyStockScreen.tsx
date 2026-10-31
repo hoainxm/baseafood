@@ -56,6 +56,7 @@ import {
   type CatalogTarget,
   type CatalogSyncItem,
 } from "@/lib/monthlyStock";
+import { ALL, activeFilterCount, matchesSearch, matchesValue } from "@/lib/recordFilters";
 import {
   HorizontalScroll,
   SummaryTable,
@@ -71,6 +72,8 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  FilterBar,
+  SearchField,
   ErrorSummary,
   Field,
   Input,
@@ -208,6 +211,7 @@ export default function MonthlyStockScreen() {
   const [warehouse, setWarehouse] = useState(ALL_WAREHOUSES);
   const [moIn, setMoIn] = useState(false);
   const [searchQuery, setSearchQuery] = useState(""); // tìm nhanh trong tháng (tên · size · xuất xứ · nhóm)
+  const [categoryFilter, setCategoryFilter] = useState(ALL); // nhóm hàng (ba-spec 53 đợt 3)
   const [selected, setSelected] = useState<Set<string>>(new Set()); // dòng đang tick (cộng tổng / thao tác lô)
   const [viewedCard, setViewedCard] = useState<MonthlyStockRow | null>(null); // thẻ kho của 1 mặt hàng
   const [hideEmptyRows, setHideEmptyRows] = useState(false); // ẩn dòng tồn đầu = nhập = xuất = 0
@@ -282,13 +286,25 @@ export default function MonthlyStockScreen() {
 
   /** Ô tìm nhanh: tên · size · invoice · nhóm · kho · vị trí (không phân biệt hoa thường) + ẩn dòng trống. */
   const monthRows: MonthlyStockRow[] = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
     const source = hideEmptyRows ? sourceRows.filter((r) => !isEmptyLine(r)) : sourceRows;
-    if (!q) return source;
-    return source.filter((r) =>
-      `${r.itemName} ${r.size} ${r.origin} ${r.category} ${r.warehouse} ${r.storageLocation}`.toLowerCase().includes(q)
+    return source.filter(
+      (r) =>
+        matchesValue(categoryFilter, r.category || "(Chưa phân nhóm)") &&
+        matchesSearch(searchQuery, r.itemName, r.size, r.origin, r.category, r.warehouse, r.storageLocation)
     );
-  }, [sourceRows, searchQuery, hideEmptyRows]);
+  }, [sourceRows, searchQuery, hideEmptyRows, categoryFilter]);
+  const categoryChoices = useMemo(
+    () => [
+      { value: ALL, label: "Tất cả nhóm" },
+      ...[...new Set(sourceRows.map((r) => r.category || "(Chưa phân nhóm)"))].sort((a, b) => a.localeCompare(b, "vi")).map((c) => ({ value: c, label: c })),
+    ],
+    [sourceRows]
+  );
+  const filterCount = activeFilterCount([searchQuery, categoryFilter]);
+  const clearFilters = () => {
+    setSearchQuery("");
+    setCategoryFilter(ALL);
+  };
 
   /* Loài của tên hàng (danh mục trước, rồi đoán từ tên) — chia bảng theo loài, cá trên bạch tuộc dưới. */
   const speciesOf = useMemo(() => buildSpeciesLookup(mtypes, products), [mtypes, products]);
@@ -472,7 +488,8 @@ export default function MonthlyStockScreen() {
     notifyCarried(carriedCount);
     notify.saved(`Đã thêm dòng ${t} vào ${category} — gõ số ngay trên bảng`);
     /* Dòng mới đang ẩn vì ô tìm / ẩn dòng trống ⇒ bỏ lọc để thấy nó. */
-    if (searchQuery.trim() && !`${t} ${category}`.toLowerCase().includes(searchQuery.trim().toLowerCase())) setSearchQuery("");
+    if (!matchesSearch(searchQuery, t, category)) setSearchQuery("");
+    if (!matchesValue(categoryFilter, category || "(Chưa phân nhóm)")) setCategoryFilter(ALL);
     if (hideEmptyRows) setHideEmptyRows(false);
     setTimeout(() => {
       const o = document.querySelector<HTMLInputElement>(
@@ -1570,8 +1587,13 @@ export default function MonthlyStockScreen() {
         </div>
       </div>
 
-      {/* Bộ lọc: tháng + kho */}
-      <div data-tour="monthly-stock-filters" className="flex flex-wrap items-end gap-3">
+      {/* Bộ lọc: tháng + kho + nhóm hàng + ô tra (ba-spec 53) */}
+      <FilterBar
+        data-tour="monthly-stock-filters"
+        activeCount={filterCount}
+        onClearAll={clearFilters}
+        resultText={`Đang hiện ${monthRows.length.toLocaleString("vi-VN")} mặt hàng`}
+      >
         <div className="flex w-full items-end gap-1 sm:w-auto">
           <Button
             title="Lùi về tháng liền trước."
@@ -1615,16 +1637,10 @@ export default function MonthlyStockScreen() {
             options={warehouseOpts}
           />
         </div>
-        <div className="min-w-0 flex-1 sm:min-w-[16rem] sm:flex-none">
-          <Field label="Tìm mặt hàng">
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Gõ tên · size · invoice · vị trí"
-              aria-label="Tìm mặt hàng trong tháng"
-            />
-          </Field>
+        <div className="min-w-0 flex-1 sm:min-w-[14rem] sm:flex-none">
+          <Combobox label="Nhóm hàng" hideRequiredMark clearable={false} value={categoryFilter} onChange={(v) => setCategoryFilter(v || ALL)} options={categoryChoices} />
         </div>
+        <SearchField label="Tra tên, size, invoice, kho, vị trí" value={searchQuery} onChange={setSearchQuery} className="sm:min-w-[16rem]" />
         <div className="flex flex-wrap items-center gap-3">
           {hasData && !isPreview && canEdit && (
             <>
@@ -1690,7 +1706,7 @@ export default function MonthlyStockScreen() {
             </Button>
           )}
         </div>
-      </div>
+      </FilterBar>
 
       {!hasData ? (
         <div data-tour="monthly-stock-month-open">
@@ -1787,11 +1803,11 @@ export default function MonthlyStockScreen() {
 
           {noSearchMatch && (
             <p className="rounded-lg border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              {searchQuery.trim()
-                ? `Không có mặt hàng nào khớp "${searchQuery}" trong ${formatMonthLabel(month)}.`
+              {filterCount
+                ? `Không có dòng nào khớp bộ lọc trong ${formatMonthLabel(month)}.`
                 : `Mọi dòng của ${formatMonthLabel(month)} đều không có số liệu và đang bị ẩn.`}{" "}
               <button
-                title="Xóa ô tìm và hiện lại dòng trống để thấy toàn bộ mặt hàng của tháng." type="button" className="underline" onClick={() => { setSearchQuery(""); setHideEmptyRows(false); }}>
+                title="Bỏ hết bộ lọc và hiện lại dòng trống để thấy toàn bộ mặt hàng của tháng." type="button" className="underline" onClick={() => { clearFilters(); setHideEmptyRows(false); }}>
                 Hiện tất cả
               </button>
             </p>

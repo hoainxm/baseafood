@@ -21,6 +21,10 @@ import {
   DateField,
   DateRangeField,
   EmptyState,
+  FilterBar,
+  NoMatchState,
+  SearchField,
+  ChoiceGroup,
   PrintSheet,
   TableSkeleton,
   Table,
@@ -43,6 +47,7 @@ import {
   type SortColumnSpec,
 } from "@/design-system";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { ALL, activeFilterCount, countedLabel, matchesSearch, statusOptions } from "@/lib/recordFilters";
 import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { useCan } from "@/features/shared/PermissionProvider";
@@ -116,6 +121,9 @@ export default function OrderExportReport() {
   const [customFrom, setCustomFrom] = useState(todayIso());
   const [customTo, setCustomTo] = useState(todayIso());
   const [customerFilter, setCustomerFilter] = useState("Tất cả");
+  // Bộ lọc thêm (ba-spec 53 đợt 2): trạng thái đơn · ô tra mặt hàng — bảng + tổng theo dòng đang hiện.
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const [query, setQuery] = useState("");
   const [inPrint, setInPrint] = useState(false);
   const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
   // Mỗi dòng là một dòng lệnh xuất (id bản ghi) ⇒ dấu "đã dò" khỏi ghép kỳ.
@@ -127,7 +135,7 @@ export default function OrderExportReport() {
     ...customers.map((k) => ({ value: k.id, label: k.name, subLabel: k.market || undefined })),
   ];
 
-  const { groups: group, totalKg, totalBlocks } = useMemo(() => {
+  const { groups: periodGroups } = useMemo(() => {
     const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
     const tenKH = (id: string) => customers.find((k) => k.id === id)?.name || "(đơn đã xóa)";
     const orderById = (id: string) => don.find((d) => d.id === id);
@@ -189,6 +197,25 @@ export default function OrderExportReport() {
       totalBlocks: groups.reduce((s, g) => s + g.totalBlocks, 0),
     };
   }, [exportOrders, exportItems, don, orderItems, customers, products, fromDate, toDate, customerFilter]);
+  const filterCount = activeFilterCount([customerFilter === "Tất cả" ? "" : customerFilter, statusFilter, query]);
+  const clearFilters = () => {
+    setCustomerFilter("Tất cả");
+    setStatusFilter(ALL);
+    setQuery("");
+  };
+  const statusChoices = statusOptions(periodGroups, (g) => g.status, (Object.keys(STATUS_LABELS) as SalesOrderStatus[]).map((v) => ({ value: v, label: STATUS_LABELS[v] })), "Tất cả đơn");
+  const { group, totalKg, totalBlocks } = useMemo(() => {
+    const groups = periodGroups
+      .filter((g) => statusFilter === ALL || g.status === statusFilter)
+      .map((g) => {
+        const lines = g.lines.filter((l) => matchesSearch(query, l.productName, l.spec, g.customerName));
+        return lines.length === g.lines.length
+          ? g
+          : { ...g, lines, totalKg: lines.reduce((t, l) => t + l.quantityKg, 0), totalBlocks: lines.reduce((t, l) => t + l.blocksCount, 0) };
+      })
+      .filter((g) => g.lines.length > 0);
+    return { group: groups, totalKg: groups.reduce((t, g) => t + g.totalKg, 0), totalBlocks: groups.reduce((t, g) => t + g.totalBlocks, 0) };
+  }, [periodGroups, statusFilter, query]);
   const lineSort = useTableSort(
     useMemo(() => group.flatMap((g) => g.lines), [group]),
     (l) => l.id,
@@ -209,9 +236,9 @@ export default function OrderExportReport() {
 
   const cards: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
-    { label: "Tổng xuất", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Tổng block", value: num(totalBlocks), numeric: true, icon: Layers, color: "neutral" },
-    { label: "Số đơn được xuất", value: num(group.length), numeric: true, icon: PackageCheck, color: "success" },
+    { label: filterCount ? "Tổng xuất · theo bộ lọc" : "Tổng xuất", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: filterCount ? "Tổng block · theo bộ lọc" : "Tổng block", value: num(totalBlocks), numeric: true, icon: Layers, color: "neutral" },
+    { label: filterCount ? "Số đơn · theo bộ lọc" : "Số đơn được xuất", value: num(group.length), numeric: true, icon: PackageCheck, color: "success" },
   ];
 
   const exportExcel = () => {
@@ -261,7 +288,12 @@ export default function OrderExportReport() {
         )}
       </div>
 
-      <div data-tour="export-report-filters" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <FilterBar
+        data-tour="export-report-filters"
+        activeCount={filterCount}
+        onClearAll={clearFilters}
+        resultText={`Đang hiện ${group.length.toLocaleString("vi-VN")} / ${periodGroups.length.toLocaleString("vi-VN")} đơn có xuất trong kỳ`}
+      >
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -305,7 +337,16 @@ export default function OrderExportReport() {
             options={customerOptions}
           />
         </div>
-      </div>
+        <ChoiceGroup
+          label="Trạng thái đơn"
+          hideRequiredMark
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={statusChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
+          columns={4}
+        />
+        <SearchField label="Tra mặt hàng, quy cách, khách" value={query} onChange={setQuery} />
+      </FilterBar>
 
       <div data-tour="export-report-stats">
         <StatCardGrid cards={cards} />
@@ -313,6 +354,8 @@ export default function OrderExportReport() {
 
       {isLoading ? (
         <TableSkeleton />
+      ) : group.length === 0 && periodGroups.length > 0 ? (
+        <NoMatchState onClearAll={clearFilters} />
       ) : group.length === 0 ? (
         <EmptyState
           icon={PackageCheck}

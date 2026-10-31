@@ -7,7 +7,9 @@ import { useMemo, useState } from "react";
 import {
   SummaryTable,
   BarChart,
+  ChoiceGroup,
   Combobox,
+  FilterBar,
   DateField,
   DateRangeField,
   StatCardGrid,
@@ -20,7 +22,8 @@ import { useSalesItems, useSalesInvoices, useCustomers } from "@/lib/catalogRepo
 import { useCan } from "@/features/shared/PermissionProvider";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
-import { calculateSalesAmount, type SalesChannel } from "@/types";
+import { SALES_CHANNELS, calculateSalesAmount, type SalesChannel } from "@/types";
+import { ALL, activeFilterCount, matchesValue } from "@/lib/recordFilters";
 import { SALES_CHANNEL_UNITS, sumSalesAmountByChannel } from "@/lib/salesTotals";
 import { CalendarRange, Coins, Scale, Users } from "lucide-react";
 
@@ -52,6 +55,16 @@ export default function SalesReport() {
   const [customFrom, setCustomFrom] = useState(todayIso());
   const [customTo, setCustomTo] = useState(todayIso());
   const [fromDate, toDate] = getViewPeriodRange(period, anchor, customFrom, customTo);
+  // Bộ lọc (ba-spec 53 đợt 3): khách · kênh — số, biểu đồ, bảng theo phần đang lọc.
+  const [customerFilter, setCustomerFilter] = useState(ALL);
+  const [channelFilter, setChannelFilter] = useState(ALL);
+  const filterCount = activeFilterCount([customerFilter, channelFilter]);
+  const passes = (inv: { customerId: string; channel: string }) => matchesValue(customerFilter, inv.customerId) && matchesValue(channelFilter, inv.channel);
+  const customerChoices = useMemo(() => {
+    const invById = new Map(invoices.map((i) => [i.id, i]));
+    const ids = new Set(items.filter((it) => it.deliveryDate >= fromDate && it.deliveryDate <= toDate).map((it) => invById.get(it.invoiceId)?.customerId ?? ""));
+    return [{ value: ALL, label: "Tất cả khách" }, ...[...ids].filter(Boolean).map((id) => ({ value: id, label: customers.find((c) => c.id === id)?.name || id })).sort((a, b) => a.label.localeCompare(b.label, "vi"))];
+  }, [items, invoices, customers, fromDate, toDate]);
 
   const { rows: row, chart, customerCount, totalKg } = useMemo(() => {
     const invById = new Map(invoices.map((i) => [i.id, i]));
@@ -62,7 +75,7 @@ export default function SalesReport() {
     for (const it of items) {
       if (it.deliveryDate < fromDate || it.deliveryDate > toDate) continue;
       const inv = invById.get(it.invoiceId);
-      if (!inv) continue;
+      if (!inv || !passes(inv)) continue;
       const kh = tenKH.get(inv.customerId) || "(chưa có khách)";
       const k = `${inv.customerId}|||${inv.channel}`;
       let d = map.get(k);
@@ -89,21 +102,27 @@ export default function SalesReport() {
       customerCount: theoKH.size,
       totalKg: rows.reduce((s, d) => s + d.quantityKg, 0),
     };
-  }, [items, invoices, customers, fromDate, toDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- passes đọc 2 ô lọc ở deps
+  }, [items, invoices, customers, fromDate, toDate, customerFilter, channelFilter]);
 
   // Giá trị theo kênh — USD và VND không cộng chung (33 §4); chỉ kênh có dòng trong kỳ.
   const valueCards = useMemo(() => {
     if (!canViewPrice) return [];
-    const inPeriod = items.filter((it) => it.deliveryDate >= fromDate && it.deliveryDate <= toDate);
+    const invById = new Map(invoices.map((i) => [i.id, i]));
+    const inPeriod = items.filter((it) => {
+      const inv = invById.get(it.invoiceId);
+      return it.deliveryDate >= fromDate && it.deliveryDate <= toDate && !!inv && passes(inv);
+    });
     return sumSalesAmountByChannel(inPeriod, invoices)
       .byChannel.filter((c) => c.lineCount > 0)
       .map((c): StatCardData => ({ label: `Giá trị ${c.channel}`, value: `${num(c.amount)} ${c.unit}`, numeric: true, icon: Coins, color: "success" }));
-  }, [canViewPrice, items, invoices, fromDate, toDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- passes đọc 2 ô lọc ở deps
+  }, [canViewPrice, items, invoices, fromDate, toDate, customerFilter, channelFilter]);
 
   const cards: StatCardData[] = [
     { label: "Kỳ báo cáo", value: `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`, icon: CalendarRange, color: "neutral" },
-    { label: "Tổng bán", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
-    { label: "Số khách", value: num(customerCount), numeric: true, icon: Users, color: "neutral" },
+    { label: filterCount ? "Tổng bán · theo bộ lọc" : "Tổng bán", value: `${num(totalKg)} kg`, numeric: true, icon: Scale, color: "brand" },
+    { label: filterCount ? "Số khách · theo bộ lọc" : "Số khách", value: num(customerCount), numeric: true, icon: Users, color: "neutral" },
     ...valueCards,
   ];
 
@@ -132,7 +151,14 @@ export default function SalesReport() {
 
   return (
     <div className="space-y-6">
-      <div data-tour="sales-report-filters" className="flex flex-wrap items-end gap-4">
+      <FilterBar
+        data-tour="sales-report-filters"
+        activeCount={filterCount}
+        onClearAll={() => {
+          setCustomerFilter(ALL);
+          setChannelFilter(ALL);
+        }}
+      >
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -166,7 +192,18 @@ export default function SalesReport() {
             />
           )}
         </div>
-      </div>
+        <div className="min-w-[14rem] flex-1">
+          <Combobox label="Khách hàng" hideRequiredMark clearable={false} value={customerFilter} onChange={(v) => setCustomerFilter(v || ALL)} options={customerChoices} />
+        </div>
+        <ChoiceGroup
+          label="Kênh bán"
+          hideRequiredMark
+          value={channelFilter}
+          onChange={setChannelFilter}
+          options={[{ value: ALL, label: "Tất cả" }, ...SALES_CHANNELS.map((k) => ({ value: k, label: k }))]}
+          columns={3}
+        />
+      </FilterBar>
 
       <div data-tour="sales-report-stats">
         <StatCardGrid cards={cards} />
@@ -186,8 +223,8 @@ export default function SalesReport() {
         rows={row}
         columns={columns}
         getKey={(r) => `${r.customerName}|||${r.channel}`}
-        rowMarkKey={`sales-report|${fromDate}|${toDate}`}
-        emptyText="Không có phiếu bán trong kỳ này."
+        rowMarkKey={`sales-report|${fromDate}|${toDate}${filterCount ? `|${customerFilter}|${channelFilter}` : ""}`}
+        emptyText={filterCount ? "Không có dòng nào khớp bộ lọc." : "Không có phiếu bán trong kỳ này."}
       />
       </div>
     </div>

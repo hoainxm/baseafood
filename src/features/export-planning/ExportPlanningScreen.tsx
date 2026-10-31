@@ -39,8 +39,14 @@ import {
   cancelContract,
   contractTotals,
   effectiveRevision,
+  isBlankShipment,
   isShipmentClosed,
   missingDocumentItems,
+  buildSchedule,
+  scheduleFor,
+  scheduleGate,
+  shipmentsFromSchedule,
+  type ScheduleRow,
   nextRevisionNo,
   openShipmentsOf,
   shipmentMonth,
@@ -74,9 +80,11 @@ import {
 import { ShipmentPanel } from "./ShipmentPanel";
 import {
   LoadingUploadDialog,
+  ScheduleDialog,
   ShipmentFormDialog,
   StepItemDialog,
   type LoadingUploadTarget,
+  type ScheduleTarget,
   type ShipmentTarget,
   type StepItemTarget,
   type InvoiceNameExtract,
@@ -163,6 +171,7 @@ export default function ExportPlanningScreen() {
   const [attachTarget, setAttachTarget] = useState<AttachmentTarget | null>(null);
   const [extensionTarget, setExtensionTarget] = useState<ExtensionTarget | null>(null);
   const [shipmentTarget, setShipmentTarget] = useState<ShipmentTarget | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<ScheduleTarget | null>(null);
   const [itemTarget, setItemTarget] = useState<StepItemTarget | null>(null);
   const [loadingTarget, setLoadingTarget] = useState<LoadingUploadTarget | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null);
@@ -266,8 +275,64 @@ export default function ExportPlanningScreen() {
       }),
     );
     setContractForm(null);
-    if (p.mode === "create") setParam({ contract: p.contract.id, shipment: "" });
+    if (p.mode === "create") {
+      setParam({ contract: p.contract.id, shipment: "" });
+      // NV19: HĐ mới ⇒ hỏi tạo lịch xuất hàng đi kèm (R39 dựng theo bản vừa lưu — `d` chưa kịp có HĐ này).
+      if (can.create) {
+        const t = p.revision.terms;
+        const totalKg = contractTotals(p.revision.lines).kg;
+        setScheduleTarget({
+          contractId: p.contract.id,
+          contractNo: p.contract.contractNo,
+          rows: buildSchedule({ signedOn: p.contract.signedOn, latestShipmentDate: t.latestShipmentDate, containerCount: t.containerCount, totalKg, today }),
+          totalKg,
+          containerCount: t.containerCount,
+          deadline: t.latestShipmentDate,
+          afterCreate: true,
+        });
+      }
+    }
     return true;
+  };
+
+  /** NV19: ghi lịch xuất hàng = N chuyến còn trống + mục chứng từ bước 5 theo bản hiệu lực (R6). Không cần đủ hồ sơ (R40). */
+  const saveSchedule = (contractId: string, rows: ScheduleRow[]): boolean => {
+    const gate = scheduleGate(d, contractId);
+    if (!gate.ok) {
+      notify.error(gate.reason === "has-shipments" ? "Hợp đồng đã có chuyến — ghi thêm chuyến ở hồ sơ hợp đồng." : "Hợp đồng đã đóng / hủy hoặc chưa có bản hiệu lực — chưa tạo lịch được.");
+      return false;
+    }
+    const terms = termsOf(d, contractId);
+    const created = shipmentsFromSchedule(rows, { contractId, kind: KIND_FROM_TEXT(terms.containerType), portOfDischarge: terms.portOfDischarge }, newId, new Date().toISOString());
+    const prevS = d.shipments;
+    const prevI = d.items;
+    if (!store.saveShipments([...prevS, ...created])) return false;
+    const add = created.flatMap((s) => missingDocumentItems(s.id, terms, prevI, newId));
+    if (add.length) store.saveItems([...prevI, ...add]);
+    const what = `Tạo lịch xuất hàng: ${created.length} chuyến (${[...new Set(created.map((s) => s.planMonth.split("-").reverse().join("/")))].join(", ")})`;
+    track(contractId, "", "create", what);
+    notify.saved(
+      `Đã tạo lịch xuất hàng: ${created.length} chuyến`,
+      undoTracked(contractId, "", what, () => {
+        store.saveShipments(prevS);
+        store.saveItems(prevI);
+      }),
+    );
+    setScheduleTarget(null);
+    return true;
+  };
+  const openSchedule = (c: ExportContract) => {
+    const rev = effectiveRevision(d, c.id);
+    const t = termsOf(d, c.id);
+    setScheduleTarget({
+      contractId: c.id,
+      contractNo: c.contractNo,
+      rows: scheduleFor(d, c.id, today),
+      totalKg: rev ? contractTotals(rev.lines).kg : 0,
+      containerCount: rev?.terms.containerCount ?? null,
+      deadline: t.latestShipmentDate,
+      afterCreate: false,
+    });
   };
 
   /** File thêm của một ô đính kèm (phụ lục, thư bổ sung) ⇒ Hồ sơ đính kèm cấp HĐ. Trả hàm lùi (null = ghi hụt). */
@@ -444,8 +509,14 @@ export default function ExportPlanningScreen() {
   };
 
   const doDeleteContract = (c: ExportContract) => {
-    const prev = { c: d.contracts, r: d.revisions, a: d.approvals, e: d.extensions, p: d.payments };
+    const prev = { c: d.contracts, r: d.revisions, a: d.approvals, e: d.extensions, p: d.payments, s: d.shipments, i: d.items };
+    // R41: xóa được thì mọi chuyến của HĐ đều còn trống (lịch chưa làm gì) ⇒ xóa luôn chuyến + mục của chúng.
+    const blankIds = new Set(prev.s.filter((x) => x.contractId === c.id && isBlankShipment(d, x)).map((x) => x.id));
     if (!store.saveContracts(prev.c.filter((x) => x.id !== c.id))) return;
+    if (blankIds.size) {
+      store.saveShipments(prev.s.filter((x) => !blankIds.has(x.id)));
+      store.saveItems(prev.i.filter((x) => !blankIds.has(x.shipmentId)));
+    }
     store.saveRevisions(prev.r.filter((x) => x.contractId !== c.id));
     store.saveApprovals(prev.a.filter((x) => x.contractId !== c.id));
     store.saveExtensions(prev.e.filter((x) => x.contractId !== c.id));
@@ -461,6 +532,10 @@ export default function ExportPlanningScreen() {
         store.saveApprovals(prev.a);
         store.saveExtensions(prev.e);
         store.savePayments(prev.p);
+        if (blankIds.size) {
+          store.saveShipments(prev.s);
+          store.saveItems(prev.i);
+        }
       }),
     );
   };
@@ -786,6 +861,7 @@ export default function ExportPlanningScreen() {
           }}
           onExtend={() => setExtensionTarget({ contractId: contract.id, contractNo: contract.contractNo, currentDeadline: termsOf(d, contract.id).latestShipmentDate })}
           onAddShipment={() => setShipmentTarget({ contractId: contract.id, contractNo: contract.contractNo, defaults: shipmentDefaults(contract) })}
+          onSchedule={() => openSchedule(contract)}
           onCancelContract={() =>
             setReasonTarget({
               title: `Hủy HĐ ${contract.contractNo}?`,
@@ -879,6 +955,7 @@ export default function ExportPlanningScreen() {
       <AttachmentDialog target={attachTarget} recordedBy={recordedBy} onClose={() => setAttachTarget(null)} onSave={saveAttachments} />
       <ExtensionDialog target={extensionTarget} recordedBy={recordedBy} onClose={() => setExtensionTarget(null)} onSave={saveExtension} />
       <ShipmentFormDialog target={shipmentTarget} onClose={() => setShipmentTarget(null)} onSave={saveShipment} />
+      <ScheduleDialog target={scheduleTarget} onClose={() => setScheduleTarget(null)} onSave={saveSchedule} />
       <StepItemDialog
         target={itemTarget}
         documentKindSource={store.documentKindSource}
@@ -917,7 +994,14 @@ export default function ExportPlanningScreen() {
         onOpenChange={(o) => !o && setDeletingContract(null)}
         title="Xóa hợp đồng này?"
         confirmLabel="Xóa hợp đồng"
-        recordDescription={deletingContract ? `HĐ ${deletingContract.contractNo} — ${customerName(deletingContract.customerId)}` : ""}
+        recordDescription={
+          deletingContract
+            ? `HĐ ${deletingContract.contractNo} — ${customerName(deletingContract.customerId)}${(() => {
+                const n = d.shipments.filter((x) => x.contractId === deletingContract.id).length;
+                return n ? ` · kèm ${n} chuyến dự kiến còn trống của lịch xuất hàng` : "";
+              })()}`
+            : ""
+        }
         onConfirm={() => {
           if (deletingContract) doDeleteContract(deletingContract);
           setDeletingContract(null);

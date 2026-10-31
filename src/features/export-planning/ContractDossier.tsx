@@ -27,6 +27,8 @@ import {
   finalReviewsOf,
   missingAttachmentKinds,
   requiredAttachmentKinds,
+  canEditContractDirectly,
+  scheduleGate,
   shipmentGate,
   shipmentGateText,
   approvalsOf,
@@ -60,6 +62,7 @@ import {
   ArrowLeft,
   Ban,
   CalendarClock,
+  CalendarPlus,
   CheckCircle2,
   ClipboardCheck,
   FilePen,
@@ -103,6 +106,7 @@ export function ContractDossier({
   onRevise,
   onExtend,
   onAddShipment,
+  onSchedule,
   onCancelContract,
   onAttach,
   onRemoveAttachment,
@@ -133,6 +137,8 @@ export function ContractDossier({
   onRevise: () => void;
   onExtend: () => void;
   onAddShipment: () => void;
+  /** Mở hộp tạo lịch xuất hàng (NV19) — HĐ còn mở, chưa có chuyến còn mở; không cần đủ hồ sơ (R40). */
+  onSchedule: () => void;
   onCancelContract: () => void;
   /** Mở hộp đính kèm hồ sơ cấp HĐ (bước Đính kèm). */
   onAttach: () => void;
@@ -249,6 +255,7 @@ export function ContractDossier({
   ];
 
   const gate = shipmentGate(data, contract.id, opts);
+  const schedule = scheduleGate(data, contract.id);
   const finalGate = finalReviewGate(data, contract.id, opts);
   const attachments = contractAttachments(data, contract.id);
   const missingKinds = missingAttachmentKinds(data, contract.id, opts);
@@ -293,10 +300,11 @@ export function ContractDossier({
           Đính kèm hồ sơ
         </Button>
       ));
-    // Chưa có chuyến nào dựa vào HĐ ⇒ sửa thẳng bản đang dùng (gõ nhầm lúc lập). Có chuyến rồi ⇒ ghi bản sửa để giữ dấu.
-    if (can.update && working && !shipments.length)
+    // Chưa có chuyến nào dựa vào HĐ (chuyến của lịch còn trống không tính — R41) ⇒ sửa thẳng bản đang dùng (gõ nhầm lúc lập).
+    // Có chuyến đã có thông tin rồi ⇒ ghi bản sửa để giữ dấu.
+    if (can.update && working && canEditContractDirectly(data, contract.id))
       menuBtn("edit", (
-        <Button variant="edit" className="w-full justify-start" onClick={onEditContract} title="Sửa thẳng bản hợp đồng đang dùng — được khi hợp đồng chưa có chuyến nào.">
+        <Button variant="edit" className="w-full justify-start" onClick={onEditContract} title="Sửa thẳng bản hợp đồng đang dùng — được khi hợp đồng chưa có chuyến nào đã ghi mã lô, booking, ngày, số cont hay file.">
           <Pencil className="mr-2 h-4 w-4" aria-hidden />
           Sửa hợp đồng
         </Button>
@@ -313,6 +321,13 @@ export function ContractDossier({
         <Button variant="ghost" className="w-full justify-start" onClick={onExtend} title="Ghi hạn giao mới khách đã xác nhận — không cần duyệt lại.">
           <CalendarClock className="mr-2 h-4 w-4" aria-hidden />
           Gia hạn giao hàng
+        </Button>
+      ));
+    if (can.create && schedule.ok)
+      menuBtn("schedule", (
+        <Button variant="ghost" className="w-full justify-start" onClick={onSchedule} title="Chia sẵn các chuyến dự kiến theo số cont và hạn giao để hiện trên lịch xuất hàng — chưa cần đủ hồ sơ.">
+          <CalendarPlus className="mr-2 h-4 w-4" aria-hidden />
+          Tạo lịch xuất hàng
         </Button>
       ));
     if (can.create && gate.ok && primary !== "ship")
@@ -493,7 +508,14 @@ export function ContractDossier({
           <p className="text-sm text-muted-foreground">
             Mỗi chuyến là một container: lệnh sản xuất, bao bì, đóng cont và bộ chứng từ ghi theo từng chuyến.
             {!gate.ok && gate.reason !== "not-open" ? ` Ghi chuyến được sau khi hợp đồng được duyệt và đính kèm đủ hồ sơ — ${shipmentGateText(gate)}` : ""}
+            {can.create && schedule.ok ? " Muốn thấy trước tháng nào xuất bao nhiêu cont thì tạo lịch xuất hàng — chưa cần đủ hồ sơ." : ""}
           </p>
+          {can.create && schedule.ok && (
+            <Button variant="outline" size="sm" onClick={onSchedule} title="Chia sẵn các chuyến dự kiến theo số cont và hạn giao để hiện trên lịch xuất hàng — chưa cần đủ hồ sơ.">
+              <CalendarPlus className="mr-2 h-4 w-4" aria-hidden />
+              Tạo lịch xuất hàng
+            </Button>
+          )}
         </div>
       )}
       {shipments.length > 1 && (

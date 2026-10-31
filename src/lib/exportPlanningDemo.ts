@@ -13,7 +13,7 @@
 // Không gói ⇒ bộ demo dùng số tự đặt + file giữ chỗ `demo-placeholder/…`. Người ký luôn là
 // "Giám đốc (demo)" — không ghi tên người thật.
 import { subtractDays } from "./dataFlow";
-import { DEMO_PLACEHOLDER_PREFIX, blankItem, emptyTerms, missingDocumentItems, type ExportData } from "./exportPlanning";
+import { DEMO_PLACEHOLDER_PREFIX, blankItem, buildSchedule, emptyTerms, missingDocumentItems, type ExportData } from "./exportPlanning";
 import type {
   Customer,
   ExportContract,
@@ -499,6 +499,13 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
 
   /* ---- 7. Mới lập, chờ BGĐ ký ---- */
   contract("99.26/BSF-LK.2026", kh(5), today, T(40), 1, [line(id("dong"), "Tako karaage 10-15g", 100, 6, price(7.95), 2)], { note: "Mới lập — chờ BGĐ ký" });
+
+  /* ---- 7b. Mới lập + lịch xuất hàng (NV19, ba-spec 41 §0d): 3 chuyến dự kiến còn trống, chưa đính kèm HĐ đã ký ---- */
+  {
+    const { c, r } = contract("98.26/BSF-HTC.2026", kh(2), today, T(100), 3, [line(id("dong"), "Boiled octopus cut 5-8g", 3240, 10, price(10.6))], { note: "Mới lập — đã tạo lịch xuất hàng" });
+    const rows = buildSchedule({ signedOn: c.signedOn, latestShipmentDate: r.terms.latestShipmentDate, containerCount: 3, totalKg: 32400, today });
+    for (const row of rows) shipment(c, r.terms, { planMonth: row.planMonth, plannedKg: row.plannedKg, goodsSummary: "" });
+  }
 
   /* ---- 8. Sổ "Kế hoạch xuất hàng" của gói: mỗi dòng một HĐ + chuyến, dời sang tháng gần đây ---- */
   if (pack?.plan.length) {

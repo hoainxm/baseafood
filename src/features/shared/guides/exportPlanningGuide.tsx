@@ -98,7 +98,7 @@ export const EXPORT_GUIDE_CONTRACT_STATES: readonly GuideState[] = [
   {
     label: CONTRACT_STATE_LABELS.attaching,
     tone: "warning",
-    meaning: "Vừa lập, hoặc còn thiếu hồ sơ bắt buộc (thẻ Thiếu ghi rõ loại). Chưa ghi chuyến được.",
+    meaning: "Vừa lập, hoặc còn thiếu hồ sơ bắt buộc (thẻ Thiếu ghi rõ loại). Chưa ghi chuyến lẻ được, nhưng tạo được lịch xuất hàng (chuyến dự kiến) khi chưa có chuyến nào.",
     next: "Đính kèm hồ sơ · Nhân viên Kế hoạch.",
   },
   {
@@ -169,7 +169,8 @@ export const exportPlanningGuide: PageGuide = {
       </GuideSection>
       <GuideSection title="Mẹo">
         <GuideList>
-          <li>Việc ít dùng nằm ở <b>Thao tác khác</b>: Sửa hợp đồng (khi chưa có chuyến), Ghi bản sửa (khi đã có chuyến), Gia hạn giao hàng, hủy.</li>
+          <li>Việc ít dùng nằm ở <b>Thao tác khác</b>: Sửa hợp đồng (khi chưa có chuyến nào đã ghi mã lô, booking, ngày, số cont hay file), Ghi bản sửa, Gia hạn giao hàng, hủy.</li>
+          <li>Lập hợp đồng xong, app hỏi <b>Tạo lịch xuất hàng</b>: chia sẵn số chuyến = số cont, kg chia đều, tháng rải từ tháng sau ngày ký tới hạn giao. Sửa tháng / kg từng chuyến rồi Tạo, hoặc chọn Không tạo. Chưa cần đủ hồ sơ; hợp đồng chưa có chuyến thì tạo lại được ở hồ sơ (Thao tác khác). Chuyến của lịch còn trống thì vẫn Sửa hợp đồng, Xóa hợp đồng được (xóa kèm các chuyến đó).</li>
           <li>Thanh toán <b>Khác</b> thì ghi Hình thức thanh toán; L/C thì ghi Số L/C. Đính <b>Hồ sơ khác</b> thì ghi Tên hồ sơ.</li>
           <li>Dòng hàng chép được (Chép dòng — chỉ đổi size); có ô Loại hàng (danh mục) khi máy chủ đã bật.</li>
           <li>Dòng hàng chỉ khác size: chọn <b>Chép dòng</b>, dòng mới giữ mọi ô và để trống Size.</li>

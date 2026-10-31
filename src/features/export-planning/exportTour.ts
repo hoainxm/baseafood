@@ -96,7 +96,8 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         body:
           "Khi có hợp đồng giấy mới, chọn Lập hợp đồng và nhập đúng như bản giấy. Phiếu gồm 5 phần: 1 Hợp đồng · 2 Điều khoản và thanh toán · 3 Chứng từ khách yêu cầu · 4 Dòng hàng · 5 File và ghi chú.\n" +
           "Ở phần 4, dòng chỉ khác size thì chọn Chép dòng: dòng mới nằm ngay dưới, giữ mọi ô, để trống Size để gõ size khác. Mỗi dòng có Chiều dài, Tỉ lệ râu / thân / cổ, Số miếng / kg và Ghi chú dòng như cột trên hợp đồng: các ô này tự chép sang Lệnh sản xuất (vào Quy cách và ghi chú của dòng lệnh). Phần 5 chọn được nhiều file: file đầu là hợp đồng, các file sau (phụ lục) vào Hồ sơ đính kèm.\n" +
-          "Sau khi lưu, hồ sơ hợp đồng mở ra ở trạng thái Chờ đính kèm: việc tiếp là đính kèm hợp đồng đã ký (và L/C nếu thanh toán L/C).",
+          "Sau khi lưu, app hỏi có tạo lịch xuất hàng không: chia sẵn số chuyến = số cont, kg chia đều, tháng rải từ tháng sau ngày ký tới hạn giao; sửa được từng chuyến, hoặc chọn Không tạo (về sau tạo ở hồ sơ, khi chưa có chuyến). Lịch tạo được dù chưa đủ hồ sơ.\n" +
+          "Hồ sơ hợp đồng mở ra ở trạng thái Chờ đính kèm: việc tiếp là đính kèm hợp đồng đã ký (và L/C nếu thanh toán L/C).",
       }),
     );
   }
@@ -180,7 +181,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Trạng thái hợp đồng",
         body:
           "Thẻ đầu tiên dưới số hợp đồng là trạng thái:\n" +
-          "• Chờ đính kèm: vừa lập, hoặc còn thiếu hồ sơ bắt buộc (thẻ Thiếu ghi rõ loại). Chưa ghi chuyến được.\n" +
+          "• Chờ đính kèm: vừa lập, hoặc còn thiếu hồ sơ bắt buộc (thẻ Thiếu ghi rõ loại). Chưa ghi chuyến lẻ được, nhưng tạo được lịch xuất hàng (chuyến dự kiến) khi hợp đồng chưa có chuyến nào.\n" +
           "• Đang ghi chuyến: đủ hồ sơ, đang ghi và theo dõi các chuyến.\n" +
           "• Chờ duyệt cuối: mọi chuyến đủ hồ sơ và số thực xuất nằm trong dung sai cả kg lẫn tiền (hệ thống tự tính), chờ Trưởng / Phó phòng xem lại.\n" +
           "• Đã đóng HĐ: đã duyệt cuối, hoặc đóng sớm kèm lý do.\n" +

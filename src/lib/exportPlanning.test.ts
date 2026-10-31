@@ -4,6 +4,13 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_EXPORT_DATA,
+  buildSchedule,
+  canEditContractDirectly,
+  isBlankShipment,
+  openShipmentsOf,
+  scheduleFor,
+  scheduleGate,
+  shipmentsFromSchedule,
   copyContractLine,
   lineGoodsTypeNames,
   insertCopiedLine,
@@ -549,9 +556,10 @@ describe("NV12 · khép kín (AC-19…AC-23)", () => {
 });
 
 describe("NV13 · xóa / hủy (AC-28)", () => {
-  it("HĐ chưa duyệt chưa chuyến xóa được; có chuyến thì không", () => {
+  it("HĐ chưa duyệt chưa chuyến xóa được; có chuyến đã có thông tin thì không (R41: chuyến còn trống không chặn)", () => {
     expect(canDeleteContract(data({ contracts: [contract("a")] }), "a").ok).toBe(true);
-    expect(canDeleteContract(data({ contracts: [contract("b")], shipments: [shipment("s", "b")] }), "b").ok).toBe(false);
+    expect(canDeleteContract(data({ contracts: [contract("b")], shipments: [shipment("s", "b", { lotCode: "165" })] }), "b").ok).toBe(false);
+    expect(canDeleteContract(data({ contracts: [contract("b")], shipments: [shipment("s", "b")] }), "b").ok).toBe(true);
   });
   it("HĐ có chuyến đã có số cont ⇒ không hủy được", () => {
     const d = data({ contracts: [contract("c")], shipments: [shipment("s", "c", { containerNo: "SZLU9522312" })] });
@@ -898,5 +906,50 @@ describe("cột Loại hàng trong Excel (mig 0089)", () => {
   it("tên theo thứ tự dòng, không lặp; dòng chưa chọn / loại đã xóa bỏ qua", () => {
     expect(lineGoodsTypeNames([line("a", "mada"), line("b", "one-skin"), line("c", "mada"), line("d"), line("e", "gone")], g)).toBe("Mada; 1 da");
     expect(lineGoodsTypeNames([], g)).toBe("");
+  });
+});
+
+describe("NV19 · lịch xuất hàng theo HĐ (§0d, R39–R41)", () => {
+  it("AC-74 — 6 cont, ký 10/10/2026, giao 04/2027 ⇒ mỗi tháng 1 chuyến 21.600 kg", () => {
+    const rows = buildSchedule({ signedOn: "2026-10-10", latestShipmentDate: "2027-04-30", containerCount: 6, totalKg: 129600, today: "2026-10-31" });
+    expect(rows.map((r) => r.planMonth)).toEqual(["2026-11", "2026-12", "2027-01", "2027-02", "2027-03", "2027-04"]);
+    expect(rows.every((r) => r.plannedKg === 21600)).toBe(true);
+    const ships = shipmentsFromSchedule(rows, { contractId: "c", kind: "40RF", portOfDischarge: "Hakata" }, nid, T0);
+    expect(ships.every((s) => s.kind === "40RF" && s.status === "open" && s.portOfDischarge === "Hakata")).toBe(true);
+  });
+  it("AC-75 — phần dư vào chuyến cuối; ít tháng hơn số cont; không ghi số cont ⇒ 1 chuyến ở tháng hạn giao", () => {
+    const rows = buildSchedule({ signedOn: "2026-10-05", latestShipmentDate: "2026-11-30", containerCount: 3, totalKg: 10000, today: "2026-10-31" });
+    expect(rows.map((r) => r.plannedKg)).toEqual([3333.33, 3333.33, 3333.34]);
+    expect(rows.filter((r) => r.planMonth === "2026-11")).toHaveLength(3);
+    const one = buildSchedule({ signedOn: "2026-10-05", latestShipmentDate: "2027-02-15", containerCount: null, totalKg: 5000, today: "2026-10-31" });
+    expect(one).toEqual([{ planMonth: "2027-02", plannedKg: 5000 }]);
+    // Thiếu ngày ký ⇒ bắt đầu từ tháng hiện tại; hạn giao sớm hơn tháng sau ngày ký ⇒ dồn vào tháng hạn giao.
+    expect(buildSchedule({ signedOn: "", latestShipmentDate: "2026-12-31", containerCount: 2, totalKg: 0, today: "2026-10-31" }).map((r) => r.planMonth)).toEqual(["2026-10", "2026-12"]);
+    expect(buildSchedule({ signedOn: "2026-10-20", latestShipmentDate: "2026-10-31", containerCount: 2, totalKg: 0, today: "2026-10-31" }).map((r) => r.planMonth)).toEqual(["2026-10", "2026-10"]);
+  });
+  it("AC-76 — tạo lịch khi chưa đủ hồ sơ; HĐ vẫn Đính kèm; ghi chuyến lẻ vẫn chặn; có chuyến rồi thì không tạo lại", () => {
+    const base = data({ contracts: [contract("c")], revisions: [revision("r0", "c", 0, { terms: terms({ containerCount: 6 }) })] });
+    expect(scheduleGate(base, "c")).toEqual({ ok: true });
+    const rows = scheduleFor(base, "c", "2026-10-31");
+    const ships = shipmentsFromSchedule(rows, { contractId: "c", kind: "40RF", portOfDischarge: "Tokyo" }, nid, T0);
+    const withPlan = { ...base, shipments: ships };
+    expect(openShipmentsOf(withPlan, "c")).toHaveLength(6);
+    expect(contractState(withPlan, "c")).toBe("attaching");
+    expect(shipmentGate(withPlan, "c").ok).toBe(false);
+    expect(scheduleGate(withPlan, "c")).toEqual({ ok: false, reason: "has-shipments" });
+    expect(scheduleGate(data({ contracts: [contract("x", { status: "cancelled" })] }), "x")).toEqual({ ok: false, reason: "not-open" });
+  });
+  it("AC-77 — chuyến còn trống không chặn sửa thẳng / xóa; có MSL thì chỉ ghi bản sửa", () => {
+    const blank = [1, 2, 3, 4, 5, 6].map((i) => shipment(`s${i}`, "c"));
+    const d = data({ contracts: [contract("c")], revisions: [revision("r0", "c", 0)], shipments: blank });
+    expect(canEditContractDirectly(d, "c")).toBe(true);
+    expect(canDeleteContract(d, "c").ok).toBe(true);
+    expect(d.shipments.filter((s) => s.contractId === "c" && isBlankShipment(d, s))).toHaveLength(6);
+    const lot = { ...d, shipments: [shipment("s1", "c", { lotCode: "205" }), ...blank.slice(1)] };
+    expect(canEditContractDirectly(lot, "c")).toBe(false);
+    expect(canDeleteContract(lot, "c").ok).toBe(false);
+    // Có file hoặc mục Xong cũng không còn trống.
+    expect(isBlankShipment({ ...d, files: [file("s2", "packaging")] }, blank[1])).toBe(false);
+    expect(isBlankShipment({ ...d, items: [item("s3", "packaging", { state: "done" })] }, blank[2])).toBe(false);
   });
 });

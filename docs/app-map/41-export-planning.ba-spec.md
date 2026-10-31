@@ -2,7 +2,9 @@
 
 > Load khi: xây hoặc sửa module Xuất khẩu của Phòng Kế hoạch đợt 1: hồ sơ hợp đồng (dòng hàng, bản sửa, gia hạn, file ký, kết quả duyệt giấy), chuyến (mã lô MSL, booking, cont, seal, ngày đóng/ETD), 6 bước dạng checklist tay kèm file, thực xuất lấy từ invoice, khép kín chuyến/hợp đồng theo dung sai, tiền về, vai trò Phòng Kế hoạch, mở rộng danh mục khách.
 covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql, supabase/migrations/0079_export_approval_workflow.sql, src/lib/abbreviations.ts, supabase/migrations/0081_export_document_kinds.sql
-last_verified: 2026-10-30
+last_verified: 2026-10-31
+<!-- re-verified: 2026-10-31 — NV19 / AC-74…77: test exportPlanning (77) + demo (8) xanh, cả bộ 1207; preview demo: lập HĐ 97.26 (3 cont, ký 31/10, giao 28/01/2027) ⇒ hộp tự mở 3 chuyến 11/2026 · 12/2026 · 01/2027 × 1.000 kg; "Không tạo" ⇒ 0 chuyến, hồ sơ có nút Tạo lịch; nháp giữ tháng sửa dở qua sang trang, tạo xong nháp mất; HĐ 99.26 tạo lịch 2 chuyến 600 kg (lệch kg ⇒ cảnh báo, vẫn tạo), lịch 11/2026 hiện chuyến "Chờ booking"; Sửa hợp đồng + Xóa hợp đồng vẫn còn, xóa ⇒ kèm 3 chuyến, 0 mục mồ côi; 360 px × 130 % không tràn; bsf.* trước == sau. -->
+<!-- updated: 2026-10-31 (lịch) — §0d v9.3 ĐÃ BUILD: NV19 tạo lịch xuất hàng khi lập HĐ / HĐ chưa có chuyến; R39 dựng lịch theo số cont, R40 nới R29 cho lịch, R41 chuyến còn trống (sửa R35, xóa HĐ). AC-74…77. -->
 <!-- re-verified: 2026-10-30 15:40 — R38 / AC-73: preview demo ghi bản sửa HĐ 21.26 với 4 ô → tải lại ⇒ hồ sơ hiện Chiều dài · Tỉ lệ · Số miếng / kg đúng chữ; nháp hộp HĐ giữ 4 ô; 360 px × 130 % hộp không tràn; bsf.* trước == sau. -->
 <!-- updated: 2026-10-30 (NL dòng) — §0c v9.2: R38 bốn ô yêu cầu NL của dòng hàng (Chiều dài · Tỉ lệ râu / thân / cổ · Số miếng / kg · Ghi chú dòng) trong JSON lines, `repo.parseLines` giữ, Chép dòng chép theo; tự chép sang Lệnh sản xuất (48 R17). AC-73. -->
 <!-- updated: 2026-10-30 (khác) — Thanh toán = Khác ⇒ bắt ghi `terms.paymentOther` (JSON terms, không cột mới; `validateContract` lỗi `paymentOther`, test exportPlanning); hồ sơ đính kèm "Hồ sơ khác" ⇒ bắt ghi Tên hồ sơ (vào caption). -->
@@ -26,6 +28,52 @@ status: ba-spec v9.1 (2026-10-29: danh mục Loại chứng từ — §0b) · v9
 > **Mục đích:** oracle HÀNH VI cho đợt 1. Định nghĩa ai làm nghiệp vụ gì, vào gì ra gì, thế nào là đúng (AC). **Không** mô tả giao diện (việc của design-spec).
 > **Nguồn đã chốt:** kế hoạch [`spec/xuat-khau-phong-ke-hoach.md`](../spec/xuat-khau-phong-ke-hoach.md) (§9 chốt 11 câu 2026-10-20) · quy trình [`QTI-KH-01`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (luật KH-R1…R16) · phân quyền [`spec/role-permissions.md`](../spec/role-permissions.md) · tài liệu công ty [`40-documents.md`](40-documents.md) (khuôn file + RLS).
 
+
+## 0d. v9.3 (2026-10-31) — tạo lịch xuất hàng ngay khi lập hợp đồng · ✅ ĐÃ BUILD 2026-10-31
+
+Chủ dự án yêu cầu: lập HĐ mới thì **hỏi có tạo lịch xuất hàng đi kèm không**, thay vì đợi đủ hồ sơ mới Ghi chuyến. Lý do: HĐ mới chỉ hiện "chưa lên chuyến" ở tháng hạn giao, Phòng KH không thấy trước tháng nào xuất bao nhiêu cont. Chốt 2026-10-31 (3 câu, cả 3 theo đề xuất): chia theo số cont, rải đều · HĐ chưa có chuyến thì tạo lịch được về sau, không cần đủ hồ sơ · chuyến kế hoạch còn trống không chặn Sửa hợp đồng.
+
+**Nghiệp vụ NV19 — Lên lịch xuất hàng theo HĐ · owner U1 Nhân viên KH** (U6 làm được như U1). Không thêm user, không thêm cross-user: chuyến kế hoạch chỉ hiện trên lịch và báo cáo như chuyến thường.
+- **Start:** (a) vừa lưu HĐ MỚI thành công, hoặc (b) HĐ còn mở và **chưa có chuyến nào** (kể cả chuyến đã hủy thì không tính — chỉ chuyến `open`), U1 chọn tạo lịch.
+- **Input:** bản đang dùng của HĐ (tổng kg dòng hàng, số cont, loại cont, cảng đích, ngày ký, hạn giao muộn nhất).
+- **Flow:** app hỏi có tạo lịch không → **Không** ⇒ kết thúc, HĐ như cũ · **Có** ⇒ app dựng danh sách chuyến dự kiến theo R39 → U1 sửa tháng / kg từng chuyến (thêm / bỏ chuyến được) → xác nhận ⇒ ghi N chuyến `open`.
+- **Output:** N chuyến có tháng kế hoạch, loại cont, kg kế hoạch, cảng đích, tóm tắt hàng; chưa MSL / booking / số cont; mục chứng từ bước 5 sinh theo chứng từ yêu cầu của bản đang dùng (R6). Nhật ký HĐ ghi 1 dòng "Tạo lịch xuất hàng: N chuyến".
+- **End:** lịch xuất hàng hiện N chuyến ở đúng tháng; HĐ vẫn ở chặng **Đính kèm** nếu chưa đủ hồ sơ; bước 1 "Hợp đồng" của mỗi chuyến **chưa xong** tới khi đủ hồ sơ.
+
+**Luật:**
+- **R39 — Dựng lịch xuất hàng.** N = số cont trên HĐ (trống / 0 ⇒ 1). kg mỗi chuyến = tổng kg HĐ ÷ N làm tròn 2 số lẻ, **chuyến cuối nhận phần dư** ⇒ Σ kg kế hoạch == tổng kg HĐ. Tháng: đầu = tháng **sau** tháng ký (không muộn hơn tháng hạn giao), cuối = tháng hạn giao muộn nhất; S = số tháng từ đầu tới cuối (tính cả hai đầu); N = 1 ⇒ tháng cuối; N > 1 ⇒ chuyến i (0 … N−1) ở tháng đầu + ⌊i × (S − 1) / (N − 1)⌋ (N > S ⇒ nhiều chuyến chung tháng). Loại cont, cảng đích theo HĐ (như gợi ý của Ghi chuyến). Chỉ là gợi ý: U1 sửa được tháng / kg / số chuyến trước khi xác nhận; Σ kg khác tổng HĐ ⇒ cảnh báo, vẫn tạo được.
+- **R40 — Nới R29 cho lịch.** Tạo lịch (NV19) **không** cần đủ hồ sơ đính kèm, chỉ cần HĐ còn mở, có bản đang dùng và chưa có chuyến `open`. Ghi **từng chuyến lẻ** (NV7) vẫn giữ R29 (đủ hồ sơ). Bước 1 của chuyến vẫn theo R29 (xong = có bản hiệu lực + đủ hồ sơ).
+- **R41 — Chuyến còn trống.** Chuyến `open` **còn trống** = chưa MSL, booking, ngày đóng, ETD, số cont, seal; không file; không mục nào "Xong" (≈ `canDeleteShipment` + các ô đầu chuyến trống). Sửa R35: "HĐ chưa có chuyến" đọc là **mọi chuyến open đều còn trống** ⇒ vẫn "Sửa hợp đồng" sửa thẳng; sửa thẳng đổi chứng từ yêu cầu ⇒ chuyến còn mở nhận thêm mục chứng từ thiếu (như R34); đổi kg ⇒ chuyến **không** tự chia lại (phần chênh hiện ở "còn thiếu" / vượt như R23). Xóa HĐ: mọi chuyến đều còn trống ⇒ xóa HĐ xóa luôn các chuyến đó (vẫn qua xác nhận + Hoàn tác); có chuyến không trống ⇒ như cũ (chỉ hủy).
+
+**Flow optimization log:** loại (a) "1 chuyến ở tháng hạn giao" — HĐ nhiều cont phải tách tay, không trả lời được "tháng nào xuất bao nhiêu" · (b) "người dùng tự gõ từng chuyến" — chậm, dễ lệch tổng kg · (c) "bỏ R29 toàn bộ" — mất kỷ luật đính kèm; chọn R40 (chỉ nới cho lịch, bước 1 vẫn treo tới khi đủ hồ sơ) · (d) "giữ R35 cũ" — lập lịch xong mất quyền sửa lỗi gõ ⇒ thay bằng R41.
+
+**Build (2026-10-31):** luật thuần `buildSchedule` · `scheduleGate` · `scheduleFor` · `shipmentsFromSchedule` · `isBlankShipment` · `canEditContractDirectly` (+ `canDeleteContract` theo R41) ở `lib/exportPlanning.ts`, test AC-74…77 ở `exportPlanning.test.ts`. Hộp `ScheduleDialog` (`ShipmentDialogs.tsx`, nháp `export-schedule`) mở ngay sau Lập HĐ mới (nút đóng "Không tạo") và từ hồ sơ HĐ (Thao tác khác + khối "Chưa ghi chuyến nào"). Ghi = chuyến `open` còn trống + mục chứng từ bước 5 (R6) + nhật ký; có Hoàn tác. Xóa HĐ xóa kèm chuyến còn trống + mục của chúng. Sửa thẳng HĐ đã tự bổ sung mục chứng từ cho chuyến còn mở (đường sẵn có). Demo: ca 7b HĐ 98.26/BSF-HTC.2026 mới lập + 3 chuyến dự kiến.
+
+**Giả định:** tháng đầu = tháng sau tháng ký (khớp phụ lục 01 HĐ 01-26-HAT: ký 10/10/2026, 6 cont, giao 11/2026 → 04/2027 ⇒ mỗi tháng 1 chuyến) · HĐ thiếu ngày ký ⇒ tháng đầu = tháng hiện tại · tóm tắt hàng của chuyến = như Ghi chuyến đang điền · không migration (chuyến kế hoạch = chuyến thường còn trống) · demo: bộ sinh có ≥ 1 HĐ mới lập kèm lịch.
+
+### AC-74 — Dựng lịch theo số cont · Maps to: NV19, R39 · Test: unit
+- **Given** HĐ ký 10/10/2026, hạn giao 30/04/2027, 6 cont 40RF, tổng 129.600 kg
+- **When** dựng lịch xuất hàng
+- **Then** 6 chuyến, mỗi tháng 1 chuyến từ 11/2026 tới 04/2027
+- **Assert** tháng == ["2026-11","2026-12","2027-01","2027-02","2027-03","2027-04"]; mỗi chuyến 21.600 kg; Σ kg == 129.600; loại == "40RF"
+
+### AC-75 — Phần dư vào chuyến cuối, ít tháng hơn số cont · Maps to: NV19, R39 · Test: unit
+- **Given** HĐ ký 05/10/2026, hạn giao 30/11/2026, 3 cont, tổng 10.000 kg
+- **When** dựng lịch
+- **Then** kg 3.333,33 · 3.333,33 · 3.333,34; tháng đầu 11/2026 = tháng cuối
+- **Assert** Σ kg == 10.000; số chuyến tháng "2026-11" == 3; HĐ không ghi số cont ⇒ số chuyến == 1, tháng == tháng hạn giao
+
+### AC-76 — Tạo lịch trước khi đủ hồ sơ · Maps to: NV19, R40 · Test: unit + e2e
+- **Given** HĐ mới lập, chưa đính kèm hợp đồng đã ký, chưa có chuyến
+- **When** U1 chọn tạo lịch và xác nhận 6 chuyến
+- **Then** 6 chuyến open; HĐ vẫn chặng Đính kèm; bước 1 mỗi chuyến chưa xong; Ghi chuyến lẻ vẫn bị chặn tới khi đủ hồ sơ
+- **Assert** số chuyến open == 6; `contractState` == "attaching"; `shipmentGate.ok` == false; HĐ đã có chuyến open ⇒ tạo lịch lần 2 bị chặn (0 chuyến thêm)
+
+### AC-77 — Chuyến còn trống không chặn sửa thẳng, xóa HĐ xóa luôn · Maps to: NV19, R41 · Test: unit
+- **Given** HĐ có 6 chuyến kế hoạch còn trống
+- **When** kiểm quyền sửa thẳng và xóa HĐ; rồi gõ MSL cho 1 chuyến và kiểm lại
+- **Then** lúc đầu sửa thẳng được, xóa được (xóa cả 6 chuyến); sau khi chuyến có MSL ⇒ chỉ ghi bản sửa, không xóa được
+- **Assert** lần 1: sửa thẳng == true, xóa == true, chuyến bị xóa == 6; lần 2: sửa thẳng == false, `canDeleteContract.ok` == false
 
 ## 0c. v9.2 (2026-10-30) — yêu cầu nguyên liệu của dòng hàng, tự chép sang Lệnh sản xuất
 
@@ -762,6 +810,7 @@ Chủ dự án chốt 2026-10-28 (4 câu hỏi qua phiên Claude). Mục nào b�
 - Thêm dòng vào bảng "Code đổi → doc phải update" của CLAUDE.md khi tạo thư mục `features/export-planning`.
 
 ## History
+- v9.3 2026-10-31 — NV19 lịch xuất hàng khi lập HĐ (§0d): R39 dựng lịch theo số cont, R40 nới R29 cho lịch, R41 chuyến còn trống (sửa R35, xóa HĐ). AC-74…77 = test; demo ca 7b.
 
 - v7 (2026-10-22 tối): **đọc Commercial Invoice** (NV17, R27, AC-51…55; NV16 thêm nguồn invoice). Chủ dự án chốt 3 điểm: không đọc bản scan (cần file gốc), chưa rõ Phòng KH giữ Excel hay PDF ⇒ đọc cả hai, đọc xong tự điền 3 số tổng + báo chỗ lệch (không ghi đè). Orchestrator tự chấm (việc nhỏ, không spawn team): loại OCR Tesseract (sai trên bảng scan), hoãn AI cloud (phí + key), loại ghi đè ô đã có số. Không migration; thêm thư viện `pdfjs-dist` (nạp khi đính PDF).
 - v6.2 (2026-10-22 chiều): chủ dự án đặt tên chức năng **"Trích xuất từ chứng từ"** (thay "tự học" ở mọi chỗ) + thêm lối chủ động: nút quét mọi HĐ của khách (NV16 (b), AC-50). Nguồn = dòng hàng hợp đồng (Commercial Invoice chỉ có tổng + PDF). Ghi chú dòng mới "Trích xuất từ HĐ <số>".

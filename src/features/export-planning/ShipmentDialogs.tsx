@@ -20,6 +20,7 @@ import {
   Input,
   NumberField,
   Textarea,
+  formatNumber,
   notify,
   type FieldError,
 } from "@/design-system";
@@ -42,11 +43,12 @@ import {
   validateShipment,
   workingRevision,
   type ExportData,
+  type ScheduleRow,
 } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import { invoiceNameLines } from "@/lib/invoiceReader";
 import type { CustomerProductName, ExportContractLine, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem, Product } from "@/types";
-import { Camera, ClipboardList, Container, Save } from "lucide-react";
+import { CalendarPlus, Camera, ClipboardList, Container, Plus, Save, Trash2 } from "lucide-react";
 import { FileList, FilePicker, type PreviewTarget } from "./parts";
 import { InvoiceReadPanel, type InvoiceReadState } from "./InvoiceReadPanel";
 
@@ -245,6 +247,173 @@ export function ShipmentFormDialog({
           <Field label="Ghi chú">
             <Textarea rows={2} value={form.note} onChange={(e) => set("note", e.target.value)} />
           </Field>
+        </div>
+      )}
+    </FormDialog>
+  );
+}
+
+/* ---------- Tạo lịch xuất hàng theo HĐ (NV19, ba-spec 41 §0d) ---------- */
+
+export interface ScheduleTarget {
+  contractId: string;
+  contractNo: string;
+  /** Lịch dựng sẵn theo R39 — người dùng sửa tháng / kg, thêm / bỏ chuyến. */
+  rows: ScheduleRow[];
+  totalKg: number;
+  containerCount: number | null;
+  deadline: string;
+  /** Mở ngay sau khi lập HĐ mới ⇒ nút đóng là "Không tạo". */
+  afterCreate: boolean;
+}
+
+interface ScheduleForm {
+  key: string;
+  contractId: string;
+  contractNo: string;
+  totalKg: number;
+  containerCount: number | null;
+  deadline: string;
+  afterCreate: boolean;
+  rows: (ScheduleRow & { id: string })[];
+  initial: string;
+}
+const scheduleSnap = (f: ScheduleForm) => JSON.stringify(f.rows.map((r) => [r.planMonth, r.plannedKg]));
+
+export function ScheduleDialog({
+  target,
+  onClose,
+  onSave,
+}: {
+  target: ScheduleTarget | null;
+  onClose: () => void;
+  onSave: (contractId: string, rows: ScheduleRow[]) => boolean;
+}) {
+  const [form, setForm] = useState<ScheduleForm | null>(null);
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const draft = useDialogDraft({ form: "export-schedule", value: form, setValue: setForm, isEmpty: (f) => scheduleSnap(f) === f.initial });
+
+  useEffect(() => {
+    if (!target) return;
+    const f: ScheduleForm = {
+      key: `schedule:${target.contractId}`,
+      contractId: target.contractId,
+      contractNo: target.contractNo,
+      totalKg: target.totalKg,
+      containerCount: target.containerCount,
+      deadline: target.deadline,
+      afterCreate: target.afterCreate,
+      rows: target.rows.map((r) => ({ ...r, id: newId() })),
+      initial: "",
+    };
+    const fresh = { ...f, initial: scheduleSnap(f) };
+    const kept = draft.takeKept();
+    setForm(kept && kept.key === fresh.key ? kept : fresh);
+    setErrors([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
+  }, [target]);
+
+  const setRow = (id: string, patch: Partial<ScheduleRow>) => setForm((f) => (f ? { ...f, rows: f.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) } : f));
+  const sumKg = form ? Math.round(form.rows.reduce((t, r) => t + (r.plannedKg ?? 0), 0) * 100) / 100 : 0;
+  const off = form && form.totalKg > 0 && Math.abs(sumKg - form.totalKg) >= 0.005;
+
+  const close = () => {
+    draft.cancel();
+    onClose();
+  };
+  const save = () => {
+    if (!form) return;
+    const errs: FieldError[] = [];
+    if (!form.rows.length) errs.push({ field: "Chuyến", message: "Lịch cần ít nhất 1 chuyến" });
+    form.rows.forEach((r, i) => {
+      if (!/^\d{4}-\d{2}$/.test(r.planMonth)) errs.push({ field: `Chuyến ${i + 1}`, message: `Chuyến ${i + 1}: chọn tháng kế hoạch` });
+    });
+    setErrors(errs);
+    if (errs.length) return;
+    if (onSave(form.contractId, form.rows.map((r) => ({ planMonth: r.planMonth, plannedKg: r.plannedKg })))) draft.done();
+  };
+
+  const deadlineText = form?.deadline ? form.deadline.slice(0, 7).split("-").reverse().join("/") : "";
+  return (
+    <FormDialog
+      open={!!form}
+      onOpenChange={(o) => {
+        if (o) return;
+        draft.dismiss();
+        onClose();
+      }}
+      title={`Tạo lịch xuất hàng · HĐ ${form?.contractNo ?? ""}`}
+      description={
+        form?.afterCreate
+          ? "Đã lập hợp đồng. Tạo luôn các chuyến dự kiến để hợp đồng hiện trên lịch xuất hàng theo từng tháng? Chưa cần đủ hồ sơ — bước 1 của mỗi chuyến xong khi đính kèm đủ."
+          : "Chia sẵn các chuyến dự kiến để hợp đồng hiện trên lịch xuất hàng theo từng tháng. Chưa cần đủ hồ sơ — bước 1 của mỗi chuyến xong khi đính kèm đủ."
+      }
+      icon={CalendarPlus}
+      size="lg"
+      hasRequiredFields
+      footer={
+        <>
+          {form?.afterCreate ? (
+            <Button variant="outline" onClick={close} title="Không tạo lịch lúc này — về sau vẫn tạo được ở hồ sơ hợp đồng khi chưa có chuyến nào.">
+              Không tạo
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={close}>
+              Hủy
+            </Button>
+          )}
+          <Button variant="save" onClick={save} title="Ghi các chuyến dự kiến này lên lịch xuất hàng.">
+            <Save className="mr-2 h-4 w-4" aria-hidden />
+            Tạo {form?.rows.length ?? 0} chuyến
+          </Button>
+        </>
+      }
+    >
+      <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
+      {form && (
+        <div className="grid gap-4 py-2">
+          <ErrorSummary errors={errors} />
+          <p className="text-sm text-muted-foreground">
+            Chia theo hợp đồng: {form.containerCount ? `${formatNumber(form.containerCount)} cont` : "không ghi số cont ⇒ 1 chuyến"}
+            {form.totalKg > 0 ? ` · ${formatNumber(form.totalKg)} kg chia đều` : ""}
+            {deadlineText ? ` · rải từ tháng sau ngày ký tới hạn giao ${deadlineText}` : ""}. Sửa tháng, kg từng chuyến nếu cần.
+          </p>
+          <div className="grid gap-2">
+            {form.rows.map((r, i) => (
+              <div key={r.id} className="grid items-end gap-3 rounded-lg border border-border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                <Field label={`Chuyến ${i + 1} · tháng kế hoạch`} required>
+                  <Input type="month" value={r.planMonth} onChange={(e) => setRow(r.id, { planMonth: e.target.value })} aria-required />
+                </Field>
+                <NumberField label="Kg kế hoạch" unit="kg" value={r.plannedKg} onChange={(v) => setRow(r.id, { plannedKg: v })} />
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setForm((f) => (f ? { ...f, rows: f.rows.filter((x) => x.id !== r.id) } : f))}
+                  title={`Bỏ chuyến ${i + 1} khỏi lịch.`}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" aria-hidden />
+                  Bỏ
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setForm((f) => (f ? { ...f, rows: [...f.rows, { id: newId(), planMonth: f.rows.at(-1)?.planMonth ?? f.deadline.slice(0, 7), plannedKg: null }] } : f))
+              }
+              title="Thêm một chuyến dự kiến vào lịch."
+            >
+              <Plus className="mr-1 h-4 w-4" aria-hidden />
+              Thêm chuyến
+            </Button>
+            <span className={`tnum text-sm ${off ? "text-warning" : "text-muted-foreground"}`}>
+              Tổng {formatNumber(sumKg)} kg{form.totalKg > 0 ? ` / hợp đồng ${formatNumber(form.totalKg)} kg` : ""}
+              {off ? " — lệch hợp đồng, vẫn tạo được" : ""}
+            </span>
+          </div>
         </div>
       )}
     </FormDialog>

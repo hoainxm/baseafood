@@ -26,8 +26,8 @@ const PRODUCTS = Array.from({ length: 12 }, (_, i) => ({ id: `sp-${i}` }));
 describe("bộ demo Xuất khẩu", () => {
   const d = buildExportDemo(CUSTOMERS, TODAY, { products: PRODUCTS });
 
-  it("đủ 7 ca của buổi audit hồ sơ SCM", () => {
-    expect(d.contracts.map((c) => c.contractNo)).toHaveLength(7);
+  it("đủ 7 ca của buổi audit hồ sơ SCM + 1 ca lịch xuất hàng (NV19)", () => {
+    expect(d.contracts.map((c) => c.contractNo)).toHaveLength(8);
     const st = Object.fromEntries(d.contracts.map((c) => [c.contractNo, contractState(d, c.id)]));
     expect(st).toEqual({
       "DM-01/2026": "closed",
@@ -38,8 +38,14 @@ describe("bộ demo Xuất khẩu", () => {
       "11.26/BSF-MTD.2026": "attaching",
       "05.26/BSF-PC.2026": "cancelled",
       "99.26/BSF-LK.2026": "attaching",
+      "98.26/BSF-HTC.2026": "attaching",
     });
     const byNo = (no: string) => d.contracts.find((c) => c.contractNo === no)!;
+    // 7b. Mới lập + lịch xuất hàng: 3 chuyến dự kiến còn trống, Σ kg == kg HĐ, chưa đủ hồ sơ.
+    const plan = d.shipments.filter((s) => s.contractId === byNo("98.26/BSF-HTC.2026").id);
+    expect(plan).toHaveLength(3);
+    expect(plan.every((s) => s.status === "open" && !s.lotCode && !s.bookingNo)).toBe(true);
+    expect(plan.reduce((t, s) => t + (s.plannedKg ?? 0), 0)).toBe(32400);
     // 1. Không gói ⇒ ca 1 dùng số tự đặt (không số của khách trong mã nguồn); đủ hồ sơ, ngoài dung sai ⇒ chốt TAY
     const c1 = byNo("DM-01/2026");
     expect(c1.status).toBe("closed");

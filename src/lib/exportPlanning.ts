@@ -198,7 +198,7 @@ export const isLiveContractState = (st: ContractState) => st !== "closed" && st 
 
 /** Các chặng của quy trình HĐ — thanh chặng ở hồ sơ HĐ, tour, hộp "?". */
 export const CONTRACT_FLOW_STAGES: readonly { state: Exclude<ContractState, "cancelled">; title: string; who: string; hint: string }[] = [
-  { state: "attaching", title: "Đính kèm", who: "Nhân viên Kế hoạch", hint: "Lập HĐ xong là vào bước này. Đính kèm đủ hồ sơ bắt buộc: hợp đồng đã ký, L/C (nếu thanh toán L/C). Đủ hồ sơ mới ghi chuyến được." },
+  { state: "attaching", title: "Đính kèm", who: "Nhân viên Kế hoạch", hint: "Lập HĐ xong là vào bước này. Đính kèm đủ hồ sơ bắt buộc: hợp đồng đã ký, L/C (nếu thanh toán L/C). Đủ hồ sơ mới ghi chuyến lẻ được; lịch xuất hàng (chuyến dự kiến) tạo được ngay." },
   { state: "shipping", title: "Ghi chuyến", who: "Nhân viên Kế hoạch", hint: "Ghi từng chuyến (container) và theo dõi các bước lệnh SX → chứng từ, tới khi xuất đủ hợp đồng." },
   { state: "final-review", title: "Duyệt cuối", who: "Trưởng / Phó phòng KH", hint: "Xuất đủ trong dung sai ⇒ Trưởng hoặc Phó phòng Kế hoạch xem lại hồ sơ, đồng ý thì đóng HĐ; chưa ổn thì trả về kèm lý do." },
   { state: "closed", title: "Đóng HĐ", who: "", hint: "Hợp đồng đã đóng. Mở lại được (Trưởng / Phó phòng) nếu cần sửa." },
@@ -1079,6 +1079,101 @@ export function shipmentGateText(g: ShipmentGate): string {
   return `Còn thiếu hồ sơ đính kèm: ${g.missing.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}.`;
 }
 
+/* ---------- NV19: lịch xuất hàng theo HĐ (ba-spec 41 §0d, R39–R41) ---------- */
+
+/** Một chuyến dự kiến của lịch — chỉ tháng + kg, phần còn lại theo HĐ. */
+export interface ScheduleRow {
+  planMonth: string;
+  plannedKg: number | null;
+}
+
+const monthIndex = (ym: string) => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
+const monthText = (i: number) => `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`;
+/** Lịch dài nhất app dựng sẵn — số cont gõ nhầm (VD 600) không sinh hàng trăm chuyến. */
+export const MAX_SCHEDULE_ROWS = 60;
+
+/**
+ * R39: N = số cont (trống / 0 ⇒ 1); kg chia đều làm tròn 2 số lẻ, chuyến cuối nhận phần dư; tháng rải đều từ
+ * tháng SAU tháng ký (thiếu ngày ký ⇒ tháng của `today`) tới tháng hạn giao.
+ */
+export function buildSchedule(p: { signedOn: string; latestShipmentDate: string; containerCount: number | null; totalKg: number; today: string }): ScheduleRow[] {
+  const n = Math.min(MAX_SCHEDULE_ROWS, Math.max(1, Math.round(p.containerCount ?? 0) || 1));
+  const startRaw = p.signedOn ? monthIndex(p.signedOn) + 1 : monthIndex(p.today);
+  const end = p.latestShipmentDate ? monthIndex(p.latestShipmentDate) : startRaw;
+  const start = Math.min(startRaw, end);
+  const span = end - start + 1;
+  const each = p.totalKg > 0 ? round2(p.totalKg / n) : null;
+  return Array.from({ length: n }, (_, i) => ({
+    planMonth: monthText(n === 1 ? end : start + Math.floor((i * (span - 1)) / (n - 1))),
+    plannedKg: each == null ? null : i === n - 1 ? round2(p.totalKg - each * (n - 1)) : each,
+  }));
+}
+
+export type ScheduleGate = { ok: true } | { ok: false; reason: "not-open" | "no-revision" | "has-shipments" };
+
+/** R40: tạo lịch KHÔNG cần đủ hồ sơ — chỉ cần HĐ còn mở, có bản hiệu lực, chưa có chuyến còn mở. */
+export function scheduleGate(d: ExportData, contractId: string): ScheduleGate {
+  const c = d.contracts.find((x) => x.id === contractId);
+  if (!c || c.status !== "open") return { ok: false, reason: "not-open" };
+  if (!effectiveRevision(d, contractId)) return { ok: false, reason: "no-revision" };
+  return openShipmentsOf(d, contractId).length ? { ok: false, reason: "has-shipments" } : { ok: true };
+}
+
+/** Lịch dự kiến của HĐ theo bản hiệu lực (R39). */
+export function scheduleFor(d: ExportData, contractId: string, today: string): ScheduleRow[] {
+  const c = d.contracts.find((x) => x.id === contractId);
+  const rev = effectiveRevision(d, contractId);
+  if (!c || !rev) return [];
+  return buildSchedule({
+    signedOn: c.signedOn,
+    latestShipmentDate: termsOf(d, contractId).latestShipmentDate,
+    containerCount: rev.terms.containerCount,
+    totalKg: contractTotals(rev.lines).kg,
+    today,
+  });
+}
+
+/** Chuyến của lịch: chuyến thường còn trống (chưa MSL / booking / ngày / số cont). */
+export function shipmentsFromSchedule(
+  rows: readonly ScheduleRow[],
+  base: Pick<ExportShipment, "contractId" | "kind" | "portOfDischarge">,
+  newId: () => string,
+  createdAt: string,
+): ExportShipment[] {
+  return rows.map((r) => ({
+    id: newId(),
+    contractId: base.contractId,
+    planMonth: r.planMonth,
+    kind: base.kind,
+    goodsSummary: "",
+    plannedKg: r.plannedKg,
+    lotCode: "",
+    portOfDischarge: base.portOfDischarge,
+    bookingNo: "",
+    loadingDate: "",
+    etd: "",
+    eta: "",
+    vesselVoyage: "",
+    containerNo: "",
+    sealNo: "",
+    status: "open",
+    cancelReason: "",
+    note: "",
+    createdAt,
+  }));
+}
+
+/** R41: chuyến còn trống = chưa có thông tin chuyến thật, không file, không mục nào Xong. */
+export function isBlankShipment(d: Pick<ExportData, "files" | "items">, s: ExportShipment): boolean {
+  const head = [s.lotCode, s.bookingNo, s.loadingDate, s.etd, s.eta, s.vesselVoyage, s.containerNo, s.sealNo];
+  return head.every((v) => !v.trim()) && canDeleteShipment(d, s.id);
+}
+
+/** R35 sửa theo R41: mọi chuyến của HĐ đều còn trống ⇒ "Sửa hợp đồng" vẫn sửa thẳng bản đang dùng. */
+export function canEditContractDirectly(d: ExportData, contractId: string): boolean {
+  return d.shipments.filter((s) => s.contractId === contractId).every((s) => isBlankShipment(d, s));
+}
+
 /** Các lượt duyệt cuối của HĐ, cũ trước. */
 export function finalReviewsOf(d: Pick<ExportData, "approvals">, contractId: string): ExportContractApproval[] {
   return d.approvals
@@ -1108,7 +1203,8 @@ export function activitiesOf(d: Pick<ExportData, "activities">, contractId: stri
 export const isShipmentLoaded = (s: Pick<ExportShipment, "containerNo">) => !!s.containerNo.trim();
 
 export function canDeleteContract(d: ExportData, contractId: string): { ok: boolean; reason?: string } {
-  if (d.shipments.some((s) => s.contractId === contractId)) return { ok: false, reason: "has-shipments" };
+  // R41: chuyến còn trống (lịch chưa làm gì) không chặn xóa — xóa HĐ xóa luôn các chuyến đó.
+  if (d.shipments.some((s) => s.contractId === contractId && !isBlankShipment(d, s))) return { ok: false, reason: "has-shipments" };
   const revIds = new Set(revisionsOf(d, contractId).map((r) => r.id));
   if (d.approvals.some((a) => revIds.has(a.revisionId) && a.decision === "approved")) return { ok: false, reason: "was-approved" };
   return { ok: true };
@@ -1133,7 +1229,7 @@ export function cancelContract(
   };
 }
 
-export function canDeleteShipment(d: ExportData, shipmentId: string): boolean {
+export function canDeleteShipment(d: Pick<ExportData, "files" | "items">, shipmentId: string): boolean {
   if (d.files.some((f) => f.shipmentId === shipmentId)) return false;
   return !d.items.some((i) => i.shipmentId === shipmentId && i.state === "done");
 }

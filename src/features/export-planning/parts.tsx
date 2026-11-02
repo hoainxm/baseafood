@@ -89,7 +89,7 @@ export function ExportFilePreview({ file, onClose }: { file: PreviewTarget | nul
         file &&
         !isPlaceholder && (
           <>
-            <Button variant="outline" onClick={() => !warnPlaceholder(file.path) && void openFileView("export", file.path, file.name)} title="Xem file này trên tab mới của trình duyệt (để in hoặc xem toàn màn hình) — không tải về.">
+            <Button variant="outline" onClick={() => !warnPlaceholder(file.path) && openFileView("export", file.path, file.name)} title="Xem file này trên tab mới của trình duyệt (để in hoặc xem toàn màn hình) — không tải về.">
               <ExternalLink className="mr-2 h-4 w-4" aria-hidden />
               Mở tab mới
             </Button>

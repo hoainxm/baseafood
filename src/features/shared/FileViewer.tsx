@@ -95,7 +95,7 @@ export function FileViewer({
     return (
       <div className="grid gap-2">
         <iframe title={name} src={loaded.url} className={cn(frame, "w-full rounded-lg border border-border bg-muted")} />
-        <p className="text-sm text-muted-foreground">Trên iPhone / iPad khung có thể chỉ hiện trang đầu — chọn Mở tab mới để xem đủ các trang.</p>
+        <p className="text-sm text-muted-foreground">Trên iPhone / iPad khung có thể chỉ hiện trang đầu — chọn {fullPage ? "Mở file gốc" : "Mở tab mới"} để xem đủ các trang.</p>
       </div>
     );
   }

@@ -1,22 +1,13 @@
 // ============================================================
 // Tên file: src/lib/fileViewLink.ts
 // Tên tiếng Việt: Link trang xem file của app (mở tab mới không bắt tải về)
-// Description: Builds / parses the `#/file-view?src=…&path=…&name=…` link. PDF and images open the signed
-//              Storage link directly (browsers show them); Word / Excel / text open the in-app viewer page,
-//              because a signed link to those makes the browser download (ba-spec 61 N2, AC-5).
+// Description: Builds / parses the `#/file-view?src=…&path=…&name=…` link that "Mở tab mới" opens for every
+//              file kind (ba-spec 61 N2, AC-5) — a signed Storage link to Word / Excel makes the browser download.
 // ============================================================
-import { filePreviewKind } from "./documents";
-
 /** Nguồn file — mỗi nguồn một hàm lấy link có hạn theo quyền hiện có (không đổi bucket / RLS). */
 export type FileViewSource = "documents" | "export" | "import";
 
 const SOURCES: readonly FileViewSource[] = ["documents", "export", "import"];
-
-/** Loại cần trang xem của app khi mở tab mới (PDF / ảnh / file chỉ-tải-về thì không). */
-export function needsAppViewer(fileName: string): boolean {
-  const kind = filePreviewKind(fileName);
-  return kind === "docx" || kind === "doc" || kind === "sheet" || kind === "text";
-}
 
 export function fileViewHref(source: FileViewSource, path: string, name: string): string {
   const q = new URLSearchParams({ src: source, path, name });

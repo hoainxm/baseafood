@@ -1,8 +1,9 @@
 # 61 — ba-spec: Xem file đính kèm ngay trên web app (không bắt tải về)
 
 > Load khi: đổi cách xem / mở / tải file đính kèm (tài liệu công ty, chứng từ Xuất khẩu, chứng từ Nhập khẩu), thêm loại file mới cho phép đính, hoặc màn mới có nút "Xem file".
-covers: src/lib/documents.ts, src/lib/legacyWordText.ts, src/lib/sheetPreview.ts, src/lib/fileViewLink.ts, src/features/shared/FileViewer.tsx, src/features/shared/FileViewScreen.tsx, src/features/documents/FilePreviewDialog.tsx, src/features/documents/openDocumentFile.ts, src/features/export-planning/parts.tsx, src/features/import-planning/parts.tsx
+covers: src/lib/documents.ts, src/lib/legacyWordText.ts, src/lib/sheetPreview.ts, src/lib/fileViewLink.ts, src/features/shared/FileViewer.tsx, src/features/shared/FileViewScreen.tsx, src/features/documents/FilePreviewDialog.tsx, src/features/documents/openDocumentFile.ts, src/features/export-planning/parts.tsx, src/features/import-planning/parts.tsx, src/features/shared/fileViewSources.ts, src/lib/openInNewTab.ts
 last_verified: 2026-11-02
+<!-- updated: 2026-11-02 (b) — R8 + Flow N2 mới: "Mở tab mới" = liên kết tab mới tới trang xem của app cho MỌI loại; bỏ mọi đường dự phòng thay trang đang mở (`openInNewTab` trả opened | no-url | blocked, chỉ tải về được dùng tab này); trang xem không tự rời app; AC-8. -->
 ttl_days: 180
 
 > **Mục đích**: oracle HÀNH VI cho việc xem file đính kèm. Không mô tả giao diện.
@@ -35,7 +36,7 @@ Không có cross-user handoff: xem file là việc một người, không chuy�
 | N3 | Tải về | Người xem | như N1 | file gốc tải về máy, đúng tên gốc |
 
 Flow N1: chọn Xem → app lấy link có hạn (10 phút, theo quyền hiện có) → loại PDF / ảnh: hiện trực tiếp từ link; loại Word / Excel / văn bản: app tải bytes về bộ nhớ trình duyệt rồi dựng nội dung → END: nội dung hiện, hoặc câu lỗi nói rõ lý do + còn Tải về.
-Flow N2: chọn Mở tab mới → PDF / ảnh: tab mới trỏ link có hạn (trình duyệt tự hiện); loại khác: tab mới mở **trang xem file của app** (cùng phiên đăng nhập) chạy đúng Flow N1 → END như N1.
+Flow N2: chọn Mở tab mới → app mở NGAY trong lúc bấm một liên kết tab mới tới **trang xem file của app** (mọi loại) → trang đó chạy Flow N1; PDF / ảnh có thêm "Mở file gốc" (tab khác, trình xem của trình duyệt — iPhone / iPad đủ trang) → END như N1. **Trang đang làm KHÔNG BAO GIỜ bị thay** (R8).
 Flow N3: chọn Tải về → link có hạn kèm tên tải → END: file nằm trong Downloads.
 
 ## 4. Rules
@@ -48,6 +49,7 @@ Flow N3: chọn Tải về → link có hạn kèm tên tải → END: file nằ
 | R4 | `.doc` (Word 97–2003, nhị phân) không có thư viện trình duyệt dựng đúng trang ⇒ hiện **chữ + bảng** trích từ file (bỏ định dạng, hình) kèm dòng nói rõ "bản xem chữ — định dạng gốc xem bằng Tải về". File `.doc` mã hóa / hỏng ⇒ báo không đọc được, còn Tải về. |
 | R5 | Bảng tính: mỗi sheet một phần, hiện giá trị ô đã định dạng như Excel hiện; tối đa 1.000 dòng / sheet, quá ⇒ ghi "đang hiện 1.000 / N dòng — tải về để xem đủ". |
 | R6 | File demo giữ chỗ (`DEMO_PLACEHOLDER_PREFIX`) giữ hành vi cũ: báo không có file thật, không mở tab. |
+| R8 | (2026-11-02, lỗi người dùng báo) Mở tab mới KHÔNG được thay trang đang mở: trước đây khi trình duyệt không trả cửa sổ mới (chặn bật lên, app trên màn hình chính iPhone, trình duyệt trong ứng dụng) code "dự phòng" chuyển chính trang đang làm sang file ⇒ Quay lại thì app tải lại, mất trạng thái. Nay: xem bị chặn ⇒ báo lỗi, trang giữ nguyên; chỉ TẢI VỀ được dùng tab hiện tại (file tải xuống, trang không rời đi). Trang xem file không tự chuyển đi nơi khác (trình duyệt ép mở tại chỗ thì Quay lại vẫn về đúng trang, không tải lại). |
 | R7 | Xem không ghi dữ liệu, không toast khi mở thành công; lỗi luôn báo (README luật 8). |
 
 ## 5. Acceptance Criteria
@@ -77,10 +79,10 @@ Flow N3: chọn Tải về → link có hạn kèm tên tải → END: file nằ
 - **Assert** `readSheetPreview(bytes, 1000)` → `sheets.length == 2`, `sheets[0].rows.length == 1000`, `sheets[0].total == 1205`.
 
 ### AC-5 — N2, R1/R3 · Test: unit
-- **Given** file `.doc` / `.docx` / `.xlsx` / `.txt`
+- **Given** file bất kỳ loại nào (`.doc`, `.xlsx`, `.pdf`, ảnh…)
 - **When** chọn Mở tab mới
-- **Then** tab mới mở trang xem của app (không trỏ link Storage), địa chỉ chứa nguồn + đường dẫn file; PDF / ảnh vẫn trỏ link có hạn.
-- **Assert** `fileViewHref("export", "c1/x.doc", "x.doc")` bắt đầu bằng `#/file-view?` và chứa `src=export`; `needsAppViewer("scan.pdf") == false`, `needsAppViewer("x.doc") == true`.
+- **Then** tab mới mở trang xem của app (không trỏ thẳng link Storage), địa chỉ chứa nguồn + đường dẫn file, tên có dấu đọc lại đúng
+- **Assert** `fileViewHref("export", "c1/Hợp đồng.doc", "Hợp đồng.doc")` bắt đầu bằng `#/file-view?`, chứa `src=export`; `parseFileViewParams` trả lại đúng `{ source: "export", path: "c1/Hợp đồng.doc", name: "Hợp đồng.doc" }`
 
 ### AC-6 — N2, R3 · Test: manual
 - **Given** trang xem ở tab mới với `src` không thuộc {`documents`, `export`, `import`} hoặc thiếu `path`
@@ -93,6 +95,12 @@ Flow N3: chọn Tải về → link có hạn kèm tên tải → END: file nằ
 - **When** xem / mở tab mới
 - **Then** không có request nào tới máy chủ ngoài app + Storage của dự án.
 - **Assert** số request tới host `officeapps.live.com` hoặc `docs.google.com` == 0. (preview, tab Network)
+
+### AC-8 — Mở tab mới không bao giờ thay trang đang mở · N2, R8 · Test: unit
+- **Given** trình duyệt chặn tab mới (`window.open` trả null)
+- **When** xem file (không phải tải về)
+- **Then** trả `blocked`, trang hiện tại không đổi địa chỉ; tải về thì được tải bằng tab hiện tại
+- **Assert** `openInNewTab(get)` == `"blocked"` và số lần `location.assign` == 0; với `{ download: true }` == `"opened"` và `location.assign` gọi đúng 1 lần
 
 ## 6. Flow optimization log
 
@@ -116,3 +124,4 @@ OUT: ảnh `.heic` trên Chrome (trình duyệt không đọc được — vẫn
 ## History
 
 - 2026-11-02 — tạo (biến thể C).
+- 2026-11-02 (b) — sửa lỗi "Mở tab mới mở ngay trong trang, quay lại bị tải lại" (R8, AC-8).

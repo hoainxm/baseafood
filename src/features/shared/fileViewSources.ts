@@ -2,15 +2,15 @@
 // Tên file: src/features/shared/fileViewSources.ts
 // Tên tiếng Việt: Nguồn file đính kèm + mở file ở tab mới không bắt tải về
 // Description: Maps each attachment source to its signed-link getter (existing permissions, no bucket change)
-//              and opens a file in a new tab: PDF / images go to the signed link, Word / Excel / text go to the
-//              in-app viewer page `#/file-view` (ba-spec 61 N2).
+//              and opens a file in a NEW tab through the in-app viewer page `#/file-view` (ba-spec 61 N2). The
+//              current page is never replaced — doing so reloaded the app on "back" and lost unsaved state.
 // ============================================================
 import { notify } from "@/design-system";
 import { getDocumentFileUrl } from "@/lib/documentStorage";
 import { getExportFileUrl } from "@/lib/exportFileStorage";
-import { fileViewHref, needsAppViewer, type FileViewSource } from "@/lib/fileViewLink";
+import { fileViewHref, type FileViewSource } from "@/lib/fileViewLink";
 import { getImportFileUrl } from "@/lib/importFileStorage";
-import { openInNewTab } from "@/lib/openInNewTab";
+import { NEW_TAB_BLOCKED_MESSAGE, openInNewTab, openLinkInNewTab } from "@/lib/openInNewTab";
 
 export const FILE_VIEW_URL: Record<FileViewSource, (path: string, seconds?: number, downloadName?: string) => Promise<string | null>> = {
   documents: getDocumentFileUrl,
@@ -18,24 +18,18 @@ export const FILE_VIEW_URL: Record<FileViewSource, (path: string, seconds?: numb
   import: getImportFileUrl,
 };
 
-/** Mở file ở tab mới để XEM (không tải về). Gọi ngay trong lúc bấm — trình duyệt chặn cửa sổ mở sau `await`. */
-export async function openFileView(source: FileViewSource, path: string, name: string): Promise<void> {
-  if (needsAppViewer(name || path)) {
-    const href = fileViewHref(source, path, name);
-    const w = window.open(href, "_blank");
-    // "noopener" làm window.open luôn trả null — cắt opener tay. Bị chặn hẳn ⇒ mở ngay tab này.
-    if (w) w.opener = null;
-    else window.location.hash = href.slice(1);
-    return;
-  }
-  if (!(await openInNewTab(() => FILE_VIEW_URL[source](path, 600)))) {
-    notify.error("Không mở được file — tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.");
-  }
+/**
+ * Mở file ở tab mới để XEM (không tải về). Luôn đi qua trang xem của app bằng liên kết `target="_blank"` mở
+ * ngay trong lúc bấm — không chờ link có hạn, nên trình duyệt không chặn và trang đang mở không bao giờ bị thay.
+ * PDF / ảnh: trang xem tự chuyển sang link có hạn (trình duyệt hiện đủ trang, kể cả iPhone / iPad).
+ */
+export function openFileView(source: FileViewSource, path: string, name: string): void {
+  openLinkInNewTab(fileViewHref(source, path, name));
 }
 
-/** Tải file gốc về máy, đúng tên gốc. */
+/** Tải file gốc về máy, đúng tên gốc. Tab mới bị chặn ⇒ tải bằng tab này (file tải xuống, trang không rời đi). */
 export async function downloadFileFrom(source: FileViewSource, path: string, name: string): Promise<void> {
-  if (!(await openInNewTab(() => FILE_VIEW_URL[source](path, 600, name)))) {
-    notify.error("Không tải được file — tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.");
-  }
+  const result = await openInNewTab(() => FILE_VIEW_URL[source](path, 600, name), { download: true });
+  if (result === "no-url") notify.error("Không tải được file — tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.");
+  else if (result === "blocked") notify.error(NEW_TAB_BLOCKED_MESSAGE);
 }

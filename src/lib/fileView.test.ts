@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { fileViewHref, needsAppViewer, parseFileViewParams } from "./fileViewLink";
+import { fileViewHref, parseFileViewParams } from "./fileViewLink";
 import { readSheetPreview } from "./sheetPreview";
 
 describe("readSheetPreview (ba-spec 61 R5)", () => {
@@ -20,11 +20,6 @@ describe("readSheetPreview (ba-spec 61 R5)", () => {
 });
 
 describe("link trang xem file (ba-spec 61 AC-5, AC-6)", () => {
-  it("Word / Excel / văn bản mở trang xem của app; PDF / ảnh / zip thì không", () => {
-    expect(["x.doc", "x.DOCX", "x.xlsx", "x.xls", "x.txt", "x.csv"].map(needsAppViewer)).toEqual([true, true, true, true, true, true]);
-    expect(["scan.pdf", "anh.png", "goi.zip"].map(needsAppViewer)).toEqual([false, false, false]);
-  });
-
   it("dựng rồi đọc lại đúng nguồn, đường dẫn, tên (cả dấu tiếng Việt)", () => {
     const href = fileViewHref("export", "c1/Hợp đồng.doc", "Hợp đồng.doc");
     expect(href.startsWith("#/file-view?")).toBe(true);

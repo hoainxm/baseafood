@@ -71,7 +71,7 @@ import {
 import { useCan } from "@/features/shared/PermissionProvider";
 import { DEFAULT_CATEGORY, WORKSHOPS, generateLotCode } from "./importHelpers";
 import { CreateTripDialog, ExplainMismatchDialog, type CreateTripTarget, type ExplainTarget } from "./supplierInvoiceParts";
-import { openInNewTab } from "@/lib/openInNewTab";
+import { NEW_TAB_BLOCKED_MESSAGE, openInNewTab } from "@/lib/openInNewTab";
 
 const STATE_TAG: Record<InvoiceLineState, TagVariant> = {
   matched: "done",
@@ -464,8 +464,10 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
   };
 
   const openFile = async (inv: SupplierInvoice) => {
-    if (!(await openInNewTab(() => getSupplierInvoiceFileUrl(inv.filePath))))
+    const result = await openInNewTab(() => getSupplierInvoiceFileUrl(inv.filePath));
+    if (result === "no-url")
       notify.warning(inv.filePath ? "Chưa mở được file (file mẫu của chế độ demo, hoặc chưa nối máy chủ)." : "Hóa đơn này chưa có file PDF.");
+    else if (result === "blocked") notify.error(NEW_TAB_BLOCKED_MESSAGE);
   };
 
   /* ---------- Cột ---------- */

@@ -94,13 +94,22 @@ export function ShipmentFormDialog({
   target,
   onClose,
   onSave,
+  recordedBy,
+  bookingFilesEnabled,
 }: {
   target: ShipmentTarget | null;
   onClose: () => void;
-  onSave: (s: ExportShipment, isNew: boolean) => boolean;
+  /** `bookingFiles`: file booking vừa tải lên (ba-spec 60 NV1) — lưu chuyến hỏng thì màn tự gỡ file đã tải. */
+  onSave: (s: ExportShipment, isNew: boolean, bookingFiles: ExportFile[]) => boolean;
+  recordedBy: string;
+  /** Máy chủ đã chạy 0094 + có kho file ⇒ hiện ô chọn file booking. */
+  bookingFilesEnabled: boolean;
 }) {
   const [form, setForm] = useState<ShipmentForm | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
+  // File chọn không vào nháp (File không lưu được) — mở lại nháp thì chọn lại.
+  const [bookingFiles, setBookingFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
   const draft = useDialogDraft({ form: "export-shipment", value: form, setValue: setForm, isEmpty: (f) => shipSnap(f) === f.initial });
 
   useEffect(() => {
@@ -132,20 +141,51 @@ export function ShipmentFormDialog({
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
     setErrors([]);
+    setBookingFiles([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
 
   const set = <K extends keyof ShipmentForm>(k: K, v: ShipmentForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
-  const save = () => {
+  const save = async () => {
+    if (busy) return;
     // Không đòi `target`: hộp mở lại từ nháp sau tải trang thì target rỗng, mọi thứ cần đã nằm trong form.
     if (!form) return;
     const errs = validateShipment(form).map((i) => ({ field: i.label, message: i.message }));
     // Nháp cũ (trước khi form mang existingMeta) không biết là sửa hay lên mới ⇒ không đoán, bắt mở lại.
     if (form.existingMeta === undefined) errs.push({ field: "Nháp cũ", message: "Bấm Bỏ bản nháp rồi mở lại chuyến để sửa" });
+    for (const f of bookingFiles) {
+      const err = checkExportFile(f);
+      if (err) errs.push({ field: "File booking", message: err });
+    }
     setErrors(errs);
     if (errs.length) return;
     const e = form.existingMeta;
+    let uploaded: { path: string; fileName: string }[] = [];
+    if (bookingFiles.length && bookingFilesEnabled) {
+      setBusy(true);
+      try {
+        uploaded = await uploadAll(bookingFiles, form.contractId, "shipment", "booking");
+      } catch (err) {
+        notify.error(err instanceof Error ? err.message : "Không tải được file booking lên máy chủ");
+        setBusy(false);
+        return;
+      }
+    }
+    const now = new Date().toISOString();
+    const fileRows: ExportFile[] = uploaded.map((u) => ({
+      id: newId(),
+      contractId: form.contractId,
+      shipmentId: form.id,
+      stepItemId: "",
+      step: "booking",
+      path: u.path,
+      fileName: u.fileName,
+      layerNo: null,
+      caption: "",
+      uploadedBy: recordedBy,
+      createdAt: now,
+    }));
     const { key: _key, contractNo: _no, initial: _initial, existingMeta: _meta, ...rest } = form;
     const ok = onSave(
       {
@@ -161,8 +201,14 @@ export function ShipmentFormDialog({
         createdAt: e?.createdAt ?? new Date().toISOString(),
       },
       !e,
+      fileRows,
     );
-    if (ok) draft.done();
+    setBusy(false);
+    if (!ok) {
+      void removeExportFiles(uploaded.map((u) => u.path));
+      return;
+    }
+    draft.done();
   };
 
   const isTruck = form?.kind === "truck";
@@ -192,9 +238,9 @@ export function ShipmentFormDialog({
           >
             Hủy
           </Button>
-          <Button variant="save" onClick={save} title="Lưu chuyến này.">
+          <Button variant="save" onClick={() => void save()} title="Lưu chuyến này (kèm file booking đã chọn).">
             <Save className="mr-2 h-4 w-4" aria-hidden />
-            Lưu chuyến
+            {busy ? `Đang tải ${bookingFiles.length} file…` : "Lưu chuyến"}
           </Button>
         </>
       }
@@ -217,9 +263,13 @@ export function ShipmentFormDialog({
             <Input value={form.goodsSummary} onChange={(e) => set("goodsSummary", e.target.value)} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Số booking" hint="Trống = chờ booking">
-              <Input value={form.bookingNo} onChange={(e) => set("bookingNo", e.target.value)} />
-            </Field>
+            <div className="grid min-w-0 content-start gap-2">
+              <Field label="Số booking" hint="Trống = chờ booking">
+                <Input value={form.bookingNo} onChange={(e) => set("bookingNo", e.target.value)} />
+              </Field>
+              {/* File booking (ba-spec 60 NV1): không bắt buộc; booking sửa đổi đính thêm ở khối Đóng cont. */}
+              {bookingFilesEnabled && <FilePicker files={bookingFiles} onChange={setBookingFiles} label="Đính file booking" />}
+            </div>
             <Field label="Cảng đến">
               <Input value={form.portOfDischarge} onChange={(e) => set("portOfDischarge", e.target.value)} />
             </Field>
@@ -744,7 +794,8 @@ export function StepItemDialog({
 export interface LoadingUploadTarget {
   shipment: ExportShipment;
   contractId: string;
-  step: Extract<ExportStep, "loading-plan" | "loading-photos">;
+  /** "booking" = file booking của chuyến (ba-spec 60) — không gắn mục bước, không làm bước nào tự xong. */
+  step: Extract<ExportStep, "loading-plan" | "loading-photos"> | "booking";
   label: string;
 }
 
@@ -789,17 +840,19 @@ export function LoadingUploadDialog({
   /** Đích của hộp: mở bằng nút thì có `target`; mở lại từ nháp (tải trang) thì lấy trong form. */
   const tgt = target ?? form?.tg ?? null;
   const isPhotos = tgt?.step === "loading-photos";
+  const isBooking = tgt?.step === "booking";
 
   const save = async () => {
     if (!form || !tgt || busy) return;
     const errs: FieldError[] = [];
-    if (!files.length) errs.push({ field: "File", message: isPhotos ? "Chọn hoặc chụp ít nhất một ảnh" : "Chọn file sơ đồ container" });
+    if (!files.length) errs.push({ field: "File", message: isPhotos ? "Chọn hoặc chụp ít nhất một ảnh" : isBooking ? "Chọn file booking" : "Chọn file sơ đồ container" });
     if (!hasExportStorage) errs.push({ field: "Máy chủ", message: "Đang chạy không nối máy chủ — chưa tải ảnh lên được" });
     setErrors(errs);
     if (errs.length) return;
     setBusy(true);
     try {
-      const up = await uploadAll(files, tgt.contractId, "loading", tgt.step);
+      // File booking chỉ người ghi Xuất khẩu đính ⇒ vùng "shipment" (như file chứng từ), không vùng "loading" của người đóng hàng.
+      const up = await uploadAll(files, tgt.contractId, isBooking ? "shipment" : "loading", tgt.step);
       const rows: ExportFile[] = up.map((u, i) => ({
         id: newId(),
         contractId: tgt.contractId,
@@ -833,8 +886,14 @@ export function LoadingUploadDialog({
         draft.dismiss();
         onClose();
       }}
-      title={`${isPhotos ? "Ảnh đóng cont" : "Sơ đồ container"} · ${tgt?.label ?? ""}`}
-      description={isPhotos ? "Chụp từng lớp hàng (có tờ giấy ghi lớp / số thùng), ảnh seal và ảnh số cont. Chọn nhiều ảnh một lần được." : "Đính file sơ đồ xếp hàng (Excel / PDF / ảnh)."}
+      title={`${isPhotos ? "Ảnh đóng cont" : isBooking ? "File booking" : "Sơ đồ container"} · ${tgt?.label ?? ""}`}
+      description={
+        isPhotos
+          ? "Chụp từng lớp hàng (có tờ giấy ghi lớp / số thùng), ảnh seal và ảnh số cont. Chọn nhiều ảnh một lần được."
+          : isBooking
+            ? "Đính bản xác nhận booking của hãng tàu (PDF / ảnh / Word). Booking sửa đổi thì đính thêm — bản mới nhất hiện đầu."
+            : "Đính file sơ đồ xếp hàng (Excel / PDF / ảnh)."
+      }
       icon={isPhotos ? Camera : ClipboardList}
       size="md"
       footer={

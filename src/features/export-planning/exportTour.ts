@@ -238,6 +238,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         body:
           "Hợp đồng có nhiều chuyến thì chọn chuyến ở danh sách phía trên; mỗi dòng có thanh tiến độ và bước tiếp theo của chuyến.\n" +
           "Thẻ chuyến ghi booking, ngày đóng cont, ETD và ETA, tàu, số container và seal, kg kế hoạch và kg thực xuất.\n" +
+          "File booking: đính bản xác nhận booking của hãng tàu ngay ở ô Số booking khi Ghi chuyến, hoặc ở hàng File booking của bước Đóng cont (booking sửa đổi thì đính thêm, bản mới nhất ở đầu). File booking chỉ để xem, không làm bước nào tự xong; người chỉ đóng hàng không thấy file này.\n" +
           "Thẻ trạng thái chuyến: Đang làm · xong k/5 bước bắt buộc (bước 1 đến 5; bước 6 không bắt buộc) · Đủ hồ sơ · Trễ hạn giao n ngày · Đã hủy.\n" +
           "Hàng 6 bước bên dưới: chọn một bước để chuyển nhanh tới phần đó.",
       }),

@@ -11,6 +11,7 @@ import { newId } from "@/lib/store";
 import {
   ITEM_STATE_LABELS,
   LOADING_STEPS,
+  bookingFilesOf,
   STEP_TITLES,
   SUB_STEP_LABELS,
   blankItem,
@@ -41,6 +42,8 @@ import type { PaymentTarget } from "./RecordDialogs";
 import { ShipmentOrders } from "@/features/production-orders/ShipmentOrders";
 
 export interface ShipmentPanelCan {
+  /** Xem được Xuất khẩu (`export-plans.view`) — người chỉ đóng hàng không thấy file booking (ba-spec 60 R4). */
+  view: boolean;
   update: boolean;
   delete: boolean;
   viewPrice: boolean;
@@ -62,7 +65,8 @@ function ChecklistRow({
   tourMark,
 }: {
   label: string;
-  state: ExportItemState;
+  /** Bỏ trống = hàng chỉ để xem (vd File booking — ba-spec 60 R3), không có thẻ trạng thái. */
+  state?: ExportItemState;
   extraTag?: ReactNode;
   children?: ReactNode;
   actions?: ReactNode;
@@ -74,10 +78,12 @@ function ChecklistRow({
       {/* Thẻ trạng thái LUÔN nằm dưới tên — tên ngắn hay dài thì hàng nào cũng cùng khuôn. */}
       <div className="grid min-w-0 justify-items-start gap-1">
         {label && <span className="font-semibold break-words">{label}</span>}
-        <span data-tour={tourMark ? "item-status" : undefined} className="flex flex-wrap gap-1">
-          <StateTag state={state} />
-          {extraTag}
-        </span>
+        {(state || extraTag) && (
+          <span data-tour={tourMark ? "item-status" : undefined} className="flex flex-wrap gap-1">
+            {state && <StateTag state={state} />}
+            {extraTag}
+          </span>
+        )}
       </div>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-sm">{children}</div>
       {actions && (
@@ -126,6 +132,7 @@ export function ShipmentPanel({
   onDeletePayment,
   onPreview,
   onRemoveFile,
+  bookingFilesEnabled,
 }: {
   data: ExportData;
   shipment: ExportShipment;
@@ -145,6 +152,8 @@ export function ShipmentPanel({
   onDeletePayment: (p: ExportPayment) => void;
   onPreview: (f: PreviewTarget) => void;
   onRemoveFile: (f: ExportFile) => void;
+  /** Máy chủ đã chạy 0094 + có kho file ⇒ đính được file booking (ba-spec 60 R6). */
+  bookingFilesEnabled: boolean;
 }) {
   const opts = { filesAvailable };
   const label = [shipment.lotCode && `Lô ${shipment.lotCode}`, shipmentKindLabel(shipment.kind), shipment.containerNo].filter(Boolean).join(" · ");
@@ -219,6 +228,39 @@ export function ShipmentPanel({
         actions={updateButton(() => openStep(step), `Cập nhật ${SUB_STEP_LABELS[step].toLowerCase()}: trạng thái, số, file.`)}
       >
         {itemDetail(it, files, `${label} · ${SUB_STEP_LABELS[step]}`)}
+      </ChecklistRow>
+    );
+  };
+
+  /** File booking của chuyến (ba-spec 60 NV2, NV3): chỉ để xem, không trạng thái, bản mới nhất đầu. */
+  const bookingRow = () => {
+    const files = bookingFilesOf(data, shipment.id);
+    return (
+      <ChecklistRow
+        key="booking"
+        label="File booking"
+        actions={
+          !isCancelled &&
+          bookingFilesEnabled &&
+          can.update && (
+            <Button size="sm" variant="outline" onClick={() => onUploadLoading({ shipment, contractId: contract.id, step: "booking", label })} title="Đính bản xác nhận booking của hãng tàu (booking sửa đổi thì đính thêm).">
+              <FilePlus2 className="mr-1 h-4 w-4" aria-hidden />
+              Đính file booking
+            </Button>
+          )
+        }
+      >
+        {files.length ? (
+          <>
+            <span className="text-muted-foreground">
+              {shipment.bookingNo ? `Booking ${shipment.bookingNo} · ` : ""}
+              {files.length} file — bản mới nhất ở đầu
+            </span>
+            <FileList files={files} onPreview={onPreview} caption={`${label} · File booking`} onRemove={can.update && !isCancelled ? onRemoveFile : undefined} />
+          </>
+        ) : (
+          <span className="text-muted-foreground">Chưa có file booking{shipment.bookingNo ? ` (số booking ${shipment.bookingNo})` : ""}.</span>
+        )}
       </ChecklistRow>
     );
   };
@@ -376,6 +418,7 @@ export function ShipmentPanel({
               : [shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ") || <span className="text-muted-foreground">Chưa điền</span>}
           </span>
         </ChecklistRow>
+        {can.view && bookingRow()}
         {LOADING_STEPS.map((st) => (st === "loading-plan" || st === "loading-photos" ? uploadRow(st) : singleRow(st, 4)))}
       </StepBlock>
 

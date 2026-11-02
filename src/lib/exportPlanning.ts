@@ -562,6 +562,16 @@ export function filesOfItem(d: Pick<ExportData, "files">, itemId: string): Expor
 }
 
 /** File của bước đóng cont 4a / 4b (gắn theo bước, không cần mục). */
+/**
+ * File booking của MỘT chuyến (ba-spec 60 R1, R2): mới nhất trước. Chuyến "dùng chung" KHÔNG mượn file của chuyến
+ * nguồn (R5). Không gắn mục bước ⇒ không làm bước nào tự xong (R3).
+ */
+export function bookingFilesOf(d: Pick<ExportData, "files">, shipmentId: string): ExportFile[] {
+  return d.files
+    .filter((f) => f.shipmentId === shipmentId && f.step === "booking")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.fileName.localeCompare(b.fileName, "vi"));
+}
+
 export function filesOfStep(d: Pick<ExportData, "files">, shipmentId: string, step: ExportStep): ExportFile[] {
   return d.files
     .filter((f) => f.shipmentId === shipmentId && f.step === step)

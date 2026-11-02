@@ -55,7 +55,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Ghi chuyến",
     needs: ["export-plans", "create"],
     actors: KH,
-    text: "Chọn Ghi chuyến cho từng container, xe tải hoặc lô đóng ghép: số lượng, booking, số cont, ETD.",
+    text: "Chọn Ghi chuyến cho từng container, xe tải hoặc lô đóng ghép: số lượng, booking (đính kèm file booking được), số cont, ETD.",
     done: "Mọi dòng hàng đã có chuyến (còn thiếu thì hiện thẻ Còn … chưa ghi chuyến)",
   },
   {
@@ -155,6 +155,10 @@ export const exportPlanningGuide: PageGuide = {
         <GuideList>
           <li>Đầu mỗi bước ghi <b>Còn thiếu</b> kèm tên mục chưa xong.</li>
           <li>Thẻ <b>Trễ hạn</b>: chuyến quá hạn giao. Thẻ <b>Chờ booking</b>: chưa có số booking và số container.</li>
+          <li>
+            <b>File booking</b>: đính ở ô Số booking khi Ghi chuyến hoặc ở hàng File booking của bước Đóng cont; booking sửa đổi thì đính
+            thêm, bản mới nhất ở đầu. Chỉ để xem — không làm bước nào tự xong; người chỉ đóng hàng không thấy file này.
+          </li>
         </GuideList>
       </GuideSection>
       <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">

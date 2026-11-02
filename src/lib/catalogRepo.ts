@@ -385,6 +385,21 @@ export function useExportDeferralsAvailable(): boolean {
   }, []);
   return ok;
 }
+/**
+ * Máy chủ đã chạy 0094 (file booking của chuyến xuất khẩu, ba-spec 60) — dò view `export_file_steps`. Chưa có ⇒ ẩn
+ * chỗ đính file booking (dòng `step = booking` bị ràng buộc cũ từ chối ⇒ kẹt hàng chờ). Không nối máy chủ ⇒ true.
+ */
+export function useExportBookingFilesAvailable(): boolean {
+  const [ok, setOk] = useState<boolean>(!isServerConnected);
+  useEffect(() => {
+    let alive = true;
+    void serverHasColumn("export_file_steps", "step").then((v) => alive && setOk(v));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return ok;
+}
 /** Nhật ký nhóm Nhập hàng / Sản xuất (mig 0092) — thiếu bảng ⇒ không ghi. */
 export const useImportsActivities = () => useTable(IMPORTS_ACTIVITY_TABLE);
 export const useProductionActivities = () => useTable(PRODUCTION_ACTIVITY_TABLE);

@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
-import { useCustomerProductNameStore, useCustomers, useExportDeferralsAvailable, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
+import { useCustomerProductNameStore, useCustomers, useExportBookingFilesAvailable, useExportDeferralsAvailable, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNamesDialog";
 import { useAuth } from "@/lib/auth";
@@ -363,7 +363,7 @@ export default function ExportPlanningScreen() {
     return true;
   };
 
-  const saveShipment = (s: ExportShipment, isNew: boolean): boolean => {
+  const saveShipment = (s: ExportShipment, isNew: boolean, bookingFiles: ExportFile[] = []): boolean => {
     // Ghi chuyến MỚI chỉ sau khi HĐ đã duyệt + đủ hồ sơ (mig 0079) — nút đã ẩn, chặn thêm ở đây.
     const gate = shipmentGate(d, s.contractId, opts);
     if (isNew && !gate.ok) {
@@ -372,19 +372,25 @@ export default function ExportPlanningScreen() {
     }
     const prevS = d.shipments;
     const prevI = d.items;
+    const prevF = d.files;
     const nextS = isNew ? [...prevS, s] : prevS.map((x) => (x.id === s.id ? s : x));
     if (!store.saveShipments(nextS)) return false;
+    // File booking chọn trong hộp ghi chuyến (ba-spec 60 NV1) — cùng lần lưu, cùng Hoàn tác.
+    if (bookingFiles.length) store.saveFiles([...prevF, ...bookingFiles]);
     if (isNew) {
       const add = missingDocumentItems(s.id, termsOf(d, s.contractId), prevI, newId);
       if (add.length) store.saveItems([...prevI, ...add]);
     }
-    const what = isNew ? `Ghi chuyến ${shipName(s)} — tháng ${shipmentMonth(s).split("-").reverse().join("/")}` : `Sửa chuyến ${shipName(s)}`;
+    const what =
+      (isNew ? `Ghi chuyến ${shipName(s)} — tháng ${shipmentMonth(s).split("-").reverse().join("/")}` : `Sửa chuyến ${shipName(s)}`) +
+      (bookingFiles.length ? ` · đính ${bookingFiles.length} file booking: ${bookingFiles.map((f) => f.fileName).join(", ")}` : "");
     track(s.contractId, s.id, isNew ? "create" : "update", what);
     notify.saved(
       isNew ? `Đã ghi chuyến${s.lotCode ? ` lô ${s.lotCode}` : ""} — tháng ${shipmentMonth(s).split("-").reverse().join("/")}` : "Đã lưu chuyến",
       undoTracked(s.contractId, s.id, what, () => {
         store.saveShipments(prevS);
         store.saveItems(prevI);
+        if (bookingFiles.length) store.saveFiles(prevF);
       }),
     );
     setShipmentTarget(null);
@@ -423,9 +429,10 @@ export default function ExportPlanningScreen() {
     const prev = d.files;
     if (!store.saveFiles([...prev, ...rows])) return false;
     const r0 = rows[0];
-    const what = r0 ? `Đính ${rows.length} file ${SUB_STEP_LABELS[r0.step as ExportStepItem["step"]] ?? "đóng cont"} cho chuyến ${shipName(d.shipments.find((x) => x.id === r0.shipmentId))}` : "";
+    const kindText = r0?.step === "booking" ? "booking" : (SUB_STEP_LABELS[r0?.step as ExportStepItem["step"]] ?? "đóng cont");
+    const what = r0 ? `Đính ${rows.length} file ${kindText} cho chuyến ${shipName(d.shipments.find((x) => x.id === r0.shipmentId))}` : "";
     if (r0) track(r0.contractId, r0.shipmentId, "attach", what);
-    notify.saved(`Đã đính ${rows.length} file đóng cont`, undoTracked(r0?.contractId ?? "", r0?.shipmentId ?? "", what, () => store.saveFiles(prev)));
+    notify.saved(`Đã đính ${rows.length} file ${r0?.step === "booking" ? "booking" : "đóng cont"}`, undoTracked(r0?.contractId ?? "", r0?.shipmentId ?? "", what, () => store.saveFiles(prev)));
     setLoadingTarget(null);
     return true;
   };
@@ -600,6 +607,8 @@ export default function ExportPlanningScreen() {
 
   /** ba-spec 58: máy chủ đã chạy 0093 thì mới cho ghi "bổ sung sau" (chưa có cột ⇒ gửi lên kẹt hàng chờ). */
   const deferralsAvailable = useExportDeferralsAvailable();
+  /** ba-spec 60: máy chủ đã chạy 0094 + có kho file ⇒ đính file booking được. */
+  const bookingFilesEnabled = useExportBookingFilesAvailable() && filesAvailable;
 
   /** Ghi "bổ sung sau" cho một loại hồ sơ bắt buộc còn thiếu (R1–R3): mở ghi chuyến, vẫn chặn duyệt cuối. */
   const doDefer = (c: ExportContract, kind: ExportContractAttachmentKind, reason: string) => {
@@ -946,6 +955,7 @@ export default function ExportPlanningScreen() {
               can={{
                 update: can.update,
                 delete: can.delete,
+                view: can.view,
                 viewPrice: can["view-price"],
                 loadingCreate: loadingCan.create,
                 paymentsView: paymentsCan.view,
@@ -970,6 +980,7 @@ export default function ExportPlanningScreen() {
               onDelete={() => dossier.selected && setDeletingShipment(dossier.selected)}
               onOpenItem={setItemTarget}
               onUploadLoading={setLoadingTarget}
+              bookingFilesEnabled={bookingFilesEnabled}
               onPayment={setPaymentTarget}
               onDeletePayment={deletePayment}
               onPreview={setPreview}
@@ -997,7 +1008,13 @@ export default function ExportPlanningScreen() {
       <FinalReviewDialog target={finalTarget} approverName={approverName} onClose={() => setFinalTarget(null)} onSave={saveFinalReview} />
       <AttachmentDialog target={attachTarget} recordedBy={recordedBy} onClose={() => setAttachTarget(null)} onSave={saveAttachments} />
       <ExtensionDialog target={extensionTarget} recordedBy={recordedBy} onClose={() => setExtensionTarget(null)} onSave={saveExtension} />
-      <ShipmentFormDialog target={shipmentTarget} onClose={() => setShipmentTarget(null)} onSave={saveShipment} />
+      <ShipmentFormDialog
+        target={shipmentTarget}
+        onClose={() => setShipmentTarget(null)}
+        onSave={saveShipment}
+        recordedBy={recordedBy}
+        bookingFilesEnabled={bookingFilesEnabled}
+      />
       <ScheduleDialog target={scheduleTarget} onClose={() => setScheduleTarget(null)} onSave={saveSchedule} />
       <StepItemDialog
         target={itemTarget}

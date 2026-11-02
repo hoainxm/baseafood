@@ -73,6 +73,8 @@ import {
   DEFERRED_STEP_TEXT,
   contractStepState,
   CONTRACT_ATTACHMENT_LABELS,
+  bookingFilesOf,
+  subStepState,
 } from "./exportPlanning";
 import type {
   ExportContract,
@@ -1026,5 +1028,29 @@ describe("ba-spec 58 · hồ sơ HĐ \"bổ sung sau\" (mig 0093)", () => {
       approvals: [...d0.approvals, approveNew("r1", "c1")],
     };
     expect(shipmentGate(d, "c1").ok).toBe(true);
+  });
+});
+
+describe("ba-spec 60 · file booking của chuyến (mig 0094)", () => {
+  it("AC-1: file booking không làm 4a / bước 4 / chuyến tự xong", () => {
+    const s = shipment("s1", "c1");
+    const base = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], shipments: [s] });
+    const withBooking = { ...base, files: [file("s1", "booking")] };
+    expect(subStepState(withBooking, "s1", "loading-plan")).toBe(subStepState(base, "s1", "loading-plan"));
+    expect(subStepState(withBooking, "s1", "loading-plan")).not.toBe("done");
+    expect(stepState(withBooking, s, 4)).toBe(stepState(base, s, 4));
+    expect(isShipmentClosed(withBooking, s)).toBe(false);
+  });
+  it("AC-2: chỉ file booking của đúng chuyến, mới nhất trước", () => {
+    const f1 = { ...file("s1", "booking"), createdAt: "2026-11-02T01:00:00.000Z", fileName: "Booking cũ.pdf" };
+    const f2 = { ...file("s1", "booking"), createdAt: "2026-11-02T03:00:00.000Z", fileName: "Booking sửa đổi.pdf" };
+    const other = { ...file("s2", "booking"), createdAt: "2026-11-02T04:00:00.000Z" };
+    const plan = file("s1", "loading-plan");
+    const d = data({ files: [f1, other, f2, plan] });
+    expect(bookingFilesOf(d, "s1").map((f) => f.fileName)).toEqual(["Booking sửa đổi.pdf", "Booking cũ.pdf"]);
+  });
+  it("AC-3: chuyến dùng chung không mượn file booking của chuyến kia", () => {
+    const d = data({ files: [file("s1", "booking")], shipments: [shipment("s1", "c1"), shipment("s2", "c1", { bookingNo: "BK1" })] });
+    expect(bookingFilesOf(d, "s2")).toHaveLength(0);
   });
 });

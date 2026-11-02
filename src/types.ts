@@ -1443,7 +1443,8 @@ export interface ExportFile {
   contractId: string;
   shipmentId: string;
   stepItemId: string;
-  step: ExportStep | "contract";
+  /** "contract" = hồ sơ cấp HĐ (0079); "booking" = file booking của chuyến (0094, ba-spec 60) — không gắn mục bước. */
+  step: ExportStep | "contract" | "booking";
   attachmentKind?: ExportContractAttachmentKind | "";
   path: string;
   fileName: string;

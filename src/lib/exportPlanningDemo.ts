@@ -358,6 +358,8 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
     out.items.push({ ...blankItem(s.id, step, id("muc"), at(today)), sharedFromId: src.id, docKind: src.docKind, docForm: src.docForm, docIssuer: src.docIssuer });
   };
   const loadingFiles = (s: ExportShipment, c: ExportContract, photos: number, plan?: ExportDemoPackFile, realPhotos: ExportDemoPackFile[] = []) => {
+    // File booking của chuyến (ba-spec 60, mig 0094) — giữ chỗ, chuyến đã đóng cont thì có booking.
+    out.files.push({ id: id("booking"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "booking", path: placeholder(`booking-${s.id}.pdf`), fileName: `Booking ${s.bookingNo || s.id}.pdf`, layerNo: null, caption: "", uploadedBy: "Demo", createdAt: at(today) });
     out.files.push({ id: id("file"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "loading-plan", path: plan?.path ?? placeholder(`so-do-${s.id}.xls`), fileName: plan?.name ?? "Sơ đồ container.xls", layerNo: null, caption: "", uploadedBy: "Thủ kho demo", createdAt: at(today) });
     const list = realPhotos.length ? realPhotos : Array.from({ length: photos }, (_, k) => ({ key: "", name: `Lớp ${k + 1}.jpg`, path: placeholder(`lop-${k + 1}.jpg`) }));
     list.forEach((f, k) =>

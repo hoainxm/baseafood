@@ -56,9 +56,11 @@ import {
 import { progressText, shipmentProgress } from "./progress";
 import { formatDateVN } from "@/lib/format";
 import type { Customer, ExportContract, ExportItemState } from "@/types";
-import { AlarmClock, CalendarCheck, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Container, Eye, FileSpreadsheet, ListChecks } from "lucide-react";
+import { AlarmClock, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, CircleCheck, Container, Eye, FileSpreadsheet, ListChecks } from "lucide-react";
 import { StepBar } from "./parts";
 
+/** Khóa "ngày" của khối chuyến chưa có ngày đóng cont / ETD. */
+const UNDATED = "undated";
 const WEEKDAYS = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
 /** "Thứ 3, 03/11/2026" — tiêu đề một ngày của lịch. */
 const dayHeading = (iso: string) => `${WEEKDAYS[new Date(`${iso}T00:00:00Z`).getUTCDay()]}, ${formatDateVN(iso)}`;
@@ -96,22 +98,22 @@ export function MonthView({
   const plan = useMemo(() => buildPeriodPlan(period, data, customers, today, opts, customerFilter), [period, data, customers, today, filesAvailable, customerFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   const groups = plan.groups;
   const pending = plan.pendingContracts;
-  // ba-spec 57: chuyến xếp theo ngày xuất. Ngày mở sẵn = ngày có chuyến đầu tiên ≥ hôm nay (R9); đổi kỳ /
-  // lọc khách ⇒ tính lại ngày mở sẵn. Mở nhiều ngày cùng lúc được.
+  // ba-spec 57 v2 (phương án A): hai cột — danh sách ngày | chi tiết MỘT ngày đang chọn. Ngày chọn sẵn = ngày có
+  // chuyến đầu tiên ≥ hôm nay, kỳ đã qua ⇒ ngày đầu của kỳ (R9). Đổi kỳ / lọc khách ⇒ chọn lại từ đầu.
+  // Điện thoại: chỉ hiện một cột — danh sách, chạm ngày ⇒ chi tiết có Quay lại.
   const schedule = useMemo(() => buildDaySchedule(groups), [groups]);
   const scheduleKey = `${period.from}_${period.to}_${customerFilter}`;
-  const [openState, setOpenState] = useState<{ key: string; days: ReadonlySet<string> } | null>(null);
-  const openDays: ReadonlySet<string> =
-    openState?.key === scheduleKey ? openState.days : new Set([defaultOpenDay(schedule.days, today)].filter((x): x is string => !!x));
-  const toggleDay = (date: string) => {
-    const next = new Set(openDays);
-    if (next.has(date)) next.delete(date);
-    else next.add(date);
-    setOpenState({ key: scheduleKey, days: next });
-  };
-  /** Dòng đầu tiên đang hiện (ngày mở đầu tiên, rồi khối chưa có ngày) — mốc tour "Tiến độ" + "Mở". */
-  const firstVisibleRow =
-    schedule.days.find((d) => openDays.has(d.date))?.customers[0]?.rows[0] ?? schedule.undated[0]?.rows[0];
+  const [pick, setPick] = useState<{ key: string; day: string; phoneDetail: boolean } | null>(null);
+  const defaultDay = defaultOpenDay(schedule.days, today) ?? schedule.days[0]?.date ?? (schedule.undated.length ? UNDATED : "");
+  const picked = pick?.key === scheduleKey && (pick.day === UNDATED ? schedule.undated.length > 0 : schedule.days.some((d) => d.date === pick.day)) ? pick : null;
+  const selectedDay = picked?.day ?? defaultDay;
+  const phoneDetail = picked?.phoneDetail ?? false;
+  const selectDay = (day: string) => setPick({ key: scheduleKey, day, phoneDetail: true });
+  const backToDays = () => setPick({ key: scheduleKey, day: selectedDay, phoneDetail: false });
+  const selected = schedule.days.find((d) => d.date === selectedDay);
+  const selectedCustomers = selectedDay === UNDATED ? schedule.undated : (selected?.customers ?? []);
+  /** Dòng đầu tiên của ngày đang chọn — mốc tour "Tiến độ" + "Mở". */
+  const firstVisibleRow = selectedCustomers[0]?.rows[0];
   const markKey = period.kind === "month" ? period.from.slice(0, 7) : `${period.from}_${period.to}`;
   const current = currentPeriodOf(period.kind, today);
   const isCurrent = current.from === period.from && current.to === period.to;
@@ -284,6 +286,30 @@ export function MonthView({
     },
   ];
 
+  /** Một mục ngày ở cột trái: ngày đang chọn tô viền + nền nhấn; chọn ⇒ chi tiết bên phải (điện thoại: sang trang chi tiết). */
+  const dayButton = (day: string, heading: string, counts: string, lateCount: number, missingCount: number, sub: string) => {
+    const active = day === selectedDay;
+    return (
+      <button
+        type="button"
+        aria-current={active ? "true" : undefined}
+        onClick={() => selectDay(day)}
+        title="Xem các chuyến của ngày này, gom theo khách."
+        className={`grid w-full min-w-0 gap-0.5 rounded-lg border-2 px-3 py-2 text-left press-feedback ${
+          active ? "border-primary bg-accent text-accent-foreground" : "border-border bg-background hover:bg-muted"
+        }`}
+      >
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="tnum font-semibold">{heading}</span>
+          {lateCount > 0 && <Tag variant="error">{lateCount} trễ</Tag>}
+          {missingCount > 0 && <Tag variant="warning">{missingCount} còn thiếu</Tag>}
+        </span>
+        <span className="tnum text-sm">{counts}</span>
+        <span className="truncate text-sm text-muted-foreground">{sub}</span>
+      </button>
+    );
+  };
+
   /** Chuyến của một ngày (hoặc chưa có ngày) — mỗi khách một bảng nhỏ, đủ cột tiến độ như trước (R6). */
   const customerTables = (list: readonly ScheduleCustomer[], markPrefix: string) =>
     list.map((c) => (
@@ -420,46 +446,41 @@ export function MonthView({
               description="Lập hợp đồng → duyệt → đính kèm hồ sơ rồi Ghi chuyến — chuyến xếp theo ngày đóng cont (chưa có thì ETD, rồi tháng kế hoạch)."
             />
           )}
-          {schedule.days.length > 0 && (
-            <section data-tour="shipment-table" className="grid min-w-0 gap-3">
-              <h3 className="font-semibold">Chuyến theo ngày xuất</h3>
-              <ol className="grid min-w-0 gap-3">
-                {schedule.days.map((day) => {
-                  const isOpen = openDays.has(day.date);
-                  return (
-                    <li key={day.date} className="grid min-w-0 rounded-xl border border-border">
-                      <button
-                        type="button"
-                        aria-expanded={isOpen}
-                        onClick={() => toggleDay(day.date)}
-                        title={isOpen ? "Thu chi tiết ngày này." : "Xem các chuyến của ngày này, gom theo khách."}
-                        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-4 py-3 text-left hover:bg-muted press-feedback"
-                      >
-                        <ChevronDown aria-hidden className={`size-5 shrink-0 text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`} />
-                        <span className="tnum font-semibold">{dayHeading(day.date)}</span>
-                        <span className="tnum text-muted-foreground">
-                          {day.customerCount} khách · {day.shipmentCount} chuyến · KH {formatNumber(day.plannedKg)} kg
-                        </span>
-                        {day.lateCount > 0 && <Tag variant="error">{day.lateCount} trễ</Tag>}
-                        {day.missingCount > 0 && <Tag variant="warning">{day.missingCount} còn thiếu</Tag>}
-                        <span className="basis-full min-w-0 pl-8 text-sm text-muted-foreground">{day.customers.map((c) => c.customerName).join(" · ")}</span>
-                      </button>
-                      {isOpen && (
-                        <div className="grid min-w-0 gap-4 border-t border-border px-4 py-3">
-                          {customerTables(day.customers, `${markKey}:${day.date}`)}
-                        </div>
-                      )}
+          {(schedule.days.length > 0 || schedule.undated.length > 0) && (
+            <section data-tour="shipment-table" className="grid min-w-0 gap-4 md:grid-cols-[minmax(13rem,17rem)_minmax(0,1fr)] md:items-start">
+              {/* Cột trái: các ngày có chuyến — chọn một ngày (không thu / mở). Điện thoại ẩn khi đang xem chi tiết. */}
+              <nav aria-label="Ngày xuất trong kỳ" className={`grid min-w-0 gap-2 ${phoneDetail ? "max-md:hidden" : ""}`}>
+                <h3 className="font-semibold">Ngày xuất</h3>
+                <ol className="grid min-w-0 gap-2">
+                  {schedule.days.map((day) => (
+                    <li key={day.date}>
+                      {dayButton(day.date, dayHeading(day.date), `${day.customerCount} khách · ${day.shipmentCount} chuyến`, day.lateCount, day.missingCount, day.customers.map((c) => c.customerName).join(" · "))}
                     </li>
-                  );
-                })}
-              </ol>
-            </section>
-          )}
-          {schedule.undated.length > 0 && (
-            <section data-tour={schedule.days.length ? undefined : "shipment-table"} className="grid min-w-0 gap-3">
-              <h3 className="font-semibold">Chuyến chưa có ngày</h3>
-              <p className="text-sm text-muted-foreground">Chuyến mới có tháng kế hoạch, chưa có ngày đóng cont hay ETD. Ghi ngày ở hồ sơ thì chuyến tự vào danh sách theo ngày.</p>
-              {customerTables(schedule.undated, `${markKey}:undated`)}
+                  ))}
+                  {schedule.undated.length > 0 && (
+                    <li>{dayButton(UNDATED, "Chưa có ngày", `${schedule.undated.length} khách · ${schedule.undated.reduce((n, c) => n + c.rows.length, 0)} chuyến`, 0, 0, "mới có tháng kế hoạch")}</li>
+                  )}
+                </ol>
+              </nav>
+              {/* Cột phải: chi tiết ngày đang chọn, gom theo khách. */}
+              <div className={`grid min-w-0 gap-4 rounded-xl border border-border p-4 ${phoneDetail ? "" : "max-md:hidden"}`}>
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                  <Button variant="ghost" size="sm" className="md:hidden" onClick={backToDays} title="Quay lại danh sách ngày.">
+                    <ChevronLeft className="mr-1 h-4 w-4" aria-hidden />
+                    Quay lại
+                  </Button>
+                  <h3 className="tnum font-semibold">{selectedDay === UNDATED ? "Chuyến chưa có ngày" : dayHeading(selectedDay)}</h3>
+                  {selected && (
+                    <span className="tnum text-muted-foreground">
+                      {selected.customerCount} khách · {selected.shipmentCount} chuyến · KH {formatNumber(selected.plannedKg)} kg
+                    </span>
+                  )}
+                </div>
+                {selectedDay === UNDATED && (
+                  <p className="text-sm text-muted-foreground">Chuyến mới có tháng kế hoạch, chưa có ngày đóng cont hay ETD. Ghi ngày ở hồ sơ thì chuyến tự vào đúng ngày.</p>
+                )}
+                {customerTables(selectedCustomers, `${markKey}:${selectedDay}`)}
+              </div>
             </section>
           )}
           {pending.length > 0 && (

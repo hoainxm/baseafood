@@ -136,8 +136,9 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       title: "Chuyến theo ngày xuất",
       body:
         "Chuyến của kỳ xếp theo ngày xuất: ngày đóng cont, chưa có thì ETD. Chỉ hiện ngày có chuyến, từ sớm tới muộn. Mỗi ngày ghi số khách · số chuyến · kg kế hoạch, tên các khách, và thẻ n trễ (trễ hạn giao) · n còn thiếu (chưa đủ hồ sơ).\n" +
-        "Chọn một ngày để xem chi tiết: chuyến gom theo khách, mỗi dòng là một chuyến (mã lô, loại chuyến, số hợp đồng, ngày đóng cont và ETD, kg kế hoạch và thực xuất). Chọn lại ngày để thu. Ngày có chuyến gần nhất từ hôm nay được mở sẵn.\n" +
-        "Chuyến mới có tháng kế hoạch, chưa có ngày đóng cont hay ETD, nằm ở khối Chuyến chưa có ngày bên dưới. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu.",
+        "Cột trái là các ngày, cột phải là chi tiết ngày đang chọn: chuyến gom theo khách, mỗi dòng là một chuyến (mã lô, loại chuyến, số hợp đồng, ngày đóng cont và ETD, kg kế hoạch và thực xuất). Chọn ngày khác ở cột trái thì cột phải đổi theo. Ngày có chuyến gần nhất từ hôm nay được chọn sẵn; kỳ đã qua thì chọn ngày đầu kỳ.\n" +
+        "Trên điện thoại chỉ hiện danh sách ngày; chạm một ngày để xem chi tiết, chọn Quay lại để về danh sách.\n" +
+        "Chuyến mới có tháng kế hoạch, chưa có ngày đóng cont hay ETD, nằm ở mục Chưa có ngày cuối cột trái. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu.",
     }),
     plan({
       id: "shipment-progress",

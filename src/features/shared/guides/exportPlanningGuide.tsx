@@ -168,8 +168,8 @@ export const exportPlanningGuide: PageGuide = {
         <GuideList>
           <li>Chuyến xếp theo ngày xuất: ngày đóng cont, chưa có thì ETD. Chỉ hiện ngày có chuyến, từ sớm tới muộn.</li>
           <li>Mỗi ngày ghi <b>n khách · m chuyến</b>, kg kế hoạch, tên khách; thẻ <b>n trễ</b> (trễ hạn giao) và <b>n còn thiếu</b> (chưa đủ hồ sơ).</li>
-          <li>Chọn một ngày để xem chuyến gom theo khách, chọn lại để thu. Ngày có chuyến gần nhất từ hôm nay được mở sẵn.</li>
-          <li>Chuyến mới có tháng kế hoạch nằm ở <b>Chuyến chưa có ngày</b>; ghi ngày đóng cont hoặc ETD thì chuyến tự vào lịch.</li>
+          <li>Cột trái là các ngày, cột phải là chuyến của ngày đang chọn, gom theo khách. Ngày có chuyến gần nhất từ hôm nay được chọn sẵn. Điện thoại: chạm ngày để xem chi tiết, Quay lại để về danh sách.</li>
+          <li>Chuyến mới có tháng kế hoạch nằm ở mục <b>Chưa có ngày</b> cuối cột trái; ghi ngày đóng cont hoặc ETD thì chuyến tự vào lịch.</li>
         </GuideList>
       </GuideSection>
       <GuideSection title="Ai làm gì">

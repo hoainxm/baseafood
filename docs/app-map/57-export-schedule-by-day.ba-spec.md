@@ -47,10 +47,10 @@ N/A — không cross. Tab chỉ đọc; xử lý chuyến vẫn ở hồ sơ HĐ
 - **End:** người xem biết ngày nào xuất gì.
 
 ### Flow NV2 — Chi tiết một ngày · owner U1
-- **Start:** chọn một ngày trong danh sách.
+- **Start:** chọn một ngày trong danh sách (v2: luôn có đúng MỘT ngày đang chọn — chi tiết hiện bên cạnh danh sách; điện thoại: danh sách → chi tiết → Quay lại).
 - **Input:** chuyến của ngày đó.
 - **Steps:** gom theo khách (tên khách tăng dần) → mỗi chuyến hiện đủ thông tin như bảng cũ (lô, loại, HĐ, hàng, kg kế hoạch · thực xuất, tiến độ 6 bước, bước tiếp, Trễ / Chờ booking).
-- **Output:** chi tiết ngày; chọn một chuyến ⇒ mở hồ sơ HĐ đúng chuyến (như nút Mở hiện có). Chọn lại ngày ⇒ thu chi tiết.
+- **Output:** chi tiết ngày; chọn một chuyến ⇒ mở hồ sơ HĐ đúng chuyến (như nút Mở hiện có). Chọn ngày khác ⇒ chi tiết đổi theo (không thu / mở).
 - **End:** vào hồ sơ chuyến, hoặc thu lại.
 
 ### Flow NV3 — Chưa có ngày · owner U1
@@ -68,7 +68,8 @@ N/A — không cross. Tab chỉ đọc; xử lý chuyến vẫn ở hồ sơ HĐ
 | NV1 | Mỗi ngày: chỉ số khách · số khách + số chuyến · tên khách | **số khách + số chuyến** (+ tên khách ở danh sách) | một ngày một khách nhiều cont ⇒ "1 khách" che mất khối lượng việc | Chủ dự án + Domain (XK) | — |
 | NV1 | Ngày xếp theo: ngày đóng cont → ETD · ngày ký HĐ · hạn giao | **đóng cont → ETD** | trùng luật kỳ xem 41 R1 / v4; ngày ký và hạn giao không phải ngày xuất (41 log NV11 v4 đã VETO ngày ký) | Domain (XK) | — |
 | NV2 | A: chi tiết ngày (gom theo khách) rồi mới mở hồ sơ · B: ngày 1 chuyến mở thẳng hồ sơ | **A** (chủ dự án chọn) | một cách duy nhất cho mọi ngày, không đoán | Chủ dự án | — |
-| NV3 | A: khối riêng dưới danh sách · B: bỏ khỏi tab | **A** (chủ dự án chọn) | chuyến chưa có ngày vẫn là việc của kỳ; bỏ đi thì mất | Chủ dự án | — |
+| NV1–NV2 (v2) | A: hai cột ngày \| chi tiết · B: dải ngày + bảng · C: lưới lịch · D: một bảng chia đoạn (minh hoạ cho chủ dự án) | **A** (chủ dự án chọn 2026-11-02) | bản v1 thu / mở: phải bấm mở, mở nhiều thì mất cái nhìn cả kỳ, không rõ đang xem ngày nào. A giữ cả kỳ bên trái, một ngày bên phải; điện thoại một cột | Chủ dự án + Optimizer | — |
+| NV3 | A: khối riêng dưới danh sách · B: bỏ khỏi tab | **A** (chủ dự án chọn) ⇒ v2: mục "Chưa có ngày" cuối danh sách ngày | chuyến chưa có ngày vẫn là việc của kỳ; bỏ đi thì mất | Chủ dự án | — |
 
 ## 7. Scope & Priority
 
@@ -95,7 +96,7 @@ N/A — không cross. Tab chỉ đọc; xử lý chuyến vẫn ở hồ sơ HĐ
 | R6 | Trong chi tiết ngày: gom theo khách (tên tăng dần), trong khách xếp theo số lô; mỗi chuyến giữ đủ trạng thái, cảnh báo Trễ / Chờ booking như bảng cũ. | — |
 | R7 | Dấu trên mục ngày: có chuyến trễ hạn giao (41 `isShipmentLate`) ⇒ "n trễ"; có chuyến chưa đủ hồ sơ ⇒ "n còn thiếu". | — |
 | R8 | Tra cứu (ô tra mọi kỳ) giữ nguyên bảng kết quả riêng, không theo ngày. | — |
-| R9 | Mặc định: ngày đầu tiên ≥ hôm nay trong kỳ mở sẵn chi tiết; kỳ đã qua ⇒ không ngày nào mở sẵn. | kỳ tương lai ⇒ ngày đầu tiên của kỳ có chuyến mở sẵn |
+| R9 | (v2) Luôn có đúng một ngày đang chọn: ngày có chuyến đầu tiên ≥ hôm nay; kỳ đã qua ⇒ ngày đầu của kỳ; kỳ chỉ có chuyến chưa có ngày ⇒ mục Chưa có ngày. Đổi kỳ / lọc khách ⇒ chọn lại theo luật này. | kỳ tương lai ⇒ ngày đầu tiên của kỳ có chuyến |
 
 ## 9b. Kiểm kê nội dung (NV4)
 
@@ -148,7 +149,7 @@ N/A — không cross. Tab chỉ đọc; xử lý chuyến vẫn ở hồ sơ HĐ
 - **Given** kỳ tháng 11, hôm nay 04/11, có ngày 03/11 và 05/11
 - **When** chọn ngày mở sẵn
 - **Then** 05/11 mở sẵn
-- **Assert** `defaultOpenDay(days, "2026-11-04") == "2026-11-05"`; kỳ đã qua hết ⇒ `== null`
+- **Assert** `defaultOpenDay(days, "2026-11-04") == "2026-11-05"`; kỳ đã qua hết ⇒ `defaultOpenDay == null` và màn chọn `days[0]` (v2)
 
 ### AC-8 — Từ danh sách tới hồ sơ chuyến · NV2 · Test: e2e
 - **Given** tab Lịch xuất hàng tháng 11 có chuyến ngày 03/11
@@ -169,4 +170,5 @@ N/A — không cross. Tab chỉ đọc; xử lý chuyến vẫn ở hồ sơ HĐ
 
 ## History
 
+- v2 (2026-11-02): chủ dự án thấy thu / mở chưa trực quan ⇒ chọn phương án A (hai cột ngày | chi tiết, điện thoại danh sách → chi tiết). Sửa NV2, R9, AC-7; mục Chưa có ngày vào cuối danh sách.
 - v1 (2026-11-02): khởi tạo — chủ dự án chốt: danh sách theo ngày · bấm ngày mở chi tiết gom theo khách · mỗi ngày số khách + số chuyến · chuyến chưa có ngày + HĐ chưa đủ chuyến ở khối riêng.

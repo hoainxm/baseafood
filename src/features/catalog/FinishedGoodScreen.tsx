@@ -69,18 +69,10 @@ export default function FinishedGoodScreen() {
   ];
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">
-          Thành phẩm theo danh mục kế toán
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {items.length} mã, tài khoản 1551, đơn vị ki-lô-gam. Danh mục chỉ để
-          tra cứu — muốn đổi phải sửa ở sổ kế toán.
-        </p>
-      </div>
+    <div className="space-y-4">
+      <h2 className="sr-only">Thành phẩm theo danh mục kế toán</h2>
 
-      <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-64 flex-1">
           <Combobox
             label="Nhóm hàng"
@@ -95,7 +87,7 @@ export default function FinishedGoodScreen() {
           <span className="tnum font-semibold text-foreground">
             {rows.length}
           </span>{" "}
-          / {items.length} mã
+          / {items.length} mã · TK 1551, kg · chỉ tra cứu, muốn đổi sửa ở sổ kế toán
         </p>
         {group && (
           <Button

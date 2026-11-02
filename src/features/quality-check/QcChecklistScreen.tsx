@@ -264,17 +264,9 @@ export default function QcChecklistScreen() {
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold text-foreground">
-          Kiểm tra QC
-          {!canWrite && <ReadOnlyBadge />}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Cuối ngày chấm nhanh các chỉ tiêu vệ sinh / dụng cụ / thiết bị theo phân
-          xưởng, rồi chốt ngày. (Ảnh kèm sẽ bổ sung sau.)
-        </p>
-      </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Kiểm tra QC</h1>
+      {!canWrite && <ReadOnlyBadge />}
 
       <DraftRestoredNotice
         savedAt={qcDraft.restoredAt}
@@ -287,9 +279,10 @@ export default function QcChecklistScreen() {
       />
 
       {/* Bộ lọc: ngày + xưởng */}
-      <div data-tour="qc-filter" className="grid gap-5 rounded-xl border-2 border-border p-4 sm:grid-cols-2">
-        <DateField label="Ngày kiểm" value={date} onChange={setDate} hideRequiredMark />
+      <div data-tour="qc-filter" className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-border p-3 [&>*]:h-auto max-sm:[&>*]:w-full">
+        <DateField label="Ngày kiểm" value={date} onChange={setDate} hideRequiredMark className="min-w-0 sm:w-56" />
         <ChoiceGroup
+          className="min-w-0 sm:w-[22rem]"
           label="Phân xưởng"
           value={workshop}
           onChange={(v) => setWorkshop(v as Workshop)}

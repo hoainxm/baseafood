@@ -147,8 +147,8 @@ export function OrderListView({
           <Combobox label="Khách" hideRequiredMark value={customer} onChange={setCustomer} options={[{ value: "", label: "Mọi khách" }, ...customerOptions]} />
         </div>
         <div data-tour="order-search" className="min-w-56 flex-1 basis-56">
-          <Field label="Tra số lệnh (số lệnh · MSL · số HĐ · tên hàng)">
-            <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} title="Gõ một phần số — tra ở mọi tháng." />
+          <Field label="Tra số lệnh, MSL, số HĐ, tên hàng">
+            <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} title="Gõ một phần số lệnh, mã số lô, số hợp đồng hoặc tên hàng — tra ở mọi tháng." />
           </Field>
         </div>
       </div>

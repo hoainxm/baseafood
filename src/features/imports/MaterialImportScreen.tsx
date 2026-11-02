@@ -1716,14 +1716,10 @@ export default function MaterialImportScreen() {
   usePageTour(isLoading ? null : tour);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold text-foreground">
-            Nhập hàng về xưởng
-            {isReadOnly && <ReadOnlyBadge />}
-          </h1>
-        </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Nhập hàng về xưởng</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {isReadOnly ? <ReadOnlyBadge /> : <span aria-hidden className="max-sm:hidden" />}
         {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
         <div data-tour="imports-mode-tabs" className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
           <button

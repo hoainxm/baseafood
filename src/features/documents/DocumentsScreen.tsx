@@ -313,12 +313,27 @@ export default function DocumentsScreen() {
   usePageTour(isLoading ? null : tour);
 
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
+      <h1 className="sr-only">Tài liệu công ty</h1>
+      {/* Một hàng: bộ lọc trái, nút Thêm phải — để bảng tài liệu hiện ngay màn đầu. */}
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="max-w-3xl text-base text-muted-foreground">
-          Quy trình, biểu mẫu, chứng nhận và hồ sơ năng lực của công ty. Mỗi tài liệu giữ đủ các lần ban hành, bản cũ vẫn mở lại được. Bạn chỉ thấy tài
-          liệu của phòng mình và tài liệu được mở cho phòng mình.
-        </p>
+        <div data-tour="documents-filters" className="flex min-w-0 flex-1 flex-wrap items-end gap-3 [&>*]:h-auto [&>*]:max-w-full max-sm:[&>*]:w-full">
+          <div className="min-w-0 flex-1 basis-36 sm:max-w-64">
+            <Combobox label="Loại" hideRequiredMark value={kindFilter} onChange={setKindFilter} options={KIND_FILTERS} clearable={false} />
+          </div>
+          <div className="min-w-0 flex-1 basis-36 sm:max-w-64">
+            <Combobox label="Phòng" hideRequiredMark value={departmentFilter} onChange={setDepartmentFilter} options={DEPARTMENT_FILTERS} clearable={false} />
+          </div>
+          <ChoiceGroup
+            className="min-w-0 sm:w-[26rem] sm:shrink-0"
+            label="Trạng thái"
+            hideRequiredMark
+            value={statusFilter}
+            onChange={(v) => setStatusFilter(v as StatusFilter)}
+            options={STATUS_FILTERS}
+            columns={3}
+          />
+        </div>
         {can.create && (
           <Button data-tour="documents-add" title="Thêm một tài liệu mới: mã, tên, loại, phòng sở hữu và ai được xem." onClick={() => setFormTarget({ kind: "create" })}>
             <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
@@ -335,20 +350,6 @@ export default function DocumentsScreen() {
 
       <div data-tour="documents-stats">
         <StatCardGrid cards={cards} />
-      </div>
-
-      <div data-tour="documents-filters" className="grid gap-4 sm:grid-cols-2">
-        <Combobox label="Loại" hideRequiredMark value={kindFilter} onChange={setKindFilter} options={KIND_FILTERS} clearable={false} />
-        <Combobox label="Phòng" hideRequiredMark value={departmentFilter} onChange={setDepartmentFilter} options={DEPARTMENT_FILTERS} clearable={false} />
-        <ChoiceGroup
-          className="sm:col-span-2"
-          label="Trạng thái"
-          hideRequiredMark
-          value={statusFilter}
-          onChange={(v) => setStatusFilter(v as StatusFilter)}
-          options={STATUS_FILTERS}
-          columns={3}
-        />
       </div>
 
       {onlyMissingFile && (

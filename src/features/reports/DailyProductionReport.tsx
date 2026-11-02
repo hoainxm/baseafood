@@ -234,28 +234,10 @@ export default function DailyProductionReport() {
   const columnCount = days.length + 4;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">
-          Báo cáo thành phẩm hàng ngày
-        </h1>
-        {allowed.export && (
-        <div data-tour="production-report-export" className="flex flex-wrap gap-2">
-          <Button
-            title="Xem trước bản in A4 báo cáo sản lượng ngày rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!groups.length}>
-            <Printer />
-            In A4
-          </Button>
-          <Button
-            title="Tải báo cáo sản lượng đang xem ra file Excel." size="lg" variant="outline" onClick={exportExcel} disabled={!groups.length}>
-            <FileSpreadsheet />
-            Xuất Excel
-          </Button>
-        </div>
-        )}
-      </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Báo cáo thành phẩm hàng ngày</h1>
 
-      <div data-tour="production-report-filters" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="production-report-filters" className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-border p-3">
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -299,6 +281,20 @@ export default function DailyProductionReport() {
             options={WORKSHOP_OPTIONS}
           />
         </div>
+        {allowed.export && (
+          <div data-tour="production-report-export" className="ml-auto flex flex-wrap gap-2">
+            <Button
+              title="Xem trước bản in A4 báo cáo sản lượng ngày rồi in giấy hoặc lưu PDF." variant="outline" onClick={() => setInPrint(true)} disabled={!groups.length}>
+              <Printer />
+              In A4
+            </Button>
+            <Button
+              title="Tải báo cáo sản lượng đang xem ra file Excel." variant="outline" onClick={exportExcel} disabled={!groups.length}>
+              <FileSpreadsheet />
+              Xuất Excel
+            </Button>
+          </div>
+        )}
       </div>
 
       <div data-tour="production-report-stats">

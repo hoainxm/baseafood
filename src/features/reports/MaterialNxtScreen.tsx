@@ -334,29 +334,11 @@ export default function MaterialNxtScreen() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
-            <Snowflake className="h-8 w-8 text-primary" />
-            Tồn kho nguyên liệu (Nhập – Xuất – Tồn)
-            {isReadOnly && <ReadOnlyBadge />}
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Tồn suy thẳng từ sổ Nhập hàng: <b>Tồn cuối = Tồn đầu + Nhập − Xuất SX − Bán nội địa</b>. Cả 3 phân
-            xưởng, xem theo ngày.
-          </p>
-        </div>
-        <Button
-          data-tour="nxt-material-opening"
-          title="Khai tồn đầu kho nguyên liệu cho các loại chưa có kỳ trước để kế thừa — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setIsOpeningOpen(true)}>
-          <PackagePlus className="mr-2 h-4 w-4" />
-          Tồn đầu ({filteredOpening.length})
-        </Button>
-      </div>
-
-      {/* Bộ chọn kỳ + phân xưởng */}
-      <div data-tour="nxt-material-filters" className="flex flex-wrap items-end gap-4">
+    <div className="space-y-4">
+      <h1 className="sr-only">Tồn kho nguyên liệu (Nhập – Xuất – Tồn)</h1>
+      {isReadOnly && <ReadOnlyBadge />}
+      {/* Bộ chọn kỳ + phân xưởng; nút Tồn đầu dạt phải cùng hàng (README § Đầu trang gọn) */}
+      <div data-tour="nxt-material-filters" className="flex flex-wrap items-end gap-3">
         <div className="min-w-[12rem]">
           <Combobox
             label="Kỳ báo cáo"
@@ -400,6 +382,13 @@ export default function MaterialNxtScreen() {
             options={WORKSHOP_OPTIONS}
           />
         </div>
+        <Button
+          data-tour="nxt-material-opening"
+          className="ml-auto"
+          title="Khai tồn đầu kho nguyên liệu cho các loại chưa có kỳ trước để kế thừa — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setIsOpeningOpen(true)}>
+          <PackagePlus className="mr-2 h-4 w-4" />
+          Tồn đầu ({filteredOpening.length})
+        </Button>
       </div>
 
       <div data-tour="nxt-material-stats">
@@ -407,10 +396,10 @@ export default function MaterialNxtScreen() {
       </div>
 
       {/* Chú thích phạm vi — trung thực (nhất là với BGĐ) */}
-      <div data-tour="nxt-material-scope-note" className="flex flex-wrap items-start gap-3 rounded-xl border-2 border-warning bg-warning/10 p-4">
+      <div data-tour="nxt-material-scope-note" className="flex flex-wrap items-start gap-3 rounded-xl border-2 border-warning bg-warning/10 px-4 py-2">
         <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
-        <span className="text-base text-warning">
-          <b>Xuất SX chưa được ghi</b> (màn Sản xuất chưa có ô "NL lấy ra sản xuất") nên tạm = 0 —
+        <span className="min-w-0 flex-1 text-sm text-warning">
+          <b>Tồn cuối = Tồn đầu + Nhập − Xuất SX − Bán nội địa</b> (cả 3 phân xưởng, theo ngày). <b>Xuất SX chưa được ghi</b> (màn Sản xuất chưa có ô "NL lấy ra sản xuất") nên tạm = 0 —
           tồn hiện là <b>tồn theo nhập, CHƯA trừ phần đưa vào chế biến</b>. Cột "Đông gửi / Xả đông"
           là thông tin kho đông dự trữ (vòng gối đầu ở Cân đối), <b>không cộng vào tồn</b>.
         </span>

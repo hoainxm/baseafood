@@ -430,43 +430,29 @@ export default function SalesOrderScreen() {
     },
   ];
 
+  // Nút Tạo đơn: có đơn ⇒ cuối hàng lọc; chưa có đơn ⇒ hàng gọn dạt phải (README § Đầu trang gọn).
+  const createButton = (
+    <Button
+      data-tour="orders-create"
+      title="Tạo một đơn đặt hàng xuất khẩu: khách, hạn giao, và các mặt hàng cần bao nhiêu kg." onClick={openCreate}>
+      <Plus />
+      Tạo đơn
+    </Button>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-foreground">
-              Đơn đặt &amp; lệnh xuất
-            </h1>
-            {isReadOnly && <ReadOnlyBadge />}
-          </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Đơn đặt &amp; lệnh xuất</h1>
+      {(isReadOnly || (allowed.create && don.length === 0)) && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {isReadOnly && <ReadOnlyBadge />}
+          {allowed.create && don.length === 0 && <div className="ml-auto">{createButton}</div>}
         </div>
-        {allowed.create && (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            data-tour="orders-create"
-            title="Tạo một đơn đặt hàng xuất khẩu: khách, hạn giao, và các mặt hàng cần bao nhiêu kg." size="lg" onClick={openCreate}>
-            <Plus />
-            Tạo đơn
-          </Button>
-        </div>
-        )}
-      </div>
-
-      <div data-tour="orders-stats">
-      <StatCardGrid
-        className="grid-cols-1 sm:grid-cols-3"
-        cards={[
-          { label: filterCount ? "Số đơn · theo bộ lọc" : "Tổng số đơn", value: shownOrders.length, numeric: true, icon: ClipboardList, color: "neutral" },
-          { label: filterCount ? "Đang gom · theo bộ lọc" : "Đang gom hàng", value: shownOrders.filter((d) => d.status === "collecting").length, numeric: true, icon: Package, color: "brand" },
-          { label: filterCount ? "Đã xuất · theo bộ lọc" : "Đã xuất xong", value: shownOrders.filter((d) => d.status === "closed").length, numeric: true, icon: CheckCircle, color: "success" },
-        ]}
-      />
-      </div>
-
+      )}
       {don.length > 0 && (
         <FilterBar
           data-tour="orders-filter"
+          actions={allowed.create && createButton}
           activeCount={filterCount}
           onClearAll={clearFilters}
           resultText={`Đang hiện ${shownOrders.length.toLocaleString("vi-VN")} / ${don.length.toLocaleString("vi-VN")} đơn`}
@@ -492,6 +478,17 @@ export default function SalesOrderScreen() {
           <SearchField label="Tra khách, mặt hàng, quy cách, ghi chú" value={query} onChange={setQuery} />
         </FilterBar>
       )}
+
+      <div data-tour="orders-stats">
+      <StatCardGrid
+        className="grid-cols-1 sm:grid-cols-3"
+        cards={[
+          { label: filterCount ? "Số đơn · theo bộ lọc" : "Tổng số đơn", value: shownOrders.length, numeric: true, icon: ClipboardList, color: "neutral" },
+          { label: filterCount ? "Đang gom · theo bộ lọc" : "Đang gom hàng", value: shownOrders.filter((d) => d.status === "collecting").length, numeric: true, icon: Package, color: "brand" },
+          { label: filterCount ? "Đã xuất · theo bộ lọc" : "Đã xuất xong", value: shownOrders.filter((d) => d.status === "closed").length, numeric: true, icon: CheckCircle, color: "success" },
+        ]}
+      />
+      </div>
 
       <div data-tour="orders-table">
       {isLoading ? (

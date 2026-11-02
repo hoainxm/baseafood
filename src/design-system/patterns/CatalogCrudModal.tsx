@@ -210,26 +210,29 @@ export function CatalogCrud<T extends { id: string }>({
     })),
   ];
 
+  // Nút Thêm của danh mục: có bộ lọc ⇒ đứng cuối hàng lọc; không có ⇒ một hàng gọn dạt phải.
+  // Tiêu đề + mô tả chỉ cho trình đọc màn hình — tab đang chọn đã nói tên danh mục, công dụng ở hộp "?"
+  // (README § Đầu trang gọn).
+  const addButton = canCreate ? (
+    <Button
+      onClick={openAdd}
+      title={`Mở hộp thoại tạo một ${entityName} mới. Lưu xong dùng được ngay ở mọi màn có ô chọn ${entityName}.`}
+    >
+      <Plus />
+      Thêm {entityName}
+    </Button>
+  ) : (
+    !canUpdate && !canDelete && <ReadOnlyBadge />
+  );
+  const addInFilterBar = !loading && rows.length > 0 && shownFilters.length > 0;
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
-        </div>
-        {canCreate ? (
-          <Button
-            size="lg"
-            onClick={openAdd}
-            title={`Mở hộp thoại tạo một ${entityName} mới. Lưu xong dùng được ngay ở mọi màn có ô chọn ${entityName}.`}
-          >
-            <Plus />
-            Thêm {entityName}
-          </Button>
-        ) : (
-          !canUpdate && !canDelete && <ReadOnlyBadge />
-        )}
+    <div className="space-y-4">
+      <div className="sr-only">
+        <h2>{title}</h2>
+        {description && <p>{description}</p>}
       </div>
+      {!addInFilterBar && addButton && <div className="flex flex-wrap justify-end gap-2">{addButton}</div>}
 
       {loading ? (
         <TableSkeleton />
@@ -252,12 +255,13 @@ export function CatalogCrud<T extends { id: string }>({
         <>
         {shownFilters.length > 0 && (
           <FilterBar
+            actions={addButton}
             activeCount={activeFilters.length}
             onClearAll={clearFilters}
             resultText={`Đang hiện ${shownRows.length.toLocaleString("vi-VN")} / ${rows.length.toLocaleString("vi-VN")} ${entityName}`}
           >
             {shownFilters.map(({ f, options }) => (
-              <div key={f.key} className="min-w-[14rem] flex-1">
+              <div key={f.key} className="min-w-[12rem] flex-1 sm:max-w-80">
                 <Combobox
                   label={f.label}
                   hideRequiredMark

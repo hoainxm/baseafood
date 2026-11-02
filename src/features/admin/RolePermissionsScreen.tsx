@@ -242,19 +242,19 @@ export default function RolePermissionsScreen() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Vai trò &amp; quyền</h1>
-        <p className="text-muted-foreground">
-          Tick quyền của từng vai trò ở từng màn. Người giữ nhiều vai trò được cộng quyền; chỉnh riêng một người thì chặn thắng cho.
-          Quản trị viên luôn toàn quyền.
-        </p>
-      </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Vai trò &amp; quyền</h1>
       <Tabs value={tab} onValueChange={(v) => setParam({ tab: v === "users" ? "users" : null })}>
-        <TabsList>
-          <TabsTrigger value="roles" title="Chỉnh ma trận quyền của từng vai trò.">Theo vai trò</TabsTrigger>
-          <TabsTrigger value="users" title="Xem và chỉnh riêng quyền của từng người.">Theo người dùng</TabsTrigger>
-        </TabsList>
+        {/* Luật cộng quyền đứng cạnh tab (cùng hàng) — không chiếm riêng một đoạn đầu trang. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <TabsList>
+            <TabsTrigger value="roles" title="Chỉnh ma trận quyền của từng vai trò.">Theo vai trò</TabsTrigger>
+            <TabsTrigger value="users" title="Xem và chỉnh riêng quyền của từng người.">Theo người dùng</TabsTrigger>
+          </TabsList>
+          <p className="min-w-0 flex-1 basis-80 text-sm text-muted-foreground">
+            Nhiều vai trò ⇒ cộng quyền; chỉnh riêng một người thì chặn thắng cho; quản trị viên luôn toàn quyền.
+          </p>
+        </div>
         <TabsContent value="roles" className="pt-4">
           <RolesTab selectedId={params.get("role")} onSelect={(id) => setParam({ role: id })} />
         </TabsContent>

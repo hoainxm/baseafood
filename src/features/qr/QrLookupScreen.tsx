@@ -163,17 +163,8 @@ export default function QrLookupScreen() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Mã lô QR — tra cứu & in tem</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {tab === "print"
-            ? "In tem QR cho nhiều lô một lượt: nguyên liệu, bán thành phẩm, thành phẩm."
-            : tab === "stages"
-              ? "Kiểm QR từng khâu: nhập nguyên liệu → sản xuất → nhập kho → đóng gói → xuất / bán. Chỗ nào thiếu thì bấm làm ngay."
-              : "Quét tem QR (camera điện thoại quét cũng mở thẳng trang này) hoặc gõ mã lô, để xem lô đó làm từ đâu và đã đi đâu."}
-        </p>
-      </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Mã lô QR — tra cứu & in tem</h1>
 
       {/* Hai việc của màn: TRA một lô ⇄ IN TEM nhiều lô. Tab nằm trên link (?tab=print) để gửi được. */}
       <div data-tour="qr-tabs" className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-fit">

@@ -266,29 +266,27 @@ export default function OrderExportReport() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">
-          Báo cáo đơn đặt được xuất hàng
-        </h1>
-        {allowed.export && (
-        <div data-tour="export-report-export" className="flex flex-wrap gap-2">
-          <Button
-            title="Xem trước bản in A4 báo cáo đơn xuất rồi in giấy hoặc lưu PDF." size="lg" variant="outline" onClick={() => setInPrint(true)} disabled={!group.length}>
-            <Printer />
-            In A4
-          </Button>
-          <Button
-            title="Tải báo cáo đơn xuất đang xem ra file Excel." size="lg" variant="outline" onClick={exportExcel} disabled={!group.length}>
-            <FileSpreadsheet />
-            Xuất Excel
-          </Button>
-        </div>
-        )}
-      </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Báo cáo đơn đặt được xuất hàng</h1>
 
       <FilterBar
         data-tour="export-report-filters"
+        actions={
+          allowed.export && (
+            <div data-tour="export-report-export" className="flex flex-wrap gap-2">
+              <Button
+                title="Xem trước bản in A4 báo cáo đơn xuất rồi in giấy hoặc lưu PDF." variant="outline" onClick={() => setInPrint(true)} disabled={!group.length}>
+                <Printer />
+                In A4
+              </Button>
+              <Button
+                title="Tải báo cáo đơn xuất đang xem ra file Excel." variant="outline" onClick={exportExcel} disabled={!group.length}>
+                <FileSpreadsheet />
+                Xuất Excel
+              </Button>
+            </div>
+          )
+        }
         activeCount={filterCount}
         onClearAll={clearFilters}
         resultText={`Đang hiện ${group.length.toLocaleString("vi-VN")} / ${periodGroups.length.toLocaleString("vi-VN")} đơn có xuất trong kỳ`}

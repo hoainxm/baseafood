@@ -23,9 +23,10 @@ describe("buildWarehouseTour", () => {
     expect(steps[steps.length - 1].target ?? "").toBe("");
   });
 
-  it("thứ tự theo công việc: chỉ số → chờ nhập → quét / duyệt → tuổi tồn → bảng tồn (R2)", () => {
+  it("thứ tự theo công việc: chỉ số → chờ nhập → quét / duyệt → bảng tồn → tuổi tồn, dung tích (R2)", () => {
     const ids = buildWarehouseTour({ can: { approve: true } }).steps.map((s) => s.id);
-    const order = ["stats", "pending", "scan", "approve", "age", "capacity", "filter", "stock"];
+    // 2026-11-02 (Đầu trang gọn): tổng quan tuổi tồn + dung tích xuống SAU bảng tồn.
+    const order = ["stats", "pending", "scan", "approve", "filter", "stock", "age", "capacity"];
     const at = order.map((id) => ids.indexOf(id));
     expect(at.every((i) => i >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);

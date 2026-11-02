@@ -60,9 +60,8 @@ export function buildPackagingTour(ctx: PackagingTourContext): PageTour {
     {
       id: "stats",
       target: "packaging-stats",
-      title: "Năm chỉ số của kỳ",
+      title: "Bốn chỉ số của kỳ",
       body:
-        "• Đang xem: kỳ đang lọc.\n" +
         "• Số phiếu: số phiếu đóng gói trong kỳ.\n" +
         "• BTP vào: tổng kg bán thành phẩm đem đóng.\n" +
         "• TP ra: tổng kg thành phẩm đóng gói ra.\n" +

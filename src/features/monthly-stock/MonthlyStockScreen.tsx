@@ -113,7 +113,6 @@ import {
   ArrowUp,
   ArrowDown,
   ListOrdered,
-  CalendarRange,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -1534,62 +1533,50 @@ export default function MonthlyStockScreen() {
   const noSearchMatch = hasData && monthRows.length === 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
-              <CalendarRange className="h-8 w-8 text-primary" />
-              Sổ kho theo tháng
-            </h1>
-            {!allowed.create && !allowed.update && <ReadOnlyBadge />}
-          </div>
-          <p className="mt-1 text-muted-foreground">
-            Kỳ = tháng dương lịch. Tồn cuối = tồn đầu + nhập − xuất. Hết tháng, bấm "Dồn sang tháng sau" để tồn
-            cuối kỳ này thành tồn đầu kỳ sau — hết chép tay.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
-          {allowed.import && (
-            <Button
-              data-tour="monthly-stock-import"
-              variant="outline"
-              onClick={pickFile}
-              title="Đọc file Excel 'bảng kê kho' của kế toán — mỗi sheet một tháng. Nạp lại cùng file + cùng kho chỉ cập nhật, không nhân đôi dòng."
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Nhập Excel bảng kê
-            </Button>
-          )}
-          {allowed.update && (
-            <Button
-              data-tour="monthly-stock-sync"
-              variant="outline"
-              onClick={openSyncDialog}
-              title="Đối chiếu tên hàng trong sổ với danh mục Loại nguyên liệu và Mặt hàng, rồi ánh xạ từng tên về tên chuẩn. Không đụng 141 mã thành phẩm kế toán."
-            >
-              <Library className="mr-2 h-4 w-4" />
-              Đồng bộ danh mục{needsSync.length ? ` (${needsSync.length})` : ""}
-            </Button>
-          )}
-          {allowed.export && (
-            <Button
-              data-tour="monthly-stock-print"
-              onClick={() => setMoIn(true)}
-              disabled={!hasData}
-              title="Xem trước bản in A4. Có tick dòng thì chỉ in đúng mấy dòng đó kèm tổng của chúng."
-            >
-              <Printer className="mr-2 h-4 w-4" />
-              In A4{selectedRows.length ? ` (${selectedRows.length} dòng chọn)` : ""}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Bộ lọc: tháng + kho + nhóm hàng + ô tra (ba-spec 53) */}
+    <div className="space-y-4">
+      <h1 className="sr-only">Sổ kho theo tháng</h1>
+      <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
+      {!allowed.create && !allowed.update && <ReadOnlyBadge />}
+      {/* Bộ lọc: tháng + kho + nhóm hàng + ô tra (ba-spec 53); nút của trang cuối hàng lọc */}
       <FilterBar
         data-tour="monthly-stock-filters"
+        actions={
+          <>
+            {allowed.import && (
+              <Button
+                data-tour="monthly-stock-import"
+                variant="outline"
+                onClick={pickFile}
+                title="Đọc file Excel 'bảng kê kho' của kế toán — mỗi sheet một tháng. Nạp lại cùng file + cùng kho chỉ cập nhật, không nhân đôi dòng."
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Nhập Excel bảng kê
+              </Button>
+            )}
+            {allowed.update && (
+              <Button
+                data-tour="monthly-stock-sync"
+                variant="outline"
+                onClick={openSyncDialog}
+                title="Đối chiếu tên hàng trong sổ với danh mục Loại nguyên liệu và Mặt hàng, rồi ánh xạ từng tên về tên chuẩn. Không đụng 141 mã thành phẩm kế toán."
+              >
+                <Library className="mr-2 h-4 w-4" />
+                Đồng bộ danh mục{needsSync.length ? ` (${needsSync.length})` : ""}
+              </Button>
+            )}
+            {allowed.export && (
+              <Button
+                data-tour="monthly-stock-print"
+                onClick={() => setMoIn(true)}
+                disabled={!hasData}
+                title="Xem trước bản in A4. Có tick dòng thì chỉ in đúng mấy dòng đó kèm tổng của chúng."
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                In A4{selectedRows.length ? ` (${selectedRows.length} dòng chọn)` : ""}
+              </Button>
+            )}
+          </>
+        }
         activeCount={filterCount}
         onClearAll={clearFilters}
         resultText={`Đang hiện ${monthRows.length.toLocaleString("vi-VN")} mặt hàng`}

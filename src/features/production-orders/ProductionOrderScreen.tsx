@@ -11,12 +11,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { usePageTour, usePageTourControl } from "@/features/shared/PageTourProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
 import { ReasonDialog, type ReasonTarget } from "@/features/export-planning/RecordDialogs";
 import { newId } from "@/lib/store";
 import { cancelOrder, issueOrder, keepOldRevision, shipmentsWithLot, visibleOrders } from "@/lib/productionOrder";
 import type { ExportActivityAction, ProductionOrder, ProductionOrderMaterial, ProductionOrderShipment } from "@/types";
-import { BarChart3, ClipboardList, FilePlus2, FolderLock, Route } from "lucide-react";
+import { BarChart3, ClipboardList, FilePlus2, FolderLock } from "lucide-react";
 import { parseReportPeriod, type ReportPeriod } from "@/lib/exportReports";
 import { buildOrderReport, buildOrderReportExcel } from "@/lib/productionOrderReports";
 import { OrderReportView } from "./OrderReportView";
@@ -235,7 +235,6 @@ export default function ProductionOrderScreen() {
     [tourOrderId, canWrite],
   );
   usePageTour(can.view && !store.isLoading ? tour : null);
-  const pageTour = usePageTourControl();
 
   if (!can.view) {
     return (
@@ -252,7 +251,7 @@ export default function ProductionOrderScreen() {
     return <OrderFileComposer data={d} order={order} canWrite={canWrite} isAdmin={isAdmin} by={by} onBack={() => setParam({ file: "" })} />;
 
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       {!store.isAvailable && (
         <p role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
           Máy chủ chưa có bảng Lệnh sản xuất (chưa chạy migration 0088) — chưa ghi được. Báo quản trị.
@@ -316,29 +315,21 @@ export default function ProductionOrderScreen() {
         />
       ) : (
         <>
+          <h1 className="sr-only">Lệnh sản xuất</h1>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
-              <p className="max-w-3xl text-muted-foreground">Lệnh sản xuất ra từ dòng hàng hợp đồng xuất, gửi Ban quản đốc phân xưởng và Thủ kho.</p>
-              <Tabs value={view} onValueChange={(v) => setParam({ view: v === "reports" ? v : "" }, true)}>
-                <TabsList data-tour="order-tabs" className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
-                  <TabsTrigger value="orders" className={TAB_TRIGGER} title="Danh sách lệnh sản xuất theo tháng.">
-                    <ClipboardList className="mr-2 h-4 w-4" aria-hidden />
-                    Lệnh
-                  </TabsTrigger>
-                  <TabsTrigger value="reports" className={TAB_TRIGGER} title="Số lệnh sản xuất theo tháng / quý / năm: thùng, kg, khách, mặt hàng, NL nhập khẩu đã dành, lệnh cần chú ý.">
-                    <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
-                    Báo cáo
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
+            <Tabs value={view} onValueChange={(v) => setParam({ view: v === "reports" ? v : "" }, true)}>
+              <TabsList data-tour="order-tabs" className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
+                <TabsTrigger value="orders" className={TAB_TRIGGER} title="Danh sách lệnh sản xuất theo tháng.">
+                  <ClipboardList className="mr-2 h-4 w-4" aria-hidden />
+                  Lệnh
+                </TabsTrigger>
+                <TabsTrigger value="reports" className={TAB_TRIGGER} title="Số lệnh sản xuất theo tháng / quý / năm: thùng, kg, khách, mặt hàng, NL nhập khẩu đã dành, lệnh cần chú ý.">
+                  <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
+                  Báo cáo
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             <div className="flex flex-wrap items-center gap-2">
-              {pageTour.available && (
-                <Button variant="outline" data-tour-start onClick={pageTour.start} title="Mở hướng dẫn thao tác: lần lượt chỉ từng khu vực trên trang theo thứ tự công việc. Hướng dẫn không thay đổi dữ liệu.">
-                  <Route className="mr-2 h-4 w-4" aria-hidden />
-                  Hướng dẫn thao tác
-                </Button>
-              )}
               {canWrite && can.create && (
                 <Button data-tour="create-production-order" onClick={() => setFormTarget({ mode: "create" })} title="Lập lệnh sản xuất mới từ dòng hàng hợp đồng xuất: số thùng, mã số lô, ngày sản xuất, ngày giao.">
                   <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />

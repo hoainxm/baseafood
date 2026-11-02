@@ -449,6 +449,8 @@ thứ tự DOM, tự bỏ ô ẩn của dòng chưa mở); Tab để trình duy�
 - [ ] Màn mới đã vào `KIT_NAV` **và** `CAY_NAV`
 - [ ] **Mọi nút thao tác có `title` giải thích nút làm gì** (§9) — nút chỉ-icon
       bắt buộc, kèm `aria-label`
+- [ ] **Đầu trang gọn** (§ dưới): không lặp tiêu đề trang, không phụ đề giới thiệu; 1280×720 chữ 100% thì
+      bảng / khối chính bắt đầu trong khoảng 45% chiều cao đầu
 - [ ] **Mọi bảng nghiệp vụ đã bật tô màu dòng** (`rowMarks`) hoặc nằm trong bảng ngoại
       lệ — mục [Tô màu dòng](#tô-màu-dòng-đã-dò-kiểu-excel)
 
@@ -849,6 +851,27 @@ không có lý do miễn ⇒ CI đỏ.
 `tableSort.test.ts`) · `patterns/SortableHeader.tsx` (`useTableSort`, `SortHeaderButton`,
 `ariaSort`).
 
+## Đầu trang gọn — tiêu đề ở header, tab + nút một hàng, lọc trước thẻ số (từ 2026-11-02)
+
+Người dùng than (trang Xuất khẩu): câu mô tả thừa dưới tiêu đề, nhóm bộ lọc + nút chiếm nửa màn dọc, phải cuộn
+mới thấy lịch / bảng. Luật cho MỌI trang nghiệp vụ (sổ dày: khối chính ≥ 60% diện tích, phần đầu chỉ là thanh công cụ):
+
+| Luật | Làm thế nào |
+|---|---|
+| Tiêu đề trang chỉ ở **header** (AppShell) | Thân trang đặt `<h1 className="sr-only">` (trình đọc màn hình vẫn có h1). Ngoại lệ: tiêu đề **mang dữ liệu** (tên kỳ cân đối, số hợp đồng trong hồ sơ) — giữ, cùng hàng với nút "← Danh sách" |
+| **Không** phụ đề giới thiệu trang ("Mỗi chuyến container của từng khách…") | Công dụng trang, công thức, trạng thái ⇒ hộp "?" / tour. Chữ gắn với TRẠNG THÁI giữ: trống, cảnh báo, lỗi, giới hạn phạm vi số (vd khối "Xuất SX chưa được ghi" ở Tồn kho NL — chứa luôn công thức tồn) |
+| Trang có **tab**: tab trái + nút chính phải, **một hàng** | `flex flex-wrap items-center justify-between`. Tab nằm ở khung cha (vd `SalesTab`) ⇒ khung cha `relative`, hàng nút của trang con `sm:absolute sm:right-0 sm:top-0` |
+| Trang **không tab**: nút của trang ở **cuối hàng lọc** | `FilterBar actions={…}` (dạt phải, xuống dòng khi hẹp). Hàng lọc tự dựng: khối nút `ml-auto`. Chưa có số ⇒ chưa hiện hàng lọc ⇒ nút đứng một hàng gọn dạt phải |
+| **Không** nút "Hướng dẫn thao tác" trong thân trang | Nút "?" trên header đã có "Bắt đầu hướng dẫn thao tác" |
+| Thứ tự: hàng tab/nút → **bộ lọc** → thẻ số → bảng | Thẻ số tính theo dòng đang hiện nên đứng SAU bộ lọc. Thẻ **không lặp giá trị bộ lọc** ("Đang xem: 02/11", "Phân xưởng: Đông" — đã thấy ở ô lọc) |
+| Khối tổng quan phụ (tuổi tồn, dung tích kho) | Xếp SAU bảng chính — việc chính (duyệt, xem tồn) lên trước |
+| Ô lọc cùng một hàng trên desktop | Bề rộng theo nội dung (`basis-36…44`, `sm:max-w-64`), ô tra `flex-1`; nhãn ô tra ngắn ("Tra lô, booking, cont, số HĐ, PO"), chi tiết vào `title`. `ChoiceGroup` 3 lựa chọn cần ~25rem để chữ không bẻ dòng |
+| Khoảng cách dọc | Khung trang `space-y-4` / `gap-4` (không `6`); `FilterBar` `p-3 gap-3` |
+| Điện thoại | `FilterBar` dưới `sm` ép mỗi ô một hàng (`basis-full`) — ô `flex-1` có basis 0 sẽ bóp dẹt cả hàng nếu không ép |
+
+`ChoiceGroup` (2026-11-02): nút `px-3 gap-2`, dấu ✓ chỉ chiếm chỗ ở nút đang chọn — trước đó mọi nút giữ chỗ ✓,
+nút 120px còn ~50px cho chữ, "Hết hiệu lực" bẻ 3 dòng, hàng lọc cao 88px.
+
 ## Bộ lọc — `FilterBar` · `SearchField` · `NoMatchState` (từ 2026-10-31)
 
 Oracle hành vi: [ba-spec 53](../../docs/app-map/53-filters.ba-spec.md). Logic so khớp là hàm thuần ở `lib/recordFilters.ts` (có test) — màn KHÔNG tự viết so chuỗi.
@@ -858,6 +881,7 @@ Oracle hành vi: [ba-spec 53](../../docs/app-map/53-filters.ba-spec.md). Logic s
 | Sổ dài (cỡ L) có **kỳ xem + ô tra + lọc đối tượng chính** (khách / đại lý / xưởng); bảng có cột trạng thái lọc được theo trạng thái | `FilterBar` bọc hàng ô lọc; ô tra = `SearchField` (nhãn "Tra …" nói rõ tra gì); trạng thái / kênh / hạn = **`Combobox` (danh sách thả xuống)** với `statusOptions` + `countedLabel` ("Đang gom (3)"), `clearable={false}`, `className="min-w-[14rem] flex-1"` — **không** dùng `ChoiceGroup` (hàng nút) trong `FilterBar` (từ 2026-11-02: hàng nút chiếm chỗ, xuống nhiều dòng ở điện thoại). `ChoiceGroup` chỉ còn cho ô NHẬP của form và chọn kỳ xem |
 | Ô tra bỏ dấu, không phân hoa thường, mọi từ phải có | `matchesSearch(q, ...cộtChữ)` |
 | Nhiều điều kiện = AND | `filterRows(rows, [điềuKiện…])`, ô một giá trị dùng `matchesValue(chọn, giáTrị)` với `ALL` = "" là Tất cả |
+| Nút của trang (Xuất Excel, In, Thêm…) khi trang không có tab | `FilterBar actions={…}` — cuối hàng lọc, dạt phải (§ Đầu trang gọn) |
 | Có điều kiện đang bật ⇒ "Bỏ hết bộ lọc (N)" + số dòng khớp | `FilterBar activeCount={activeFilterCount([...])} onClearAll resultText="Đang hiện 12 / 40 phiếu"` — KHÔNG đếm kỳ xem; bỏ lọc giữ kỳ |
 | Lọc ra 0 dòng ≠ kỳ trống | `NoMatchState onClearAll` khi kỳ có dòng mà lọc hết; `EmptyState` cũ khi kỳ trống |
 | Tổng / thẻ số tính theo **dòng đang hiện**, ghi "theo bộ lọc" khi đang lọc | Tính tổng từ mảng đã lọc |

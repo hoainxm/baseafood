@@ -27,7 +27,8 @@ describe("buildSalesTour", () => {
 
   it("thứ tự theo công việc: tab → ghi phiếu → kỳ xem → phiếu → dòng → gắn lô → tổng (R2)", () => {
     const ids = buildSalesTour({ can: FULL }).steps.map((s) => s.id);
-    const order = ["intro", "tabs", "create", "add-item", "stats", "filter", "invoice", "items", "lot", "totals", "report-filters", "report-stats", "report-table", "outro"];
+    // 2026-11-02 (Đầu trang gọn): thẻ số đứng SAU bộ lọc — số tính theo dòng đang hiện.
+    const order = ["intro", "tabs", "create", "add-item", "filter", "stats", "invoice", "items", "lot", "totals", "report-filters", "report-stats", "report-table", "outro"];
     expect(ids).toEqual(order);
   });
 

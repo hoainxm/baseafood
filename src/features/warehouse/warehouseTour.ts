@@ -30,9 +30,9 @@ export function buildWarehouseTour(ctx: WarehouseTourContext): PageTour {
     {
       id: "stats",
       target: "warehouse-stats",
-      title: "Bốn chỉ số của kho",
+      title: "Ba chỉ số của kho",
       body:
-        "• Đang xem: Tồn hiện tại — số tính tới lúc mở trang, không theo kỳ.\n" +
+        "Số tính tới lúc mở trang (tồn hiện tại), không theo kỳ.\n" +
         "• Chờ nhập: số lô sản xuất đã ghi mà chưa duyệt nhập kho. Lô chờ nhập chưa tính vào tồn.\n" +
         "• Số lô hàng: số lô còn hàng trong kho đang lọc.\n" +
         "• Tổng tồn: tổng kg còn lại của các lô đó. Mỗi lô còn = kg thực khi duyệt nhập − kg đã xuất theo lệnh xuất của Đơn đặt − kg bán lẻ block thô − kg đem đóng gói. Dòng đã gắn lô thì trừ đúng lô đó, phần còn lại trừ lô sản xuất sớm trước.",
@@ -81,6 +81,21 @@ export function buildWarehouseTour(ctx: WarehouseTourContext): PageTour {
   }
   steps.push(
     {
+      id: "filter",
+      target: "warehouse-filter",
+      title: "Lọc theo kho",
+      body: "Chọn một kho để chỉ xem tồn của kho đó; bỏ chọn để xem mọi kho. Bộ lọc đổi theo Số lô hàng, Tổng tồn, thanh Hàng nằm kho bao lâu và bảng tồn bên dưới.",
+    },
+    {
+      id: "stock",
+      target: "warehouse-stock",
+      title: "Bảng tồn theo lô",
+      body:
+        "Mỗi dòng là một lô còn hàng: Mặt hàng · Kho · Lô (ngày SX) · Còn (kg) · Block · Nhập / xuất (kg nhập khi duyệt / kg đã ra). Lô đã hết hàng không hiện.\n" +
+        "Ô tìm lọc theo mặt hàng, quy cách hoặc kho; chọn tên cột để sắp xếp. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu, đánh dấu những dòng đã kiểm. Dòng Tổng tồn ở cuối bảng.\n" +
+        "Chưa có lô nào thì trang ghi \"Chưa có tồn trong kho\": duyệt các lô chờ nhập ở trên, hoặc ghi sản lượng ở Sản xuất thành phẩm trước.",
+    },
+    {
       id: "age",
       target: "warehouse-age",
       optional: true,
@@ -99,21 +114,6 @@ export function buildWarehouseTour(ctx: WarehouseTourContext): PageTour {
         "• Thanh vàng: đã dùng trên 85%.\n" +
         "• Thẻ và thanh đỏ: vượt sức chứa.\n" +
         "Thẻ viền xanh là kho đang lọc.",
-    },
-    {
-      id: "filter",
-      target: "warehouse-filter",
-      title: "Lọc theo kho",
-      body: "Chọn một kho để chỉ xem tồn của kho đó; bỏ chọn để xem mọi kho. Bộ lọc đổi theo Số lô hàng, Tổng tồn, thanh Hàng nằm kho bao lâu và bảng tồn bên dưới.",
-    },
-    {
-      id: "stock",
-      target: "warehouse-stock",
-      title: "Bảng tồn theo lô",
-      body:
-        "Mỗi dòng là một lô còn hàng: Mặt hàng · Kho · Lô (ngày SX) · Còn (kg) · Block · Nhập / xuất (kg nhập khi duyệt / kg đã ra). Lô đã hết hàng không hiện.\n" +
-        "Ô tìm lọc theo mặt hàng, quy cách hoặc kho; chọn tên cột để sắp xếp. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu, đánh dấu những dòng đã kiểm. Dòng Tổng tồn ở cuối bảng.\n" +
-        "Chưa có lô nào thì trang ghi \"Chưa có tồn trong kho\": duyệt các lô chờ nhập ở trên, hoặc ghi sản lượng ở Sản xuất thành phẩm trước.",
     },
     {
       id: "outro",

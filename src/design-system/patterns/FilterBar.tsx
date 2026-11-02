@@ -16,10 +16,16 @@ export function FilterBar({
   activeCount = 0,
   onClearAll,
   resultText,
+  actions,
   className,
   ...rest
 }: {
   children: React.ReactNode;
+  /**
+   * Nút thao tác của TRANG (Xuất Excel, In, Thêm…) khi trang không có hàng tab — đứng cuối hàng lọc, dạt phải,
+   * thay vì chiếm một hàng riêng phía trên (README § Đầu trang gọn).
+   */
+  actions?: React.ReactNode;
   /** Số điều kiện đang khác mặc định (KHÔNG tính kỳ xem) — `activeFilterCount` của lib/recordFilters. */
   activeCount?: number;
   /** Đưa mọi điều kiện về mặc định, giữ kỳ xem. */
@@ -34,8 +40,13 @@ export function FilterBar({
     // [&>*]:h-auto: `Field` có h-full — trong hàng flex xuống dòng nằm ở ô lưới (chiều cao xác định) nó cao bằng CẢ
     // khung, hàng đầu phình ra và hàng sau tràn khỏi viền, đè lên khối bên dưới (trang Người dùng 2026-11-02).
     // Thẳng đáy các ô đã có items-end lo.
-    <div className={cn("grid grid-cols-[minmax(0,1fr)] gap-3 rounded-xl border-2 border-border p-4", className)} {...rest}>
-      <div className="flex min-w-0 flex-wrap items-end gap-4 [&>*]:h-auto [&>*]:max-w-full max-sm:[&>*]:w-full max-sm:[&>*]:min-w-0">{children}</div>
+    // max-sm basis-full: ô `flex-1` có flex-basis 0 ⇒ w-full không ép xuống dòng, cả hàng bị bóp dẹt ở 360px
+    // (Bán hàng 2026-11-02). Điện thoại: mỗi ô một hàng thật.
+    <div className={cn("grid grid-cols-[minmax(0,1fr)] gap-2 rounded-xl border-2 border-border p-3", className)} {...rest}>
+      <div className="flex min-w-0 flex-wrap items-end gap-3 [&>*]:h-auto [&>*]:max-w-full max-sm:[&>*]:w-full max-sm:[&>*]:min-w-0 max-sm:[&>*]:basis-full">
+        {children}
+        {actions && <div className="ml-auto flex flex-wrap items-end justify-end gap-2">{actions}</div>}
+      </div>
       {activeCount > 0 && (
         <div className="flex flex-wrap items-center gap-3">
           {resultText && <span className="tnum text-sm text-muted-foreground">{resultText}</span>}

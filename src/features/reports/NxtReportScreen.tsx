@@ -332,39 +332,29 @@ export default function NxtReportScreen() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
-            <Snowflake className="h-8 w-8 text-primary" />
-            Báo cáo Nhập – Xuất – Tồn thành phẩm
-            {isReadOnly && <ReadOnlyBadge />}
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Kho bán thành phẩm cấp đông dự trữ. Số suy từ sổ Sản xuất, Đơn đặt và Bán hàng — không nhập
-            tay lần hai.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            data-tour="nxt-opening"
-            title="Khai tồn đầu kho thành phẩm cho các mã chưa có lịch sử giao dịch — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setIsOpeningOpen(true)}>
-            <PackagePlus className="mr-2 h-4 w-4" />
-            Tồn đầu ({opening.length})
-          </Button>
-          {allowed.export && (
-            <Button
-              data-tour="nxt-export"
-              title="Tải báo cáo của kỳ đang xem ra file Excel (đủ mọi mặt hàng, không theo ô tra)." onClick={exportExcel} disabled={!allRows.length}>
-              <Download className="mr-2 h-4 w-4" />
-              Xuất Excel
-            </Button>
-          )}
-        </div>
-      </div>
-
+    <div className="space-y-4">
+      <h1 className="sr-only">Báo cáo Nhập – Xuất – Tồn thành phẩm</h1>
+      {isReadOnly && <ReadOnlyBadge />}
       <FilterBar
         data-tour="nxt-period"
+        actions={
+          <>
+            <Button
+              data-tour="nxt-opening"
+              title="Khai tồn đầu kho thành phẩm cho các mã chưa có lịch sử giao dịch — không có số này thì kỳ đầu tiên tính thiếu." variant="outline" onClick={() => setIsOpeningOpen(true)}>
+              <PackagePlus className="mr-2 h-4 w-4" />
+              Tồn đầu ({opening.length})
+            </Button>
+            {allowed.export && (
+              <Button
+                data-tour="nxt-export"
+                title="Tải báo cáo của kỳ đang xem ra file Excel (đủ mọi mặt hàng, không theo ô tra)." onClick={exportExcel} disabled={!allRows.length}>
+                <Download className="mr-2 h-4 w-4" />
+                Xuất Excel
+              </Button>
+            )}
+          </>
+        }
         activeCount={filterCount}
         onClearAll={() => setQuery("")}
         resultText={`Đang hiện ${rows.length.toLocaleString("vi-VN")} / ${allRows.length.toLocaleString("vi-VN")} mặt hàng`}

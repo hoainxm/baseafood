@@ -47,7 +47,7 @@ export default function SalesTab() {
   usePageTour(isLoading ? null : tour);
 
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as SalesTabId)} className="space-y-6">
+    <Tabs value={tab} onValueChange={(v) => setTab(v as SalesTabId)} className="relative space-y-4">
       <TabsList data-tour="sales-tabs">
         <TabsTrigger value="ledger">Sổ bán hàng</TabsTrigger>
         <TabsTrigger value="report">Báo cáo</TabsTrigger>

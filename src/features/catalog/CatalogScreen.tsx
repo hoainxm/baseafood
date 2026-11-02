@@ -100,10 +100,8 @@ export default function CatalogScreen() {
   const [exportFiles] = useExportFiles();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Danh mục</h1>
-      </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Danh mục</h1>
 
       <Tabs value={tab} onValueChange={setTab}>
         {/* 6 tab: hẹp thì XUỐNG HÀNG thay vì cuộn ngang khuất tab cuối. */}
@@ -120,11 +118,11 @@ export default function CatalogScreen() {
           {canViewTab("finished-goods") && <TabsTrigger value="finished-goods" title="141 mã thành phẩm kế toán (TK 1551) — chỉ đọc, không sửa ở đây.">Thành phẩm (141 mã)</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="products" data-tour="catalog-products" className="pt-6">
+        <TabsContent value="products" data-tour="catalog-products" className="pt-4">
           <CatalogCrudFor cfg={c.product} rowMarkKey="danh-muc-mat-hang" resource={TAB_RESOURCE["products"]} />
         </TabsContent>
 
-        <TabsContent value="customers" data-tour="catalog-customers" className="pt-6">
+        <TabsContent value="customers" data-tour="catalog-customers" className="pt-4">
           <CatalogCrudFor
             cfg={c.customer}
             rowMarkKey="danh-muc-khach-hang"
@@ -150,34 +148,34 @@ export default function CatalogScreen() {
           />
         </TabsContent>
 
-        <TabsContent value="suppliers" data-tour="catalog-suppliers" className="pt-6">
+        <TabsContent value="suppliers" data-tour="catalog-suppliers" className="pt-4">
           <CatalogCrudFor cfg={c.supplier} rowMarkKey="danh-muc-dai-ly" resource={TAB_RESOURCE["suppliers"]} />
         </TabsContent>
-        <TabsContent value="import-suppliers" data-tour="catalog-import-suppliers" className="pt-6">
+        <TabsContent value="import-suppliers" data-tour="catalog-import-suppliers" className="pt-4">
           <CatalogCrudFor cfg={c.importSupplier} rowMarkKey="import-suppliers" resource={TAB_RESOURCE["import-suppliers"]} />
         </TabsContent>
 
-        <TabsContent value="material-types" data-tour="catalog-material-types" className="pt-6">
+        <TabsContent value="material-types" data-tour="catalog-material-types" className="pt-4">
           <CatalogCrudFor cfg={c.materialType} rowMarkKey="danh-muc-loai-nl" resource={TAB_RESOURCE["material-types"]} />
         </TabsContent>
 
-        <TabsContent value="batters" data-tour="catalog-batters" className="pt-6">
+        <TabsContent value="batters" data-tour="catalog-batters" className="pt-4">
           <CatalogCrudFor cfg={c.batter} rowMarkKey="danh-muc-bot-tam" resource={TAB_RESOURCE["batters"]} />
         </TabsContent>
 
-        <TabsContent value="storage-locations" data-tour="catalog-storage-locations" className="pt-6">
+        <TabsContent value="storage-locations" data-tour="catalog-storage-locations" className="pt-4">
           <CatalogCrudFor cfg={c.storageLocation} rowMarkKey="danh-muc-kho-luu" resource={TAB_RESOURCE["storage-locations"]} />
         </TabsContent>
 
-        <TabsContent value="document-kinds" data-tour="catalog-document-kinds" className="pt-6">
+        <TabsContent value="document-kinds" data-tour="catalog-document-kinds" className="pt-4">
           <CatalogCrudFor cfg={c.documentKind} rowMarkKey="export-document-kinds" resource={TAB_RESOURCE["document-kinds"]} />
         </TabsContent>
 
-        <TabsContent value="goods-types" data-tour="catalog-goods-types" className="pt-6">
+        <TabsContent value="goods-types" data-tour="catalog-goods-types" className="pt-4">
           <CatalogCrudFor cfg={c.goodsType} rowMarkKey="goods-types" resource={TAB_RESOURCE["goods-types"]} />
         </TabsContent>
 
-        <TabsContent value="finished-goods" data-tour="catalog-finished-goods" className="pt-6">
+        <TabsContent value="finished-goods" data-tour="catalog-finished-goods" className="pt-4">
           <FinishedGoodScreen />
         </TabsContent>
       </Tabs>

@@ -72,7 +72,7 @@ import { buildPackagingTour } from "./packagingTour";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { ALL, activeFilterCount, filterRows, matchesSearch, matchesValue } from "@/lib/recordFilters";
-import { Boxes, CalendarRange, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
+import { Boxes, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
 
 const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
 const FG_WAREHOUSE_NAMES = BSF1_WAREHOUSES.map((w) => w.name);
@@ -133,9 +133,6 @@ export default function PackagingScreen() {
 
   const [effectiveFrom, effectiveTo] = getViewPeriodRange(period, date, fromDate, toDate);
   const isSingleDay = effectiveFrom === effectiveTo;
-  const rangeDescription = isSingleDay
-    ? formatDateVN(effectiveFrom)
-    : `${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`;
 
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
   const productOptions: ComboboxOption[] = products.map((m) => ({
@@ -411,42 +408,21 @@ export default function PackagingScreen() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex flex-wrap items-center gap-3 text-xl font-semibold text-foreground">
-            Đóng gói thành phẩm
-            {!canWrite && <ReadOnlyBadge />}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Bán thành phẩm (còn khuôn đá) → đóng gói thành thành phẩm sẵn bán. Đóng gói trừ tồn dự trữ, cộng tồn thành phẩm.
-          </p>
-        </div>
-        {canAdd && (
-        <Button
-          data-tour="packaging-add"
-          title="Ghi một phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, phần chênh là hao hụt." size="lg" onClick={openAdd}>
-          <Plus />
-          Ghi phiếu đóng gói
-        </Button>
-        )}
-      </div>
-
-      <div data-tour="packaging-stats">
-        <StatCardGrid
-          className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-          cards={[
-            { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
-            { label: filterCount ? "Số phiếu · theo bộ lọc" : "Số phiếu", value: view.length, numeric: true, icon: Package, color: "brand" },
-            { label: filterCount ? "BTP vào · theo bộ lọc" : "BTP vào", value: kg(totalIn), numeric: true, icon: Scale, color: "neutral" },
-            { label: filterCount ? "TP ra · theo bộ lọc" : "TP ra", value: kg(totalOut), numeric: true, icon: PackageCheck, color: "success" },
-            { label: filterCount ? "Hao hụt · theo bộ lọc" : "Hao hụt", value: kg(totalLoss), numeric: true, icon: Scale, color: totalLoss < 0 ? "warning" : "neutral" },
-          ]}
-        />
-      </div>
-
+    <div className="space-y-4">
+      <h1 className="sr-only">Đóng gói thành phẩm</h1>
+      {!canWrite && <ReadOnlyBadge />}
       <FilterBar
         data-tour="packaging-filter"
+        actions={
+          canAdd && (
+            <Button
+              data-tour="packaging-add"
+              title="Ghi một phiếu đóng gói: trừ bán thành phẩm đem đóng, cộng thành phẩm ra, phần chênh là hao hụt." onClick={openAdd}>
+              <Plus />
+              Ghi phiếu đóng gói
+            </Button>
+          )
+        }
         activeCount={filterCount}
         onClearAll={clearFilters}
         resultText={`Đang hiện ${view.length.toLocaleString("vi-VN")} / ${periodView.length.toLocaleString("vi-VN")} phiếu của kỳ`}
@@ -498,6 +474,17 @@ export default function PackagingScreen() {
         )}
         <SearchField label="Tra mặt hàng, quy cách, kho, ghi chú" value={query} onChange={setQuery} />
       </FilterBar>
+
+      <div data-tour="packaging-stats">
+        <StatCardGrid
+          cards={[
+            { label: filterCount ? "Số phiếu · theo bộ lọc" : "Số phiếu", value: view.length, numeric: true, icon: Package, color: "brand" },
+            { label: filterCount ? "BTP vào · theo bộ lọc" : "BTP vào", value: kg(totalIn), numeric: true, icon: Scale, color: "neutral" },
+            { label: filterCount ? "TP ra · theo bộ lọc" : "TP ra", value: kg(totalOut), numeric: true, icon: PackageCheck, color: "success" },
+            { label: filterCount ? "Hao hụt · theo bộ lọc" : "Hao hụt", value: kg(totalLoss), numeric: true, icon: Scale, color: totalLoss < 0 ? "warning" : "neutral" },
+          ]}
+        />
+      </div>
 
       {/* Tồn thành phẩm đóng gói còn kho */}
       {finishedGoodStock.some((t) => t.remainingKg > 0) && (

@@ -211,26 +211,10 @@ export default function AuditLogScreen() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">Nhật ký thao tác</h1>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            title="Nạp lại nhật ký từ máy chủ để thấy thao tác vừa xảy ra." size="lg" variant="outline" onClick={reload}>
-            <RefreshCw />
-            Tải lại
-          </Button>
-          <Button
-            title="Tải nhật ký đang lọc ra file Excel." size="lg" variant="outline" onClick={exportExcel} disabled={!view.length}>
-            <FileSpreadsheet />
-            Xuất Excel
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Nhật ký thao tác</h1>
 
-      <StatCardGrid cards={cards} />
-
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-border p-3">
         <div className="min-w-[10rem]">
           <DateField label="Từ ngày" hideRequiredMark value={fromDate} onChange={setFromDate} />
         </div>
@@ -255,7 +239,22 @@ export default function AuditLogScreen() {
             />
           </Field>
         </div>
+        {/* Nút của trang cuối hàng lọc (README § Đầu trang gọn) */}
+        <div className="ml-auto flex flex-wrap gap-2">
+          <Button
+            title="Nạp lại nhật ký từ máy chủ để thấy thao tác vừa xảy ra." variant="outline" onClick={reload}>
+            <RefreshCw />
+            Tải lại
+          </Button>
+          <Button
+            title="Tải nhật ký đang lọc ra file Excel." variant="outline" onClick={exportExcel} disabled={!view.length}>
+            <FileSpreadsheet />
+            Xuất Excel
+          </Button>
+        </div>
       </div>
+
+      <StatCardGrid cards={cards} />
 
       {!isLoading && isTruncated && (
         <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warning-surface px-4 py-2 text-sm">

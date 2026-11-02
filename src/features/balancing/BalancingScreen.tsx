@@ -358,18 +358,15 @@ export default function BalancingScreen() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold text-foreground">
-            Cân đối nguyên liệu
-          </h1>
-          {!allowed.create && !allowed.update && <ReadOnlyBadge />}
-        </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Cân đối nguyên liệu</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 empty:hidden">
+        {!allowed.create && !allowed.update && <ReadOnlyBadge />}
         {allowed.create && (
           <Button
             data-tour="balancing-create-period"
-            title="Mở một kỳ cân đối mới (thường ~5 ngày một lô): khai khoảng ngày rồi hút số liệu nhập · sản xuất · bán vào." size="lg" onClick={openAdd}>
+            className="ml-auto"
+            title="Mở một kỳ cân đối mới (thường ~5 ngày một lô): khai khoảng ngày rồi hút số liệu nhập · sản xuất · bán vào." onClick={openAdd}>
             <Plus />
             Tạo kỳ cân đối
           </Button>
@@ -661,20 +658,18 @@ function PeriodDetail({
   const pendingSourceCount = grid.pendingWips.length;
 
   return (
-    <div className="space-y-6">
-      <Button
-        title="Quay về danh sách các kỳ cân đối." variant="ghost" size="lg" onClick={onBack}>
-        <ChevronLeft />
-        Danh sách kỳ
-      </Button>
-
-      <div data-tour="balancing-period-header" className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-foreground">Bảng cân đối {period.materialTypeName}</h1>
-            {grid.isReadOnly && <ReadOnlyBadge />}
-          </div>
-          <p className="mt-1 text-base text-muted-foreground">
+    <div className="space-y-4">
+      {/* Nút về danh sách + tên kỳ + ngày chung một cụm — không để nút Quay về chiếm riêng một hàng. */}
+      <div data-tour="balancing-period-header" className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <Button
+            title="Quay về danh sách các kỳ cân đối." variant="ghost" onClick={onBack}>
+            <ChevronLeft />
+            Danh sách kỳ
+          </Button>
+          <h1 className="text-xl font-semibold text-foreground">Bảng cân đối {period.materialTypeName}</h1>
+          {grid.isReadOnly && <ReadOnlyBadge />}
+          <p className="text-base text-muted-foreground">
             {period.dateRangeDescription || "Chưa ghi ngày tiếp nhận"}
             {period.isLocked && " · đã chốt"}
           </p>

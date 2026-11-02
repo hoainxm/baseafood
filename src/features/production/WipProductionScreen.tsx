@@ -1573,14 +1573,10 @@ export default function WipProductionScreen() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold text-foreground">
-            Sản xuất thành phẩm
-            {isReadOnly && <ReadOnlyBadge />}
-          </h1>
-        </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Sản xuất thành phẩm</h1>
+      <div className="flex flex-col gap-3 empty:hidden sm:flex-row sm:items-center sm:justify-between">
+        {isReadOnly && <ReadOnlyBadge />}
         {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
         {canEnter && (
         <div data-tour="wip-mode-switch" className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">

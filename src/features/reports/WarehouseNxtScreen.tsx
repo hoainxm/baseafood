@@ -74,7 +74,6 @@ import {
   Snowflake,
   Trash2,
   Upload,
-  Warehouse,
   PackageOpen,
 } from "lucide-react";
 
@@ -611,45 +610,44 @@ export default function WarehouseNxtScreen() {
 
   const hasData = snapshots.length > 0;
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
-            <Warehouse className="h-8 w-8 text-primary" />
-            Báo cáo Xuất – Nhập – Tồn kho
-            {!canWrite && <ReadOnlyBadge />}
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Số thật theo báo cáo của xí nghiệp (Kho × Mã hàng × Kỳ). Tồn cuối = tồn đầu + nhập − xuất.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
-          {canWrite && (
-            <Button data-tour="nxt-warehouse-import" variant="outline" onClick={pickFile} title="Đọc file Excel báo cáo Xuất–Nhập–Tồn xuất từ hệ thống xí nghiệp (mẫu 10 cột). Nạp lại cùng kho + cùng kỳ chỉ cập nhật, không nhân đôi dòng.">
-              <Upload className="mr-2 h-4 w-4" />
-              Nhập Excel báo cáo
-            </Button>
-          )}
-          {allowed.export && (
-            <>
-              <Button data-tour="nxt-warehouse-export" variant="outline" onClick={exportExcel} disabled={!rows.length} title="Tải kỳ đang xem ra file Excel đúng mẫu báo cáo của xí nghiệp, để gửi kế toán hoặc lưu hồ sơ.">
-                <Download className="mr-2 h-4 w-4" />
-                Xuất Excel
-              </Button>
-              <Button onClick={() => setMoIn(true)} disabled={!rows.length} title="Xem trước bản in A4 của kỳ đang xem, rồi in giấy hoặc lưu PDF.">
-                <Printer className="mr-2 h-4 w-4" />
-                In A4
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
+  // Nút của trang: có số ⇒ đứng cuối hàng lọc; chưa có số ⇒ một hàng riêng (README § Đầu trang gọn).
+  const pageActions = (
+    <>
+      {canWrite && (
+        <Button data-tour="nxt-warehouse-import" variant="outline" onClick={pickFile} title="Đọc file Excel báo cáo Xuất–Nhập–Tồn xuất từ hệ thống xí nghiệp (mẫu 10 cột). Nạp lại cùng kho + cùng kỳ chỉ cập nhật, không nhân đôi dòng.">
+          <Upload className="mr-2 h-4 w-4" />
+          Nhập Excel báo cáo
+        </Button>
+      )}
+      {allowed.export && (
+        <>
+          <Button data-tour="nxt-warehouse-export" variant="outline" onClick={exportExcel} disabled={!rows.length} title="Tải kỳ đang xem ra file Excel đúng mẫu báo cáo của xí nghiệp, để gửi kế toán hoặc lưu hồ sơ.">
+            <Download className="mr-2 h-4 w-4" />
+            Xuất Excel
+          </Button>
+          <Button onClick={() => setMoIn(true)} disabled={!rows.length} title="Xem trước bản in A4 của kỳ đang xem, rồi in giấy hoặc lưu PDF.">
+            <Printer className="mr-2 h-4 w-4" />
+            In A4
+          </Button>
+        </>
+      )}
+    </>
+  );
 
+  return (
+    <div className="space-y-4">
+      <h1 className="sr-only">Báo cáo Xuất – Nhập – Tồn kho</h1>
+      <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
+      {(!canWrite || !hasData) && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {!canWrite && <ReadOnlyBadge />}
+          {!hasData && <div className="ml-auto flex flex-wrap items-center gap-2">{pageActions}</div>}
+        </div>
+      )}
       {hasData && (
         <FilterBar
           data-tour="nxt-warehouse-filters"
+          actions={pageActions}
           activeCount={filterCount}
           onClearAll={clearFilters}
           resultText={`Đang hiện ${rows.length.toLocaleString("vi-VN")} / ${periodRows.length.toLocaleString("vi-VN")} mã của kỳ`}

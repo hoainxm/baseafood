@@ -67,16 +67,6 @@ export function buildSalesTour(ctx: SalesTourContext): PageTour {
   }
   steps.push(
     {
-      id: "stats",
-      target: "sales-stats",
-      title: "Năm chỉ số của kỳ",
-      body:
-        "• Đang xem: ngày hoặc khoảng ngày đang xem.\n" +
-        "• Phân xưởng: xưởng đang lọc.\n" +
-        "• Số phiếu và Số dòng: số phiếu bán và số dòng mặt hàng trong kỳ.\n" +
-        "• Tổng bán: tổng kg đã bán trong kỳ.",
-    },
-    {
       id: "filter",
       target: "sales-filter",
       title: "Kỳ xem sổ, phân xưởng và bộ lọc",
@@ -85,6 +75,14 @@ export function buildSalesTour(ctx: SalesTourContext): PageTour {
         "Phân xưởng: Đông · Cá · Khô hoặc Tất cả. Sổ lọc theo ngày xuất bán của phiếu.\n" +
         "Khách hàng · Kênh bán · ô Tra khách, mặt hàng, quy cách, ghi chú (không cần dấu) để chỉ xem phiếu cần. Đang lọc thì thẻ số và tổng tính theo dòng đang hiện (ghi \"theo bộ lọc\"); Bỏ hết bộ lọc để về sổ đầy đủ của kỳ. Lọc ra không dòng nào thì trang báo Không có dòng nào khớp bộ lọc.\n" +
         "Ghi xong một phiếu nằm ngoài kỳ đang xem, sổ tự chuyển về ngày của phiếu đó.",
+    },
+    {
+      id: "stats",
+      target: "sales-stats",
+      title: "Ba chỉ số của kỳ",
+      body:
+        "• Số phiếu và Số dòng: số phiếu bán và số dòng mặt hàng trong kỳ.\n" +
+        "• Tổng bán: tổng kg đã bán trong kỳ.",
     },
     {
       id: "invoice",

@@ -653,14 +653,8 @@ export default function DashboardScreen() {
   }));
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Tổng quan — dòng chảy số liệu</h1>
-        <p className="mt-1 text-muted-foreground">
-          Nguyên liệu vào đi qua 5 khâu ra sao, đang kẹt ở đâu, Phòng Kế hoạch đã nhập / ra lệnh / xuất bao nhiêu, còn
-          việc gì phải đốc. Mọi số lấy từ sổ đã ghi; sổ nào chưa có số thì hình để trống.
-        </p>
-      </div>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+      <h1 className="sr-only">Tổng quan — dòng chảy số liệu</h1>
 
       {/* Thanh lọc GỌN một hàng: kỳ (bấm nhanh) · lùi/tiến · xưởng. Tự chọn mới hiện ô ngày. */}
       <div data-tour="dashboard-filters" className="grid gap-3 rounded-xl border bg-muted/30 p-3">

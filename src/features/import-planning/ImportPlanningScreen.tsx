@@ -12,7 +12,7 @@ import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsT
 import { useImportSupplierStore, useProducts } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { usePageTour, usePageTourControl } from "@/features/shared/PageTourProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
 import { ReasonDialog, type ReasonTarget } from "@/features/export-planning/RecordDialogs";
 import { newId } from "@/lib/store";
 import { closeGate, contractProgress, documentLabel, requiredDocumentStubs, type ImportData } from "@/lib/importPlanning";
@@ -22,7 +22,7 @@ import { formatDateVN } from "@/lib/format";
 import { entriesOf, usePlanningActivityLog } from "@/features/shared/activityLog";
 import { mergeSamples } from "@/lib/importSampleChecks";
 import { SampleCheckDialog, type SampleDialogTarget, type SampleSavePayload } from "./SampleChecks";
-import { BarChart3, FilePlus2, FileText, FolderLock, Route, Ship } from "lucide-react";
+import { BarChart3, FilePlus2, FileText, FolderLock, Ship } from "lucide-react";
 import { ImportDossier } from "./ImportDossier";
 import {
   CloseContractDialog,
@@ -358,7 +358,6 @@ export default function ImportPlanningScreen() {
     [tourPick, can.create, can.update, receivingCan.create, receivingCan.update],
   );
   usePageTour(can.view && !store.isLoading ? tour : null);
-  const pageTour = usePageTourControl();
 
   /* ---------- Vẽ ---------- */
 
@@ -402,7 +401,7 @@ export default function ImportPlanningScreen() {
   };
 
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       {notAvailable}
       {!hasImportStorage && (
         <p role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
@@ -454,33 +453,25 @@ export default function ImportPlanningScreen() {
         />
       ) : (
         <>
+          <h1 className="sr-only">Nhập khẩu</h1>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
-              <p className="max-w-3xl text-muted-foreground">Hợp đồng nhập, chứng từ từng lô hàng về và số lượng thực nhập. Khác Nhập hàng nguyên liệu trong nước.</p>
-              <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" ? v : "" }, true)}>
-                <TabsList data-tour="import-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
-                  <TabsTrigger value="month" className={TAB_TRIGGER} title="Lô nhập của tháng, gom theo đối tác, kèm chứng từ còn thiếu.">
-                    <Ship className="mr-2 h-4 w-4" aria-hidden />
-                    Lô nhập
-                  </TabsTrigger>
-                  <TabsTrigger value="contracts" className={TAB_TRIGGER} title="Danh sách mọi hợp đồng nhập, lọc theo trạng thái.">
-                    <FileText className="mr-2 h-4 w-4" aria-hidden />
-                    Hợp đồng
-                  </TabsTrigger>
-                  <TabsTrigger value="reports" className={TAB_TRIGGER} title="Số nhập khẩu theo tháng / quý / năm: lần nhập, kg thực nhập, trị giá, đối tác, mặt hàng, lần nhập cần chú ý.">
-                    <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
-                    Báo cáo
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
+            <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" ? v : "" }, true)}>
+              <TabsList data-tour="import-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
+                <TabsTrigger value="month" className={TAB_TRIGGER} title="Lô nhập của tháng, gom theo đối tác, kèm chứng từ còn thiếu.">
+                  <Ship className="mr-2 h-4 w-4" aria-hidden />
+                  Lô nhập
+                </TabsTrigger>
+                <TabsTrigger value="contracts" className={TAB_TRIGGER} title="Danh sách mọi hợp đồng nhập, lọc theo trạng thái.">
+                  <FileText className="mr-2 h-4 w-4" aria-hidden />
+                  Hợp đồng
+                </TabsTrigger>
+                <TabsTrigger value="reports" className={TAB_TRIGGER} title="Số nhập khẩu theo tháng / quý / năm: lần nhập, kg thực nhập, trị giá, đối tác, mặt hàng, lần nhập cần chú ý.">
+                  <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
+                  Báo cáo
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             <div className="flex flex-wrap items-center gap-2">
-              {pageTour.available && (
-                <Button variant="outline" data-tour-start onClick={pageTour.start} title="Mở hướng dẫn thao tác: lần lượt chỉ từng khu vực trên trang theo thứ tự công việc. Hướng dẫn không thay đổi dữ liệu.">
-                  <Route className="mr-2 h-4 w-4" aria-hidden />
-                  Hướng dẫn thao tác
-                </Button>
-              )}
               {can.create && canWrite && (
                 <Button data-tour="create-import-contract" onClick={() => setContractForm({ mode: "create" })} title="Lập hợp đồng nhập mới: đối tác, số HĐ, loại hình, dòng hàng (tên, kg, đơn giá).">
                   <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />

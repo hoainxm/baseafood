@@ -154,7 +154,7 @@ export function ImportMonthView({
           <Combobox label="Đối tác" hideRequiredMark value={supplierId} onChange={setSupplierId} options={[{ value: "", label: "Mọi đối tác" }, ...supplierOptions]} />
         </div>
         <div data-tour="import-search" className="min-w-56 flex-1 basis-56">
-          <SearchField label="Tra số chứng từ (số HĐ · invoice · tờ khai · cont · B/L)" hint="Gõ một phần số — tra ở mọi tháng." value={query} onChange={setQuery} />
+          <SearchField label="Tra số HĐ, invoice, tờ khai, cont, B/L" value={query} onChange={setQuery} />
         </div>
         {!query.trim() && view.groups.length > 0 && (
           <ChoiceGroup

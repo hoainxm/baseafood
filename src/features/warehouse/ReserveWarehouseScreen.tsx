@@ -39,7 +39,7 @@ import {
   todayIso,
 } from "@/design-system";
 import { kg, num, formatDateVN } from "@/lib/format";
-import { AlertTriangle, CalendarRange, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
+import { AlertTriangle, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
 import { QrScanner } from "@/features/shared";
 import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
 import { parseQrCode, formatWipLotLabel, findLots } from "@/lib/lotTraceability";
@@ -244,19 +244,13 @@ export default function ReserveWarehouseScreen() {
   usePageTour(isLoading ? null : tour);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold text-foreground">
-          Kho dự trữ đông
-          {isReadOnly && <ReadOnlyBadge />}
-        </h1>
-      </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Kho dự trữ đông</h1>
+      {isReadOnly && <ReadOnlyBadge />}
 
       <div data-tour="warehouse-stats">
       <StatCardGrid
-        className="grid-cols-2 lg:grid-cols-4"
         cards={[
-          { label: "Đang xem", value: "Tồn hiện tại", icon: CalendarRange, color: "neutral" },
           { label: "Chờ nhập", value: pendingIntake.length, numeric: true, icon: Warehouse, color: "neutral" },
           { label: "Số lô hàng", value: filteredStock.length, numeric: true, icon: ClipboardList, color: "brand" },
           { label: "Tổng tồn", value: kg(totalStock), numeric: true, icon: Scale, color: "success" },
@@ -276,87 +270,6 @@ export default function ReserveWarehouseScreen() {
           </span>
         </div>
       )}
-
-      {/* Hàng nằm kho bao lâu — đẩy lô cũ trước (FIFO). */}
-      {totalStock > 0 && (
-        <section data-tour="warehouse-age" className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
-          <h2 className="text-lg font-semibold text-foreground">Hàng nằm kho bao lâu</h2>
-          <p className="text-sm text-muted-foreground">
-            Tồn {warehouseFilter ? `kho ${warehouseFilter}` : "mọi kho"} chia theo số ngày từ ngày sản xuất tới hôm nay. Phần nằm lâu nên xuất trước.
-          </p>
-          <ProportionBar
-            description="Tồn kho chia theo số ngày nằm kho"
-            segments={ageBuckets.map((g) => ({
-              id: g.key,
-              label: g.label,
-              description: `${num(g.lotCount)} lô`,
-              value: g.kg,
-              tone: ({ "under-30": "green", "30-60": "sand", "60-90": "orange", "over-90": "pink" } as const)[g.key],
-            }))}
-          />
-        </section>
-      )}
-
-      {/* Dung tích & Tải trọng 5 Kho BSF1 */}
-      <div data-tour="warehouse-capacity" className="rounded-xl border-2 border-border p-4 bg-card space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground">
-          <Warehouse className="w-5 h-5 text-primary" />
-          Dung tích & Tải trọng Kho BSF1
-        </h2>
-        {/* auto-fill theo CHỖ TRỐNG thật (không theo bề rộng màn): trừ thanh bên, lg:grid-cols-5
-            từng ép 5 thẻ ~114px ⇒ nhãn xưởng bị cắt chữ. Mỗi thẻ tối thiểu 11rem. */}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(11rem,100%),1fr))] gap-4">
-          {warehouseCapacity.map((item) => (
-            <div
-              key={item.warehouse.id}
-              className={`rounded-lg border p-3 flex flex-col justify-between transition-colors ${
-                item.isOverCapacity
-                  ? "border-destructive bg-destructive/10"
-                  : warehouseFilter === item.warehouse.name
-                  ? "border-primary bg-primary/10"
-                  : "border-border bg-background"
-              }`}
-            >
-              <div>
-                {/* flex-wrap: thẻ hẹp thì nhãn xưởng xuống dòng thay vì bị ép cắt chữ. */}
-                <div className="flex flex-wrap items-center justify-between gap-1">
-                  <span className="min-w-0 font-semibold text-sm text-foreground">{item.warehouse.name}</span>
-                  {item.warehouse.type === "plant" ? (
-                    <Tag variant="category" tone={toneByName("Kho lớn")}>Kho lớn</Tag>
-                  ) : (
-                    <Tag variant="category" tone={toneForWorkshop(item.warehouse.workshop)}>
-                      {`Xưởng ${item.warehouse.workshop}`}
-                    </Tag>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Sức chứa: <span className="font-medium tnum">{num(item.warehouse.capacityKg / 1000)}</span> tấn
-                </div>
-              </div>
-              <div className="mt-3 space-y-1">
-                <div className="flex justify-between text-xs font-semibold tnum">
-                  <span>{num(item.currentKg)} kg</span>
-                  <span className={item.isOverCapacity ? "text-destructive font-bold" : "text-muted-foreground"}>
-                    {item.percentage}%
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className={`h-full transition-all ${
-                      item.isOverCapacity
-                        ? "bg-destructive"
-                        : item.percentage > 85
-                        ? "bg-warning"
-                        : "bg-primary"
-                    }`}
-                    style={{ width: `${Math.min(100, item.percentage)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Khối chờ nhập — lời mời duyệt (không coi rỗng khi còn lô chờ) */}
       {pendingIntake.length > 0 && (
@@ -420,7 +333,7 @@ export default function ReserveWarehouseScreen() {
         </div>
       )}
 
-      <div data-tour="warehouse-filter" className="flex flex-wrap items-end gap-4 rounded-xl border-2 border-border p-4">
+      <div data-tour="warehouse-filter" className="flex flex-wrap items-end gap-3">
         <Combobox
           label="Lọc theo kho"
           hideRequiredMark
@@ -463,6 +376,88 @@ export default function ReserveWarehouseScreen() {
           </div>
         </>
       )}
+      </div>
+
+      {/* Tổng quan kho (tuổi tồn, dung tích) xếp SAU sổ tồn: việc chính của trang là duyệt nhập + xem tồn. */}
+      {/* Hàng nằm kho bao lâu — đẩy lô cũ trước (FIFO). */}
+      {totalStock > 0 && (
+        <section data-tour="warehouse-age" className="space-y-3 rounded-xl border-2 border-border bg-card p-4">
+          <h2 className="text-lg font-semibold text-foreground">Hàng nằm kho bao lâu</h2>
+          <p className="text-sm text-muted-foreground">
+            Tồn {warehouseFilter ? `kho ${warehouseFilter}` : "mọi kho"} chia theo số ngày từ ngày sản xuất tới hôm nay. Phần nằm lâu nên xuất trước.
+          </p>
+          <ProportionBar
+            description="Tồn kho chia theo số ngày nằm kho"
+            segments={ageBuckets.map((g) => ({
+              id: g.key,
+              label: g.label,
+              description: `${num(g.lotCount)} lô`,
+              value: g.kg,
+              tone: ({ "under-30": "green", "30-60": "sand", "60-90": "orange", "over-90": "pink" } as const)[g.key],
+            }))}
+          />
+        </section>
+      )}
+
+      {/* Dung tích & Tải trọng 5 Kho BSF1 */}
+      <div data-tour="warehouse-capacity" className="rounded-xl border-2 border-border p-4 bg-card space-y-3">
+        <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground">
+          <Warehouse className="w-5 h-5 text-primary" />
+          Dung tích & Tải trọng Kho BSF1
+        </h2>
+        {/* auto-fill theo CHỖ TRỐNG thật (không theo bề rộng màn): trừ thanh bên, lg:grid-cols-5
+            từng ép 5 thẻ ~114px ⇒ nhãn xưởng bị cắt chữ. Mỗi thẻ tối thiểu 11rem. */}
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(11rem,100%),1fr))] gap-4">
+          {warehouseCapacity.map((item) => (
+            <div
+              key={item.warehouse.id}
+              className={`rounded-lg border p-3 flex flex-col justify-between transition-colors ${
+                item.isOverCapacity
+                  ? "border-destructive bg-destructive/10"
+                  : warehouseFilter === item.warehouse.name
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-background"
+              }`}
+            >
+              <div>
+                {/* flex-wrap: thẻ hẹp thì nhãn xưởng xuống dòng thay vì bị ép cắt chữ. */}
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="min-w-0 font-semibold text-sm text-foreground">{item.warehouse.name}</span>
+                  {item.warehouse.type === "plant" ? (
+                    <Tag variant="category" tone={toneByName("Kho lớn")}>Kho lớn</Tag>
+                  ) : (
+                    <Tag variant="category" tone={toneForWorkshop(item.warehouse.workshop)}>
+                      {`Xưởng ${item.warehouse.workshop}`}
+                    </Tag>
+                  )}
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Sức chứa: <span className="font-medium tnum">{num(item.warehouse.capacityKg / 1000)}</span> tấn
+                </div>
+              </div>
+              <div className="mt-3 space-y-1">
+                <div className="flex justify-between text-sm font-semibold tnum">
+                  <span>{num(item.currentKg)} kg</span>
+                  <span className={item.isOverCapacity ? "text-destructive font-bold" : "text-muted-foreground"}>
+                    {item.percentage}%
+                  </span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${
+                      item.isOverCapacity
+                        ? "bg-destructive"
+                        : item.percentage > 85
+                        ? "bg-warning"
+                        : "bg-primary"
+                    }`}
+                    style={{ width: `${Math.min(100, item.percentage)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Dialog duyệt nhập kho */}

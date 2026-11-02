@@ -123,11 +123,8 @@ export default function AdminHomeScreen() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Tổng quan quản trị</h1>
-        <p className="text-muted-foreground">Tình trạng tài khoản và phân quyền — chỉ quản trị viên thấy trang này.</p>
-      </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Tổng quan quản trị</h1>
 
       <StatCardGrid cards={cards} />
 

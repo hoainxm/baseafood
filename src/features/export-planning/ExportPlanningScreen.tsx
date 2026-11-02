@@ -57,7 +57,7 @@ import {
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
 import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportStepItem } from "@/types";
-import { BarChart3, CalendarDays, FilePlus2, FileText, FolderLock, Route } from "lucide-react";
+import { BarChart3, CalendarDays, FilePlus2, FileText, FolderLock } from "lucide-react";
 import { ContractDossier } from "./ContractDossier";
 import { ContractFormDialog, type ContractFormTarget, type ContractSavePayload } from "./ContractFormDialog";
 import { ContractListView } from "./ContractListView";
@@ -93,7 +93,7 @@ import {
 } from "./ShipmentDialogs";
 import { useExportData } from "./useExportData";
 import { buildExportTour, pickTourContract } from "./exportTour";
-import { usePageTour, usePageTourControl } from "@/features/shared/PageTourProvider";
+import { usePageTour } from "@/features/shared/PageTourProvider";
 import { recordName } from "@/lib/personName";
 
 /** Hai tab luôn nằm cạnh nhau, chữ được xuống dòng: điện thoại 360 px / chữ 130 % không tràn, không đè nút Lập hợp đồng. */
@@ -747,7 +747,6 @@ export default function ExportPlanningScreen() {
     [tourPick, can.create, can.update, paymentsCan.view], // eslint-disable-line react-hooks/exhaustive-deps
   );
   usePageTour(can.view && !store.isLoading ? tour : null);
-  const pageTour = usePageTourControl();
 
   /* ---------- Vẽ ---------- */
 
@@ -777,48 +776,33 @@ export default function ExportPlanningScreen() {
   const currency = contract ? termsOf(d, contract.id).currency || "USD" : "USD";
 
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       {!contract && (
         <>
+          <h1 className="sr-only">Xuất khẩu</h1>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
-              <p className="max-w-3xl text-muted-foreground">Mỗi chuyến container của từng khách đang ở bước nào và còn thiếu gì, tới khi hợp đồng xuất đủ.</p>
-              <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" ? v : "" }, true)}>
-                <TabsList data-tour="export-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
-                  <TabsTrigger value="month" className={TAB_TRIGGER} title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
-                    <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
-                    Lịch xuất hàng
-                  </TabsTrigger>
-                  <TabsTrigger value="contracts" className={TAB_TRIGGER} title="Danh sách mọi hợp đồng, lọc theo trạng thái.">
-                    <FileText className="mr-2 h-4 w-4" aria-hidden />
-                    Hợp đồng
-                  </TabsTrigger>
-                  <TabsTrigger value="reports" className={TAB_TRIGGER} title="Báo cáo theo tháng · quý · năm: sản lượng, giá trị, tiền về, đúng hạn, hồ sơ còn kẹt, hợp đồng cần chú ý.">
-                    <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
-                    Báo cáo
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {pageTour.available && (
-                <Button
-                  variant="outline"
-                  data-tour-start
-                  onClick={pageTour.start}
-                  title="Mở hướng dẫn thao tác: lần lượt chỉ từng khu vực trên trang theo thứ tự công việc. Hướng dẫn không thay đổi dữ liệu."
-                >
-                  <Route className="mr-2 h-4 w-4" aria-hidden />
-                  Hướng dẫn thao tác
-                </Button>
-              )}
-              {can.create && (
-                <Button data-tour="create-contract" onClick={() => setContractForm({ mode: "create" })} title="Lập hồ sơ hợp đồng xuất khẩu mới: khách, số HĐ, điều khoản, dòng hàng. Lập xong đính kèm hợp đồng đã ký rồi ghi chuyến.">
-                  <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
-                  Lập hợp đồng
-                </Button>
-              )}
-            </div>
+            <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" ? v : "" }, true)}>
+              <TabsList data-tour="export-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
+                <TabsTrigger value="month" className={TAB_TRIGGER} title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
+                  <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
+                  Lịch xuất hàng
+                </TabsTrigger>
+                <TabsTrigger value="contracts" className={TAB_TRIGGER} title="Danh sách mọi hợp đồng, lọc theo trạng thái.">
+                  <FileText className="mr-2 h-4 w-4" aria-hidden />
+                  Hợp đồng
+                </TabsTrigger>
+                <TabsTrigger value="reports" className={TAB_TRIGGER} title="Báo cáo theo tháng · quý · năm: sản lượng, giá trị, tiền về, đúng hạn, hồ sơ còn kẹt, hợp đồng cần chú ý.">
+                  <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
+                  Báo cáo
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {can.create && (
+              <Button data-tour="create-contract" onClick={() => setContractForm({ mode: "create" })} title="Lập hồ sơ hợp đồng xuất khẩu mới: khách, số HĐ, điều khoản, dòng hàng. Lập xong đính kèm hợp đồng đã ký rồi ghi chuyến.">
+                <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
+                Lập hợp đồng
+              </Button>
+            )}
           </div>
           {!filesAvailable && (
             <p role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">

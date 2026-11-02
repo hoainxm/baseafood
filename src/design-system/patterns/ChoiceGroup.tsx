@@ -90,7 +90,7 @@ export function ChoiceGroup({
       <div
         className={cn(
           // mt-auto: các nút chọn dồn đáy như ô nhập của Field khi ô cùng hàng có dòng gợi ý (2026-10-30).
-          "mt-auto grid gap-3",
+          "mt-auto grid gap-2",
           columns === 2 && "grid-cols-1 sm:grid-cols-2",
           columns === 3 && "grid-cols-2 sm:grid-cols-3",
           columns === 4 && "grid-cols-2 sm:grid-cols-4"
@@ -109,8 +109,11 @@ export function ChoiceGroup({
               className={cn(
                 /* 40px — bằng đúng chiều cao ô nhập, để hai cột cạnh nhau
                    (VD "Ngày nhập hàng" ↔ "Phân xưởng") thẳng hàng.
-                   Giữ border-2: viền dày là tín hiệu CHỌN (không chỉ dựa màu). */
-                "flex min-h-10 w-full items-center justify-between gap-4 rounded-lg border-2 px-4 py-2 text-left text-sm font-semibold press-feedback",
+                   Giữ border-2: viền dày là tín hiệu CHỌN (không chỉ dựa màu).
+                   px-3 gap-2 + dấu ✓ chỉ chiếm chỗ ở nút ĐANG chọn (2026-11-02): trước đây mọi nút giữ
+                   chỗ ✓ 20px + gap 16px ⇒ nút 120px chỉ còn ~50px cho chữ, "Hết hiệu lực" bẻ 3 dòng,
+                   hàng lọc cao 88px. */
+                "flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border-2 px-3 py-2 text-left text-sm font-semibold press-feedback",
                 isSelected
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-input bg-background text-foreground hover:bg-muted"
@@ -124,13 +127,7 @@ export function ChoiceGroup({
                   </span>
                 )}
               </span>
-              <Check
-                aria-hidden
-                className={cn(
-                  "size-5 shrink-0 text-primary",
-                  isSelected ? "opacity-100" : "opacity-0"
-                )}
-              />
+              {isSelected && <Check aria-hidden className="size-4 shrink-0 text-primary" />}
             </button>
           );
         })}

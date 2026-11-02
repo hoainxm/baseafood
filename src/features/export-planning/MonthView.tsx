@@ -342,9 +342,10 @@ export function MonthView({
   );
 
   return (
-    <div className="grid min-w-0 gap-6">
-      <div className="grid min-w-0 gap-3">
-        <div data-tour="period-filter" className="flex min-w-0 flex-wrap items-end gap-3">
+    <div className="grid min-w-0 gap-4">
+      {/* Một hàng lọc (xuống dòng khi hẹp): kỳ xem trái, khách + ô tra + Xuất Excel phải — để lịch hiện ngay màn đầu. */}
+      <div className="flex min-w-0 flex-wrap items-end gap-3">
+        <div data-tour="period-filter" className="flex min-w-0 max-w-full flex-wrap items-end gap-3">
           <ChoiceGroup
             label="Xem theo"
             hideRequiredMark
@@ -356,7 +357,7 @@ export function MonthView({
               { value: "range", label: "Ngày" },
             ]}
             columns={3}
-            className="w-full min-w-0 sm:w-[21rem] sm:shrink-0"
+            className="w-full min-w-0 sm:w-[15rem] sm:shrink-0"
           />
           {period.kind === "range" ? (
             <DateRangeField
@@ -389,12 +390,12 @@ export function MonthView({
             </div>
           )}
         </div>
-        <div data-tour="customer-search" className="flex min-w-0 flex-wrap items-end gap-3">
-          <div className="min-w-0 flex-1 basis-48">
+        <div data-tour="customer-search" className="flex min-w-0 flex-1 basis-[24rem] flex-wrap items-end gap-3 sm:flex-nowrap">
+          <div className="min-w-0 flex-1 basis-36">
             <Combobox label="Khách hàng" hideRequiredMark value={customerFilter} onChange={setCustomerFilter} options={customerOptions} clearable={false} />
           </div>
-          <div className="min-w-0 flex-1 basis-56">
-            <Field label="Tra lô · booking · cont · số chứng từ · số HĐ · số PO">
+          <div className="min-w-0 flex-1 basis-44">
+            <Field label="Tra lô, booking, cont, số HĐ, PO">
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}

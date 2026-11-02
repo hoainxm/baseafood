@@ -503,6 +503,16 @@ export default function MaterialImportScreen() {
     setSearchParams(withoutDayLink(searchParams), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy một lần khi link mang ngày/xưởng và nháp đã mở lại
   }, [importDraft.isReady, dayLink?.date, dayLink?.workshop]);
+  // `?tab=invoices` (việc hóa đơn đại lý ở Tổng quan, ba-spec 55): mở thẳng tab Hóa đơn, sau khi nháp mở lại xong.
+  const tabLink = searchParams.get("tab");
+  useEffect(() => {
+    if (!importDraft.isReady || tabLink !== "invoices") return;
+    setMode("invoices");
+    const next = new URLSearchParams(searchParams);
+    next.delete("tab");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy một lần khi link mang tab và nháp đã mở lại
+  }, [importDraft.isReady, tabLink]);
 
   /** Mở lại một chuyến đã ghi để sửa — dùng CHUNG dialog với ghi chuyến mới. */
   const openShipmentEdit = (n: ShipmentGroup) => {

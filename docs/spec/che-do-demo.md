@@ -1,6 +1,7 @@
 > Load khi: làm chế độ DEMO (bật/tắt), sinh bộ dữ liệu demo, gỡ màn DEMO dữ liệu mẫu, thêm chức năng mới cần có mặt trong demo.
 > Trạng thái: **ĐÃ CHỐT hướng (2026-10-12)** — chủ dự án chọn **phương án B `site-demo` trong DB thật** · ẩn danh mặc định có công tắc · xóa hẳn `/production` + `/reports` · **chỉ admin** bật demo. Chưa build. Đọc §4b (rào chắn bắt buộc của B) trước khi code.
 last_verified: 2026-11-02
+<!-- updated: 2026-11-02 (b) — §5b Tổng quan đọc thêm Phòng Kế hoạch + hóa đơn đại lý (ba-spec [55](../app-map/55-dashboard-modules.ba-spec.md)): khối "Phòng Kế hoạch" (Nhập khẩu → Lệnh sản xuất → Xuất khẩu, theo tháng chạm kỳ, cả công ty, theo quyền) + 11 loại việc mới gộp vào "Việc cần đốc", hàm thuần `lib/dashboardAttention.ts` (+ test) đọc lại hàm báo cáo của từng module. Không bảng mới ⇒ DemoBundle không đổi (đọc các hook đã có trong demo). -->
 <!-- updated: 2026-11-02 — 3 bảng MỚI mig 0091 vào `DemoBundle` (`documentTemplates` để TRỐNG — file khuôn ở Storage, demo dùng khuôn gốc · `composedDocuments` · `composedDocumentExports`): lệnh demo đã phát hành có 1 bản soạn file LSX đã xuất Word 1 lần (`buildProductionOrderFormDemo` ở `lib/documentTypes/productionOrderForm.ts`) + `DemoPackLoader` (`useDocumentTemplates` / `useComposedDocuments` / `useComposedDocumentExports`). Khóa ngoại mềm: `composed_documents.source_id` · `product_ids`, `composed_document_exports.document_id` · `template_id` (refColumns). Bản soạn / lần xuất số thật không xóa được — RLS 0091 chỉ cho xóa dòng `site-demo`. Thử 2026-11-02 sandbox demolocal: "Tạo bộ mới" ⇒ 1 bản soạn (lệnh 1.11) + 1 lần xuất; soạn + xuất Word / PDF lệnh 2.11; 29 khóa `bsf.*` trước == sau. -->
 <!-- updated: 2026-10-30 (c) — 3 bảng MỚI mig 0090 vào `DemoBundle` (`supplierInvoices` · `supplierInvoiceLines` · `accountingCodeMaps`), dựng từ chuyến demo (`lib/supplierInvoiceDemo.ts`): HĐ khớp, HĐ gộp 2 chuyến có một dòng lệch giá 2.000 đ, HĐ không có chuyến, chuyến chờ HĐ; file là đường dẫn GIỮ CHỖ. Checklist §5 dòng 23b. -->
 <!-- updated: 2026-10-30 (b) — bảng MỚI `goods_types` (mig 0089) vào `DemoBundle` (`goodsTypes`, 5 loại mẫu ở demoGenerator) + `DemoPackLoader` (`useGoodsTypes`); khóa ngoại `import_contract_lines.goods_type_id` khai `refColumns`. -->
@@ -180,6 +181,8 @@ Mục đích demo là cho thấy **số chảy qua hệ thống**: kg nguyên li
 | V14 | **Tiến độ đơn đặt**: đặt vs đã xuất (thanh) theo đơn/khách, hạn giao | `/orders`, `/export-report` | "Đơn nào sắp trễ" | sales_orders + export_* | P2 |
 | V15 | **Cơ cấu bán** (kg): XK / nội địa / bán lẻ theo khách lớn | `/sales` báo cáo | "Hàng ra kênh nào" | sales_items + domestic_sales | P2 |
 | V16 | **Điểm QC theo ngày / xưởng** (đường) + tỉ lệ đạt | `/qc` | "Chất lượng có đi xuống không" | qc_checklists | P2 |
+
+**Mở rộng 2026-11-02 (ba-spec [55](../app-map/55-dashboard-modules.ba-spec.md)):** dưới năm khâu có khối **Phòng Kế hoạch** (3 thẻ Nhập khẩu → Lệnh sản xuất → Xuất khẩu, số từ `buildImportReport` / `buildOrderReport` / `buildExportReport`); bảng V9 nhận thêm việc của 3 màn đó + chuyến chờ / lệch hóa đơn đại lý (`lib/dashboardAttention.ts`). Chỉ cộng kg + đếm; tiền chỉ có USD chưa về của Xuất khẩu (cần quyền xem giá).
 
 V1 + V2 + V3 + V9 dựng lại **`/dashboard` thành màn "Dòng chảy số liệu"**: trên = thẻ, giữa = băng chuyền/sankey, dưới = cảnh báo + tồn theo ngày. Bảng tồn theo kho hiện có giữ ở dưới cùng.
 

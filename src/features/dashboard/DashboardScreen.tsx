@@ -38,8 +38,25 @@ import {
   useNxtSnapshots,
   useProductionLocks,
   useScraps,
+  useSupplierInvoiceStore,
 } from "@/lib/catalogRepo";
 import { useTraceData } from "@/features/shared/useTraceData";
+import { useCan } from "@/features/shared/PermissionProvider";
+import { useImportData } from "@/features/import-planning/useImportData";
+import { useProductionOrderData } from "@/features/production-orders/useProductionOrderData";
+import { hasExportStorage } from "@/lib/exportFileStorage";
+import { visibleOrders } from "@/lib/productionOrder";
+import { buildCodeMaps } from "@/lib/supplierInvoice";
+import {
+  PLANNING_ATTENTION_LABELS,
+  PLANNING_MODULE_LABELS,
+  buildPlanningAttention,
+  buildPlanningReports,
+  buildPlanningSummary,
+  buildSupplierInvoiceAttention,
+  planningPeriodFor,
+  type PlanningAccess,
+} from "@/lib/dashboardAttention";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { useAuth } from "@/lib/auth";
 import { IS_DEMO } from "@/lib/demoMode";
@@ -60,7 +77,7 @@ import {
   type FlowRange,
 } from "@/lib/dataFlow";
 import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
-import { num, formatDateVN } from "@/lib/format";
+import { num, formatDateVN, formatMoney as formatAmount } from "@/lib/format";
 import type { Workshop } from "@/types";
 import type { TraceStageKey } from "@/lib/lotTraceability";
 import {
@@ -68,11 +85,14 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   Factory,
   FileSpreadsheet,
   Gauge,
+  PackageOpen,
   QrCode,
   Scale,
+  Ship,
   ShoppingCart,
   Truck,
   Warehouse,
@@ -163,6 +183,9 @@ function periodLabel(period: ViewPeriod, fromDate: string, toDate: string): stri
   return `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`;
 }
 
+/** Một dòng "Việc cần đốc": việc chuỗi (lib/dataFlow) hoặc việc module mới (lib/dashboardAttention, ba-spec 55). */
+type WarningRow = Omit<FlowWarning, "kind"> & { kindLabel: string };
+
 const LEVEL_LABELS: Record<FlowWarning["level"], { text: string; variant: TagVariant }> = {
   error: { text: "Sổ sai", variant: "error" },
   reminder: { text: "Chưa làm", variant: "warning" },
@@ -251,14 +274,70 @@ export default function DashboardScreen() {
   const warnings = useMemo(() => buildChainWarnings(d, range, todayIso()), [d, range]);
   const periodResults = useMemo(() => computeAllPeriodResults(d), [d]);
 
+  // ---- Phòng Kế hoạch + hóa đơn đại lý (ba-spec 55): đọc lại hàm báo cáo của từng module, theo quyền ----
+  const importCan = useCan("import-plans");
+  const orderCan = useCan("production-orders");
+  const exportCan = useCan("export-plans");
+  const invoiceCan = useCan("imports.invoices");
+  const importStore = useImportData();
+  const orderStore = useProductionOrderData();
+  const invoiceStore = useSupplierInvoiceStore();
+  const access: PlanningAccess = useMemo(
+    () => ({
+      import: importCan.view && importStore.isAvailable,
+      productionOrder: orderCan.view && orderStore.isAvailable,
+      export: exportCan.view,
+      exportPrice: exportCan.view && exportCan["view-price"],
+      supplierInvoice: invoiceCan.view && invoiceStore.isAvailable,
+    }),
+    [importCan, orderCan, exportCan, invoiceCan, importStore.isAvailable, orderStore.isAvailable, invoiceStore.isAvailable],
+  );
+  const planningPeriod = useMemo(() => planningPeriodFor(fromDate, toDate), [fromDate, toDate]);
+  const planningReports = useMemo(() => {
+    const od = orderStore.data;
+    return buildPlanningReports(
+      {
+        importData: importStore.data,
+        orderData: { orders: visibleOrders(od.orders, orderCan.create || orderCan.update), lines: od.lines, materials: od.materials, links: od.links, receiptLines: od.receiptLines, exportData: od.exportData },
+        exportData: od.exportData,
+        customers: od.customers,
+        exportFilesAvailable: hasExportStorage,
+      },
+      planningPeriod,
+      todayIso(),
+      access,
+    );
+  }, [importStore.data, orderStore.data, orderCan, planningPeriod, access]);
+  const planningSummary = useMemo(() => buildPlanningSummary(planningReports, access), [planningReports, access]);
+  const invoiceRows = useMemo(() => {
+    if (!access.supplierInvoice) return [];
+    const mappedMaterials = new Set(buildCodeMaps(invoiceStore.codeMaps).materialByCode.values());
+    return buildSupplierInvoiceAttention(
+      { trips: d.imports, shipments: d.shipments, invoices: invoiceStore.invoices, lines: invoiceStore.lines, mappedMaterials },
+      range,
+      todayIso(),
+    );
+  }, [access.supplierInvoice, invoiceStore.codeMaps, invoiceStore.invoices, invoiceStore.lines, d.imports, d.shipments, range]);
+  const allWarnings: WarningRow[] = useMemo(() => {
+    const rows: WarningRow[] = [
+      ...warnings.map(({ kind, ...w }) => ({ ...w, kindLabel: getWarningKindLabel(kind) })),
+      ...[...invoiceRows, ...buildPlanningAttention(planningReports, access)].map(({ kind, module, ...w }) => ({
+        ...w,
+        kindLabel: `${PLANNING_MODULE_LABELS[module]} · ${PLANNING_ATTENTION_LABELS[kind]}`,
+      })),
+    ];
+    return rows.sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level]);
+  }, [warnings, invoiceRows, planningReports, access]);
+  const hasPlanning = planningSummary.import != null || planningSummary.productionOrder != null || planningSummary.export != null;
+
   const stageKg = (k: TraceStageKey) => stages.find((x) => x.key === k)?.kg ?? 0;
   const inKg = stageKg("imports");
   const productionKg = stageKg("production");
   const outKg = stageKg("outbound");
   const last = byDate[byDate.length - 1];
   const latestPeriod = periodResults.find((x) => x.hasFinishedGoods);
-  const taskCount = warnings.filter((c) => c.level !== "info").length;
-  const errorCount = warnings.filter((c) => c.level === "error").length;
+  const taskCount = allWarnings.filter((c) => c.level !== "info").length;
+  const errorCount = allWarnings.filter((c) => c.level === "error").length;
 
   // % kg BTP trong khoảng đã có lô NL (hoặc lý do chưa gắn).
   const lotCoverageRatio = useMemo(() => {
@@ -358,6 +437,60 @@ export default function DashboardScreen() {
     },
   ];
 
+  // ---- Phòng Kế hoạch: Nhập khẩu → Lệnh sản xuất → Xuất khẩu (ba-spec 55 NV2) — chỉ module người xem được thấy ----
+  const reportLink = (base: string) => `${base}?view=reports&report=${planningPeriod.key}`;
+  const { import: imp, productionOrder: ord, export: exp } = planningSummary;
+  const planningCards: StatCardData[] = [
+    ...(imp
+      ? [
+          {
+            label: "Nhập khẩu · lần nhập",
+            value: `${num(imp.receipts)} lần`,
+            subtext: `${num(imp.receivedKg)} kg thực nhập · đủ hồ sơ ${num(imp.complete)} · thiếu chứng từ ${num(imp.missingDocs)} · chờ thực nhập ${num(imp.awaitingQuantity)}`,
+            numeric: true,
+            icon: PackageOpen,
+            tone: KIND_TONES.imports,
+            onSelect: () => navigate(reportLink("/planning-import")),
+            selectHint: "Mở Nhập khẩu — tab Báo cáo của tháng này.",
+          } satisfies StatCardData,
+        ]
+      : []),
+    ...(ord
+      ? [
+          {
+            label: "Lệnh sản xuất",
+            value: `${num(ord.orders)} lệnh`,
+            subtext: `đã phát hành ${num(ord.issued)} · nháp ${num(ord.drafts)} · ${num(ord.kg)} kg · ${num(ord.cartons)} thùng`,
+            numeric: true,
+            icon: ClipboardList,
+            tone: KIND_TONES.production,
+            onSelect: () => navigate(reportLink("/planning-production")),
+            selectHint: "Mở Lệnh sản xuất — tab Báo cáo của tháng này.",
+          } satisfies StatCardData,
+        ]
+      : []),
+    ...(exp
+      ? [
+          {
+            label: "Xuất khẩu · chuyến",
+            value: `${num(exp.shipments)} chuyến`,
+            subtext: [
+              `${num(exp.actualKg)} kg thực xuất`,
+              `trễ hạn ${num(exp.late)}/${num(exp.delivered)} chuyến đã giao`,
+              exp.outstanding != null ? `còn ${formatAmount(exp.outstanding)} USD chưa về` : "",
+            ]
+              .filter(Boolean)
+              .join(" · "),
+            numeric: true,
+            icon: Ship,
+            tone: KIND_TONES.sales,
+            onSelect: () => navigate(reportLink("/planning-export")),
+            selectHint: "Mở Xuất khẩu — tab Báo cáo của tháng này.",
+          } satisfies StatCardData,
+        ]
+      : []),
+  ];
+
   // ---- Hai thanh "đi đâu" (thay sơ đồ dòng chảy — dễ đọc hơn) ----
   const nodePaths = useMemo(
     () => Object.fromEntries(dataFlow.nodes.filter((n) => n.path).map((n) => [n.id, n.path as string])),
@@ -375,7 +508,7 @@ export default function DashboardScreen() {
   const wipRatio = materialOutflow.find((x) => x.id === "wip")?.share ?? 0;
 
   // ---- Bảng việc cần đốc ----
-  const warningColumns: SummaryTableColumn<FlowWarning>[] = [
+  const warningColumns: SummaryTableColumn<WarningRow>[] = [
     {
       key: "muc",
       header: "Mức",
@@ -394,7 +527,7 @@ export default function DashboardScreen() {
         <div className="min-w-0">
           <div className="font-semibold text-foreground">{r.title}</div>
           <div className="text-sm text-muted-foreground">
-            {getWarningKindLabel(r.kind)} · {r.detail}
+            {r.kindLabel} · {r.detail}
           </div>
         </div>
       ),
@@ -524,8 +657,8 @@ export default function DashboardScreen() {
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Tổng quan — dòng chảy số liệu</h1>
         <p className="mt-1 text-muted-foreground">
-          Nguyên liệu vào đi qua 5 khâu ra sao, đang kẹt ở đâu, còn việc gì phải đốc. Mọi số lấy từ sổ đã ghi; sổ
-          nào chưa có số thì hình để trống.
+          Nguyên liệu vào đi qua 5 khâu ra sao, đang kẹt ở đâu, Phòng Kế hoạch đã nhập / ra lệnh / xuất bao nhiêu, còn
+          việc gì phải đốc. Mọi số lấy từ sổ đã ghi; sổ nào chưa có số thì hình để trống.
         </p>
       </div>
 
@@ -591,6 +724,16 @@ export default function DashboardScreen() {
         <PipelineStages stages={coloredStages} onSelect={(k) => navigate(stagePaths[k] ?? "/dashboard")} />
       </Section>
 
+      {hasPlanning && (
+        <Section
+          tourTarget="dashboard-planning"
+          title="Phòng Kế hoạch"
+          description={`Nhập khẩu → Lệnh sản xuất → Xuất khẩu, tính theo ${planningPeriod.label.toLowerCase()} (cả công ty, không chia xưởng). Số lấy từ tab Báo cáo của từng màn; bấm một thẻ để mở.`}
+        >
+          <StatCardGrid cards={planningCards} />
+        </Section>
+      )}
+
       <Section
         tourTarget="dashboard-outflow"
         title="Nguyên liệu đi đâu"
@@ -638,13 +781,13 @@ export default function DashboardScreen() {
 
       <div ref={warningsRef} data-tour="dashboard-warnings" className="scroll-mt-header">
         <Section
-          title={`Việc cần đốc (${warnings.length})`}
-          description="Sổ sai đứng trước, rồi việc chưa làm, cuối cùng là các ghi bù để biết. Bấm Mở để tới đúng chỗ sửa."
+          title={`Việc cần đốc (${allWarnings.length})`}
+          description="Gồm việc của chuỗi xưởng và việc của Phòng Kế hoạch, hóa đơn đại lý mà bạn được xem. Sổ sai đứng trước, rồi việc chưa làm, cuối cùng là các mục để biết. Bấm Mở để tới đúng chỗ sửa."
         >
-          {warnings.length === 0 ? (
-            <EmptyState icon={AlertTriangle} title="Không có việc tồn đọng" description="Các ngày đã chốt, lô đã gắn, không có bán vượt tồn trong kỳ này." />
+          {allWarnings.length === 0 ? (
+            <EmptyState icon={AlertTriangle} title="Không có việc tồn đọng" description="Các ngày đã chốt, lô đã gắn, không có bán vượt tồn, không có việc kế hoạch treo trong kỳ này." />
           ) : (
-            <SummaryTable rows={warnings} columns={warningColumns} getKey={(r) => r.id} rowMarkKey={`tong-quan-canh-bao|${periodKey}`} />
+            <SummaryTable rows={allWarnings} columns={warningColumns} getKey={(r) => r.id} rowMarkKey={`tong-quan-canh-bao|${periodKey}`} />
           )}
         </Section>
       </div>

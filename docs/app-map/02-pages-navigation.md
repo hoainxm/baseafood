@@ -124,7 +124,7 @@ Cỡ chữ / trạng thái kết nối **không còn ở chân sidebar** (đã d
 | `/audit` | `audit` | Nhật ký thao tác | `features/audit/AuditLogScreen.tsx` | **Chỉ Admin** — đọc `audit_log` (nhật ký thao tác); lọc + xuất Excel. Xem [04-tang-du-lieu.md](04-tang-du-lieu.md) §Nhật ký |
 | `/kit` | — | Bộ giao diện | `design-system/kit/KitPage.tsx` | Trang demo component. **Đã gỡ khỏi sidebar** — vào bằng URL, desktop-only |
 
-Ngoài bảng trên: `/dashboard` (Tổng quan — **dòng chảy số liệu**, `features/dashboard/DashboardScreen.tsx`, số từ `lib/dataFlow.ts`; có khối "Chế độ demo" cho admin). Năm màn DEMO dữ liệu mẫu cũ (`/production`, `/quality`, `/cold-storage`, `/reports`, `/traceability`) **đã gỡ** — route chỉ còn để chuyển link cũ sang màn thật.
+Ngoài bảng trên: `/dashboard` (Tổng quan — **dòng chảy số liệu**, `features/dashboard/DashboardScreen.tsx`, số từ `lib/dataFlow.ts`; khối "Phòng Kế hoạch" + việc kế hoạch / hóa đơn đại lý theo quyền từ `lib/dashboardAttention.ts` — ba-spec 55; có khối "Chế độ demo" cho admin). `/imports?tab=invoices` mở thẳng tab Hóa đơn. Năm màn DEMO dữ liệu mẫu cũ (`/production`, `/quality`, `/cold-storage`, `/reports`, `/traceability`) **đã gỡ** — route chỉ còn để chuyển link cũ sang màn thật.
 
 Sổ kho theo THÁNG dương lịch: `/monthly-stock` (`features/monthly-stock/MonthlyStockScreen.tsx` — dồn tồn cuối kỳ tháng N → tồn đầu kỳ N+1, cho mọi đối tượng NL/BTP/TP, đủ cột kiện+kg như bảng kê kho; xem [36-so-kho-thang.md](36-so-kho-thang.md)).
 

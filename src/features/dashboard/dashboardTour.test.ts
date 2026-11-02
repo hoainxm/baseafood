@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { getWarningKindLabel, type FlowWarningKind } from "@/lib/dataFlow";
 import { groupByTraceStage, type TraceData } from "@/lib/lotTraceability";
+import { PLANNING_ATTENTION_LABELS, PLANNING_MODULE_LABELS } from "@/lib/dashboardAttention";
 import { buildDashboardTour, tourSpec } from "./dashboardTour";
 
 const screenSrc = readFileSync(new URL("./DashboardScreen.tsx", import.meta.url), "utf8");
@@ -61,6 +62,16 @@ describe("tour Tổng quan — phủ nhãn (khuôn AC-10)", () => {
   it("mọi loại việc cần đốc có nguyên văn", () => {
     const kinds = Object.keys(DASHBOARD_WARNING_KINDS).map((k) => getWarningKindLabel(k as FlowWarningKind));
     expect(kinds.filter((l) => !fullText.includes(l))).toEqual([]);
+  });
+
+  it("loại việc Phòng Kế hoạch / hóa đơn đại lý + tên màn có nguyên văn (ba-spec 55 AC-10)", () => {
+    const labels = [...Object.values(PLANNING_ATTENTION_LABELS), ...Object.values(PLANNING_MODULE_LABELS)];
+    expect(labels.filter((l) => !fullText.includes(l))).toEqual([]);
+  });
+
+  it("có bước khối Phòng Kế hoạch (tùy chọn — ẩn khi không được xem màn nào)", () => {
+    const step = tourSpec.build().steps.find((s) => s.target === "dashboard-planning");
+    expect(step?.optional).toBe(true);
   });
 
   it("5 tên khâu có nguyên văn", () => {

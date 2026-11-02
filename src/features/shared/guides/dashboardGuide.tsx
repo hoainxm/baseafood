@@ -2,7 +2,8 @@
 // Tên file: src/features/shared/guides/dashboardGuide.tsx
 // Tên tiếng Việt: Hộp "Hướng dẫn: Tổng quan" (nút "?" ở thanh tiêu đề)
 // Description: Static guide for /dashboard (data flow overview) — how to read each block, alert
-//              levels, demo mode. Source: docs/spec/che-do-demo.md §5b + lib/dataFlow.ts. ba-spec 43 v4 R14.
+//              levels, planning block, demo mode. Source: docs/spec/che-do-demo.md §5b + lib/dataFlow.ts,
+//              ba-spec 55 + lib/dashboardAttention.ts. ba-spec 43 v4 R14.
 // ============================================================
 import type { PageGuide } from "../guideContent";
 import { GuideList, GuideSection, GuideSteps } from "./parts";
@@ -24,6 +25,9 @@ export const dashboardGuide: PageGuide = {
           <li>
             Xem <b>Năm khâu của chuỗi</b> để biết số đang kẹt ở khâu nào, và <b>Nguyên liệu đi đâu</b> để biết 100 kg nguyên
             liệu ra bao nhiêu kg bán thành phẩm.
+          </li>
+          <li>
+            Được xem Phòng Kế hoạch thì đọc thêm khối <b>Phòng Kế hoạch</b>: Nhập khẩu → Lệnh sản xuất → Xuất khẩu của tháng.
           </li>
           <li>
             Mở bảng <b>Việc cần đốc</b>: làm từ trên xuống, chọn <b>Mở</b> để tới đúng chỗ sửa.
@@ -48,6 +52,20 @@ export const dashboardGuide: PageGuide = {
         </GuideList>
       </GuideSection>
 
+      <GuideSection title="Khối Phòng Kế hoạch">
+        <GuideList>
+          <li>
+            Chỉ hiện thẻ của màn bạn được xem. Số lấy từ tab Báo cáo của Nhập khẩu, Lệnh sản xuất, Xuất khẩu nên luôn khớp.
+          </li>
+          <li>
+            Tính theo <b>tháng</b>: chọn Ngày hay Tuần thì lấy cả tháng chứa ngày đó. Luôn là số cả công ty, không chia xưởng.
+          </li>
+          <li>
+            Tiền USD còn chưa về chỉ hiện với người được xem giá. Tiền nhập khẩu không cộng vì nhiều loại tiền.
+          </li>
+        </GuideList>
+      </GuideSection>
+
       <GuideSection title="Mức của việc cần đốc">
         <GuideList>
           <li>
@@ -60,6 +78,11 @@ export const dashboardGuide: PageGuide = {
           </li>
           <li>
             <b>Để biết</b>: ghi bù (kèm lý do), định mức lệch nhẹ.
+          </li>
+          <li>
+            Việc của Phòng Kế hoạch, hóa đơn đại lý ghi tên màn ở đầu. <b>Sổ sai</b>: Theo bản HĐ trước, Chuyến lệch HĐ đại lý.{" "}
+            <b>Chưa làm</b>: Quá hạn giao, Còn tiền chưa về, Thiếu chứng từ, Chờ thực nhập, Nháp quá ngày SX, Chưa gắn chuyến,
+            Chuyến chờ HĐ đại lý (về quá 10 ngày). <b>Để biết</b>: Vượt dung sai, Thiếu dung sai.
           </li>
           <li>Ngày hôm nay chưa tính là việc vì còn đang ghi. Sổ sửa xong thì việc tự hết.</li>
         </GuideList>

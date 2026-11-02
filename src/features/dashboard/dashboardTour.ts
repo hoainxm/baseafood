@@ -2,7 +2,8 @@
 // Tên file: src/features/dashboard/dashboardTour.ts
 // Tên tiếng Việt: Hướng dẫn từng bước của trang Tổng quan — dòng chảy số liệu
 // Description: Dashboard tour (docs/app-map/43-guided-tour.ba-spec.md R1–R12): period / workshop
-//              filter → KPI cards → 5-stage pipeline → "where did the kg go" bars → chain alerts →
+//              filter → KPI cards → 5-stage pipeline → planning block (import → production order →
+//              export, ba-spec 55) → "where did the kg go" bars → chain + planning alerts →
 //              daily series → balancing periods + yield → NXT stock, plus the admin-only demo mode
 //              button. Business rules: docs/spec/che-do-demo.md §5b + lib/dataFlow.ts. Read-only.
 // ============================================================
@@ -22,7 +23,7 @@ export function buildDashboardTour(ctx: DashboardTourContext): PageTour {
       id: "intro",
       title: "Giới thiệu trang Tổng quan",
       body:
-        "Trang Tổng quan cho thấy số chảy qua cả chuỗi nhập hàng → sản xuất → kho → đóng gói → xuất / bán: nguyên liệu vào đi qua 5 khâu ra sao, đang kẹt ở đâu, còn việc gì phải đốc. Dành cho quản đốc, kế toán và Ban Giám đốc.\n" +
+        "Trang Tổng quan cho thấy số chảy qua cả chuỗi nhập hàng → sản xuất → kho → đóng gói → xuất / bán: nguyên liệu vào đi qua 5 khâu ra sao, đang kẹt ở đâu, còn việc gì phải đốc. Người được xem Phòng Kế hoạch thấy thêm số Nhập khẩu, Lệnh sản xuất, Xuất khẩu. Dành cho quản đốc, kế toán, Phòng Kế hoạch và Ban Giám đốc.\n" +
         "Mọi số lấy từ sổ đã ghi ở các trang khác; trang này chỉ để xem, không sửa số. Sổ nào chưa có số thì khối đó để trống.\n" +
         "Trong lúc xem hướng dẫn, các nút trên trang tạm khóa và dữ liệu không thay đổi. Chọn Tiếp theo (phím →) để sang bước sau, Quay lại (phím ←) để xem lại, Esc để thoát.",
     },
@@ -33,7 +34,8 @@ export function buildDashboardTour(ctx: DashboardTourContext): PageTour {
       body:
         "Chọn kỳ Ngày · Tuần · Tháng · Năm (mặc định tháng hiện tại), dùng ‹ › để sang kỳ trước hoặc kỳ sau. Tự chọn: hiện ô Khoảng ngày để chọn ngày đầu, ngày cuối.\n" +
         "Chọn Cả 3 xưởng hoặc một xưởng Đông · Cá · Khô.\n" +
-        "Thẻ số, năm khâu, hai thanh chia phần, việc cần đốc, biểu đồ theo ngày và định mức theo mặt hàng đều tính theo kỳ và xưởng đang chọn. Thẻ Lãi/lỗ kỳ cân đối gần nhất, bảng kỳ cân đối và bảng tồn theo kho không đổi theo kỳ xem.",
+        "Thẻ số, năm khâu, hai thanh chia phần, việc cần đốc, biểu đồ theo ngày và định mức theo mặt hàng đều tính theo kỳ và xưởng đang chọn. Thẻ Lãi/lỗ kỳ cân đối gần nhất, bảng kỳ cân đối và bảng tồn theo kho không đổi theo kỳ xem.\n" +
+        "Khối Phòng Kế hoạch tính theo tháng: chọn Ngày hay Tuần thì lấy cả tháng chứa ngày đó, và luôn là số cả công ty, không chia xưởng.",
     },
     {
       id: "kpis",
@@ -62,6 +64,18 @@ export function buildDashboardTour(ctx: DashboardTourContext): PageTour {
         "Phần trăm trên mũi tên so với khâu nguồn: sản xuất so với nguyên liệu nhập, nhập kho so với sản xuất, đóng gói và xuất / bán so với nhập kho. Chọn một ô để mở màn của khâu đó.",
     },
     {
+      id: "planning",
+      target: "dashboard-planning",
+      optional: true,
+      title: "Phòng Kế hoạch",
+      body:
+        "Ba thẻ theo đúng thứ tự công việc: Nhập khẩu → Lệnh sản xuất → Xuất khẩu. Bạn chỉ thấy thẻ của màn mình được xem; không được xem màn nào thì khối này không hiện.\n" +
+        "• Nhập khẩu · lần nhập: số lần nhập của tháng, kg thực nhập; đủ hồ sơ là lần nhập đã có Commercial Invoice, Packing List và Tờ khai nhập khẩu; thiếu chứng từ là còn thiếu một trong ba; chờ thực nhập là hàng đã về mà thủ kho chưa ghi kg.\n" +
+        "• Lệnh sản xuất: số lệnh của tháng, đã phát hành và nháp, kg và số thùng theo lệnh.\n" +
+        "• Xuất khẩu · chuyến: số chuyến của tháng, kg thực xuất, số chuyến giao trễ hạn trên số chuyến đã giao. Người được xem giá thấy thêm tiền USD còn chưa về.\n" +
+        "Số lấy từ tab Báo cáo của từng màn nên luôn khớp nhau. Chọn một thẻ để mở tab Báo cáo đúng tháng. Module chưa có số thì thẻ ghi 0.",
+    },
+    {
       id: "outflow",
       target: "dashboard-outflow",
       title: "Nguyên liệu đi đâu",
@@ -80,7 +94,12 @@ export function buildDashboardTour(ctx: DashboardTourContext): PageTour {
         "• Sổ sai: Sổ nhập đổi sau khi chốt (tổng nhập khác lúc chốt) · Bán / xuất vượt tồn · Định mức lệch khi tốn nguyên liệu hơn bình quân quá 5%.\n" +
         "• Chưa làm: Ngày nhập chưa chốt · Ngày sản xuất chưa chốt · Chưa gắn lô (mẻ, phiếu đóng gói chưa gắn và chưa ghi lý do) · BTP chờ duyệt nhập kho quá 3 ngày · Kỳ cân đối chưa chốt khi đã hết ngày cuối.\n" +
         "• Để biết: Ghi bù (kèm lý do) · Định mức lệch khi ít nguyên liệu hơn bình quân · Kỳ cân đối định mức lệch so với các kỳ cùng loại nguyên liệu.\n" +
-        "Ngày hôm nay chưa tính là việc vì còn đang ghi. Việc tự hết khi sổ đã sửa xong.",
+        "Ngày hôm nay chưa tính là việc vì còn đang ghi. Việc tự hết khi sổ đã sửa xong.\n" +
+        "Người được xem Phòng Kế hoạch, hóa đơn đại lý thấy thêm việc, cột Việc ghi tên màn trước (Nhập khẩu · Lệnh sản xuất · Xuất khẩu · Hóa đơn đại lý):\n" +
+        "• Sổ sai: Theo bản HĐ trước (hợp đồng đã sửa mà lệnh chưa theo) · Chuyến lệch HĐ đại lý (hóa đơn lệch sổ chuyến chưa xử lý).\n" +
+        "• Chưa làm: Quá hạn giao (hết hạn giao mà chưa ghi đủ chuyến) · Còn tiền chưa về (chỉ người được xem giá) · Thiếu chứng từ · Chờ thực nhập · Nháp quá ngày SX · Chưa gắn chuyến · Chuyến chờ HĐ đại lý (đã về quá 10 ngày chưa có hóa đơn).\n" +
+        "• Để biết: Vượt dung sai · Thiếu dung sai (kg hoặc tiền thực xuất ra ngoài dung sai hợp đồng).\n" +
+        "Các việc này theo luật của từng màn: hết khi màn đó xử lý xong (đủ chứng từ, ghi kg, phát hành lệnh, gắn hóa đơn…).",
     },
     {
       id: "daily",

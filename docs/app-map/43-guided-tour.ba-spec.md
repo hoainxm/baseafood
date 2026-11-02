@@ -3,6 +3,7 @@
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
 last_verified: 2026-11-02
+<!-- updated: 2026-11-02 (b) — tour Tổng quan thêm bước tùy chọn `planning` (mốc `dashboard-planning`, khối Phòng Kế hoạch: Nhập khẩu → Lệnh sản xuất → Xuất khẩu, theo tháng, cả công ty, chỉ thẻ màn được xem); bước `warnings` kể đủ 11 loại việc Phòng Kế hoạch / hóa đơn đại lý theo mức; bước `filters` nói khối kế hoạch tính theo tháng. Hộp "?" thêm mục "Khối Phòng Kế hoạch". Test `dashboardTour.test.ts` canh nhãn đọc từ `lib/dashboardAttention.ts` (ba-spec 55 AC-10). -->
 <!-- updated: 2026-11-02 — tour Lệnh sản xuất thêm bước `file` (mốc `order-file`, nút "File Word / PDF" ở hồ sơ lệnh — lời theo quyền ghi / chỉ xem); hộp "?" thêm mục "File Lệnh sản xuất Word / PDF" (`OrderFileGuideSection`: luồng, 3 trạng thái bản soạn, 5 nguồn ô, 3 cờ, điều kiện xuất, PDF, lịch sử, khuôn) — test `guides/orderFileGuide.test.tsx` canh nhãn đọc từ code (ba-spec 54 AC-17). Trang soạn có mốc `compose-status` · `compose-actions` · `compose-fields` · `compose-preview` · `compose-history` · `compose-templates`. -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): 12 bước tour nói lọc được theo gì; hộp "?" 13 trang thêm mục "Bộ lọc" tự ghép qua FILTER_NOTES (guideContent.tsx), canh bằng filterCoverage.test.ts. Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->
 <!-- updated: 2026-10-30 (c) — tour Nhập hàng thêm chế độ `invoices` + 2 bước (khi có `imports.invoices`): `invoice-cards` (tab Hóa đơn + 4 thẻ việc còn lại, điều kiện xong = 4 thẻ về 0) · `invoice-saved` (nạp file khi có quyền ghi + đủ 8 kết quả dòng + cách xử). Tổng bước đủ quyền = 22 (trần R9). Hộp "?" Nhập hàng thêm mục Hóa đơn đại lý. -->
@@ -283,11 +284,12 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
 | Truy ngược / xuôi · thu hồi | chỉ tính mối nối đã gắn lô; ai đã nhận hàng | §4.4 §6d | trace-*, recall |
 | Theo giai đoạn · in tem | 5 khâu, Còn thiếu N / Đủ; số tem theo block / thùng | §6b–§6d | stage-*, print-* |
 
-### `/dashboard` Tổng quan — 11 bước · `dashboard/dashboardTour.ts`
+### `/dashboard` Tổng quan — 12 bước (bước `planning` tùy chọn) · `dashboard/dashboardTour.ts`
 | Khu vực | Lời phải nói | Nguồn | Bước |
 |---|---|---|---|
 | Thẻ · năm khâu · đi đâu | nghĩa 8 thẻ; % so với khâu nguồn; Hao hụt / chưa ghi ra | che-do-demo §5b V1–V3 | kpis, stages, outflow |
-| Việc cần đốc | Sổ sai · Chưa làm · Để biết + 10 loại cảnh báo | `buildChainWarnings` | warnings |
+| Phòng Kế hoạch | 3 thẻ Nhập khẩu → Lệnh sản xuất → Xuất khẩu; theo tháng, cả công ty; chỉ màn được xem; tiền chưa về cần quyền xem giá | ba-spec 55 R2–R4, R7 | planning |
+| Việc cần đốc | Sổ sai · Chưa làm · Để biết + 10 loại cảnh báo chuỗi + 11 loại việc kế hoạch / hóa đơn đại lý | `buildChainWarnings` · `lib/dashboardAttention.ts` (55 R3) | warnings |
 | Chế độ demo | bộ số trình diễn riêng, không chạm sổ thật; chỉ admin | quy tắc 15 | demo-mode |
 
 ### `/my-tasks` Việc của tôi — 10 bước · `my-tasks/myTasksTour.ts`

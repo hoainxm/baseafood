@@ -82,9 +82,11 @@ import type {
   CustomerProductName,
   ExportDocumentKindRow,
   GoodsType,
+  ExportOption,
   ExportShipment,
   ExportStepItem,
 } from "@/types";
+import { EXPORT_OPTION_SEED } from "./exportOptions";
 import { calculateBalancing } from "@/lib/balancingCalc";
 import { RETAIL_WAREHOUSE, FG_WAREHOUSE } from "@/lib/inventory";
 import { listDatesInRange, subtractDays } from "@/lib/dataFlow";
@@ -160,6 +162,8 @@ export interface DemoBundle {
   /** Danh mục loại chứng từ (mig 0081) — một loại tự thêm để trình diễn thêm / sửa tại chỗ. */
   exportDocumentKinds: ExportDocumentKindRow[];
   goodsTypes: GoodsType[];
+  /** Danh sách chọn Xuất khẩu (mig 0095) — đúng danh sách khởi tạo, để thử thêm / sửa / xóa tại ô. */
+  exportOptions: ExportOption[];
   /** Nhập khẩu (mig 0082) — bộ nhỏ dựng sẵn (lib/importPlanningDemo.ts): 3 HĐ, 4 lần nhập đủ trạng thái;
    *  file là đường dẫn GIỮ CHỖ. NCC nước ngoài của bộ được thêm vào `suppliers`. */
   /** Danh mục NCC nhập khẩu (mig 0083) — riêng, không thêm vào Đại lý. */
@@ -776,6 +780,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
       { id: "dried-fish", name: "Cá khô", sortOrder: 40, note: "" },
       { id: "frozen-fish", name: "Cá đông", sortOrder: 70, note: "" },
     ],
+    exportOptions: EXPORT_OPTION_SEED.map((o) => ({ ...o })),
     importSuppliers: importDemo.suppliers,
     importContracts: importDemo.contracts,
     importContractLines: importDemo.lines,

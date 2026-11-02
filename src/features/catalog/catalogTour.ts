@@ -9,7 +9,7 @@
 import type { PageTour, PageTourSpec, TourStep } from "@/lib/guidedTour";
 
 /** Id tab (`?tab=`) — khớp TAB_RESOURCE ở CatalogScreen. */
-export type CatalogTourTab = "products" | "customers" | "suppliers" | "import-suppliers" | "material-types" | "batters" | "storage-locations" | "document-kinds" | "goods-types" | "finished-goods";
+export type CatalogTourTab = "products" | "customers" | "suppliers" | "import-suppliers" | "material-types" | "batters" | "storage-locations" | "finished-goods";
 
 /** Tên tab đang hiện trên trang (CatalogScreen TabsTrigger). */
 export const CATALOG_TAB_LABELS: Readonly<Record<CatalogTourTab, string>> = {
@@ -20,8 +20,6 @@ export const CATALOG_TAB_LABELS: Readonly<Record<CatalogTourTab, string>> = {
   "material-types": "Loại nguyên liệu",
   batters: "Bột tẩm",
   "storage-locations": "Kho lưu trữ",
-  "document-kinds": "Loại chứng từ",
-  "goods-types": "Loại hàng",
   "finished-goods": "Thành phẩm (141 mã)",
 };
 
@@ -147,20 +145,6 @@ export function buildCatalogTour(ctx: CatalogTourContext): PageTour {
       body:
         "Nơi hàng đang nằm: Kho nhà hoặc Kho thuê ngoài (kho lạnh thuê). Dùng ở cột Kho lưu của báo cáo Xuất – Nhập – Tồn và ô vị trí ở Sổ kho tháng. Tên kho là chỗ nối dữ liệu nên không được trùng.\n" +
         "Danh mục này khác với các kho hệ thống của sổ kho tháng (K1000T, K1500T…), không sửa ở đây.",
-    }),
-    at("document-kinds", {
-      id: "document-kinds",
-      title: "Loại chứng từ",
-      body:
-        "Loại chứng từ xuất khẩu khách yêu cầu, dùng ở phần Chứng từ khách yêu cầu của hợp đồng và Bộ chứng từ của chuyến. 10 loại gốc có luật riêng (Commercial Invoice bắt kg, số thùng, tiền; B/L bắt ngày on board; Bảo hiểm khi CIF / CIP): đổi tên được, xóa thì về tên gốc.\n" +
-        "Loại thêm mới tính như Chứng từ khác: cần số, ngày và file mới Xong. Thêm nhanh được ngay trong ô chọn Loại chứng từ.",
-    }),
-    at("goods-types", {
-      id: "goods-types",
-      title: "Loại hàng",
-      body:
-        "Loại hàng của dòng hàng hợp đồng xuất và nhập (1 da, 2 da, mada, cá khô, cá gia công, cá sản xuất xuất khẩu, cá đông…). Chọn ở ô Loại hàng của từng dòng; khi xuất Excel có cột Loại hàng để lọc.\n" +
-        "Dòng đã chọn nối theo mã nên đổi tên ở đây không tách sổ. Thêm nhanh được ngay trong ô chọn Loại hàng của phiếu hợp đồng.",
     }),
     at("finished-goods", {
       id: "finished-goods",

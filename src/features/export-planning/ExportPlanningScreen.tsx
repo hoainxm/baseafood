@@ -57,7 +57,8 @@ import {
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
 import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportStepItem } from "@/types";
-import { BarChart3, CalendarDays, FilePlus2, FileText, FolderLock } from "lucide-react";
+import { BarChart3, CalendarDays, FilePlus2, FileText, FolderLock, ListChecks } from "lucide-react";
+import { ExportCatalogView, normalizeExportCatalogList } from "./ExportCatalogView";
 import { ContractDossier } from "./ContractDossier";
 import { ContractFormDialog, type ContractFormTarget, type ContractSavePayload } from "./ContractFormDialog";
 import { ContractListView } from "./ContractListView";
@@ -133,7 +134,9 @@ export default function ExportPlanningScreen() {
   const opts = { filesAvailable };
 
   const viewParam = params.get("view");
-  const view = viewParam === "contracts" || viewParam === "reports" ? viewParam : "month";
+  const view = viewParam === "contracts" || viewParam === "reports" || viewParam === "catalog" ? viewParam : "month";
+  // Tab Danh mục (ba-spec 62): danh sách đang xem ở ?list= (mặc định Cảng xếp).
+  const catalogList = normalizeExportCatalogList(params.get("list"));
   // Kỳ báo cáo: ?report=2026 · 2026-Q3 · 2026-09 (mặc định năm nay) — giữ khi mở HĐ rồi Quay lại.
   const reportPeriod = parseReportPeriod(params.get("report"), today, "year");
   const setReportPeriod = (p: ReportPeriod) => setParam({ report: p.key === today.slice(0, 4) ? "" : p.key }, true);
@@ -748,7 +751,7 @@ export default function ExportPlanningScreen() {
         pick: tourPick,
         can: { create: can.create, update: can.update, payments: paymentsCan.view },
         openDossier: (cid, sid) => setParamRef.current({ view: "", contract: cid, shipment: sid }, true),
-        backToPlan: () => setParamRef.current({ view: "", contract: "", shipment: "" }, true),
+        backToPlan: () => setParamRef.current({ view: "", list: "", contract: "", shipment: "" }, true),
       }),
     [tourPick, can.create, can.update, paymentsCan.view], // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -787,8 +790,8 @@ export default function ExportPlanningScreen() {
         <>
           <h1 className="sr-only">Xuất khẩu</h1>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" ? v : "" }, true)}>
-              <TabsList data-tour="export-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
+            <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" || v === "catalog" ? v : "", list: "" }, true)}>
+              <TabsList data-tour="export-tabs" className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
                 <TabsTrigger value="month" className={TAB_TRIGGER} title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
                   <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
                   Lịch xuất hàng
@@ -800,6 +803,10 @@ export default function ExportPlanningScreen() {
                 <TabsTrigger value="reports" className={TAB_TRIGGER} title="Báo cáo theo tháng · quý · năm: sản lượng, giá trị, tiền về, đúng hạn, hồ sơ còn kẹt, hợp đồng cần chú ý.">
                   <BarChart3 className="mr-2 h-4 w-4" aria-hidden />
                   Báo cáo
+                </TabsTrigger>
+                <TabsTrigger value="catalog" className={TAB_TRIGGER} title="Danh sách chọn của Xuất khẩu: cảng xếp, cảng đích, loại container, tiền tệ, loại chứng từ, loại hàng — thêm, sửa, xóa mục.">
+                  <ListChecks className="mr-2 h-4 w-4" aria-hidden />
+                  Danh mục
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -815,7 +822,9 @@ export default function ExportPlanningScreen() {
               Đang chạy không nối máy chủ: chưa tải / mở được file — ghi chú và số chứng từ được tính thay file.
             </p>
           )}
-          {store.isLoading ? (
+          {view === "catalog" ? (
+            <ExportCatalogView list={catalogList} onListChange={(v) => setParam({ list: v === "loading-port" ? "" : v }, true)} />
+          ) : store.isLoading ? (
             <TableSkeleton />
           ) : view === "month" ? (
             <MonthView

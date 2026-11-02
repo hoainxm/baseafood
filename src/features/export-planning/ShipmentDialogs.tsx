@@ -26,6 +26,7 @@ import {
 } from "@/design-system";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useDocumentKindPicker, type DocumentKindSource } from "./documentKindPicker";
+import { useExportOptionPicker } from "./exportOptionPicker";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import {
@@ -106,6 +107,8 @@ export function ShipmentFormDialog({
   bookingFilesEnabled: boolean;
 }) {
   const [form, setForm] = useState<ShipmentForm | null>(null);
+  // Cảng đến chọn theo danh sách Cảng đích (ba-spec 62).
+  const optionPicker = useExportOptionPicker();
   const [errors, setErrors] = useState<FieldError[]>([]);
   // File chọn không vào nháp (File không lưu được) — mở lại nháp thì chọn lại.
   const [bookingFiles, setBookingFiles] = useState<File[]>([]);
@@ -270,9 +273,12 @@ export function ShipmentFormDialog({
               {/* File booking (ba-spec 60 NV1): không bắt buộc; booking sửa đổi đính thêm ở khối Đóng cont. */}
               {bookingFilesEnabled && <FilePicker files={bookingFiles} onChange={setBookingFiles} label="Đính file booking" />}
             </div>
-            <Field label="Cảng đến">
-              <Input value={form.portOfDischarge} onChange={(e) => set("portOfDischarge", e.target.value)} />
-            </Field>
+            <Combobox
+              label="Cảng đến"
+              hideRequiredMark
+              {...optionPicker.fieldProps("discharge-port", form.portOfDischarge)}
+              onChange={(v) => set("portOfDischarge", v)}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <DateField label="Ngày đóng cont" value={form.loadingDate} onChange={(v) => set("loadingDate", v)} />
@@ -299,6 +305,7 @@ export function ShipmentFormDialog({
           </Field>
         </div>
       )}
+      {optionPicker.dialogs}
     </FormDialog>
   );
 }

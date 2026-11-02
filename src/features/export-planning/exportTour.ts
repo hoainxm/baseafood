@@ -79,11 +79,12 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
     plan({
       id: "tabs",
       target: "export-tabs",
-      title: "Lịch xuất hàng, Hợp đồng và Báo cáo",
+      title: "Lịch xuất hàng, Hợp đồng, Báo cáo và Danh mục",
       body:
         "Lịch xuất hàng: các chuyến trong kỳ đang xem, nhóm theo khách hàng. Dùng hằng ngày để biết chuyến nào còn thiếu việc.\n" +
         "Hợp đồng: toàn bộ hợp đồng ở mọi tháng, lọc theo trạng thái. Dùng khi cần tìm một hợp đồng cụ thể.\n" +
-        "Báo cáo: số theo tháng, quý hoặc năm — chuyến, kg thực xuất, giá trị, tiền về, tỉ lệ đúng hạn, hồ sơ còn kẹt ở bước nào và hợp đồng cần chú ý (quá hạn, lệch dung sai, còn tiền chưa về). Chỉ xem, không sửa số.",
+        "Báo cáo: số theo tháng, quý hoặc năm — chuyến, kg thực xuất, giá trị, tiền về, tỉ lệ đúng hạn, hồ sơ còn kẹt ở bước nào và hợp đồng cần chú ý (quá hạn, lệch dung sai, còn tiền chưa về). Chỉ xem, không sửa số.\n" +
+        "Danh mục: 6 danh sách chọn của Xuất khẩu (Cảng xếp, Cảng đích, Loại container, Tiền tệ, Loại chứng từ, Loại hàng) — thêm, sửa tên, xóa mục ở đây hoặc ngay trong ô chọn của phiếu. Hợp đồng, chuyến đã ghi giữ đúng chữ lúc ghi: đổi tên hay xóa mục không đổi hợp đồng cũ; hợp đồng cũ gõ khác danh sách hiện dòng Ngoài danh sách ở ô chọn.",
     }),
   ];
   if (can.create) {
@@ -97,6 +98,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           "Khi có hợp đồng giấy mới, chọn Lập hợp đồng và nhập đúng như bản giấy. Phiếu gồm 5 phần: 1 Hợp đồng · 2 Điều khoản và thanh toán · 3 Chứng từ khách yêu cầu · 4 Dòng hàng · 5 File và ghi chú.\n" +
           "Ở phần 4, dòng chỉ khác size thì chọn Chép dòng: dòng mới nằm ngay dưới, giữ mọi ô, để trống Size để gõ size khác. Mỗi dòng có Chiều dài, Tỉ lệ râu / thân / cổ, Số miếng / kg và Ghi chú dòng như cột trên hợp đồng: các ô này tự chép sang Lệnh sản xuất (vào Quy cách và ghi chú của dòng lệnh). Phần 5 chọn được nhiều file: file đầu là hợp đồng, các file sau (phụ lục) vào Hồ sơ đính kèm.\n" +
           "Sau khi lưu, app hỏi có tạo lịch xuất hàng không: chia sẵn số chuyến = số cont, kg chia đều, tháng rải từ tháng sau ngày ký tới hạn giao; sửa được từng chuyến, hoặc chọn Không tạo (về sau tạo ở hồ sơ, khi chưa có chuyến). Lịch tạo được dù chưa đủ hồ sơ.\n" +
+          "Cảng xếp, Cảng đích, Loại container, Tiền tệ chọn theo danh sách ở tab Danh mục; chưa có thì gõ tên rồi chọn Thêm mới ngay trong ô.\n" +
           "Hồ sơ hợp đồng mở ra ở trạng thái Chờ đính kèm: việc tiếp là đính kèm hợp đồng đã ký (và L/C nếu thanh toán L/C).\n" +
           "Muốn ra lệnh sản xuất luôn (khi được cấp quyền Lệnh sản xuất): chọn Lưu & lập lệnh sản xuất thay cho Lưu hợp đồng. Hợp đồng được lưu, rồi trang Lệnh sản xuất mở hộp lập lệnh với hợp đồng chọn sẵn. Cần ít nhất một dòng hàng đã chọn Mặt hàng (danh mục). Lịch xuất hàng khi đó tạo sau ở hồ sơ hợp đồng.",
       }),

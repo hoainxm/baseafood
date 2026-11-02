@@ -90,6 +90,8 @@ import type {
   ExportPayment,
   CustomerProductName,
   ExportDocumentKindRow,
+  ExportOption,
+  ExportOptionListKind,
   GoodsType,
   ExportShipment,
   ExportStepItem,
@@ -2665,6 +2667,29 @@ export const EXPORT_DOCUMENT_KIND_TABLE: TableMapping<ExportDocumentKindRow> = {
   }),
 };
 
+const EXPORT_OPTION_KINDS: readonly ExportOptionListKind[] = ["loading-port", "discharge-port", "container-type", "currency"];
+
+/** Danh sách chọn của Xuất khẩu (mig 0095, ba-spec 62) — cảng xếp · cảng đích · loại container · tiền tệ. */
+export const EXPORT_OPTION_TABLE: TableMapping<ExportOption> = {
+  table: "export_options",
+  localKey: "bsf.export-options.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    list_kind: x.listKind,
+    name: x.name,
+    sort_order: Math.round(Number(x.sortOrder) || 0),
+    note: x.note ?? "",
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    listKind: (EXPORT_OPTION_KINDS as readonly string[]).includes(s(r.list_kind)) ? (s(r.list_kind) as ExportOptionListKind) : "discharge-port",
+    name: s(r.name),
+    sortOrder: Number(r.sort_order) || 0,
+    note: s(r.note),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /* ---------- Phòng Kế hoạch · Nhập khẩu (mig 0082, ba-spec 45) ---------- */
@@ -3415,6 +3440,7 @@ export const TABLE_LABELS: Readonly<Record<string, string>> = {
   production_activity_log: "Nhật ký Sản xuất",
   customer_product_names: "Tên hàng theo khách",
   export_document_kinds: "Loại chứng từ xuất khẩu",
+  export_options: "Danh sách chọn xuất khẩu",
   import_suppliers: "NCC nhập khẩu",
   goods_types: "Loại hàng",
   import_contracts: "Hợp đồng nhập khẩu",

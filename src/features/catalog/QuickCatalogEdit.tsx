@@ -21,6 +21,7 @@ import type {
   Supplier,
   ImportSupplier,
   GoodsType,
+  ExportOption,
 } from "@/types";
 import { useBatterTypes, useFinishedGoods, useMaterialTypes } from "@/lib/catalogRepo";
 import { CatalogEditDialog, notify, type FieldError } from "@/design-system";
@@ -44,6 +45,7 @@ export interface CatalogRecordMap {
   batter: BatterType;
   documentKind: DocumentKindOption;
   goodsType: GoodsType;
+  exportOption: ExportOption;
 }
 
 /**
@@ -100,6 +102,7 @@ function QuickEditDialog<K extends CatalogKind>({
       batter: emptySource(),
       documentKind: emptySource(),
       goodsType: emptySource(),
+      exportOption: emptySource(),
     });
     return configs[kind] as unknown as CatalogConfig<T>;
   }, [kind, materialTypes, finishedGoods, batterTypes, addBatter]);
@@ -173,6 +176,8 @@ const KIND_RESOURCE: Record<CatalogKind, string> = {
   documentKind: "export-plans",
   // Loại hàng (mig 0089) — dùng chung HĐ xuất + nhập, tab Danh mục theo quyền export-plans như Loại chứng từ.
   goodsType: "export-plans",
+  // Danh sách chọn Xuất khẩu (mig 0095) — RLS theo export-plans.
+  exportOption: "export-plans",
 };
 
 /**
@@ -204,6 +209,7 @@ export function useQuickCatalogEdit<K extends CatalogKind>(
     batter: "loại bột",
     documentKind: "loại chứng từ",
     goodsType: "loại hàng",
+    exportOption: "tùy chọn",
   };
 
   const openEdit = (value: string) => {

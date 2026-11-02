@@ -53,6 +53,7 @@ import type { Customer, CustomerProductName, ExportContract, ExportContractLine,
 import { Copy, Factory, FileSignature, Plus, Save, Trash2 } from "lucide-react";
 import { FilePicker } from "./parts";
 import { useGoodsTypePicker } from "./goodsTypePicker";
+import { useExportOptionPicker } from "./exportOptionPicker";
 import { uploadExtraContractFiles } from "./RecordDialogs";
 
 export type ContractFormTarget =
@@ -214,6 +215,8 @@ export function ContractFormDialog({
   const productEditor = useQuickCatalogEdit("product", products, (rows) => void setProducts(rows));
   // Loại hàng (mig 0089) — chưa chạy ⇒ ẩn ô.
   const goodsPicker = useGoodsTypePicker();
+  // Cảng xếp · cảng đích · loại cont · tiền tệ chọn theo danh sách (ba-spec 62).
+  const optionPicker = useExportOptionPicker();
   const kindPicker = useDocumentKindPicker(documentKindSource);
   /** Dòng vừa được tự gợi ý mặt hàng (chỉ để hiện dòng nhắc "kiểm lại", không lưu). */
   const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
@@ -504,21 +507,33 @@ export function ContractFormDialog({
                 onChange={(v) => setTerm("incoterm", v)}
                 options={INCOTERMS.map((x) => ({ value: x, label: x }))}
               />
-              <Field label="Cảng xếp">
-                <Input value={form.terms.portOfLoading} onChange={(e) => setTerm("portOfLoading", e.target.value)} />
-              </Field>
-              <Field label="Cảng đích">
-                <Input value={form.terms.portOfDischarge} onChange={(e) => setTerm("portOfDischarge", e.target.value)} />
-              </Field>
+              <Combobox
+                label="Cảng xếp"
+                hideRequiredMark
+                {...optionPicker.fieldProps("loading-port", form.terms.portOfLoading)}
+                onChange={(v) => setTerm("portOfLoading", v)}
+              />
+              <Combobox
+                label="Cảng đích"
+                hideRequiredMark
+                {...optionPicker.fieldProps("discharge-port", form.terms.portOfDischarge)}
+                onChange={(v) => setTerm("portOfDischarge", v)}
+              />
               <DateField label="Hạn giao muộn nhất" required value={form.terms.latestShipmentDate} onChange={(v) => setTerm("latestShipmentDate", v)} />
               <NumberField label="Dung sai ±" unit="%" value={form.terms.tolerancePct} onChange={(v) => setTerm("tolerancePct", v)} />
-              <Field label="Tiền tệ">
-                <Input value={form.terms.currency} onChange={(e) => setTerm("currency", e.target.value.toUpperCase())} />
-              </Field>
+              <Combobox
+                label="Tiền tệ"
+                hideRequiredMark
+                {...optionPicker.fieldProps("currency", form.terms.currency)}
+                onChange={(v) => setTerm("currency", v.toUpperCase())}
+              />
               <NumberField label="Số container" unit="cont" value={form.terms.containerCount} onChange={(v) => setTerm("containerCount", v)} />
-              <Field label="Loại container">
-                <Input value={form.terms.containerType} onChange={(e) => setTerm("containerType", e.target.value)} />
-              </Field>
+              <Combobox
+                label="Loại container"
+                hideRequiredMark
+                {...optionPicker.fieldProps("container-type", form.terms.containerType)}
+                onChange={(v) => setTerm("containerType", v)}
+              />
               <NumberField label="Đặt cọc" unit="%" value={form.terms.depositPct} onChange={(v) => setTerm("depositPct", v)} />
             </div>
             <ChoiceGroup
@@ -787,6 +802,7 @@ export function ContractFormDialog({
       {productEditor.dialog}
       {goodsPicker.dialog}
       {kindPicker.dialog}
+      {optionPicker.dialogs}
     </FormDialog>
   );
 }

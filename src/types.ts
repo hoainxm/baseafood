@@ -1233,6 +1233,17 @@ export interface ExportDocumentKindRow {
   note: string;
 }
 
+/** Danh sách chọn của Xuất khẩu (mig 0095, ba-spec 62) — HĐ / chuyến lưu CHỮ của tùy chọn, không lưu id. */
+export type ExportOptionListKind = "loading-port" | "discharge-port" | "container-type" | "currency";
+
+export interface ExportOption {
+  id: string;
+  listKind: ExportOptionListKind;
+  name: string;
+  sortOrder: number;
+  note: string;
+}
+
 /** Chứng từ khách yêu cầu trên hợp đồng — giữ form (C/O form VJ…) và người cấp (H/C tự cấp…). */
 export interface ExportRequiredDocument {
   kind: ExportDocumentKind;

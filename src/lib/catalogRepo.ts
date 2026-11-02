@@ -3,7 +3,7 @@
 // Tên tiếng Việt: React Hooks & Repository thao tác với dữ liệu Danh mục
 // Description: Catalog Data Access Hooks & Local Storage / Supabase Repository
 // ============================================================
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { uid } from "@/lib/db";
 import {
   SALES_ITEM_TABLE,
@@ -75,6 +75,7 @@ import {
   EXPORT_ACTIVITY_TABLE,
   CUSTOMER_PRODUCT_NAME_TABLE,
   EXPORT_DOCUMENT_KIND_TABLE,
+  EXPORT_OPTION_TABLE,
   GOODS_TYPE_TABLE,
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
@@ -95,6 +96,7 @@ import type {
 } from "@/types";
 import { DEFAULT_STORAGE_LOCATION } from "@/types";
 import { BATTER_TYPE_SEED, inferBattersFromName } from "@/lib/batter";
+import { effectiveExportOptions } from "@/lib/exportOptions";
 import fgSeed from "@/data/finished-goods.json";
 import octopusNxtSnapshot from "@/data/nxt-bachtuoc-2026-07.json";
 
@@ -437,6 +439,19 @@ export function useExportDocumentKindStore() {
   const [kinds, setKinds, meta] = useExportDocumentKinds();
   const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
   return { kinds, setKinds, isAvailable, isLoading: meta.status === "loading" && kinds.length === 0 };
+}
+/** Danh sách chọn Xuất khẩu (mig 0095, ba-spec 62) — dùng qua `useExportOptionStore`. */
+export const useExportOptions = () => useTable(EXPORT_OPTION_TABLE);
+
+/**
+ * Danh sách chọn + cờ `isAvailable`: có máy chủ mà chưa chạy 0095 ⇒ không ghi (ô chọn dùng danh sách khởi
+ * tạo, chỉ chọn) — khỏi kẹt hàng chờ. `options` = bảng, hoặc danh sách khởi tạo khi chưa có / chưa chạy.
+ */
+export function useExportOptionStore() {
+  const [rows, setRows, meta] = useExportOptions();
+  const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
+  const options = useMemo(() => effectiveExportOptions(rows, isAvailable), [rows, isAvailable]);
+  return { options, setOptions: setRows, isAvailable, isLoading: meta.status === "loading" && rows.length === 0 };
 }
 /** Danh mục Loại hàng (mig 0089) — dùng qua `useGoodsTypeStore`. */
 export const useGoodsTypes = () => useTable(GOODS_TYPE_TABLE);

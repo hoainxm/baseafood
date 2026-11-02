@@ -177,6 +177,15 @@ export const exportPlanningGuide: PageGuide = {
           <li>Chuyến mới có tháng kế hoạch nằm ở mục <b>Chưa có ngày</b> cuối cột trái; ghi ngày đóng cont hoặc ETD thì chuyến tự vào lịch.</li>
         </GuideList>
       </GuideSection>
+      <GuideSection title="Danh mục: danh sách chọn của Xuất khẩu">
+        <GuideList>
+          <li>Tab <b>Danh mục</b> giữ 6 danh sách: <b>Cảng xếp</b>, <b>Cảng đích</b>, <b>Loại container</b>, <b>Tiền tệ</b>, <b>Loại chứng từ</b>, <b>Loại hàng</b>. Người chỉ có quyền xem thì xem được, không thêm / sửa / xóa.</li>
+          <li>Ô Cảng xếp, Cảng đích, Loại container, Tiền tệ của hợp đồng và ô Cảng đến của chuyến chọn theo danh sách. Chưa có thì gõ tên rồi chọn <b>Thêm mới</b>; bút chì để sửa tên; thùng rác để xóa mục khỏi danh sách (có hỏi xác nhận, có Hoàn tác).</li>
+          <li>Hợp đồng và chuyến <b>giữ đúng chữ lúc ghi</b>: đổi tên hay xóa một mục không làm đổi hợp đồng, chuyến đã ghi.</li>
+          <li>Hợp đồng cũ gõ tay khác danh sách (VD "Việt Nam", "TOKYO") hiện ở đầu ô với dòng <b>Ngoài danh sách</b>. Khi sửa hợp đồng đó, chọn lại mục trong danh sách cho thống nhất.</li>
+          <li>Hợp đồng ghi cả hai cảng xếp thì thêm một mục riêng, VD "Cát Lái / Cái Mép". Loại container có "HC" thì chuyến gợi ý 40HC-RF, có "20" thì 20RF, còn lại 40RF.</li>
+        </GuideList>
+      </GuideSection>
       <GuideSection title="Ai làm gì">
         <GuideActors steps={EXPORT_GUIDE_STEPS} actors={EXPORT_GUIDE_ACTORS} />
       </GuideSection>

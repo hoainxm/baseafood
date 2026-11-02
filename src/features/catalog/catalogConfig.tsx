@@ -19,6 +19,8 @@ import type {
   StorageLocation,
   ImportSupplier,
   GoodsType,
+  ExportOption,
+  ExportOptionListKind,
 } from "@/types";
 import { CATEGORIES, PROCESSING_TYPES, STORAGE_KIND_LABELS, hasSplitComponents, blockSpec } from "@/types";
 import { newId as uid } from "@/lib/store";
@@ -34,12 +36,14 @@ import {
   useStorageLocations,
   useExportDocumentKindStore,
   useGoodsTypeStore,
+  useExportOptionStore,
   useImportContracts,
   useImportSupplierStore,
 } from "@/lib/catalogRepo";
 import { canDeleteImportSupplier, emptyImportSupplier } from "@/lib/importPlanning";
 import { documentKindList, documentKindRowsFromList, type DocumentKindOption } from "@/lib/exportPlanning";
 import { sortGoodsTypes } from "@/lib/goodsTypes";
+import { exportOptionListMeta, exportOptionsOf, replaceExportOptionList } from "@/lib/exportOptions";
 import {
   ChoiceGroup,
   Combobox,
@@ -53,7 +57,7 @@ import { BatterPicker } from "./BatterPicker";
 
 const MARKETS = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
-export type CatalogKind = "product" | "customer" | "supplier" | "importSupplier" | "materialType" | "storageLocation" | "batter" | "documentKind" | "goodsType";
+export type CatalogKind = "product" | "customer" | "supplier" | "importSupplier" | "materialType" | "storageLocation" | "batter" | "documentKind" | "goodsType" | "exportOption";
 
 /** Đủ thứ để dựng màn CRUD một danh mục HOẶC hộp sửa nhanh một bản ghi. */
 export interface CatalogConfig<T extends { id: string }> {
@@ -94,6 +98,8 @@ export interface CatalogConfigSet {
   /** Loại chứng từ xuất khẩu (mig 0081) — hàng = 10 loại hệ thống (đổi tên được) + loại tự thêm. */
   documentKind: CatalogConfig<DocumentKindOption>;
   goodsType: CatalogConfig<GoodsType>;
+  /** Danh sách chọn Xuất khẩu (mig 0095) — cả bảng; tab Danh mục của Xuất khẩu tách theo danh sách (`exportOptionListConfig`). */
+  exportOption: CatalogConfig<ExportOption>;
 }
 
 /** Cảnh báo khi mã số trùng với bản ghi khác (khách hàng / đại lý). Mã trống thì bỏ qua. */
@@ -568,6 +574,17 @@ export function buildCatalogFields(
     { key: "note", label: "Ghi chú", hideOnMobile: true, example: "VD: Bạch tuộc nguyên con còn da" },
   ];
 
+  const exportOptionFields: CatalogField<ExportOption>[] = [
+    {
+      key: "name",
+      label: "Tên",
+      required: true,
+      example: "VD: Tokyo, Japan",
+      hint: "Chữ hiện ở ô chọn và ghi vào hợp đồng / chuyến. Hợp đồng đã ghi giữ nguyên chữ cũ khi đổi tên hay xóa mục.",
+    },
+    { key: "note", label: "Ghi chú", hideOnMobile: true, example: "VD: Cảng chính của khách Nhật" },
+  ];
+
   return {
     product: productFields,
     customer: customerFields,
@@ -578,6 +595,7 @@ export function buildCatalogFields(
     batter: batterFields,
     documentKind: documentKindFields,
     goodsType: goodsTypeFields,
+    exportOption: exportOptionFields,
   };
 }
 
@@ -606,6 +624,7 @@ export function buildCatalogConfigs(
     batter: CatalogSource<BatterType>;
     documentKind: CatalogSource<DocumentKindOption>;
     goodsType: CatalogSource<GoodsType>;
+    exportOption: CatalogSource<ExportOption>;
   }
 ): CatalogConfigSet {
   return {
@@ -819,6 +838,42 @@ export function buildCatalogConfigs(
       nameField: "name",
       linkedByName: false, // dòng hàng HĐ lưu id loại
     },
+    exportOption: {
+      title: "Danh sách chọn Xuất khẩu",
+      description: "Cảng xếp, cảng đích, loại container, tiền tệ của hợp đồng / chuyến xuất.",
+      entityName: "tùy chọn",
+      rows: n.exportOption.rows,
+      onChange: n.exportOption.onChange,
+      fields: fields.exportOption,
+      loading: n.exportOption.loading,
+      validate: (editing, rows) => checkDuplicateName(editing, rows.filter((r) => r.listKind === editing.listKind), "name", "Tên", "tùy chọn"),
+      createEmpty: (): ExportOption => ({ id: `discharge-port-${uid()}`, listKind: "discharge-port", name: "", sortOrder: 0, note: "" }),
+      getSearchText: (r) => `${r.name} ${r.note}`,
+      getRecordDescription: (r) => r.name,
+      nameField: "name",
+      linkedByName: true, // HĐ / chuyến lưu CHỮ — xóa / đổi tên không đụng sổ (ba-spec 62 R2)
+    },
+  };
+}
+
+/**
+ * Cấu hình CRUD của MỘT danh sách chọn (tab Danh mục của Xuất khẩu): hàng = mục của danh sách đó; ghi ⇒
+ * ghép lại cả bảng (danh sách khác giữ nguyên). `base` = `exportOption` của `useCatalogConfigs`.
+ */
+export function exportOptionListConfig(
+  base: CatalogConfig<ExportOption>,
+  kind: ExportOptionListKind,
+): CatalogConfig<ExportOption> {
+  const meta = exportOptionListMeta(kind);
+  return {
+    ...base,
+    title: meta.title,
+    description: meta.description,
+    entityName: meta.entityName,
+    rows: exportOptionsOf(base.rows, kind),
+    onChange: (next) => base.onChange(replaceExportOptionList(base.rows, kind, next)),
+    fields: base.fields.map((f) => (f.key === "name" ? { ...f, label: `Tên ${meta.entityName}`, example: meta.example } : f)),
+    createEmpty: (): ExportOption => ({ id: `${kind}-${uid()}`, listKind: kind, name: "", sortOrder: 0, note: "" }),
   };
 }
 
@@ -855,6 +910,7 @@ export function useCatalogConfigs(): CatalogConfigSet {
   const [batterTypes, setBatterTypes, { status: ttBT }] = useBatterTypes();
   const documentKindStore = useExportDocumentKindStore();
   const goodsTypeStore = useGoodsTypeStore();
+  const exportOptionStore = useExportOptionStore();
   const importSupplierStore = useImportSupplierStore();
   const [importContracts] = useImportContracts();
   const [finishedGoods] = useFinishedGoods();
@@ -921,6 +977,18 @@ export function useCatalogConfigs(): CatalogConfigSet {
         }
         let max = Math.max(0, ...next.map((r) => r.sortOrder));
         goodsTypeStore.setGoodsTypes(next.map((r) => (r.sortOrder ? r : { ...r, sortOrder: (max += 10) })));
+      },
+    },
+    exportOption: {
+      rows: exportOptionStore.options,
+      loading: exportOptionStore.isLoading,
+      onChange: (next) => {
+        // Máy chủ chưa chạy 0095 ⇒ không ghi (khỏi kẹt hàng chờ); ô chọn vẫn có danh sách khởi tạo.
+        if (!exportOptionStore.isAvailable) {
+          notify.error("Máy chủ chưa chạy migration 0095 — chưa thêm / sửa / xóa danh sách chọn được. Báo chủ dự án.");
+          return;
+        }
+        exportOptionStore.setOptions(next);
       },
     },
   });

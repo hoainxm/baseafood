@@ -3,6 +3,7 @@
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
 last_verified: 2026-11-02
+<!-- updated: 2026-11-02 (danh sách chọn) — tab thứ 4 **Danh mục** cạnh Lịch xuất hàng · Hợp đồng · Báo cáo (điện thoại: 4 tab lưới 2×2); trong tab là hàng tab con 6 danh sách (`?list=`, mốc `export-catalog-lists`), mỗi danh sách một bảng CatalogCrud. 4 ô điều khoản (Cảng xếp, Cảng đích, Tiền tệ, Loại container) + Cảng đến của chuyến thành Combobox có Thêm mới / bút chì / thùng rác; giá trị cũ khác danh sách hiện đầu danh sách với dòng phụ "Ngoài danh sách…" (ba-spec 62). -->
 <!-- updated: 2026-11-02 (lập HĐ) — chân hộp Lập HĐ: Hủy · Lưu & lập lệnh sản xuất (save, chỉ lập mới + quyền Lệnh SX) · Lưu hợp đồng (save). -->
 <!-- updated: 2026-11-02 (lệnh SX) — hàng việc tiếp theo ở hồ sơ HĐ thêm nút phụ (outline) "Lập lệnh sản xuất" cạnh nút chính (Đính kèm hồ sơ / Ghi chuyến / Duyệt cuối) — ba-spec 48 LS1. -->
 <!-- updated: 2026-11-02 (xem file) — hộp xem chứng từ dùng `FileViewer` chung (ba-spec 61): Word / Excel / văn bản xem ngay trong app; "Mở tab mới" mở trang `#/file-view`, không tải về. -->
@@ -176,7 +177,7 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 ## v9.1 (2026-10-29) — ô Loại chứng từ có Thêm mới + bút chì (ba-spec 41 §0b)
 
 - Ô "Chứng từ n" (form HĐ, phần Chứng từ khách yêu cầu) và ô "Loại chứng từ" (hộp mục chứng từ bước 5) dùng `useDocumentKindPicker` (`documentKindPicker.tsx`): danh sách 10 loại hệ thống + loại tự thêm (dòng phụ = ghi chú), `onCreate` khi có quyền thêm / sửa Xuất khẩu và máy chủ đã có bảng, bút chì mở `CatalogEditDialog` của loại `documentKind`. Hộp sửa render một lần trong mỗi hộp form.
-- Danh mục: tab "Loại chứng từ" ở `/catalog?tab=document-kinds`.
+- Danh mục: tab **Danh mục** của trang Xuất khẩu (`/planning-export?view=catalog&list=…`) — Cảng xếp · Cảng đích · Loại container · Tiền tệ · Loại chứng từ · Loại hàng (ba-spec 62).
 
 ## v9 (2026-10-29) — bỏ bước duyệt HĐ (ba-spec 41 §0a) · THẮNG v8 ở các điểm dưới
 

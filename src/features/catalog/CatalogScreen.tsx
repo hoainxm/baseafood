@@ -3,17 +3,17 @@
 // Tên tiếng Việt: Màn hình Quản lý Danh mục chung
 // Description: Master Catalog Management Screen
 // ============================================================
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Navigate, useSearchParams } from "react-router-dom";
 import {
   Button,
-  CatalogCrud,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/design-system";
-import { useCatalogConfigs, type CatalogConfig } from "./catalogConfig";
+import { useCatalogConfigs } from "./catalogConfig";
+import { CatalogCrudFor } from "./CatalogCrudFor";
 import FinishedGoodScreen from "./FinishedGoodScreen";
 import { normalizeCatalogTab } from "@/lib/legacyUrls";
 import { useCan, usePermissions } from "@/features/shared/PermissionProvider";
@@ -36,10 +36,6 @@ const TAB_RESOURCE: Record<string, string> = {
   "material-types": "catalog.material-types",
   batters: "catalog.batters",
   "storage-locations": "catalog.storage-locations",
-  // Loại chứng từ xuất khẩu (mig 0081) — thuộc khu Xuất khẩu, quyền theo export-plans.
-  "document-kinds": "export-plans",
-  // Loại hàng (mig 0089) — dòng hàng HĐ xuất / nhập, quyền theo export-plans.
-  "goods-types": "export-plans",
   "finished-goods": "catalog.finished-goods",
 };
 
@@ -99,6 +95,10 @@ export default function CatalogScreen() {
   const [exportItems] = useExportStepItems();
   const [exportFiles] = useExportFiles();
 
+  // Loại chứng từ, Loại hàng chuyển sang tab Danh mục của Xuất khẩu (ba-spec 62 Q1) — link cũ mở đúng chỗ mới.
+  if (tabParam === "document-kinds" || tabParam === "goods-types")
+    return <Navigate to={`/planning-export?view=catalog&list=${tabParam}`} replace />;
+
   return (
     <div className="space-y-4">
       <h1 className="sr-only">Danh mục</h1>
@@ -113,8 +113,6 @@ export default function CatalogScreen() {
           {canViewTab("material-types") && <TabsTrigger value="material-types" title="Quy cách / size nguyên liệu, có gắn loài (bạch tuộc, mực, cá…).">Loại nguyên liệu</TabsTrigger>}
           {canViewTab("batters") && <TabsTrigger value="batters" title="Các loại bột tẩm (24V, 18V, 220H, 232, 20802…) — gắn vào mặt hàng tẩm bột để ghi kg bột theo từng loại.">Bột tẩm</TabsTrigger>}
           {canViewTab("storage-locations") && <TabsTrigger value="storage-locations" title="Nơi hàng đang nằm: kho nhà và các kho lạnh thuê ngoài.">Kho lưu trữ</TabsTrigger>}
-          {canViewTab("document-kinds") && <TabsTrigger value="document-kinds" title="Loại chứng từ xuất khẩu (Commercial Invoice, B/L, H/C, C/O…) — thêm loại khách mới yêu cầu, đổi tên loại có sẵn.">Loại chứng từ</TabsTrigger>}
-          {canViewTab("goods-types") && <TabsTrigger value="goods-types" title="Loại hàng của dòng hàng hợp đồng (1 da, 2 da, mada, cá khô…) — để lọc khi xuất Excel.">Loại hàng</TabsTrigger>}
           {canViewTab("finished-goods") && <TabsTrigger value="finished-goods" title="141 mã thành phẩm kế toán (TK 1551) — chỉ đọc, không sửa ở đây.">Thành phẩm (141 mã)</TabsTrigger>}
         </TabsList>
 
@@ -167,58 +165,10 @@ export default function CatalogScreen() {
           <CatalogCrudFor cfg={c.storageLocation} rowMarkKey="danh-muc-kho-luu" resource={TAB_RESOURCE["storage-locations"]} />
         </TabsContent>
 
-        <TabsContent value="document-kinds" data-tour="catalog-document-kinds" className="pt-4">
-          <CatalogCrudFor cfg={c.documentKind} rowMarkKey="export-document-kinds" resource={TAB_RESOURCE["document-kinds"]} />
-        </TabsContent>
-
-        <TabsContent value="goods-types" data-tour="catalog-goods-types" className="pt-4">
-          <CatalogCrudFor cfg={c.goodsType} rowMarkKey="goods-types" resource={TAB_RESOURCE["goods-types"]} />
-        </TabsContent>
-
         <TabsContent value="finished-goods" data-tour="catalog-finished-goods" className="pt-4">
           <FinishedGoodScreen />
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-/** Dựng CatalogCrud từ một cấu hình danh mục (giữ nguyên mọi prop cũ). */
-function CatalogCrudFor<T extends { id: string }>({
-  cfg,
-  rowMarkKey,
-  resource,
-  rowActions,
-}: {
-  cfg: CatalogConfig<T>;
-  /** Nút riêng của từng dòng (VD "Tên hàng" của khách). */
-  rowActions?: (row: T) => ReactNode;
-  /** Khoá bảng tô màu dòng — một khoá cho mỗi tab, đừng đổi (mất dấu cũ). */
-  rowMarkKey: string;
-  /** Tài nguyên phân quyền của tab (catalog.*). */
-  resource: string;
-}) {
-  const allowed = useCan(resource);
-  return (
-    <CatalogCrud
-      canCreate={allowed.create}
-      canUpdate={allowed.update}
-      canDelete={allowed.delete}
-      canDeleteRow={cfg.canDeleteRow}
-      rowMarkKey={rowMarkKey}
-      loading={cfg.loading}
-      title={cfg.title}
-      description={cfg.description}
-      entityName={cfg.entityName}
-      rows={cfg.rows}
-      onChange={cfg.onChange}
-      fields={cfg.fields}
-      validate={cfg.validate}
-      createEmpty={cfg.createEmpty}
-      getSearchText={cfg.getSearchText}
-      getRecordDescription={cfg.getRecordDescription}
-      rowActions={rowActions}
-      filters={cfg.filters}
-    />
   );
 }

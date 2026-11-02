@@ -1161,6 +1161,11 @@ export function shipmentGateText(g: ShipmentGate): string {
 export interface ScheduleRow {
   planMonth: string;
   plannedKg: number | null;
+  /** R43 (v9.4): ô chuyến tùy chọn gõ ngay ở form Lập HĐ — trống = chuyến còn trống (R41). */
+  bookingNo?: string;
+  loadingDate?: string;
+  etd?: string;
+  eta?: string;
 }
 
 const monthIndex = (ym: string) => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
@@ -1225,10 +1230,10 @@ export function shipmentsFromSchedule(
     plannedKg: r.plannedKg,
     lotCode: "",
     portOfDischarge: base.portOfDischarge,
-    bookingNo: "",
-    loadingDate: "",
-    etd: "",
-    eta: "",
+    bookingNo: r.bookingNo?.trim() ?? "",
+    loadingDate: r.loadingDate ?? "",
+    etd: r.etd ?? "",
+    eta: r.eta ?? "",
     vesselVoyage: "",
     containerNo: "",
     sealNo: "",
@@ -1237,6 +1242,30 @@ export function shipmentsFromSchedule(
     note: "",
     createdAt,
   }));
+}
+
+/**
+ * R42 + R43: kiểm lịch trong form Lập HĐ — ≥ 1 chuyến, mỗi chuyến có tháng (hoặc ngày đóng / ETD, R1), thứ tự
+ * ngày đóng ≤ ETD ≤ ETA (R8). Lỗi ghi rõ chuyến số mấy.
+ */
+export function validateScheduleRows(rows: readonly ScheduleRow[]): ValidationIssue[] {
+  if (!rows.length) return [{ key: "schedule", label: "Lịch xuất hàng", message: "Lịch cần ít nhất 1 chuyến — hoặc chọn Không tạo lịch" }];
+  return rows.flatMap((r, i) =>
+    validateShipment({ planMonth: /^\d{4}-\d{2}$/.test(r.planMonth) ? r.planMonth : "", loadingDate: r.loadingDate ?? "", etd: r.etd ?? "", eta: r.eta ?? "", plannedKg: r.plannedKg }).map(
+      (x) => ({ ...x, key: `schedule-${i}-${x.key}`, label: `Chuyến ${i + 1} · ${x.label}` }),
+    ),
+  );
+}
+
+/**
+ * R42: lịch trong form Lập HĐ tự dựng lại theo các ô của HĐ (R39) cho tới khi người dùng sửa tay một chuyến;
+ * đã sửa tay ⇒ giữ bản đã sửa.
+ */
+export function formSchedule(
+  state: { edited: boolean; rows: readonly ScheduleRow[] },
+  p: Parameters<typeof buildSchedule>[0],
+): ScheduleRow[] {
+  return state.edited ? [...state.rows] : buildSchedule(p);
 }
 
 /** R41: chuyến còn trống = chưa có thông tin chuyến thật, không file, không mục nào Xong. */

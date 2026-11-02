@@ -44,7 +44,10 @@ import {
   suggestProductId,
   unmappedLines,
   validateContract,
+  formSchedule,
+  validateScheduleRows,
   type ExportData,
+  type ScheduleRow,
 } from "@/lib/exportPlanning";
 import { formatMoney } from "@/lib/format";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
@@ -55,6 +58,7 @@ import { FilePicker } from "./parts";
 import { useGoodsTypePicker } from "./goodsTypePicker";
 import { useExportOptionPicker } from "./exportOptionPicker";
 import { uploadExtraContractFiles } from "./RecordDialogs";
+import { ScheduleRowsEditor, scheduleRowsToSave, type ScheduleRowForm } from "./ShipmentDialogs";
 
 export type ContractFormTarget =
   | { mode: "create" }
@@ -79,11 +83,18 @@ interface ContractForm {
   /** File ký đang có (sửa hợp đồng) — giữ nếu không chọn file mới. */
   filePath: string;
   fileName: string;
+  /**
+   * Lịch xuất hàng ngay trong form Lập HĐ (ba-spec 41 R42 + R43) — chỉ chế độ lập mới. `edited` = đã sửa tay ⇒
+   * giữ `rows`; chưa sửa ⇒ lịch chia lại theo số cont, hạn giao, tổng kg mỗi lần các ô đó đổi.
+   */
+  schedule?: { enabled: boolean; edited: boolean; rows: ScheduleRowForm[] };
   initial: string;
 }
 
 const snapshot = (f: ContractForm) =>
-  JSON.stringify([f.customerId, f.contractNo, f.signedOn, f.orderRef, f.note, f.revisedOn, f.changeSummary, f.terms, f.lines]);
+  JSON.stringify([f.customerId, f.contractNo, f.signedOn, f.orderRef, f.note, f.revisedOn, f.changeSummary, f.terms, f.lines, f.schedule]);
+
+const NEW_SCHEDULE = { enabled: true, edited: false, rows: [] as ScheduleRowForm[] };
 
 const blankLine = (): ExportContractLine => ({
   id: newId(),
@@ -129,6 +140,7 @@ function formFor(target: ContractFormTarget, today: string): ContractForm {
       lines: [blankLine()],
       filePath: "",
       fileName: "",
+      schedule: NEW_SCHEDULE,
       initial: "",
     };
   } else {
@@ -165,6 +177,8 @@ export interface ContractSavePayload {
   attachments: ExportFile[];
   /** "Lưu & lập lệnh sản xuất": lưu xong mở ngay hộp Lập lệnh sản xuất chọn sẵn HĐ này (ba-spec 48 LS1). */
   thenCreateOrder?: boolean;
+  /** Lập HĐ mới: chuyến của lịch xuất hàng ghi CÙNG lần lưu (R42) — `[]` = chọn Không tạo lịch; bỏ trống = không phải lập mới. */
+  schedule?: ScheduleRow[];
 }
 
 export function ContractFormDialog({
@@ -262,6 +276,22 @@ export function ContractFormDialog({
   }, [target]);
 
   const set = <K extends keyof ContractForm>(k: K, v: ContractForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
+  /* Lịch xuất hàng (R42): bản nháp cũ chưa có `schedule` ⇒ coi như mặc định Có. */
+  const scheduleState = form?.mode === "create" ? (form.schedule ?? NEW_SCHEDULE) : null;
+  const scheduleRows: ScheduleRowForm[] =
+    form && scheduleState
+      ? scheduleState.edited
+        ? scheduleState.rows
+        : formSchedule(scheduleState, {
+            signedOn: form.signedOn,
+            latestShipmentDate: form.terms.latestShipmentDate,
+            containerCount: form.terms.containerCount,
+            totalKg: contractTotals(form.lines).kg,
+            today,
+          }).map((r, i) => ({ ...r, id: `auto-${i}` }))
+      : [];
+  const setSchedule = (patch: Partial<NonNullable<ContractForm["schedule"]>>) =>
+    setForm((f) => (f ? { ...f, schedule: { ...(f.schedule ?? NEW_SCHEDULE), ...patch } } : f));
   const setTerm = <K extends keyof ExportContractTerms>(k: K, v: ExportContractTerms[K]) =>
     setForm((f) => (f ? { ...f, terms: { ...f.terms, [k]: v } } : f));
   const setLine = (id: string, patch: Partial<ExportContractLine>) =>
@@ -304,6 +334,7 @@ export function ContractFormDialog({
     );
     const errs: FieldError[] = issues.map((i) => ({ field: i.label, message: i.message }));
     if (form.mode === "revise" && !form.changeSummary.trim()) errs.push({ field: "Nội dung sửa", message: "Ghi bản sửa đổi gì (VD: giảm dòng 1 còn 180 thùng)" });
+    if (scheduleState?.enabled) errs.push(...validateScheduleRows(scheduleRows).map((i) => ({ field: i.label, message: i.message })));
     // Lệnh sản xuất chỉ chọn được dòng đã nối mặt hàng (ba-spec 48 R1) — chặn sớm, khỏi lưu HĐ rồi mở hộp lệnh trống.
     if (thenCreateOrder && !form.lines.some((l) => l.description.trim() && l.productId))
       errs.push({
@@ -368,6 +399,7 @@ export function ContractFormDialog({
         },
         attachments,
         thenCreateOrder,
+        schedule: scheduleState ? (scheduleState.enabled ? scheduleRowsToSave(scheduleRows) : []) : undefined,
       });
       if (!ok) {
         void removeExportFiles(done);
@@ -796,6 +828,54 @@ export function ContractFormDialog({
               <Textarea rows={2} value={form.note} onChange={(e) => set("note", e.target.value)} />
             </Field>
           </FormSection>
+          {scheduleState && (
+            <FormSection
+              no={6}
+              title="Lịch xuất hàng"
+              hint="Chia sẵn các chuyến theo số cont, hạn giao, tổng kg — sửa được. Số booking, ngày đóng cont, ETD, ETA gõ luôn nếu đã có (không bắt buộc)."
+            >
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+                <ChoiceGroup
+                  label="Tạo lịch xuất hàng khi lưu"
+                  hideRequiredMark
+                  value={scheduleState.enabled ? "yes" : "no"}
+                  onChange={(v) => setSchedule({ enabled: v === "yes" })}
+                  options={[
+                    { value: "yes", label: "Có", description: "Lưu hợp đồng là ghi luôn các chuyến dưới đây lên lịch" },
+                    { value: "no", label: "Không", description: "Tạo sau ở hồ sơ hợp đồng khi cần" },
+                  ]}
+                  columns={2}
+                />
+                {scheduleState.enabled && (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+                        {scheduleState.edited
+                          ? "Đang dùng lịch đã sửa tay — đổi số cont, hạn giao, dòng hàng không chia lại nữa."
+                          : "Tự chia theo hợp đồng: đổi số cont, ngày ký, hạn giao hay dòng hàng thì lịch chia lại."}
+                      </p>
+                      {scheduleState.edited && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSchedule({ edited: false, rows: [] })}
+                          title="Bỏ các chỗ đã sửa tay, chia lại lịch theo số cont, hạn giao, tổng kg hiện tại."
+                        >
+                          Chia lại theo hợp đồng
+                        </Button>
+                      )}
+                    </div>
+                    <ScheduleRowsEditor
+                      rows={scheduleRows}
+                      onChange={(rows) => setSchedule({ edited: true, rows })}
+                      totalKg={totals.kg}
+                      deadline={form.terms.latestShipmentDate || today}
+                    />
+                  </>
+                )}
+              </div>
+            </FormSection>
+          )}
         </div>
       )}
       {customerEditor.dialog}

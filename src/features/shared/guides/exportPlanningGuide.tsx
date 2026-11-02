@@ -192,7 +192,7 @@ export const exportPlanningGuide: PageGuide = {
       <GuideSection title="Mẹo">
         <GuideList>
           <li>Việc ít dùng nằm ở <b>Thao tác khác</b>: Sửa hợp đồng (khi chưa có chuyến nào đã ghi mã lô, booking, ngày, số cont hay file), Ghi bản sửa, Gia hạn giao hàng, hủy.</li>
-          <li>Lập hợp đồng xong, app hỏi <b>Tạo lịch xuất hàng</b>: chia sẵn số chuyến = số cont, kg chia đều, tháng rải từ tháng sau ngày ký tới hạn giao. Sửa tháng / kg từng chuyến rồi Tạo, hoặc chọn Không tạo. Chưa cần đủ hồ sơ; hợp đồng chưa có chuyến thì tạo lại được ở hồ sơ (Thao tác khác). Chuyến của lịch còn trống thì vẫn Sửa hợp đồng, Xóa hợp đồng được (xóa kèm các chuyến đó).</li>
+          <li>Phần <b>6 Lịch xuất hàng</b> ngay trong hộp Lập hợp đồng (mặc định Có): chia sẵn số chuyến = số cont, kg chia đều, tháng rải từ tháng sau ngày ký tới hạn giao; tự chia lại khi đổi số cont / hạn giao / dòng hàng cho tới khi sửa tay. Mỗi chuyến gõ luôn được <b>Số booking</b>, <b>Ngày đóng cont</b>, <b>ETD</b>, <b>ETA</b> nếu đã có. Lưu hợp đồng là ghi luôn các chuyến; chọn Không thì tạo sau. Chưa cần đủ hồ sơ; hợp đồng chưa có chuyến thì tạo lại được ở hồ sơ (Thao tác khác). Chuyến của lịch còn trống thì vẫn Sửa hợp đồng, Xóa hợp đồng được (xóa kèm các chuyến đó).</li>
           <li>Thanh toán <b>Khác</b> thì ghi Hình thức thanh toán; L/C thì ghi Số L/C. Đính <b>Hồ sơ khác</b> thì ghi Tên hồ sơ.</li>
           <li>Dòng hàng chép được (Chép dòng — chỉ đổi size); có ô Loại hàng (danh mục) khi máy chủ đã bật.</li>
           <li>Dòng hàng chỉ khác size: chọn <b>Chép dòng</b>, dòng mới giữ mọi ô và để trống Size.</li>

@@ -95,12 +95,12 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         optional: true,
         title: "Lập hợp đồng",
         body:
-          "Khi có hợp đồng giấy mới, chọn Lập hợp đồng và nhập đúng như bản giấy. Phiếu gồm 5 phần: 1 Hợp đồng · 2 Điều khoản và thanh toán · 3 Chứng từ khách yêu cầu · 4 Dòng hàng · 5 File và ghi chú.\n" +
+          "Khi có hợp đồng giấy mới, chọn Lập hợp đồng và nhập đúng như bản giấy. Phiếu gồm 6 phần: 1 Hợp đồng · 2 Điều khoản và thanh toán · 3 Chứng từ khách yêu cầu · 4 Dòng hàng · 5 File và ghi chú · 6 Lịch xuất hàng.\n" +
           "Ở phần 4, dòng chỉ khác size thì chọn Chép dòng: dòng mới nằm ngay dưới, giữ mọi ô, để trống Size để gõ size khác. Mỗi dòng có Chiều dài, Tỉ lệ râu / thân / cổ, Số miếng / kg và Ghi chú dòng như cột trên hợp đồng: các ô này tự chép sang Lệnh sản xuất (vào Quy cách và ghi chú của dòng lệnh). Phần 5 chọn được nhiều file: file đầu là hợp đồng, các file sau (phụ lục) vào Hồ sơ đính kèm.\n" +
-          "Sau khi lưu, app hỏi có tạo lịch xuất hàng không: chia sẵn số chuyến = số cont, kg chia đều, tháng rải từ tháng sau ngày ký tới hạn giao; sửa được từng chuyến, hoặc chọn Không tạo (về sau tạo ở hồ sơ, khi chưa có chuyến). Lịch tạo được dù chưa đủ hồ sơ.\n" +
+          "Phần 6 Lịch xuất hàng (mặc định Có): app chia sẵn số chuyến = số cont, kg chia đều, tháng rải từ tháng sau ngày ký tới hạn giao, và chia lại khi bạn đổi số cont, ngày ký, hạn giao hay dòng hàng — cho tới khi bạn sửa tay một chuyến (Chia lại theo hợp đồng để bỏ chỗ đã sửa). Mỗi chuyến gõ được luôn Số booking, Ngày đóng cont, ETD, ETA nếu đã có (không bắt buộc): ngày đóng cont phải trước hoặc bằng ETD, ETA sau hoặc bằng ETD; gõ ngày đóng / ETD thì tháng của chuyến theo ngày đó. Chuyến đã có booking hoặc ngày thì hợp đồng không sửa thẳng / xóa được nữa (dùng Ghi bản sửa / Hủy). Lưu hợp đồng là ghi luôn các chuyến; chọn Không thì về sau tạo ở hồ sơ (khi chưa có chuyến). Lịch tạo được dù chưa đủ hồ sơ.\n" +
           "Cảng xếp, Cảng đích, Loại container, Tiền tệ chọn theo danh sách ở tab Danh mục; chưa có thì gõ tên rồi chọn Thêm mới ngay trong ô.\n" +
           "Hồ sơ hợp đồng mở ra ở trạng thái Chờ đính kèm: việc tiếp là đính kèm hợp đồng đã ký (và L/C nếu thanh toán L/C).\n" +
-          "Muốn ra lệnh sản xuất luôn (khi được cấp quyền Lệnh sản xuất): chọn Lưu & lập lệnh sản xuất thay cho Lưu hợp đồng. Hợp đồng được lưu, rồi trang Lệnh sản xuất mở hộp lập lệnh với hợp đồng chọn sẵn. Cần ít nhất một dòng hàng đã chọn Mặt hàng (danh mục). Lịch xuất hàng khi đó tạo sau ở hồ sơ hợp đồng.",
+          "Muốn ra lệnh sản xuất luôn (khi được cấp quyền Lệnh sản xuất): chọn Lưu & lập lệnh sản xuất thay cho Lưu hợp đồng. Hợp đồng được lưu, rồi trang Lệnh sản xuất mở hộp lập lệnh với hợp đồng chọn sẵn. Cần ít nhất một dòng hàng đã chọn Mặt hàng (danh mục). Lịch xuất hàng ở phần 6 vẫn được ghi cùng hợp đồng.",
       }),
     );
   }

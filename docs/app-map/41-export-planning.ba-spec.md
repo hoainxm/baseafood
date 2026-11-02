@@ -4,6 +4,7 @@
 covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql, supabase/migrations/0079_export_approval_workflow.sql, src/lib/abbreviations.ts, supabase/migrations/0081_export_document_kinds.sql
 last_verified: 2026-11-02
 <!-- updated: 2026-11-02 (danh sách chọn) — ba-spec [62](62-export-option-lists.ba-spec.md) ĐÃ BUILD: Cảng xếp · Cảng đích · Loại container · Tiền tệ của HĐ và Cảng đến của chuyến chọn theo danh sách (bảng `export_options`, mig 0095 chưa chạy), thêm / bút chì / thùng rác ngay trong ô; HĐ lưu CHỮ (đổi tên / xóa mục không đổi HĐ cũ). Tab **Danh mục** của trang Xuất khẩu (`?view=catalog&list=`) gom 6 danh sách — Loại chứng từ (§0b R37) và Loại hàng chuyển từ màn Danh mục chung sang. -->
+<!-- updated: 2026-11-02 (v9.4 ĐÃ BUILD) — §0d+ NV19 v2 / R42 / R43 (Số booking · Ngày đóng cont · ETD · ETA trên từng chuyến của lịch) / AC-78…80: lịch xuất hàng nằm trong form Lập HĐ (đã có NV19 dạng hộp hỏi SAU khi lưu; đường Lưu & lập lệnh bỏ qua hộp đó). ĐÃ BUILD sau commit 81df805. -->
 <!-- updated: 2026-11-02 (booking) — ba-spec [60](60-export-booking-file.ba-spec.md) ĐÃ BUILD: file booking của chuyến (`export_files.step = booking`, mig 0094 chưa chạy) — đính ở ô Số booking khi ghi chuyến + hàng File booking ở bước 4; không làm bước nào tự xong; `export-plans.loading` không thấy (RLS 0075 giữ nguyên). -->
 <!-- updated: 2026-11-02 (sửa đổi) — ba-spec [57](57-export-schedule-by-day.ba-spec.md): Lịch xuất hàng xếp theo NGÀY (thay "chuyến gom theo khách" ở Output NV11) — ĐÃ BUILD. ba-spec [58](58-contract-attachment-deferral.ba-spec.md): HĐ ký / L/C ghi "bổ sung sau" + lý do ⇒ không chặn ghi chuyến, vẫn chặn duyệt cuối (sửa dòng "Đính kèm" bảng chặng, R30, AC-56, `shipmentGate`) — ĐÃ BUILD, mig 0093 chưa chạy DB thật. -->
 <!-- updated: 2026-11-02 (nhật ký 56) — `export_activity_log` thành nhật ký CHUNG nhóm Kế hoạch (mig 0092, Q1): thêm `record_type` / `record_id` / `parent_*`; dòng HĐ xuất không đổi (khối nhật ký hồ sơ HĐ vẫn lọc theo contract_id). -->
@@ -79,6 +80,47 @@ Chủ dự án yêu cầu: lập HĐ mới thì **hỏi có tạo lịch xuất 
 - **When** kiểm quyền sửa thẳng và xóa HĐ; rồi gõ MSL cho 1 chuyến và kiểm lại
 - **Then** lúc đầu sửa thẳng được, xóa được (xóa cả 6 chuyến); sau khi chuyến có MSL ⇒ chỉ ghi bản sửa, không xóa được
 - **Assert** lần 1: sửa thẳng == true, xóa == true, chuyến bị xóa == 6; lần 2: sửa thẳng == false, `canDeleteContract.ok` == false
+
+## 0d+. v9.4 (2026-11-02, ĐÃ BUILD) — Lịch xuất hàng + Số booking, ngày đóng cont, ETD, ETA ngay trong form Lập hợp đồng
+
+Chủ dự án hỏi: "tạo Lịch xuất hàng trực tiếp khi lập hợp đồng đã có chưa — bổ sung vào form Lập hợp đồng". **Kiểm 2026-11-02:** ĐÃ CÓ (NV19, build 2026-10-31) nhưng là hộp hỏi bật ra **SAU** khi lưu, không nằm trong form; đường "Lưu & lập lệnh sản xuất" (48 LS1, commit 3dfdca0) **bỏ qua** hộp này ⇒ HĐ lập theo đường đó không có lịch tới khi người dùng nhớ vào hồ sơ tạo.
+Chủ dự án bổ sung (cùng ngày): form Lập HĐ cần có **Số booking, Ngày đóng cont, ETD, ETA**. Bốn ô này là của **từng chuyến** (mỗi cont một booking, một bộ ngày tàu — đúng ô của Ghi chuyến NV7), không phải của HĐ ⇒ đặt trên **từng chuyến của lịch** trong form; HĐ 1 cont = 1 chuyến ⇒ gõ một lần.
+
+**NV19 v2 — Lên lịch xuất hàng ngay lúc lập HĐ · owner U1** (không thêm user / cross-user).
+- **Start:** U1 đang lập HĐ MỚI (không áp cho Sửa / Ghi bản sửa — lịch của HĐ đã có tạo ở hồ sơ như NV19 (b)).
+- **Input:** các ô đang gõ của form: ngày ký, hạn giao muộn nhất, số cont, loại cont, cảng đích, tổng kg dòng hàng. Mỗi chuyến của lịch: tháng, kg, và **tùy chọn** Số booking · Ngày đóng cont · ETD · ETA.
+- **Flow:** form dựng sẵn danh sách chuyến dự kiến theo R39 từ các ô trên, **dựng lại theo ô khi U1 chưa sửa tay**; U1 chọn Có / Không tạo lịch, sửa tháng / kg, thêm / bỏ chuyến → lưu HĐ (Lưu hợp đồng hoặc Lưu & lập lệnh sản xuất) ⇒ HĐ + bản 0 + N chuyến ghi **cùng một lần lưu, một Hoàn tác**.
+- **Output:** như NV19 (N chuyến `open`; chuyến nào có booking / ngày thì ghi kèm các ô đó — chuyến đó KHÔNG còn trống theo R41; mục chứng từ bước 5 theo R6, 1 dòng nhật ký "Tạo lịch xuất hàng"). Hộp hỏi sau khi lưu **không** bật nữa với HĐ mới (đã trả lời trong form). Hồ sơ HĐ vẫn có "Tạo lịch xuất hàng" khi chưa có chuyến (NV19 b).
+- **End:** HĐ mở ở chặng Đính kèm; lịch tháng hiện N chuyến; đi đường Lưu & lập lệnh thì vẫn sang Lệnh sản xuất như cũ.
+
+**Luật:**
+- **R42 — Lịch trong form Lập HĐ.** Mặc định **Có** tạo lịch. Danh sách tự dựng lại theo R39 mỗi khi ngày ký / hạn giao / số cont / tổng kg đổi, **cho tới khi U1 sửa tay** một chuyến (tháng, kg, thêm, bỏ); từ đó giữ bản U1 sửa, có lệnh "dựng lại theo hợp đồng". Chọn Có ⇒ cần ≥ 1 chuyến, mỗi chuyến có tháng hợp lệ (thiếu ⇒ báo lỗi, không lưu); Σ kg lệch tổng HĐ ⇒ cảnh báo, vẫn lưu (như R39). Chọn Không ⇒ 0 chuyến, không hỏi lại sau khi lưu. Nháp form giữ cả lựa chọn + danh sách đang sửa (quy tắc 17).
+- **R43 — Booking, ngày tàu trên chuyến của lịch.** Bốn ô tùy chọn, mỗi chuyến một bộ: Số booking · Ngày đóng cont · ETD · ETA. Luật như Ghi chuyến: thứ tự ngày Ngày đóng ≤ ETD ≤ ETA (R8, `validateShipment`) — sai ⇒ báo lỗi đúng chuyến, không lưu; tháng của chuyến = tháng ngày đóng, chưa có thì tháng ETD, chưa có thì tháng kế hoạch (R1, `shipmentMonth`) ⇒ gõ ngày đóng / ETD thì tháng của chuyến đi theo ngày đó. Số booking **không** kiểm trùng (Ghi chuyến hiện cũng không kiểm — giữ một luật cho cả hai chỗ; muốn cảnh báo trùng thì thêm cho cả Ghi chuyến, việc riêng). **Hệ quả R41:** chuyến đã có booking / ngày không còn trống ⇒ HĐ không "Sửa hợp đồng" thẳng được nữa (dùng Ghi bản sửa) và không xóa được (chỉ hủy) — người dùng được báo ngay dưới các ô này. File booking (ba-spec 60) **không** đính trong form Lập HĐ — đính ở chuyến sau (OUT, giữ form gọn, file cần hộp tải riêng).
+- R39, R40, R41 giữ nguyên.
+
+**Flow optimization log:** (a) giữ hộp hỏi sau khi lưu — loại: đường Lưu & lập lệnh bỏ qua, người dùng không thấy lịch lúc đang gõ số cont / hạn giao · (b) bắt buộc tạo lịch — loại: HĐ khung chưa rõ lịch vẫn phải lập được · (c) **chọn: mục lịch trong form, mặc định Có, dựng lại theo ô tới khi sửa tay** — một chỗ, một lần lưu, áp cho cả hai nút lưu.
+
+**Flow optimization log (R43):** (a) ô booking / ngày ở cấp HĐ — loại: HĐ nhiều cont có nhiều booking, ghi ở HĐ thì sai đơn vị và phải chép tay sang chuyến · (b) bắt buộc nhập 4 ô khi lập HĐ — loại: lúc ký thường chưa có booking, ngày tàu · (c) **chọn: 4 ô tùy chọn trên từng chuyến của lịch**, dùng lại luật Ghi chuyến (R1, R8) ⇒ không thêm luật ngày mới.
+
+**Build (2026-11-02, sau commit 81df805 của ba-spec 62):** luật thuần `formSchedule` · `validateScheduleRows` + `ScheduleRow` có 4 ô tùy chọn + `shipmentsFromSchedule` chép 4 ô (`lib/exportPlanning.ts`, test AC-78…80 ở `exportPlanning.test.ts`). Khối `ScheduleRowsEditor` (`ShipmentDialogs.tsx`) dùng chung cho mục **6 Lịch xuất hàng** của form Lập HĐ (`ContractFormDialog`, chỉ lập mới; nháp giữ lựa chọn + bản sửa tay) và hộp Tạo lịch ở hồ sơ (nay cũng gõ được 4 ô). `saveContract` ghi HĐ + chuyến + mục chứng từ một lần, một Hoàn tác, không bật hộp hỏi lịch nữa. Thử sandbox: 2 cont 1.000 kg ⇒ 2 chuyến × 500 kg; gõ booking chuyến 1 rồi đổi 2 → 3 cont ⇒ giữ 2 chuyến + "Đang dùng lịch đã sửa tay" + dòng nhắc R41; Lưu ⇒ HĐ + 2 chuyến (chuyến 1 BKG-V94-01), không hộp hỏi lịch; Hoàn tác ⇒ 0 HĐ, 0 chuyến; 360 px × 130 % không tràn (sửa thiếu `grid-cols-[minmax(0,1fr)]`); sandbox khôi phục đúng.
+
+### AC-78 — Lưu HĐ mới kèm lịch, một lần Hoàn tác · Maps to: NV19 v2, R42 · Test: unit + e2e
+- **Given** form Lập HĐ: ký 02/11/2026, hạn giao 31/01/2027, 3 cont, 3 dòng tổng 30.000 kg; mục lịch để mặc định
+- **When** chọn Lưu hợp đồng (hoặc Lưu & lập lệnh sản xuất)
+- **Then** ghi HĐ + 3 chuyến `open` tháng 12/2026 · 12/2026 · 01/2027 (R39: rải 2 tháng, chuyến i ở tháng đầu + ⌊i × 1 / 2⌋) × 10.000 kg; hộp hỏi lịch sau khi lưu không bật; Hoàn tác gỡ cả HĐ lẫn 3 chuyến
+- **Assert** số chuyến mới == 3 · Σ plannedKg == 30000 · hộp lịch sau lưu mở == 0 lần · sau Hoàn tác: HĐ == 0, chuyến == 0
+
+### AC-80 — Booking, ngày tàu ghi vào đúng chuyến; sai thứ tự ngày thì chặn · Maps to: NV19 v2, R43 · Test: unit + e2e
+- **Given** form Lập HĐ 2 cont, hạn giao 31/01/2027; chuyến 1 gõ booking "BKG123", ngày đóng 05/12/2026, ETD 08/12/2026, ETA 20/12/2026; chuyến 2 để trống
+- **When** lưu; lần khác gõ chuyến 1 ETD 08/12, ETA 01/12 rồi lưu
+- **Then** lần 1: chuyến 1 có đủ 4 ô, tháng 12/2026, không còn trống (HĐ không sửa thẳng được nữa); chuyến 2 còn trống. Lần 2: báo lỗi ETA ở chuyến 1, không lưu gì
+- **Assert** lần 1: chuyến 1 `bookingNo` == "BKG123" · `shipmentMonth` == "2026-12" · `isBlankShipment` == false · `canEditContractDirectly` == false; chuyến 2 `isBlankShipment` == true. Lần 2: lỗi "ETA phải sau hoặc bằng ETD" == 1 · HĐ mới == 0
+
+### AC-79 — Dựng lại theo ô tới khi sửa tay; chọn Không thì 0 chuyến · Maps to: NV19 v2, R42 · Test: unit
+- **Given** form Lập HĐ 2 cont; đổi số cont 2 → 4
+- **When** chưa sửa tay ⇒ đọc danh sách; sửa kg chuyến 1 rồi đổi số cont 4 → 5; cuối cùng chọn Không và lưu
+- **Then** lần 1 có 4 chuyến; lần 2 vẫn 4 chuyến (giữ bản sửa tay); lưu với Không ⇒ không ghi chuyến nào
+- **Assert** lần 1 rows.length == 4 · lần 2 rows.length == 4 và kg chuyến 1 == số đã sửa · chuyến mới sau lưu == 0
 
 ## 0c. v9.2 (2026-10-30) — yêu cầu nguyên liệu của dòng hàng, tự chép sang Lệnh sản xuất
 

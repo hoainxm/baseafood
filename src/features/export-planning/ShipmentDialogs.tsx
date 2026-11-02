@@ -45,6 +45,7 @@ import {
   workingRevision,
   type ExportData,
   type ScheduleRow,
+  validateScheduleRows,
 } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import { invoiceNameLines } from "@/lib/invoiceReader";
@@ -332,10 +333,92 @@ interface ScheduleForm {
   containerCount: number | null;
   deadline: string;
   afterCreate: boolean;
-  rows: (ScheduleRow & { id: string })[];
+  rows: ScheduleRowForm[];
   initial: string;
 }
-const scheduleSnap = (f: ScheduleForm) => JSON.stringify(f.rows.map((r) => [r.planMonth, r.plannedKg]));
+const scheduleSnap = (f: ScheduleForm) => JSON.stringify(f.rows.map(({ id: _id, ...r }) => r));
+
+export type ScheduleRowForm = ScheduleRow & { id: string };
+
+/** Bỏ khóa dòng trước khi ghi. */
+export const scheduleRowsToSave = (rows: readonly ScheduleRowForm[]): ScheduleRow[] => rows.map(({ id: _id, ...r }) => r);
+
+/**
+ * Danh sách chuyến của lịch xuất hàng (NV19, ba-spec 41 R42 + R43) — dùng chung cho form Lập HĐ và hộp Tạo lịch
+ * xuất hàng: tháng + kg kế hoạch, và tùy chọn Số booking · Ngày đóng cont · ETD · ETA (ô như Ghi chuyến). Gõ ngày
+ * đóng / ETD thì tháng của chuyến đi theo ngày đó (R1).
+ */
+export function ScheduleRowsEditor({
+  rows,
+  onChange,
+  totalKg,
+  deadline,
+}: {
+  rows: readonly ScheduleRowForm[];
+  onChange: (rows: ScheduleRowForm[]) => void;
+  totalKg: number;
+  deadline: string;
+}) {
+  const setRow = (id: string, patch: Partial<ScheduleRow>) =>
+    onChange(
+      rows.map((r) => {
+        if (r.id !== id) return r;
+        const next = { ...r, ...patch };
+        const dated = next.loadingDate || next.etd;
+        return dated && ("loadingDate" in patch || "etd" in patch) ? { ...next, planMonth: dated.slice(0, 7) } : next;
+      }),
+    );
+  const sumKg = Math.round(rows.reduce((t, r) => t + (r.plannedKg ?? 0), 0) * 100) / 100;
+  const off = totalKg > 0 && Math.abs(sumKg - totalKg) >= 0.005;
+  const hasShipmentInfo = rows.some((r) => r.bookingNo?.trim() || r.loadingDate || r.etd || r.eta);
+  // grid-cols-[minmax(0,1fr)] ở MỌI khung lưới: thiếu nó cột tự giãn theo nội dung ⇒ ô tràn khỏi hộp ở 360px × 130%.
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
+      {rows.map((r, i) => (
+        <div key={r.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 rounded-lg border border-border bg-card p-3">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <Field label={`Chuyến ${i + 1} · tháng kế hoạch`} required>
+              <Input type="month" value={r.planMonth} onChange={(e) => setRow(r.id, { planMonth: e.target.value })} aria-required />
+            </Field>
+            <NumberField label="Kg kế hoạch" unit="kg" value={r.plannedKg} onChange={(v) => setRow(r.id, { plannedKg: v })} />
+            <Button variant="danger" size="sm" onClick={() => onChange(rows.filter((x) => x.id !== r.id))} title={`Bỏ chuyến ${i + 1} khỏi lịch.`}>
+              <Trash2 className="mr-1 h-4 w-4" aria-hidden />
+              Bỏ
+            </Button>
+          </div>
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Số booking" hint="Trống = chờ booking">
+              <Input value={r.bookingNo ?? ""} onChange={(e) => setRow(r.id, { bookingNo: e.target.value })} />
+            </Field>
+            <DateField label="Ngày đóng cont" value={r.loadingDate ?? ""} onChange={(v) => setRow(r.id, { loadingDate: v })} />
+            <DateField label="ETD" value={r.etd ?? ""} onChange={(v) => setRow(r.id, { etd: v })} />
+            <DateField label="ETA" value={r.eta ?? ""} onChange={(v) => setRow(r.id, { eta: v })} />
+          </div>
+        </div>
+      ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onChange([...rows, { id: newId(), planMonth: rows.at(-1)?.planMonth ?? deadline.slice(0, 7), plannedKg: null }])}
+          title="Thêm một chuyến dự kiến vào lịch."
+        >
+          <Plus className="mr-1 h-4 w-4" aria-hidden />
+          Thêm chuyến
+        </Button>
+        <span className={`tnum text-sm ${off ? "text-warning" : "text-muted-foreground"}`}>
+          Tổng {formatNumber(sumKg)} kg{totalKg > 0 ? ` / hợp đồng ${formatNumber(totalKg)} kg` : ""}
+          {off ? " — lệch hợp đồng, vẫn tạo được" : ""}
+        </span>
+      </div>
+      {hasShipmentInfo && (
+        <p className="text-sm text-muted-foreground">
+          Chuyến đã có booking hoặc ngày thì không còn là chuyến trống: hợp đồng sẽ không sửa thẳng / xóa được nữa — sửa bằng Ghi bản sửa, bỏ bằng Hủy.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function ScheduleDialog({
   target,
@@ -370,9 +453,6 @@ export function ScheduleDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
 
-  const setRow = (id: string, patch: Partial<ScheduleRow>) => setForm((f) => (f ? { ...f, rows: f.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) } : f));
-  const sumKg = form ? Math.round(form.rows.reduce((t, r) => t + (r.plannedKg ?? 0), 0) * 100) / 100 : 0;
-  const off = form && form.totalKg > 0 && Math.abs(sumKg - form.totalKg) >= 0.005;
 
   const close = () => {
     draft.cancel();
@@ -380,14 +460,10 @@ export function ScheduleDialog({
   };
   const save = () => {
     if (!form) return;
-    const errs: FieldError[] = [];
-    if (!form.rows.length) errs.push({ field: "Chuyến", message: "Lịch cần ít nhất 1 chuyến" });
-    form.rows.forEach((r, i) => {
-      if (!/^\d{4}-\d{2}$/.test(r.planMonth)) errs.push({ field: `Chuyến ${i + 1}`, message: `Chuyến ${i + 1}: chọn tháng kế hoạch` });
-    });
+    const errs: FieldError[] = validateScheduleRows(form.rows).map((i) => ({ field: i.label, message: i.message }));
     setErrors(errs);
     if (errs.length) return;
-    if (onSave(form.contractId, form.rows.map((r) => ({ planMonth: r.planMonth, plannedKg: r.plannedKg })))) draft.done();
+    if (onSave(form.contractId, scheduleRowsToSave(form.rows))) draft.done();
   };
 
   const deadlineText = form?.deadline ? form.deadline.slice(0, 7).split("-").reverse().join("/") : "";
@@ -435,42 +511,7 @@ export function ScheduleDialog({
             {form.totalKg > 0 ? ` · ${formatNumber(form.totalKg)} kg chia đều` : ""}
             {deadlineText ? ` · rải từ tháng sau ngày ký tới hạn giao ${deadlineText}` : ""}. Sửa tháng, kg từng chuyến nếu cần.
           </p>
-          <div className="grid gap-2">
-            {form.rows.map((r, i) => (
-              <div key={r.id} className="grid items-end gap-3 rounded-lg border border-border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                <Field label={`Chuyến ${i + 1} · tháng kế hoạch`} required>
-                  <Input type="month" value={r.planMonth} onChange={(e) => setRow(r.id, { planMonth: e.target.value })} aria-required />
-                </Field>
-                <NumberField label="Kg kế hoạch" unit="kg" value={r.plannedKg} onChange={(v) => setRow(r.id, { plannedKg: v })} />
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => setForm((f) => (f ? { ...f, rows: f.rows.filter((x) => x.id !== r.id) } : f))}
-                  title={`Bỏ chuyến ${i + 1} khỏi lịch.`}
-                >
-                  <Trash2 className="mr-1 h-4 w-4" aria-hidden />
-                  Bỏ
-                </Button>
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setForm((f) => (f ? { ...f, rows: [...f.rows, { id: newId(), planMonth: f.rows.at(-1)?.planMonth ?? f.deadline.slice(0, 7), plannedKg: null }] } : f))
-              }
-              title="Thêm một chuyến dự kiến vào lịch."
-            >
-              <Plus className="mr-1 h-4 w-4" aria-hidden />
-              Thêm chuyến
-            </Button>
-            <span className={`tnum text-sm ${off ? "text-warning" : "text-muted-foreground"}`}>
-              Tổng {formatNumber(sumKg)} kg{form.totalKg > 0 ? ` / hợp đồng ${formatNumber(form.totalKg)} kg` : ""}
-              {off ? " — lệch hợp đồng, vẫn tạo được" : ""}
-            </span>
-          </div>
+          <ScheduleRowsEditor rows={form.rows} onChange={(rows) => setForm((f) => (f ? { ...f, rows } : f))} totalKg={form.totalKg} deadline={form.deadline} />
         </div>
       )}
     </FormDialog>

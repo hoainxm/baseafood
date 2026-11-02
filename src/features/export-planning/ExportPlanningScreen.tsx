@@ -44,7 +44,6 @@ import {
   isBlankShipment,
   isShipmentClosed,
   missingDocumentItems,
-  buildSchedule,
   scheduleFor,
   scheduleGate,
   shipmentsFromSchedule,
@@ -258,17 +257,33 @@ export default function ExportPlanningScreen() {
     // Bản vừa ghi có hiệu lực ngay (không còn bước duyệt HĐ) ⇒ chuyến còn mở nhận thêm mục chứng từ bản mới yêu cầu (R6).
     const prevI = d.items;
     const added = p.mode === "create" ? [] : syncDocumentItems(p.contract.id, prevI, { ...d, contracts: nextC, revisions: nextR });
-    if (added.length) store.saveItems([...prevI, ...added]);
+    // Lịch xuất hàng gõ ngay trong form Lập HĐ (ba-spec 41 R42 + R43): N chuyến + mục chứng từ bước 5 (R6) ghi CÙNG lần lưu, chung Hoàn tác.
+    const prevS = d.shipments;
+    const t = p.revision.terms;
+    const scheduled = p.mode === "create" && p.schedule?.length
+      ? shipmentsFromSchedule(p.schedule, { contractId: p.contract.id, kind: KIND_FROM_TEXT(t.containerType), portOfDischarge: t.portOfDischarge }, newId, new Date().toISOString())
+      : [];
+    if (scheduled.length && !store.saveShipments([...prevS, ...scheduled])) {
+      undoFiles();
+      store.saveRevisions(prevR);
+      store.saveContracts(prevC);
+      return false;
+    }
+    const scheduleItems = scheduled.flatMap((s) => missingDocumentItems(s.id, t, prevI, newId));
+    if (added.length || scheduleItems.length) store.saveItems([...prevI, ...added, ...scheduleItems]);
+    const scheduleText = scheduled.length
+      ? `lịch xuất hàng ${scheduled.length} chuyến (${[...new Set(scheduled.map((s) => shipmentMonth(s).split("-").reverse().join("/")))].join(", ")})`
+      : "";
     const what =
       p.mode === "create"
-        ? `Lập HĐ ${p.contract.contractNo} (bản 0)`
+        ? `Lập HĐ ${p.contract.contractNo} (bản 0)${scheduleText ? ` + ${scheduleText}` : ""}`
         : p.mode === "revise"
           ? `Ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo} — có hiệu lực ngay`
           : `Sửa bản ${p.revision.revisionNo} của HĐ ${p.contract.contractNo}`;
     track(p.contract.id, "", p.mode === "create" ? "create" : "update", what);
     notify.saved(
       (p.mode === "create"
-        ? `Đã lập HĐ ${p.contract.contractNo} — ${p.thenCreateOrder ? "đang mở Lập lệnh sản xuất; đính kèm hợp đồng đã ký sau ở hồ sơ HĐ" : "việc tiếp: đính kèm hợp đồng đã ký"}`
+        ? `Đã lập HĐ ${p.contract.contractNo}${scheduleText ? ` + ${scheduleText}` : ""} — ${p.thenCreateOrder ? "đang mở Lập lệnh sản xuất; đính kèm hợp đồng đã ký sau ở hồ sơ HĐ" : "việc tiếp: đính kèm hợp đồng đã ký"}`
         : p.mode === "revise"
           ? `Đã ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo} — có hiệu lực ngay`
           : `Đã lưu sửa HĐ ${p.contract.contractNo}`) +
@@ -276,32 +291,19 @@ export default function ExportPlanningScreen() {
       undoTracked(p.contract.id, "", what, () => {
         store.saveContracts(prevC);
         store.saveRevisions(prevR);
-        if (added.length) store.saveItems(prevI);
+        if (scheduled.length) store.saveShipments(prevS);
+        if (added.length || scheduleItems.length) store.saveItems(prevI);
         learned.undo();
         undoFiles();
       }),
     );
     setContractForm(null);
     if (p.mode === "create" && p.thenCreateOrder) {
-      // "Lưu & lập lệnh sản xuất" (ba-spec 48 LS1): sang Lệnh sản xuất, hộp lập lệnh chọn sẵn HĐ vừa lưu. Lịch xuất hàng
-      // tạo sau ở hồ sơ HĐ (Thao tác khác → Tạo lịch xuất hàng).
+      // "Lưu & lập lệnh sản xuất" (ba-spec 48 LS1): sang Lệnh sản xuất, hộp lập lệnh chọn sẵn HĐ vừa lưu (lịch đã ghi cùng HĐ).
       navigate(`/planning-production?new=1&contract=${encodeURIComponent(p.contract.id)}`);
     } else if (p.mode === "create") {
+      // Lịch đã trả lời ngay trong form (R42) ⇒ không bật hộp hỏi lịch sau khi lưu nữa.
       setParam({ contract: p.contract.id, shipment: "" });
-      // NV19: HĐ mới ⇒ hỏi tạo lịch xuất hàng đi kèm (R39 dựng theo bản vừa lưu — `d` chưa kịp có HĐ này).
-      if (can.create) {
-        const t = p.revision.terms;
-        const totalKg = contractTotals(p.revision.lines).kg;
-        setScheduleTarget({
-          contractId: p.contract.id,
-          contractNo: p.contract.contractNo,
-          rows: buildSchedule({ signedOn: p.contract.signedOn, latestShipmentDate: t.latestShipmentDate, containerCount: t.containerCount, totalKg, today }),
-          totalKg,
-          containerCount: t.containerCount,
-          deadline: t.latestShipmentDate,
-          afterCreate: true,
-        });
-      }
     }
     return true;
   };

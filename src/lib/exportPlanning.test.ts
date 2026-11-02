@@ -6,6 +6,8 @@ import {
   EMPTY_EXPORT_DATA,
   buildSchedule,
   canEditContractDirectly,
+  formSchedule,
+  validateScheduleRows,
   isBlankShipment,
   openShipmentsOf,
   scheduleFor,
@@ -960,6 +962,54 @@ describe("NV19 · lịch xuất hàng theo HĐ (§0d, R39–R41)", () => {
     // Có file hoặc mục Xong cũng không còn trống.
     expect(isBlankShipment({ ...d, files: [file("s2", "packaging")] }, blank[1])).toBe(false);
     expect(isBlankShipment({ ...d, items: [item("s3", "packaging", { state: "done" })] }, blank[2])).toBe(false);
+  });
+});
+
+describe("ba-spec 41 v9.4 · lịch xuất hàng + booking, ngày tàu trong form Lập HĐ (R42, R43)", () => {
+  const base = { contractId: "c", kind: "40RF" as const, portOfDischarge: "Tokyo" };
+  let n = 0;
+  const id = () => `s${++n}`;
+
+  it("AC-78: dựng 3 chuyến theo HĐ 3 cont 30.000 kg, ghi thành 3 chuyến đủ kg", () => {
+    const rows = formSchedule({ edited: false, rows: [] }, { signedOn: "2026-11-02", latestShipmentDate: "2027-01-31", containerCount: 3, totalKg: 30000, today: "2026-11-02" });
+    const created = shipmentsFromSchedule(rows, base, id, "2026-11-02T08:00:00.000Z");
+    expect(created).toHaveLength(3);
+    expect(created.map((s) => s.planMonth)).toEqual(["2026-12", "2026-12", "2027-01"]);
+    expect(created.reduce((t, s) => t + (s.plannedKg ?? 0), 0)).toBe(30000);
+    expect(validateScheduleRows(rows)).toEqual([]);
+  });
+
+  it("AC-79: chưa sửa tay ⇒ dựng lại theo số cont; đã sửa tay ⇒ giữ bản sửa", () => {
+    const p = (containerCount: number) => ({ signedOn: "2026-11-02", latestShipmentDate: "2027-03-31", containerCount, totalKg: 8000, today: "2026-11-02" });
+    expect(formSchedule({ edited: false, rows: [] }, p(4))).toHaveLength(4);
+    const edited = buildSchedule(p(4)).map((r, i) => (i === 0 ? { ...r, plannedKg: 1500 } : r));
+    const kept = formSchedule({ edited: true, rows: edited }, p(5));
+    expect(kept).toHaveLength(4);
+    expect(kept[0].plannedKg).toBe(1500);
+    // Chọn Không tạo lịch ⇒ form gửi 0 chuyến ⇒ không ghi chuyến nào.
+    expect(shipmentsFromSchedule([], base, id, "x")).toHaveLength(0);
+  });
+
+  it("AC-80: booking + ngày tàu vào đúng chuyến, chuyến đó hết trống; sai thứ tự ngày ⇒ lỗi đúng chuyến", () => {
+    const rows = [
+      { planMonth: "2027-01", plannedKg: 10000, bookingNo: " BKG123 ", loadingDate: "2026-12-05", etd: "2026-12-08", eta: "2026-12-20" },
+      { planMonth: "2027-01", plannedKg: 10000 },
+    ];
+    expect(validateScheduleRows(rows)).toEqual([]);
+    const [s1, s2] = shipmentsFromSchedule(rows, base, id, "2026-11-02T08:00:00.000Z");
+    expect(s1.bookingNo).toBe("BKG123");
+    expect([s1.loadingDate, s1.etd, s1.eta]).toEqual(["2026-12-05", "2026-12-08", "2026-12-20"]);
+    expect(shipmentMonth(s1)).toBe("2026-12");
+    const d = data({ contracts: [contract("c")], revisions: [revision("r0", "c", 0)], shipments: [s1, s2] });
+    expect(isBlankShipment(d, s1)).toBe(false);
+    expect(isBlankShipment(d, s2)).toBe(true);
+    expect(canEditContractDirectly(d, "c")).toBe(false);
+
+    const bad = validateScheduleRows([{ planMonth: "2026-12", plannedKg: 1, etd: "2026-12-08", eta: "2026-12-01" }]);
+    expect(bad).toHaveLength(1);
+    expect(bad[0].message).toBe("ETA phải sau hoặc bằng ETD");
+    expect(bad[0].label).toBe("Chuyến 1 · ETA");
+    expect(validateScheduleRows([])[0].message).toMatch(/ít nhất 1 chuyến/);
   });
 });
 

@@ -46,17 +46,24 @@ export const EXPORT_OPTION_LISTS: readonly ExportOptionListMeta[] = [
     description: "Tiền tệ của hợp đồng (đơn giá, tiền dòng hàng, tiền về). Ghi mã 3 chữ.",
     example: "VD: USD",
   },
+  {
+    kind: "bank-account",
+    title: "Tài khoản ngân hàng",
+    entityName: "tài khoản ngân hàng",
+    description: "Tài khoản thụ hưởng in dưới \"Please make TT to:\" trên invoice. Tên để chọn; Ghi chú là khối in (mỗi dòng một dòng: Bank name, Account number, SWIFT CODE, Beneficiary, địa chỉ).",
+    example: "VD: MSB Vũng Tàu · 08001370022669",
+  },
 ];
 
 export const exportOptionListMeta = (kind: ExportOptionListKind): ExportOptionListMeta =>
   EXPORT_OPTION_LISTS.find((l) => l.kind === kind) ?? EXPORT_OPTION_LISTS[0];
 
-const seed = (kind: ExportOptionListKind, slug: string, name: string, sortOrder: number): ExportOption => ({
+const seed = (kind: ExportOptionListKind, slug: string, name: string, sortOrder: number, note = ""): ExportOption => ({
   id: `${kind}-${slug}`,
   listKind: kind,
   name,
   sortOrder,
-  note: "",
+  note,
 });
 
 /** Danh sách khởi tạo — TRÙNG migration 0095 (cùng id). Dùng khi máy chủ chưa chạy 0095 / chưa có mục nào. */
@@ -80,6 +87,28 @@ export const EXPORT_OPTION_SEED: readonly ExportOption[] = [
   seed("currency", "usd", "USD", 10),
   seed("currency", "jpy", "JPY", 20),
   seed("currency", "eur", "EUR", 30),
+  // Mig 0096 (ba-spec 63) — 3 tài khoản thụ hưởng chị Vi gửi 2026-11-02 (file 236/26, PDF 275/26, Zalo).
+  seed("bank-account", "msb-vung-tau", "MSB Vũng Tàu · 08001370022669", 10, [
+    "Bank name: VIETNAM MARITIME COMMERCIAL JOINT STOCK BANK VUNG TAU BRANCH",
+    "Account number: 08001370022669",
+    "SWIFT CODE: MCOBVNVX007",
+    "Beneficiary: BASEAFOOD 1 CO., LTD",
+    "Full address of Beneficiary: 321 Tran Xuan Do St., Quarter 2, Ba Ria Ward, Ho Chi Minh City, S.R.Viet Nam",
+  ].join("\n")),
+  seed("bank-account", "vcb-ba-ria", "Vietcombank Bà Rịa · 0081371242432", 20, [
+    "Bank name: JOINT STOCK COMMERCIAL BANK FOR FOREIGN TRADE OF VIET NAM, BA RIA BRANCH",
+    "Account number: 0081371242432",
+    "SWIFT CODE: BFTVVNVX115",
+    "Beneficiary: BASEAFOOD 1 CO.,LTD",
+    "Address of Beneficiary: 321 Tran Xuan Do St., Quarter 2, Ba Ria Ward, Ho Chi Minh City, Viet Nam",
+  ].join("\n")),
+  seed("bank-account", "vietinbank-brvt", "VietinBank BRVT · 110000206680", 30, [
+    "Bank name: VIETNAM JOINT STOCK COMMERCIAL BANK FOR INDUSTRY AND TRADE, BRVT BRANCH",
+    "Account number: 110000206680",
+    "SWIFT CODE: ICBVVNVX880",
+    "Beneficiary: BASEAFOOD 1 CO.,LTD",
+    "Address of Beneficiary: 321 Tran Xuan Do St., Quarter 2, Ba Ria Ward, Ho Chi Minh City, Viet Nam",
+  ].join("\n")),
 ];
 
 /** So khớp tên: không phân hoa thường, gộp khoảng trắng. Có dấu và không dấu là HAI tên. */
@@ -90,8 +119,14 @@ const tidy = (v: string) => v.trim().replace(/\s+/g, " ");
  * Bảng mà màn dùng: chưa chạy 0095 hoặc chưa có mục nào ⇒ danh sách khởi tạo (ghi lần đầu sẽ lưu cả
  * danh sách khởi tạo, cùng id với migration nên không nhân đôi).
  */
-export function effectiveExportOptions(rows: readonly ExportOption[], isAvailable: boolean): ExportOption[] {
-  return !isAvailable || rows.length === 0 ? [...EXPORT_OPTION_SEED] : [...rows];
+export function effectiveExportOptions(rows: readonly ExportOption[], isAvailable: boolean, banksAvailable = true): ExportOption[] {
+  // Máy chủ chưa chạy 0096 ⇒ KHÔNG đưa tài khoản ngân hàng vào bảng: ghi một danh sách khác sẽ upsert cả
+  // bảng, dòng `bank-account` bị ràng buộc 0095 chặn ⇒ kẹt hàng chờ.
+  const seedRows = banksAvailable ? EXPORT_OPTION_SEED : EXPORT_OPTION_SEED.filter((o) => o.listKind !== "bank-account");
+  if (!isAvailable || rows.length === 0) return [...seedRows];
+  // Danh sách thêm sau 0095 (tài khoản ngân hàng — 0096) chưa có mục nào ⇒ bù danh sách khởi tạo của nó.
+  const lacking = banksAvailable && !rows.some((r) => r.listKind === "bank-account");
+  return [...rows, ...(lacking ? EXPORT_OPTION_SEED.filter((o) => o.listKind === "bank-account") : [])];
 }
 
 /** Mục của một danh sách, theo `sortOrder` rồi tên. */

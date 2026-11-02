@@ -10,7 +10,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
-import { useCustomerProductNameStore, useCustomers, useExportBookingFilesAvailable, useExportDeferralsAvailable, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
+import { useCustomerProductNameStore, useCustomers, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportOptionStore, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
+import { lineUnits, shipmentLinesOf } from "@/lib/exportInvoice";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNamesDialog";
 import { useAuth } from "@/lib/auth";
@@ -22,6 +23,8 @@ import {
   applyProductMapping,
   contractClosure,
   documentKindLabel,
+  documentItems,
+  shipmentKindLabel,
   finalReviewGate,
   missingAttachmentKinds,
   validateDeferral,
@@ -55,7 +58,7 @@ import {
   workingRevision,
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
-import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportStepItem } from "@/types";
+import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportShipmentLine, type ExportStepItem } from "@/types";
 import { BarChart3, CalendarDays, FilePlus2, FileText, FolderLock, ListChecks } from "lucide-react";
 import { ExportCatalogView, normalizeExportCatalogList } from "./ExportCatalogView";
 import { ContractDossier } from "./ContractDossier";
@@ -80,6 +83,8 @@ import {
   type ReasonTarget,
 } from "./RecordDialogs";
 import { ShipmentPanel } from "./ShipmentPanel";
+import { LoadingCountDialog, ShipmentLinesDialog, type LoadingCountTarget, type ShipmentLinesTarget } from "./ShipmentGoods";
+import { downloadInvoiceDocument, invoiceDocumentFor } from "./invoiceDocument";
 import {
   LoadingUploadDialog,
   ScheduleDialog,
@@ -180,6 +185,9 @@ export default function ExportPlanningScreen() {
   const [scheduleTarget, setScheduleTarget] = useState<ScheduleTarget | null>(null);
   const [itemTarget, setItemTarget] = useState<StepItemTarget | null>(null);
   const [loadingTarget, setLoadingTarget] = useState<LoadingUploadTarget | null>(null);
+  const [linesTarget, setLinesTarget] = useState<ShipmentLinesTarget | null>(null);
+  const [countTarget, setCountTarget] = useState<LoadingCountTarget | null>(null);
+  const exportOptions = useExportOptionStore().options;
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null);
   const [mappingTarget, setMappingTarget] = useState<ProductMappingTarget | null>(null);
   const [reasonTarget, setReasonTarget] = useState<ReasonTarget | null>(null);
@@ -436,6 +444,52 @@ export default function ExportPlanningScreen() {
     return true;
   };
 
+  /* ---------- Hàng của chuyến · số thực đóng · tải invoice (ba-spec 63) ---------- */
+
+  const goodsLabel = (s: ExportShipment) => [s.lotCode && `Lô ${s.lotCode}`, shipmentKindLabel(s.kind), s.containerNo].filter(Boolean).join(" · ") || "Chuyến chưa có mã lô";
+
+  const openShipmentLines = (s: ExportShipment) => {
+    const other: Record<string, number> = {};
+    for (const l of d.shipmentLines ?? []) {
+      if (l.shipmentId === s.id) continue;
+      const sh = d.shipments.find((x) => x.id === l.shipmentId);
+      if (!sh || sh.status === "cancelled" || sh.contractId !== s.contractId) continue;
+      other[l.contractLineId] = (other[l.contractLineId] ?? 0) + (lineUnits(l) ?? 0);
+    }
+    setLinesTarget({ shipment: s, label: goodsLabel(s), contractLines: workingRevision(d, s.contractId)?.lines ?? [], lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), otherShipmentUnits: other });
+  };
+
+  const saveShipmentLines = (s: ExportShipment, lines: ExportShipmentLine[]): boolean => {
+    const prev = d.shipmentLines ?? [];
+    if (!store.saveShipmentLines([...prev.filter((l) => l.shipmentId !== s.id), ...lines])) return false;
+    const what = `Cập nhật hàng của chuyến ${shipName(s)} — ${lines.length} dòng`;
+    track(s.contractId, s.id, "update", what);
+    notify.saved(`Đã lưu hàng của chuyến (${lines.length} dòng)`, undoTracked(s.contractId, s.id, what, () => store.saveShipmentLines(prev)));
+    setLinesTarget(null);
+    return true;
+  };
+
+  const openLoadingCount = (s: ExportShipment) => setCountTarget({ shipment: s, label: goodsLabel(s), lines: shipmentLinesOf(d.shipmentLines ?? [], s.id) });
+
+  const saveLoadingCount = (lines: ExportShipmentLine[]): boolean => {
+    const prev = d.shipmentLines ?? [];
+    const byId = new Map(lines.map((l) => [l.id, l]));
+    if (!store.saveShipmentLines(prev.map((l) => byId.get(l.id) ?? l))) return false;
+    const s = d.shipments.find((x) => x.id === lines[0]?.shipmentId);
+    const what = `Điền số thực đóng của chuyến ${shipName(s)}`;
+    track(s?.contractId ?? "", s?.id ?? "", "update", what);
+    notify.saved("Đã lưu số thực đóng", undoTracked(s?.contractId ?? "", s?.id ?? "", what, () => store.saveShipmentLines(prev)));
+    setCountTarget(null);
+    return true;
+  };
+
+  const downloadShipmentInvoice = (s: ExportShipment) => {
+    const c = d.contracts.find((x) => x.id === s.contractId);
+    if (!c) return;
+    const ci = documentItems(d, s.id).find((x) => x.docKind === "commercial-invoice");
+    void downloadInvoiceDocument(invoiceDocumentFor(d, s, c, customers.find((x) => x.id === c.customerId), ci, exportOptions));
+  };
+
   const saveLoadingFiles = (rows: ExportFile[]): boolean => {
     const prev = d.files;
     if (!store.saveFiles([...prev, ...rows])) return false;
@@ -602,8 +656,10 @@ export default function ExportPlanningScreen() {
   const doDeleteShipment = (s: ExportShipment) => {
     const prevS = d.shipments;
     const prevI = d.items;
+    const prevL = d.shipmentLines ?? [];
     if (!store.saveShipments(prevS.filter((x) => x.id !== s.id))) return;
     store.saveItems(prevI.filter((x) => x.shipmentId !== s.id));
+    if (prevL.some((l) => l.shipmentId === s.id)) store.saveShipmentLines(prevL.filter((l) => l.shipmentId !== s.id));
     setParam({ shipment: "" }, true);
     const what = `Xóa chuyến ${shipName(s)}`;
     track(s.contractId, s.id, "delete", what);
@@ -612,6 +668,7 @@ export default function ExportPlanningScreen() {
       undoTracked(s.contractId, s.id, what, () => {
         store.saveShipments(prevS);
         store.saveItems(prevI);
+        if (prevL.some((l) => l.shipmentId === s.id)) store.saveShipmentLines(prevL);
       }),
     );
   };
@@ -773,8 +830,12 @@ export default function ExportPlanningScreen() {
           canUpload={loadingCan.create && filesAvailable}
           onUpload={setLoadingTarget}
           onPreview={setPreview}
+          shipmentLines={store.shipmentLinesAvailable ? (d.shipmentLines ?? []) : []}
+          canCount={loadingCan.create}
+          onCount={openLoadingCount}
         />
         <LoadingUploadDialog target={loadingTarget} recordedBy={recordedBy} onClose={() => setLoadingTarget(null)} onSave={saveLoadingFiles} />
+        <LoadingCountDialog target={countTarget} recordedBy={recordedBy} onClose={() => setCountTarget(null)} onSave={saveLoadingCount} />
         <ExportFilePreview file={preview} onClose={() => setPreview(null)} />
       </div>
     );
@@ -982,6 +1043,10 @@ export default function ExportPlanningScreen() {
               onOpenItem={setItemTarget}
               onUploadLoading={setLoadingTarget}
               bookingFilesEnabled={bookingFilesEnabled}
+              goodsEnabled={store.shipmentLinesAvailable}
+              onEditLines={() => dossier.selected && openShipmentLines(dossier.selected)}
+              onLoadingCount={() => dossier.selected && openLoadingCount(dossier.selected)}
+              onDownloadInvoice={() => dossier.selected && downloadShipmentInvoice(dossier.selected)}
               onPayment={setPaymentTarget}
               onDeletePayment={deletePayment}
               onPreview={setPreview}
@@ -1027,6 +1092,8 @@ export default function ExportPlanningScreen() {
         canDelete={can.update}
         invoiceCatalog={{ products, setProducts, customerNames: nameStore.names }}
         canViewPrice={can["view-price"]}
+        customers={customers}
+        invoiceComposeEnabled={store.shipmentLinesAvailable && can["view-price"]}
         onClose={() => setItemTarget(null)}
         onSave={saveItem}
         onRemoveFile={removeFile}
@@ -1034,6 +1101,8 @@ export default function ExportPlanningScreen() {
         onPreview={setPreview}
       />
       <LoadingUploadDialog target={loadingTarget} recordedBy={recordedBy} onClose={() => setLoadingTarget(null)} onSave={saveLoadingFiles} />
+      <ShipmentLinesDialog target={linesTarget} onClose={() => setLinesTarget(null)} onSave={saveShipmentLines} />
+      <LoadingCountDialog target={countTarget} recordedBy={recordedBy} onClose={() => setCountTarget(null)} onSave={saveLoadingCount} />
       <PaymentDialog target={paymentTarget} recordedBy={recordedBy} onClose={() => setPaymentTarget(null)} onSave={savePayment} />
       <ReasonDialog target={reasonTarget} onClose={() => setReasonTarget(null)} />
       <ProductMappingDialog target={mappingTarget} data={d} products={products} setProducts={setProducts} customerNames={nameStore.names} onClose={() => setMappingTarget(null)} onSave={saveProductMapping} />

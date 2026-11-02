@@ -34,7 +34,10 @@ import {
 } from "@/lib/exportPlanning";
 import { formatDateVN, formatMoney } from "@/lib/format";
 import type { ExportContract, ExportFile, ExportItemState, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
-import { Ban, Camera, ClipboardList, FilePlus2, Pencil, Plus, RotateCcw, Send, Trash2, Wallet } from "lucide-react";
+import { Ban, Boxes, Camera, ClipboardCheck, ClipboardList, Download, FilePlus2, Pencil, Plus, RotateCcw, Send, Trash2, Wallet } from "lucide-react";
+import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
+import { ShipmentLineSummary } from "./ShipmentGoods";
+import { loadingCountText } from "./shipmentGoodsLogic";
 import { FileList, StateTag, StepDot, StepStepper, type PreviewTarget } from "./parts";
 import { progressText, shipmentProgress, stepMissing } from "./progress";
 import type { LoadingUploadTarget, StepItemTarget } from "./ShipmentDialogs";
@@ -133,6 +136,10 @@ export function ShipmentPanel({
   onPreview,
   onRemoveFile,
   bookingFilesEnabled,
+  goodsEnabled,
+  onEditLines,
+  onLoadingCount,
+  onDownloadInvoice,
 }: {
   data: ExportData;
   shipment: ExportShipment;
@@ -154,6 +161,11 @@ export function ShipmentPanel({
   onRemoveFile: (f: ExportFile) => void;
   /** Máy chủ đã chạy 0094 + có kho file ⇒ đính được file booking (ba-spec 60 R6). */
   bookingFilesEnabled: boolean;
+  /** Máy chủ đã chạy 0096 ⇒ có khối Hàng của chuyến, Số thực đóng, Tải invoice (ba-spec 63). */
+  goodsEnabled: boolean;
+  onEditLines: () => void;
+  onLoadingCount: () => void;
+  onDownloadInvoice: () => void;
 }) {
   const opts = { filesAvailable };
   const label = [shipment.lotCode && `Lô ${shipment.lotCode}`, shipmentKindLabel(shipment.kind), shipment.containerNo].filter(Boolean).join(" · ");
@@ -306,6 +318,28 @@ export function ShipmentPanel({
     );
   };
 
+  const goods = shipmentLinesOf(data.shipmentLines ?? [], shipment.id);
+  const counted = loadingCountSummary(goods);
+  /** Hàng Số lượng thực đóng (bước 4) — kho điền sau khi đóng cont; KHÔNG chặn bước 4 xong (ba-spec 63 R4). */
+  const loadingCountRow = () => (
+    <ChecklistRow
+      key="loading-count"
+      label="Số lượng thực đóng"
+      state={counted.complete ? "done" : counted.filledCount ? "in-progress" : "not-started"}
+      actions={
+        !isCancelled &&
+        goods.length > 0 &&
+        (can.loadingCreate || can.update) && (
+          <Button size="sm" variant={counted.filledCount ? "edit" : "default"} onClick={onLoadingCount} title="Đóng cont xong: ghi số kiện thực đã đóng của từng dòng hàng.">
+            <ClipboardCheck className="mr-1 h-4 w-4" aria-hidden />
+            {counted.filledCount ? "Sửa số thực đóng" : "Điền số thực đóng"}
+          </Button>
+        )
+      }
+    >
+      <span className="tnum">{loadingCountText(goods)}</span>
+    </ChecklistRow>
+  );
   const docs = documentItems(data, shipment.id);
   const payments = data.payments.filter((p) => p.shipmentId === shipment.id).sort((a, b) => a.date.localeCompare(b.date));
   const goTo = (n: StepNo) => document.getElementById(`ship-step-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -378,6 +412,37 @@ export function ShipmentPanel({
         )}
       </section>
 
+      {goodsEnabled && (
+        <section data-tour="shipment-goods" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 rounded-xl border border-border bg-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="grid min-w-0 flex-1 basis-56 gap-0.5">
+              <p className="flex items-center gap-2 font-semibold">
+                <Boxes className="h-4 w-4" aria-hidden />
+                Hàng của chuyến
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {goods.length
+                  ? `${goods.length} dòng · kế hoạch ${formatNumber(counted.plannedUnits)} kiện${counted.filledCount ? ` · thực đóng ${formatNumber(counted.loadedUnits)} (${counted.filledCount}/${goods.length} dòng)` : ""}`
+                  : "Chưa nhập chi tiết — invoice, packing list và số thực đóng của kho cần danh sách này."}
+              </p>
+            </div>
+            {canWrite && (
+              <Button size="sm" variant={goods.length ? "edit" : "default"} onClick={onEditLines} title="Chọn dòng hàng của hợp đồng đóng vào chuyến này, ghi số kiện, kg cả bì, hạn dùng.">
+                <Boxes className="mr-1 h-4 w-4" aria-hidden />
+                {goods.length ? "Sửa hàng của chuyến" : "Nhập hàng của chuyến"}
+              </Button>
+            )}
+          </div>
+          {goods.length > 0 && (
+            <div className="grid min-w-0 border-t border-border">
+              {goods.map((l) => (
+                <ShipmentLineSummary key={l.id} line={l} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       <StepBlock n={1} state={progress.steps[1]} summary={summaryOf(1)} isCurrent={progress.next === 1}>
         <p className="py-3 text-sm text-muted-foreground">
           {settled(progress.steps[1])
@@ -420,6 +485,7 @@ export function ShipmentPanel({
         </ChecklistRow>
         {can.view && bookingRow()}
         {LOADING_STEPS.map((st) => (st === "loading-plan" || st === "loading-photos" ? uploadRow(st) : singleRow(st, 4)))}
+        {goodsEnabled && loadingCountRow()}
       </StepBlock>
 
       <StepBlock n={5} state={progress.steps[5]} summary={summaryOf(5)} isCurrent={progress.next === 5}>
@@ -428,6 +494,15 @@ export function ShipmentPanel({
             Thực xuất (theo Commercial Invoice): {formatNumber(actuals.cartons)} thùng · {formatNumber(actuals.kg)} kg
             {can.viewPrice ? ` · ${formatMoney(actuals.amount)} ${currency}` : ""}
           </p>
+        )}
+        {goodsEnabled && goods.length > 0 && can.viewPrice && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border py-3">
+            <span className="text-sm text-muted-foreground">Bộ Invoice · Packing list lập từ hàng của chuyến (tài khoản, đơn giá, ghi chú riêng sửa ở mục Commercial Invoice).</span>
+            <Button size="sm" variant="outline" onClick={onDownloadInvoice} title="Tải file Excel gồm Invoice, Packing list (và Expiry date list khi có hạn dùng) của chuyến này.">
+              <Download className="mr-1 h-4 w-4" aria-hidden />
+              Tải Invoice · Packing list
+            </Button>
+          </div>
         )}
         {!docs.length && <p className="py-3 text-sm text-muted-foreground">Chưa có mục chứng từ.</p>}
         {docs.map((d) => {

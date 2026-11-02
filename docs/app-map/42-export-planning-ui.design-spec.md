@@ -29,6 +29,8 @@ ttl_days: 90
 > **Oracle giao diện** — hành vi / luật ở ba-spec [41](41-export-planning.ba-spec.md) (KHÔNG đổi ở đây). Luật UI chung: [`src/design-system/README.md`](../../src/design-system/README.md) (canonical).
 > **Vì sao có doc này (chủ dự án 2026-10-20):** bản đầu "chưa trực quan": 6 chấm số không nói thiếu gì, hồ sơ 6 nút ngang không rõ việc tiếp, bước chuyến là thẻ lồng hộp lồng nút, form dài một mạch và lệch hàng.
 
+> **2026-11-02 (ba-spec [63](63-export-invoice-from-app.ba-spec.md)):** hồ sơ chuyến có khối **Hàng của chuyến** ngay dưới thẻ chuyến (danh sách dòng: tên · quy cách · kế hoạch → thực đóng · kg; nút Nhập / Sửa hàng của chuyến); bước 4 thêm hàng **Số lượng thực đóng** (nút Điền / Sửa số thực đóng — cả ở màn người đóng hàng); bước 5 có dải **Tải Invoice · Packing list**; hộp mục Commercial Invoice có khung **Lập invoice từ app** (tài khoản nhận tiền, điều kiện giao, đơn giá từng dòng, thông tin riêng của khách, tổng + nút Tải file). Lưới các khung dùng `grid-cols-[minmax(0,1fr)]`, nút chữ dài cho xuống dòng — 360px × 130% không tràn.
+
 ## Thang người dùng
 
 | Loại | Muốn thấy gì | Sản phẩm truyền tải | Thúc đẩy action tiếp |

@@ -29,8 +29,17 @@ describe("ba-spec 62 — danh sách chọn Xuất khẩu", () => {
 
   it("AC-1: bảng có mục ⇒ dùng bảng; chưa chạy 0095 ⇒ dùng danh sách khởi tạo", () => {
     const one = [{ id: "a", listKind: "loading-port" as const, name: "Cái Mép", sortOrder: 10, note: "" }];
-    expect(effectiveExportOptions(one, true)).toHaveLength(1);
+    // Bảng có mục mà chưa có tài khoản ngân hàng (0096 chạy sau) ⇒ bù 3 tài khoản khởi tạo.
+    expect(effectiveExportOptions(one, true)).toHaveLength(4);
+    expect(effectiveExportOptions(one, true, false)).toHaveLength(1);
     expect(effectiveExportOptions(one, false)).toHaveLength(EXPORT_OPTION_SEED.length);
+  });
+
+  it("ba-spec 63 AC-5: 3 tài khoản ngân hàng; chưa chạy 0096 ⇒ không đưa tài khoản vào bảng (khỏi kẹt hàng chờ)", () => {
+    const banks = exportOptionsOf(effectiveExportOptions([], true), "bank-account");
+    expect(banks.map((b) => b.id)).toEqual(["bank-account-msb-vung-tau", "bank-account-vcb-ba-ria", "bank-account-vietinbank-brvt"]);
+    expect(banks[2].note.split("\n")[2]).toBe("SWIFT CODE: ICBVVNVX880");
+    expect(exportOptionsOf(effectiveExportOptions([], true, false), "bank-account")).toHaveLength(0);
   });
 
   it("AC-2: thêm mới không tạo trùng, không lẫn danh sách", () => {

@@ -83,10 +83,12 @@ import type {
   ExportDocumentKindRow,
   GoodsType,
   ExportOption,
+  ExportShipmentLine,
   ExportShipment,
   ExportStepItem,
 } from "@/types";
 import { EXPORT_OPTION_SEED } from "./exportOptions";
+import { shipmentLineFromContract } from "./exportInvoice";
 import { calculateBalancing } from "@/lib/balancingCalc";
 import { RETAIL_WAREHOUSE, FG_WAREHOUSE } from "@/lib/inventory";
 import { listDatesInRange, subtractDays } from "@/lib/dataFlow";
@@ -164,6 +166,9 @@ export interface DemoBundle {
   goodsTypes: GoodsType[];
   /** Danh sách chọn Xuất khẩu (mig 0095) — đúng danh sách khởi tạo, để thử thêm / sửa / xóa tại ô. */
   exportOptions: ExportOption[];
+  /** Hàng của chuyến (mig 0096, ba-spec 63) — chép dòng HĐ của bản mới nhất vào mỗi chuyến chưa hủy, chia
+   *  đều số kiện theo số chuyến; chuyến đã có số cont ⇒ kho đã điền số thực đóng (bằng kế hoạch). */
+  exportShipmentLines: ExportShipmentLine[];
   /** Nhập khẩu (mig 0082) — bộ nhỏ dựng sẵn (lib/importPlanningDemo.ts): 3 HĐ, 4 lần nhập đủ trạng thái;
    *  file là đường dẫn GIỮ CHỖ. NCC nước ngoài của bộ được thêm vào `suppliers`. */
   /** Danh mục NCC nhập khẩu (mig 0083) — riêng, không thêm vào Đại lý. */
@@ -781,6 +786,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
       { id: "frozen-fish", name: "Cá đông", sortOrder: 70, note: "" },
     ],
     exportOptions: EXPORT_OPTION_SEED.map((o) => ({ ...o })),
+    exportShipmentLines: demoShipmentLines(exportDemo),
     importSuppliers: importDemo.suppliers,
     importContracts: importDemo.contracts,
     importContractLines: importDemo.lines,
@@ -820,6 +826,26 @@ export function countBundle(g: DemoBundle): { table: keyof DemoBundle; count: nu
 }
 
 /** Tên hàng theo khách của bộ demo: chạy đúng luật trích xuất từ chứng từ (R26) trên các bản HĐ demo, id tất định. */
+function demoShipmentLines(pack: Pick<ReturnType<typeof buildExportDemo>, "shipments" | "revisions">): ExportShipmentLine[] {
+  const out: ExportShipmentLine[] = [];
+  const latest = new Map<string, (typeof pack.revisions)[number]>();
+  for (const r of pack.revisions) {
+    const cur = latest.get(r.contractId);
+    if (!cur || r.revisionNo > cur.revisionNo) latest.set(r.contractId, r);
+  }
+  for (const sh of pack.shipments) {
+    const rev = latest.get(sh.contractId);
+    if (!rev || sh.status === "cancelled") continue;
+    const count = pack.shipments.filter((x) => x.contractId === sh.contractId && x.status !== "cancelled").length || 1;
+    rev.lines.forEach((cl, i) => {
+      const planned = cl.quantity == null ? null : Math.max(1, Math.round(cl.quantity / count));
+      const l = shipmentLineFromContract(cl, { id: `${sh.id}-hang-${i + 1}`, shipmentId: sh.id, contractId: sh.contractId, sortOrder: (i + 1) * 10, plannedUnits: planned });
+      out.push(sh.containerNo ? { ...l, loadedUnits: planned, loadedBy: "Thủ kho (demo)", loadedAt: `${sh.loadingDate || sh.planMonth + "-01"}T10:00:00.000Z` } : l);
+    });
+  }
+  return out;
+}
+
 function demoCustomerNames(pack: Pick<ReturnType<typeof buildExportDemo>, "contracts" | "revisions">): CustomerProductName[] {
   let k = 0;
   const out: CustomerProductName[] = [];

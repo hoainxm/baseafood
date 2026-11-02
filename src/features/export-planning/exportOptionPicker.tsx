@@ -40,6 +40,7 @@ export function useExportOptionPicker() {
     "discharge-port": useQuickCatalogEdit("exportOption", exportOptionsOf(all, "discharge-port"), listEditor("discharge-port"), { matchBy: "name" }),
     "container-type": useQuickCatalogEdit("exportOption", exportOptionsOf(all, "container-type"), listEditor("container-type"), { matchBy: "name" }),
     currency: useQuickCatalogEdit("exportOption", exportOptionsOf(all, "currency"), listEditor("currency"), { matchBy: "name" }),
+    "bank-account": useQuickCatalogEdit("exportOption", exportOptionsOf(all, "bank-account"), listEditor("bank-account"), { matchBy: "name" }),
   };
   const [deleting, setDeleting] = useState<ExportOption | null>(null);
 
@@ -89,6 +90,7 @@ export function useExportOptionPicker() {
       {editors["discharge-port"].dialog}
       {editors["container-type"].dialog}
       {editors.currency.dialog}
+      {editors["bank-account"].dialog}
       <ConfirmDelete
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}
@@ -100,5 +102,5 @@ export function useExportOptionPicker() {
     </>
   );
 
-  return { fieldProps, dialogs, isAvailable: store.isAvailable };
+  return { fieldProps, dialogs, isAvailable: store.isAvailable, options: all };
 }

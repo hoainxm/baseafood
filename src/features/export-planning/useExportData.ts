@@ -13,6 +13,7 @@ import {
   useExportDeadlineExtensions,
   useExportFiles,
   useExportPayments,
+  useExportShipmentLineStore,
   useExportShipments,
   useExportStepItems,
   useProductionOrderShipments,
@@ -39,13 +40,14 @@ export function useExportData() {
   const { activities, setActivities: saveActivities, canLog } = useExportActivityStore();
   const { kinds: documentKinds, setKinds: saveDocumentKinds, isAvailable: documentKindsAvailable } = useExportDocumentKindStore();
   // Lệnh sản xuất (mig 0088, ba-spec 48 R6): chuyến gắn lệnh đã phát hành ⇒ bước 2 xong. Chưa chạy 0088 ⇒ rỗng, luật cũ.
+  const { lines: shipmentLines, setLines: saveShipmentLines, isAvailable: shipmentLinesAvailable } = useExportShipmentLineStore();
   const [productionOrders] = useProductionOrders();
   const [orderLinks] = useProductionOrderShipments();
   const issuedOrderShipmentIds = useMemo(() => issuedShipmentIds(productionOrders, orderLinks), [productionOrders, orderLinks]);
 
   const data: ExportData = useMemo(
-    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds }),
-    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds],
+    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines }),
+    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines],
   );
 
   return {
@@ -60,6 +62,9 @@ export function useExportData() {
     saveItems: ro(saveItems),
     saveFiles: ro(saveFiles),
     savePayments: ro(savePayments),
+    /** Hàng của chuyến (mig 0096) — `shipmentLinesAvailable` false ⇒ máy chủ chưa chạy 0096, không ghi. */
+    saveShipmentLines: ro(saveShipmentLines),
+    shipmentLinesAvailable,
     saveActivities: ro(saveActivities),
     canLog,
     /** Danh mục loại chứng từ (mig 0081) — ô chọn Loại chứng từ thêm / sửa qua đây. */

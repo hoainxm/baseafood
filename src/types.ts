@@ -1234,7 +1234,8 @@ export interface ExportDocumentKindRow {
 }
 
 /** Danh sách chọn của Xuất khẩu (mig 0095, ba-spec 62) — HĐ / chuyến lưu CHỮ của tùy chọn, không lưu id. */
-export type ExportOptionListKind = "loading-port" | "discharge-port" | "container-type" | "currency";
+/** `bank-account` (mig 0096, ba-spec 63): tài khoản thụ hưởng in trên invoice — `name` để chọn, `note` = khối in. */
+export type ExportOptionListKind = "loading-port" | "discharge-port" | "container-type" | "currency" | "bank-account";
 
 export interface ExportOption {
   id: string;
@@ -1406,6 +1407,53 @@ export interface ExportShipment {
   createdAt: string;
 }
 
+/**
+ * Hàng đóng vào MỘT chuyến (mig 0096, ba-spec 63) — chi tiết từng mặt hàng thay cho tổng thùng. KHÔNG có
+ * giá: người đóng hàng đọc được bảng này và điền `loadedUnits` sau khi đóng cont (R10 ba-spec 41).
+ * Đơn giá lấy theo dòng HĐ, sửa ở phần lập invoice (`InvoiceComposition.unitPrices`).
+ */
+export interface ExportShipmentLine {
+  id: string;
+  shipmentId: string;
+  contractId: string;
+  sortOrder: number;
+  /** Dòng HĐ đã chọn (bản đang dùng) — lấy đơn giá; "" = dòng thêm tay. */
+  contractLineId: string;
+  productId: string;
+  /** Tên hàng in trên invoice (chữ tiếng Anh của HĐ / tên theo khách). */
+  description: string;
+  size: string;
+  packing: string;
+  unitKind: "carton" | "bundle";
+  cartonsPerUnit: number;
+  netKgPerCarton: number | null;
+  /** Kg cả bì của MỘT kiện (packing list: "12kgs/14kgs"). */
+  grossKgPerUnit: number | null;
+  /** Số kiện (thùng / bó) kế hoạch đóng. */
+  plannedUnits: number | null;
+  /** Số kiện THỰC ĐÓNG — kho điền sau khi đóng cont; có số ⇒ invoice / packing list dùng số này. */
+  loadedUnits: number | null;
+  loadedBy: string;
+  loadedAt: string;
+  /** Hạn dùng in ở Expiry date list, VD "2028.01". */
+  expiry: string;
+  note: string;
+}
+
+/** Phần lập invoice của mục Commercial Invoice (mig 0096) — người đóng hàng không đọc được. */
+export interface InvoiceComposition {
+  /** `export_options.id` loại `bank-account`. */
+  bankOptionId: string;
+  /** Đơn giá theo id dòng hàng của chuyến; thiếu ⇒ đơn giá dòng HĐ. */
+  unitPrices: Record<string, number>;
+  /** Trống ⇒ "<incoterm> <cảng đích>" của HĐ / chuyến. */
+  tradeTerms: string;
+  /** Dòng chữ dưới tiêu đề bảng, VD "Produced in Vietnam". */
+  originNote: string;
+  /** Thông tin riêng khách yêu cầu — mỗi dòng một hàng in, ô cách nhau bằng Tab (dán từ Excel) hoặc "|". */
+  specialNotes: string;
+}
+
 /** Bước / mục của chuyến (bước 2 → 5). Bước 1 theo hợp đồng, bước 6 = tiền về (bảng riêng). */
 export type ExportStep =
   | "production-order"
@@ -1439,6 +1487,8 @@ export interface ExportStepItem {
   amount: number | null;
   /** B/L: ngày on board ⇒ tính trễ hạn. */
   onBoardDate: string;
+  /** Commercial Invoice lập từ app (mig 0096). `undefined` = chưa lập / máy chủ chưa có cột ⇒ không gửi cột. */
+  invoiceComposition?: InvoiceComposition;
   createdAt: string;
 }
 

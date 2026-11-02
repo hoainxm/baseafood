@@ -49,6 +49,7 @@ import {
   Combobox,
   NumberField,
   notify,
+  Textarea,
   type FieldError,
   type CatalogField,
   type CatalogFilter,
@@ -582,7 +583,17 @@ export function buildCatalogFields(
       example: "VD: Tokyo, Japan",
       hint: "Chữ hiện ở ô chọn và ghi vào hợp đồng / chuyến. Hợp đồng đã ghi giữ nguyên chữ cũ khi đổi tên hay xóa mục.",
     },
-    { key: "note", label: "Ghi chú", hideOnMobile: true, example: "VD: Cảng chính của khách Nhật" },
+    {
+      key: "note",
+      label: "Ghi chú",
+      hideOnMobile: true,
+      example: "VD: Cảng chính của khách Nhật",
+      hint: "Tài khoản ngân hàng: đây là khối in trên invoice — mỗi dòng một dòng (Bank name, Account number, SWIFT CODE, Beneficiary, địa chỉ).",
+      span: "full",
+      // Nhiều dòng: khối ngân hàng in nguyên từng dòng dưới "Please make TT to:" (ba-spec 63).
+      render: (value, change) => <Textarea rows={3} value={value} onChange={(e) => change(e.target.value)} />,
+      renderValue: (r) => <span className="whitespace-pre-line">{r.note}</span>,
+    },
   ];
 
   return {

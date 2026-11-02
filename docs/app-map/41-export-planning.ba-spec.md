@@ -35,6 +35,10 @@ status: ba-spec v9.1 (2026-10-29: danh mục Loại chứng từ — §0b) · v9
 > **Nguồn đã chốt:** kế hoạch [`spec/xuat-khau-phong-ke-hoach.md`](../spec/xuat-khau-phong-ke-hoach.md) (§9 chốt 11 câu 2026-10-20) · quy trình [`QTI-KH-01`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (luật KH-R1…R16) · phân quyền [`spec/role-permissions.md`](../spec/role-permissions.md) · tài liệu công ty [`40-documents.md`](40-documents.md) (khuôn file + RLS).
 
 
+## 0e. v9.5 (2026-11-02, ĐÃ BUILD) — Hàng của chuyến, số thực đóng của kho, lập Invoice / Packing list từ app
+
+Chi tiết + AC ở [63](63-export-invoice-from-app.ba-spec.md). Đổi so với các mục dưới: chuyến có thêm **hàng chi tiết** (chọn từ dòng HĐ, không giá); bước 4 có hàng **Số lượng thực đóng** do người đóng hàng điền (KHÔNG chặn bước 4 — R4 của 63; R10 ở đây giữ nguyên: người đóng hàng vẫn không thấy giá); mục Commercial Invoice (bước 5) có phần **Lập invoice từ app** — tải một file Invoice · Packing list (+ Expiry date list). Thực xuất (R7) vẫn là 3 ô tổng của mục; ô trống thì tự điền theo invoice lập. Mig `0096` chưa chạy ⇒ ẩn cả phần mới.
+
 ## 0d. v9.3 (2026-10-31) — tạo lịch xuất hàng ngay khi lập hợp đồng · ✅ ĐÃ BUILD 2026-10-31
 
 Chủ dự án yêu cầu: lập HĐ mới thì **hỏi có tạo lịch xuất hàng đi kèm không**, thay vì đợi đủ hồ sơ mới Ghi chuyến. Lý do: HĐ mới chỉ hiện "chưa lên chuyến" ở tháng hạn giao, Phòng KH không thấy trước tháng nào xuất bao nhiêu cont. Chốt 2026-10-31 (3 câu, cả 3 theo đề xuất): chia theo số cont, rải đều · HĐ chưa có chuyến thì tạo lịch được về sau, không cần đủ hồ sơ · chuyến kế hoạch còn trống không chặn Sửa hợp đồng.

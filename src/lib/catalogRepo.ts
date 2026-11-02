@@ -76,6 +76,7 @@ import {
   CUSTOMER_PRODUCT_NAME_TABLE,
   EXPORT_DOCUMENT_KIND_TABLE,
   EXPORT_OPTION_TABLE,
+  EXPORT_SHIPMENT_LINE_TABLE,
   GOODS_TYPE_TABLE,
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
@@ -440,6 +441,18 @@ export function useExportDocumentKindStore() {
   const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
   return { kinds, setKinds, isAvailable, isLoading: meta.status === "loading" && kinds.length === 0 };
 }
+/** Hàng của chuyến xuất (mig 0096, ba-spec 63) — dùng qua `useExportShipmentLineStore`. */
+export const useExportShipmentLines = () => useTable(EXPORT_SHIPMENT_LINE_TABLE);
+
+/**
+ * Hàng của chuyến + cờ `isAvailable`: có máy chủ mà chưa chạy 0096 ⇒ không ghi (ẩn khối Hàng của chuyến,
+ * Số thực đóng, Lập invoice) — khỏi kẹt hàng chờ. Cờ này cũng là cờ của cột `invoice_composition`.
+ */
+export function useExportShipmentLineStore() {
+  const [lines, setLines, meta] = useExportShipmentLines();
+  const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
+  return { lines, setLines, isAvailable, isLoading: meta.status === "loading" && lines.length === 0 };
+}
 /** Danh sách chọn Xuất khẩu (mig 0095, ba-spec 62) — dùng qua `useExportOptionStore`. */
 export const useExportOptions = () => useTable(EXPORT_OPTION_TABLE);
 
@@ -450,7 +463,9 @@ export const useExportOptions = () => useTable(EXPORT_OPTION_TABLE);
 export function useExportOptionStore() {
   const [rows, setRows, meta] = useExportOptions();
   const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
-  const options = useMemo(() => effectiveExportOptions(rows, isAvailable), [rows, isAvailable]);
+  // Tài khoản ngân hàng cần 0096 (nới ràng buộc list_kind) — cùng migration với bảng hàng của chuyến.
+  const { isAvailable: banksAvailable } = useExportShipmentLineStore();
+  const options = useMemo(() => effectiveExportOptions(rows, isAvailable, banksAvailable), [rows, isAvailable, banksAvailable]);
   return { options, setOptions: setRows, isAvailable, isLoading: meta.status === "loading" && rows.length === 0 };
 }
 /** Danh mục Loại hàng (mig 0089) — dùng qua `useGoodsTypeStore`. */

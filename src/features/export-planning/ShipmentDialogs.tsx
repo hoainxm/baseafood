@@ -49,10 +49,11 @@ import {
 } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import { invoiceNameLines } from "@/lib/invoiceReader";
-import type { CustomerProductName, ExportContractLine, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem, Product } from "@/types";
+import type { Customer, CustomerProductName, ExportContractLine, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem, Product } from "@/types";
 import { CalendarPlus, Camera, ClipboardList, Container, Plus, Save, Trash2 } from "lucide-react";
 import { FileList, FilePicker, type PreviewTarget } from "./parts";
 import { InvoiceReadPanel, type InvoiceReadState } from "./InvoiceReadPanel";
+import { InvoiceComposePanel } from "./InvoiceComposePanel";
 
 /** Tải nhiều file lên (theo thứ tự); lỗi giữa chừng ⇒ gỡ các file đã lên rồi báo. */
 async function uploadAll(files: File[], contractId: string, area: "shipment" | "loading", prefix: string): Promise<{ path: string; fileName: string }[]> {
@@ -552,6 +553,8 @@ export function StepItemDialog({
   invoiceCatalog,
   documentKindSource,
   canViewPrice,
+  customers,
+  invoiceComposeEnabled,
   onClose,
   onSave,
   onRemoveFile,
@@ -568,6 +571,10 @@ export function StepItemDialog({
   /** Danh mục loại chứng từ (mig 0081) — ô Loại chứng từ thêm / sửa loại tại chỗ (luật 7). */
   documentKindSource: DocumentKindSource;
   canViewPrice: boolean;
+  /** Khách của HĐ — tên + địa chỉ in trên invoice lập từ app. */
+  customers: readonly Customer[];
+  /** Máy chủ đã chạy 0096 + xem được giá ⇒ có khối Lập invoice từ app (ba-spec 63). */
+  invoiceComposeEnabled: boolean;
   onClose: () => void;
   onSave: (item: ExportStepItem, newFiles: ExportFile[], isNew: boolean, extract?: InvoiceNameExtract) => boolean;
   onRemoveFile: (f: ExportFile) => void;
@@ -826,6 +833,16 @@ export function StepItemDialog({
                   currency={termsOf(data, invoiceContract.id)?.currency || "USD"}
                   contractNo={invoiceContract.contractNo}
                   readOnlyPick={!hasExportStorage}
+                />
+              )}
+              {isInvoice && invoiceContract && invoiceComposeEnabled && (
+                <InvoiceComposePanel
+                  data={data}
+                  shipment={tgt.shipment}
+                  contract={invoiceContract}
+                  customer={customers.find((c) => c.id === invoiceContract.customerId)}
+                  item={item}
+                  onPatchItem={(patch) => setForm((f) => (f ? { ...f, item: { ...f.item, ...patch } } : f))}
                 />
               )}
             </>

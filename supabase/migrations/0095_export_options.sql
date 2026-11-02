@@ -32,8 +32,9 @@ create table if not exists public.export_options (
   updated_at  timestamptz not null default now()
 );
 alter table public.export_options drop constraint if exists export_options_list_kind_check;
+-- 'bank-account' (0096, ba-spec 63) có sẵn ở đây: chạy lại 0095 SAU 0096 không vỡ vì dòng tài khoản ngân hàng.
 alter table public.export_options add constraint export_options_list_kind_check
-  check (list_kind in ('loading-port', 'discharge-port', 'container-type', 'currency'));
+  check (list_kind in ('loading-port', 'discharge-port', 'container-type', 'currency', 'bank-account'));
 create index if not exists export_options_site_kind_idx on public.export_options (site_id, list_kind);
 
 drop trigger if exists export_options_touch_updated_at on public.export_options;

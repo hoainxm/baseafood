@@ -91,6 +91,8 @@ import type {
   CustomerProductName,
   ExportDocumentKindRow,
   ExportOption,
+  ExportShipmentLine,
+  InvoiceComposition,
   ExportOptionListKind,
   GoodsType,
   ExportShipment,
@@ -2418,6 +2420,8 @@ export const EXPORT_STEP_ITEM_TABLE: TableMapping<ExportStepItem> = {
     net_kg: x.netKg,
     amount: x.amount,
     on_board_date: dateOrNull(x.onBoardDate),
+    // Mig 0096 — chỉ gửi khi đã lập invoice: máy chủ chưa có cột vẫn ghi được mục.
+    ...(x.invoiceComposition !== undefined ? { invoice_composition: x.invoiceComposition } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -2436,7 +2440,69 @@ export const EXPORT_STEP_ITEM_TABLE: TableMapping<ExportStepItem> = {
     netKg: numOrNull(r.net_kg),
     amount: numOrNull(r.amount),
     onBoardDate: s(r.on_board_date).slice(0, 10),
+    ...(r.invoice_composition && typeof r.invoice_composition === "object"
+      ? { invoiceComposition: invoiceCompositionFromRow(r.invoice_composition as Record<string, unknown>) }
+      : {}),
     createdAt: s(r.created_at),
+  }),
+};
+
+/** jsonb `invoice_composition` (mig 0096) — thiếu khóa ⇒ mặc định trống, đơn giá chỉ giữ số hữu hạn. */
+function invoiceCompositionFromRow(v: Record<string, unknown>): InvoiceComposition {
+  const prices: Record<string, number> = {};
+  if (v.unitPrices && typeof v.unitPrices === "object") {
+    for (const [k, n] of Object.entries(v.unitPrices as Record<string, unknown>)) if (typeof n === "number" && Number.isFinite(n)) prices[k] = n;
+  }
+  return { bankOptionId: s(v.bankOptionId), unitPrices: prices, tradeTerms: s(v.tradeTerms), originNote: s(v.originNote), specialNotes: s(v.specialNotes) };
+}
+
+/** Hàng của chuyến xuất (mig 0096, ba-spec 63) — không có giá; kho điền `loaded_units`. Liên kết mềm ⇒ refColumns. */
+export const EXPORT_SHIPMENT_LINE_TABLE: TableMapping<ExportShipmentLine> = {
+  table: "export_shipment_lines",
+  localKey: "bsf.export-shipment-lines.v1",
+  getKey: theoId,
+  refColumns: ["shipment_id", "contract_id", "contract_line_id", "product_id"],
+  toRow: (x) => ({
+    id: x.id,
+    shipment_id: x.shipmentId,
+    contract_id: x.contractId,
+    sort_order: Math.round(Number(x.sortOrder) || 0),
+    contract_line_id: x.contractLineId,
+    product_id: x.productId,
+    description: x.description,
+    size: x.size,
+    packing: x.packing,
+    unit_kind: x.unitKind,
+    cartons_per_unit: x.cartonsPerUnit,
+    net_kg_per_carton: x.netKgPerCarton,
+    gross_kg_per_unit: x.grossKgPerUnit,
+    planned_units: x.plannedUnits,
+    loaded_units: x.loadedUnits,
+    loaded_by: x.loadedBy,
+    loaded_at: x.loadedAt || null,
+    expiry: x.expiry,
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    shipmentId: s(r.shipment_id),
+    contractId: s(r.contract_id),
+    sortOrder: Number(r.sort_order) || 0,
+    contractLineId: s(r.contract_line_id),
+    productId: s(r.product_id),
+    description: s(r.description),
+    size: s(r.size),
+    packing: s(r.packing),
+    unitKind: s(r.unit_kind) === "bundle" ? "bundle" : "carton",
+    cartonsPerUnit: Number(r.cartons_per_unit) || 1,
+    netKgPerCarton: numOrNull(r.net_kg_per_carton),
+    grossKgPerUnit: numOrNull(r.gross_kg_per_unit),
+    plannedUnits: numOrNull(r.planned_units),
+    loadedUnits: numOrNull(r.loaded_units),
+    loadedBy: s(r.loaded_by),
+    loadedAt: s(r.loaded_at),
+    expiry: s(r.expiry),
+    note: s(r.note),
   }),
 };
 
@@ -2667,7 +2733,7 @@ export const EXPORT_DOCUMENT_KIND_TABLE: TableMapping<ExportDocumentKindRow> = {
   }),
 };
 
-const EXPORT_OPTION_KINDS: readonly ExportOptionListKind[] = ["loading-port", "discharge-port", "container-type", "currency"];
+const EXPORT_OPTION_KINDS: readonly ExportOptionListKind[] = ["loading-port", "discharge-port", "container-type", "currency", "bank-account"];
 
 /** Danh sách chọn của Xuất khẩu (mig 0095, ba-spec 62) — cảng xếp · cảng đích · loại container · tiền tệ. */
 export const EXPORT_OPTION_TABLE: TableMapping<ExportOption> = {

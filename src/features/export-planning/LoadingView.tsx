@@ -10,8 +10,11 @@ import { useState } from "react";
 import { Button, Card, CardContent, EmptyState, Field, Input, Tag, addDays } from "@/design-system";
 import { filesOfStep, shipmentKindLabel } from "@/lib/exportPlanning";
 import { formatDateVN } from "@/lib/format";
-import type { Customer, ExportContract, ExportFile, ExportShipment } from "@/types";
-import { Camera, ClipboardList, Container } from "lucide-react";
+import type { Customer, ExportContract, ExportFile, ExportShipment, ExportShipmentLine } from "@/types";
+import { Camera, ClipboardCheck, ClipboardList, Container } from "lucide-react";
+import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
+import { ShipmentLineSummary } from "./ShipmentGoods";
+import { loadingCountText } from "./shipmentGoodsLogic";
 import { FileList, type PreviewTarget } from "./parts";
 import type { LoadingUploadTarget } from "./ShipmentDialogs";
 
@@ -24,6 +27,9 @@ export function LoadingView({
   canUpload,
   onUpload,
   onPreview,
+  shipmentLines,
+  canCount,
+  onCount,
 }: {
   shipments: readonly ExportShipment[];
   contracts: readonly ExportContract[];
@@ -33,6 +39,11 @@ export function LoadingView({
   canUpload: boolean;
   onUpload: (t: LoadingUploadTarget) => void;
   onPreview: (f: PreviewTarget) => void;
+  /** Hàng của chuyến (mig 0096) — rỗng khi máy chủ chưa chạy 0096. Không có giá (R10 ba-spec 41). */
+  shipmentLines: readonly ExportShipmentLine[];
+  /** Quyền `export-plans.loading` thêm ⇒ điền được số thực đóng. */
+  canCount: boolean;
+  onCount: (s: ExportShipment) => void;
 }) {
   const [query, setQuery] = useState("");
   const from = addDays(today, -7);
@@ -49,6 +60,7 @@ export function LoadingView({
     .sort((a, b) => (a.loadingDate || "9999").localeCompare(b.loadingDate || "9999"));
   const nameOf = (s: ExportShipment) => customers.find((c) => c.id === byId.get(s.contractId)?.customerId)?.name || "(khách chưa rõ)";
   const data = { files };
+  const goodsOf = (s: ExportShipment) => shipmentLinesOf(shipmentLines, s.id);
 
   return (
     <div className="grid min-w-0 gap-4">
@@ -88,6 +100,20 @@ export function LoadingView({
                   </div>
                 </div>
                 <FileList files={[...plans, ...photos]} onPreview={onPreview} caption={label} />
+                {goodsOf(s).length > 0 && (
+                  <div className="grid min-w-0 gap-2 rounded-lg border border-border px-3 py-1">
+                    {goodsOf(s).map((l) => (
+                      <ShipmentLineSummary key={l.id} line={l} />
+                    ))}
+                    <p className="tnum pb-2 text-sm">{loadingCountText(goodsOf(s))}</p>
+                    {canCount && (
+                      <Button variant={loadingCountSummary(goodsOf(s)).filledCount ? "edit" : "default"} className="mb-2" onClick={() => onCount(s)} title="Đóng cont xong: ghi số kiện thực đã đóng của từng dòng hàng.">
+                        <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
+                        {loadingCountSummary(goodsOf(s)).filledCount ? "Sửa số thực đóng" : "Điền số thực đóng"}
+                      </Button>
+                    )}
+                  </div>
+                )}
                 {canUpload && (
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button onClick={() => onUpload({ shipment: s, contractId: s.contractId, step: "loading-photos", label })} title="Chụp / chọn ảnh từng lớp hàng, seal, số cont của chuyến này.">

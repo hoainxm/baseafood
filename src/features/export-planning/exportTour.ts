@@ -244,7 +244,8 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           "Thẻ chuyến ghi booking, ngày đóng cont, ETD và ETA, tàu, số container và seal, kg kế hoạch và kg thực xuất.\n" +
           "File booking: đính bản xác nhận booking của hãng tàu ngay ở ô Số booking khi Ghi chuyến, hoặc ở hàng File booking của bước Đóng cont (booking sửa đổi thì đính thêm, bản mới nhất ở đầu). File booking chỉ để xem, không làm bước nào tự xong; người chỉ đóng hàng không thấy file này.\n" +
           "Thẻ trạng thái chuyến: Đang làm · xong k/5 bước bắt buộc (bước 1 đến 5; bước 6 không bắt buộc) · Đủ hồ sơ · Trễ hạn giao n ngày · Đã hủy.\n" +
-          "Hàng 6 bước bên dưới: chọn một bước để chuyển nhanh tới phần đó.",
+          "Hàng 6 bước bên dưới: chọn một bước để chuyển nhanh tới phần đó.\n" +
+          "Khối Hàng của chuyến (dưới thẻ): chi tiết từng mặt hàng đóng vào chuyến. Nhân viên Kế hoạch chọn Nhập hàng của chuyến, ghi số thùng / bó kế hoạch cho từng dòng hàng của hợp đồng (để trống = không đóng dòng đó), kg cả bì, hạn dùng. Kho đóng cont xong chọn Điền số thực đóng ở hàng Số lượng thực đóng của bước Đóng cont: Chưa làm = chưa điền dòng nào · Đang làm = điền một phần · Xong = mọi dòng có số; hàng này không chặn bước Đóng cont xong. Invoice và packing list lấy số thực đóng, dòng chưa điền dùng số kế hoạch.",
       }),
       dossier({
         id: "current-step",
@@ -282,6 +283,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           body:
             "Chọn Cập nhật ở hàng của mục để ghi trạng thái, số, ngày, ghi chú và đính file. Ở bước Đóng cont: Sửa số cont để điền số container và seal; Đính sơ đồ, Đính ảnh để tải file lên.\n" +
             "Commercial Invoice: đính file Excel gốc hoặc PDF xuất từ Excel thì hệ thống tự đọc — điền số, ngày, tổng thùng, kg, tiền còn trống; ô đã có số khác thì báo để chọn, không tự ghi đè; nối từng dòng với mặt hàng để trích xuất tên hàng của khách khi Lưu. Bản scan (ảnh) không đọc, vẫn đính làm bằng chứng.\n" +
+            "Lập invoice từ app (chuyến đã có hàng của chuyến): trong mục Commercial Invoice chọn Tài khoản nhận tiền, Điều kiện giao, đơn giá từng dòng (mặc định theo hợp đồng), thông tin riêng khách yêu cầu; chọn Tải file Invoice (Excel) để có một file gồm Invoice, Packing list và Expiry date list khi có hạn dùng. Ô tổng còn trống thì tự điền theo invoice lập; phần lập ghi vào sổ khi chọn Lưu.\n" +
             "Khi mọi mục của bước là Xong hoặc Không áp dụng, bước chuyển xanh và thanh tiến độ thêm một khúc.",
         }),
       );

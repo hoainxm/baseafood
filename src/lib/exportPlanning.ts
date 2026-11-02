@@ -12,6 +12,7 @@ import type {
   AttachmentDeferral,
   Customer,
   ExportContract,
+  ExportShipmentLine,
   ExportActivity,
   ExportContractApproval,
   ExportContractAttachmentKind,
@@ -247,6 +248,8 @@ export interface ExportData {
    * xong. Tính bằng `issuedShipmentIds` (lib/productionOrder.ts). Bỏ trống ⇒ chỉ luật cũ (file / dùng chung).
    */
   issuedOrderShipmentIds?: ReadonlySet<string>;
+  /** Hàng của chuyến (mig 0096, ba-spec 63). Bỏ trống ⇒ chuyến chưa có dòng hàng chi tiết. */
+  shipmentLines?: readonly ExportShipmentLine[];
 }
 
 export const EMPTY_EXPORT_DATA: ExportData = {

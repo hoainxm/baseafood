@@ -94,6 +94,32 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             <li>Chốt ngày nhập / sản xuất và gắn lô: trong ngày, sang hôm sau là quá hạn.</li>
             <li>Duyệt BTP vào kho: trong 3 ngày. Chốt kỳ cân đối: 2 ngày sau ngày cuối kỳ.</li>
             <li>Việc được giao: theo hạn người giao đặt.</li>
+            <li>
+              Kế hoạch: Quá hạn giao theo hạn giao hợp đồng; Thiếu chứng từ, Chờ thực nhập 3 ngày sau ngày hàng về; Chuyến chờ HĐ đại lý 10
+              ngày sau ngày về; Còn tiền chưa về, Hồ sơ HĐ bổ sung sau không có hạn nhưng vẫn là việc cần làm.
+            </li>
+          </Y>
+        </Section>
+        <Section title="Theo nhóm trang">
+          <Y>
+            <li>
+              Việc gom theo nhóm trang được phân cho vai của bạn: Nhập hàng · Sản xuất · Kho · Bán hàng · Kế toán · Kế hoạch · Tài liệu. Mỗi
+              nhóm ghi số việc, số quá hạn, số hôm nay.
+            </li>
+            <li>
+              Nhóm Kế hoạch tách <b>Nhập khẩu · Lệnh sản xuất · Xuất khẩu</b>. Ai có quyền sửa phần nào thì được nhắc việc phần đó (thủ kho
+              nhận Chờ thực nhập, người ghi tiền về nhận Còn tiền chưa về).
+            </li>
+          </Y>
+        </Section>
+        <Section title="Quản trị viên: tổng hợp và Xem như">
+          <Y>
+            <li>Trang của quản trị viên tổng hợp mọi việc theo nhóm trang; chọn một nhóm để xem việc.</li>
+            <li>
+              <b>Xem như</b> một Vai: thấy đúng việc vai đó được nhắc theo ma trận đang lưu ở Vai trò &amp; quyền. Xem như một Người: thấy
+              đúng như tài khoản đó (quyền chỉnh riêng, xưởng, việc được giao).
+            </li>
+            <li>Đang xem như thì chỉ xem: không giao việc, không đánh dấu Xong, không thu hồi. Chọn <b>Thoát</b> để về trang của bạn.</li>
           </Y>
         </Section>
         <Section title="Giao việc (quản đốc, kế toán)">

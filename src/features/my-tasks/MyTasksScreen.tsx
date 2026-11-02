@@ -7,10 +7,11 @@
 // Doc: docs/app-map/39-my-tasks.md. Luật tính việc ở lib/myTasks.ts (thuần, có test);
 // màn này chỉ nạp sổ, ghép quyền + phạm vi của người dùng, và ghi bảng giao việc.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Button,
   ChoiceGroup,
+  Combobox,
   FilterBar,
   SearchField,
   ConfirmAction,
@@ -21,6 +22,7 @@ import {
   notify,
   todayIso,
   toneForWorkshop,
+  type ComboboxOption,
   type StatCardData,
   type SummaryTableColumn,
   type TagVariant,
@@ -35,22 +37,44 @@ import {
   useFinishedGoodsOpeningStock,
   useMaterialOpeningStock,
   useProductionLocks,
+  useRolePermissions,
   useScraps,
+  useSupplierInvoiceStore,
   useTaskAssignments,
+  useUserPermissions,
   useUserProfiles,
 } from "@/lib/catalogRepo";
+import { useImportData } from "@/features/import-planning/useImportData";
+import { useProductionOrderData } from "@/features/production-orders/useProductionOrderData";
+import { hasExportStorage } from "@/lib/exportFileStorage";
+import { visibleOrders } from "@/lib/productionOrder";
+import { buildCodeMaps } from "@/lib/supplierInvoice";
+import { buildPlanningAttention, buildPlanningReports, buildSupplierInvoiceAttention, planningPeriodFor, type PlanningAccess } from "@/lib/dashboardAttention";
+import { can, listRoleOptions } from "@/lib/permissions";
 import { useAuth } from "@/lib/auth";
 import { useTraceData } from "@/features/shared/useTraceData";
 import { useCan, usePermissions, useScopeContext } from "@/features/shared/PermissionProvider";
 import { buildChainWarnings, type DataFlowInput } from "@/lib/dataFlow";
 import { buildDocumentWarnings, documentViewerFor } from "@/lib/documents";
 import { hasDocumentStorage } from "@/lib/documentStorage";
-import { TASKS_START_DATE, buildMyTasks, findResolvedAssignments, type MyTaskItem, type TaskUrgency } from "@/lib/myTasks";
+import {
+  TASKS_START_DATE,
+  buildMyTasks,
+  findResolvedAssignments,
+  groupTasks,
+  parseViewAs,
+  planningTaskWarnings,
+  viewAsContext,
+  viewAsParam,
+  type MyTaskItem,
+  type TaskGroup,
+  type TaskUrgency,
+} from "@/lib/myTasks";
 import { formatDateVN } from "@/lib/format";
 import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
 import { callName, recordName } from "@/lib/personName";
 import type { TaskAssignment } from "@/types";
-import { AlarmClock, ArrowRight, CalendarCheck, CheckCircle2, ClipboardList, Pencil, Send, UserPlus, Users, XCircle } from "lucide-react";
+import { AlarmClock, ArrowRight, CalendarCheck, CheckCircle2, ClipboardList, Eye, LogOut, Pencil, Send, UserPlus, Users, XCircle } from "lucide-react";
 import { AssignTaskDialog, type AssignTarget } from "./AssignTaskDialog";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildMyTasksTour } from "./myTasksTour";
@@ -90,14 +114,21 @@ export default function MyTasksScreen() {
   const navigate = useNavigate();
   const today = todayIso();
   const { profile } = useAuth();
-  const permissions = usePermissions();
-  const scopeContext = useScopeContext();
-  const canAssign = useCan("my-tasks");
+  const ownPermissions = usePermissions();
+  const ownScope = useScopeContext();
+  const ownCanAssign = useCan("my-tasks");
   // Chạy không đăng nhập (chỉ máy này) ⇒ một "người dùng" cố định của máy.
-  const userId = profile?.id ?? "local";
+  const ownUserId = profile?.id ?? "local";
+
+  // ---- Admin xem như vai / người (ba-spec 59 NV4, NV5): tính quyền THUẦN, chỉ xem, không đổi gì thật (R5) ----
+  const [params, setParams] = useSearchParams();
+  const [appRoles] = useAppRoles();
+  const [rolePermissionRows, , { status: rolePermStatus }] = useRolePermissions();
+  const [userPermissionRows] = useUserPermissions();
+  const viewAs = parseViewAs(params.get("viewAs"), ownPermissions.isAdmin);
   // Người giao việc ghi sổ bằng họ tên (ba-spec 47 R1); lời chào gọi bằng tên gọi (R2).
   const userName = recordName(profile, "Máy này");
-  const greetName = callName(profile, "Máy này");
+  const ownGreet = callName(profile, "Máy này");
 
   // ---- Nạp sổ (giống Tổng quan — cùng bộ tính cảnh báo) ----
   const { traceData, isReady: isTraceReady } = useTraceData();
@@ -111,24 +142,83 @@ export default function MyTasksScreen() {
   const [finishedOpening] = useFinishedGoodsOpeningStock();
   const [assignments, saveAssignments, { status: assignmentStatus }] = useTaskAssignments();
   const [profiles] = useUserProfiles();
+  // Ma trận ĐANG LƯU (R7) — còn nạp thì chưa tính xem như (không dùng tạm ma trận mặc định).
+  const viewCtx = useMemo(
+    () => (viewAs && rolePermStatus !== "loading" ? viewAsContext(viewAs, { appRoles, rolePermissionRows, userPermissionRows, profiles }) : null),
+    [viewAs, rolePermStatus, appRoles, rolePermissionRows, userPermissionRows, profiles],
+  );
+  const readOnly = !!viewAs;
+  const permissions = viewCtx?.permissions ?? ownPermissions;
+  const scopeContext = viewCtx?.scopeContext ?? ownScope;
+  // Xem như VAI: không phải người ⇒ không có việc giao cho / do ai giao.
+  const userId = viewAs ? (viewCtx?.userId || "__view-as-role__") : ownUserId;
+  const viewedProfile = viewAs?.kind === "user" ? profiles.find((p) => p.id === viewAs.userId) : undefined;
+  const viewRoles = viewAs?.kind === "role" ? [viewAs.roleId] : viewedProfile ? viewedProfile.roles : (profile?.roles ?? []);
+  const greetName = viewAs?.kind === "role" ? `vai ${listRoleOptions(appRoles).find((r) => r.value === viewAs.roleId)?.label ?? viewAs.roleId}` : viewedProfile ? callName(viewedProfile, viewedProfile.fullName) : ownGreet;
+  const canAssign = { create: !readOnly && ownCanAssign.create, update: !readOnly && ownCanAssign.update, delete: !readOnly && ownCanAssign.delete };
+  const setViewAs = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set("viewAs", value);
+    else next.delete("viewAs");
+    setParams(next, { replace: true });
+  };
   // Chứng nhận / hồ sơ năng lực sắp hết hạn (lib/documents.ts) — chỉ tài liệu mình xem được.
   const [documents, , { status: documentStatus }] = useCompanyDocuments();
-  const [appRoles] = useAppRoles();
 
   const d: DataFlowInput = useMemo(
     () => ({ ...traceData, scraps, dailyLocks, productionLocks, periods, balancingInputs, balancingOutputs, materialOpening, finishedOpening }),
     [traceData, scraps, dailyLocks, productionLocks, periods, balancingInputs, balancingOutputs, materialOpening, finishedOpening],
   );
   const documentViewer = useMemo(
-    () => documentViewerFor({ roles: profile?.roles ?? [], appRoles, isAdmin: permissions.isAdmin, isOffline: !hasDocumentStorage || !profile }),
-    [profile, appRoles, permissions.isAdmin],
+    () => documentViewerFor({ roles: viewRoles, appRoles, isAdmin: permissions.isAdmin, isOffline: !hasDocumentStorage || !profile }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewRoles đổi theo viewAs / profile
+    [profile, appRoles, permissions.isAdmin, viewAs?.kind, viewedProfile, viewAs],
   );
+  // ---- Việc Kế hoạch + HĐ đại lý (ba-spec 59 NV1): đọc lại hàm của Tổng quan (55), theo quyền người đang xem ----
+  const importStore = useImportData();
+  const orderStore = useProductionOrderData();
+  const invoiceStore = useSupplierInvoiceStore();
+  const planningAccess: PlanningAccess = useMemo(
+    () => ({
+      import: (can(permissions, "import-plans", "view") || can(permissions, "import-plans.receiving", "view")) && importStore.isAvailable,
+      productionOrder: can(permissions, "production-orders", "view") && orderStore.isAvailable,
+      export: can(permissions, "export-plans", "view"),
+      exportPrice: can(permissions, "export-plans", "view-price"),
+      supplierInvoice: can(permissions, "imports.invoices", "view") && invoiceStore.isAvailable,
+    }),
+    [permissions, importStore.isAvailable, orderStore.isAvailable, invoiceStore.isAvailable],
+  );
+  const planningWarnings = useMemo(() => {
+    const od = orderStore.data;
+    const canWriteOrders = can(permissions, "production-orders", "create") || can(permissions, "production-orders", "update");
+    const reports = buildPlanningReports(
+      {
+        importData: importStore.data,
+        orderData: { orders: visibleOrders(od.orders, canWriteOrders), lines: od.lines, materials: od.materials, links: od.links, receiptLines: od.receiptLines, exportData: od.exportData },
+        exportData: od.exportData,
+        customers: od.customers,
+        exportFilesAvailable: hasExportStorage,
+      },
+      planningPeriodFor(TASKS_START_DATE, today),
+      today,
+      planningAccess,
+    );
+    const invoiceRows = planningAccess.supplierInvoice
+      ? buildSupplierInvoiceAttention(
+          { trips: traceData.imports, shipments: traceData.shipments, invoices: invoiceStore.invoices, lines: invoiceStore.lines, mappedMaterials: new Set(buildCodeMaps(invoiceStore.codeMaps).materialByCode.values()) },
+          { fromDate: TASKS_START_DATE, toDate: today },
+          today,
+        )
+      : [];
+    return planningTaskWarnings([...buildPlanningAttention(reports, planningAccess), ...invoiceRows]);
+  }, [importStore.data, orderStore.data, invoiceStore.invoices, invoiceStore.lines, invoiceStore.codeMaps, traceData.imports, traceData.shipments, planningAccess, permissions, today]);
   const warnings = useMemo(
     () => [
       ...buildChainWarnings(d, { fromDate: TASKS_START_DATE, toDate: today }, today, undefined, { includeToday: true, approvalWaitDays: 0 }),
       ...buildDocumentWarnings(documents, today, documentViewer),
+      ...planningWarnings,
     ],
-    [d, today, documents, documentViewer],
+    [d, today, documents, documentViewer, planningWarnings],
   );
   const wipOperators = useMemo(() => new Map(d.wips.map((w) => [w.id, w.operator ?? ""])), [d.wips]);
   const tasks = useMemo(
@@ -140,10 +230,15 @@ export default function MyTasksScreen() {
   // xong từ máy chủ (đang tải dở thì sổ trống ⇒ tưởng đã sửa hết ⇒ đóng nhầm). Không toast:
   // không phải thao tác của người dùng; dòng hiện "Đã xong — sổ đã sửa" ở mục Tôi đã giao.
   const isAllReady =
-    isTraceReady && [scrapStatus, dailyLockStatus, productionLockStatus, periodStatus, assignmentStatus, documentStatus].every((s) => s === "ready");
+    isTraceReady &&
+    !importStore.isLoading &&
+    !orderStore.isLoading &&
+    !invoiceStore.isLoading &&
+    [scrapStatus, dailyLockStatus, productionLockStatus, periodStatus, assignmentStatus, documentStatus].every((s) => s === "ready");
   const closedRef = useRef(new Set<string>());
   useEffect(() => {
-    if (!isAllReady) return;
+    // Đang xem như ⇒ KHÔNG ghi gì (ba-spec 59 R5).
+    if (!isAllReady || readOnly) return;
     const mine = assignments.filter((a) => a.assigneeId === userId || a.assignedById === userId);
     const resolved = findResolvedAssignments(mine, warnings).filter((a) => !closedRef.current.has(a.id));
     if (!resolved.length) return;
@@ -151,7 +246,7 @@ export default function MyTasksScreen() {
     const ids = new Set(resolved.map((a) => a.id));
     const doneAt = new Date().toISOString();
     saveAssignments(assignments.map((a) => (ids.has(a.id) ? { ...a, status: "done", doneAt, note: a.note || "Tự xong — sổ đã sửa" } : a)));
-  }, [isAllReady, assignments, warnings, userId, saveAssignments]);
+  }, [isAllReady, readOnly, assignments, warnings, userId, saveAssignments]);
 
   // ---- Giao việc / sửa / xong / thu hồi ----
   const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null);
@@ -161,7 +256,10 @@ export default function MyTasksScreen() {
   const [query, setQuery] = useState("");
 
   // Hướng dẫn thao tác (ba-spec 43): chỉ dẫn, không ghi; chờ bảng giao việc nạp xong.
-  const tour = useMemo(() => buildMyTasksTour({ can: { assign: canAssign.create, editAssigned: canAssign.update } }), [canAssign.create, canAssign.update]);
+  const tour = useMemo(
+    () => buildMyTasksTour({ can: { assign: canAssign.create, editAssigned: canAssign.update, viewAs: ownPermissions.isAdmin } }),
+    [canAssign.create, canAssign.update, ownPermissions.isAdmin],
+  );
   usePageTour(assignmentStatus === "loading" ? null : tour);
 
   const upsert = (row: TaskAssignment, message: string) => {
@@ -316,6 +414,68 @@ export default function MyTasksScreen() {
       : []),
   ];
 
+  // ---- Nhóm trang (ba-spec 59 NV2, NV3) ----
+  const mineGroups = useMemo(() => groupTasks(mine), [mine]);
+  /** Admin trên trang của chính mình (không xem như): tổng hợp theo nhóm, chọn nhóm mới xem việc (NV3). */
+  const adminSummary = ownPermissions.isAdmin && !viewAs;
+  const [openGroup, setOpenGroup] = useState("");
+  const viewAsOptions: ComboboxOption[] = useMemo(
+    () => [
+      { value: "", label: "Trang của tôi (tổng hợp theo nhóm)" },
+      ...listRoleOptions(appRoles)
+        .filter((r) => r.value !== "admin")
+        .map((r) => ({ value: viewAsParam({ kind: "role", roleId: r.value }), label: `Vai: ${r.label}` })),
+      ...[...profiles]
+        .filter((p) => p.id !== ownUserId)
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, "vi"))
+        .map((p) => ({ value: viewAsParam({ kind: "user", userId: p.id }), label: `Người: ${p.fullName || p.username}` })),
+    ],
+    [appRoles, profiles, ownUserId],
+  );
+  const viewAsLabel = viewAsOptions.find((o) => o.value === params.get("viewAs"))?.label ?? "";
+  const groupHead = (g: TaskGroup) => (
+    <span className="flex min-w-0 flex-wrap items-center gap-2">
+      <span className="font-semibold text-foreground">{g.label}</span>
+      <span className="tnum text-sm text-muted-foreground">{g.items.length} việc</span>
+      {g.overdue > 0 && <Tag variant="error">{g.overdue} quá hạn</Tag>}
+      {g.today > 0 && <Tag variant="warning">{g.today} hôm nay</Tag>}
+    </span>
+  );
+  const groupBlocks = (groups: readonly TaskGroup[]) => (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
+      {groups.map((g) => (
+        <div key={g.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
+          {groupHead(g)}
+          <SummaryTable rows={g.items} columns={columns("mine")} getKey={(r) => r.id} rowMarkKey={`my-tasks|mine|${g.key}`} />
+        </div>
+      ))}
+    </div>
+  );
+  const adminGroups = (groups: readonly TaskGroup[]) => (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+      <ul className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
+        {groups.map((g) => (
+          <li key={g.key}>
+            <button
+              type="button"
+              aria-pressed={openGroup === g.key}
+              onClick={() => setOpenGroup(openGroup === g.key ? "" : g.key)}
+              title="Xem việc của nhóm trang này."
+              className={`grid w-full min-w-0 gap-1 rounded-lg border-2 px-3 py-2 text-left press-feedback ${
+                openGroup === g.key ? "border-primary bg-accent text-accent-foreground" : "border-border bg-background hover:bg-muted"
+              }`}
+            >
+              {groupHead(g)}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {groups.filter((g) => g.key === openGroup).map((g) => (
+        <SummaryTable key={g.key} rows={g.items} columns={columns("mine")} getKey={(r) => r.id} rowMarkKey={`my-tasks|mine|${g.key}`} />
+      ))}
+    </div>
+  );
+
   const table = (bucket: MyTaskItem["bucket"], rows: MyTaskItem[], empty: string) =>
     rows.length === 0 ? (
       <p className="text-sm text-muted-foreground">{empty}</p>
@@ -327,8 +487,9 @@ export default function MyTasksScreen() {
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="max-w-3xl text-base text-muted-foreground">
-          Việc cần làm của <b className="text-foreground">{greetName}</b>: việc được giao, và việc máy tự phát hiện mà bạn có quyền làm (ngày chưa
-          chốt, BTP chờ duyệt, chưa gắn lô, kỳ chưa chốt…). Sổ sửa xong thì việc tự hết. Tính từ {formatDateVN(TASKS_START_DATE)}.
+          Việc cần làm của <b className="text-foreground">{greetName}</b>: việc được giao, và việc máy tự phát hiện thuộc các nhóm trang được
+          phân (ngày chưa chốt, BTP chờ duyệt, chưa gắn lô, kỳ chưa chốt, việc Nhập khẩu · Lệnh sản xuất · Xuất khẩu…), gom theo nhóm. Sổ
+          sửa xong thì việc tự hết. Tính từ {formatDateVN(TASKS_START_DATE)}.
         </p>
         {canAssign.create && (
           <Button data-tour="my-tasks-assign-new" title="Giao một việc tay cho một người: tiêu đề, hạn và màn cần mở." onClick={() => setAssignTarget({ kind: "manual" })}>
@@ -337,6 +498,27 @@ export default function MyTasksScreen() {
           </Button>
         )}
       </div>
+
+      {ownPermissions.isAdmin && (
+        <div data-tour="my-tasks-view-as" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 rounded-xl border-2 border-border p-4">
+          <div className="max-w-xl">
+            <Combobox label="Xem như" hideRequiredMark clearable={false} value={params.get("viewAs") ?? ""} onChange={(v) => setViewAs(v || "")} options={viewAsOptions} />
+          </div>
+          {viewAs && (
+            <div role="status" className="flex min-w-0 flex-wrap items-center gap-2 rounded-lg bg-info-surface px-3 py-2 text-sm">
+              <Eye className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1">
+                Đang xem như <b>{viewAsLabel.replace(/^(Vai|Người): /, "")}</b> — chỉ xem, không giao việc hay ghi gì. Quyền theo ma trận đang lưu ở Vai trò &amp; quyền.
+                {viewCtx?.needsPerson ? " Vai này chỉ được nhắc việc của dòng mình ghi — chọn Người để thấy đúng việc của một người." : ""}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setViewAs("")} title="Thoát chế độ xem như, về trang của bạn.">
+                <LogOut className="mr-1 h-4 w-4" aria-hidden />
+                Thoát
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div data-tour="my-tasks-stats">
         <StatCardGrid cards={cards} />
@@ -347,24 +529,36 @@ export default function MyTasksScreen() {
         <SearchField label="Tra việc, người giao, người nhận" value={query} onChange={setQuery} />
       </FilterBar>
 
+      {viewAs?.kind !== "role" && (
       <Section id="assigned" tour="my-tasks-assigned" title={`Được giao cho tôi (${assigned.length})`} description="Việc người khác giao riêng cho bạn — làm theo hạn người giao đặt.">
         {table("assigned", assigned, "Không có việc nào được giao cho bạn.")}
       </Section>
+      )}
 
       <Section
         id="mine"
         tour="my-tasks-mine"
         title={`Việc theo quyền của tôi (${mine.length})`}
-        description="Việc máy phát hiện thuộc phần việc của bạn (theo quyền và xưởng của bạn) mà chưa giao riêng cho ai. Bấm Mở việc để tới đúng ngày cần sửa."
+        description={
+          adminSummary
+            ? "Mọi việc máy phát hiện của hệ thống, gom theo nhóm trang. Chọn một nhóm để xem việc; chọn Xem như để thấy đúng việc của một vai hoặc một người."
+            : "Việc máy phát hiện thuộc các nhóm trang được phân cho bạn (theo quyền và xưởng của bạn) mà chưa giao riêng cho ai. Bấm Mở việc để tới đúng ngày cần sửa."
+        }
       >
         {tasks.mine.length === 0 && tasks.assigned.length === 0 ? (
           <EmptyState icon={CheckCircle2} title="Không còn việc tồn" description="Các ngày đã chốt, lô đã gắn, không có BTP chờ duyệt thuộc phần việc của bạn." />
         ) : (
-          table("mine", mine, "Không có việc nào khớp bộ lọc.")
+          mine.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Không có việc nào khớp bộ lọc.</p>
+          ) : adminSummary ? (
+            adminGroups(mineGroups)
+          ) : (
+            groupBlocks(mineGroups)
+          )
         )}
       </Section>
 
-      {showDelegated && (
+      {showDelegated && viewAs?.kind !== "role" && (
         <Section id="delegated" tour="my-tasks-delegated" title={`Tôi đã giao (${delegated.length})`} description="Việc bạn đã giao cho người khác — để đốc. Việc đã xong hiện thêm 7 ngày.">
           {table("delegated", delegated, "Chưa giao việc nào cho người khác.")}
         </Section>

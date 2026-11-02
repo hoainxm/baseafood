@@ -23,8 +23,8 @@ import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { KIT_NAV } from "@/features/shared/AppShell";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
-import { dayPath, type FlowWarning } from "@/lib/dataFlow";
-import { canDoTask, defaultDueDate, type MyTaskItem } from "@/lib/myTasks";
+import { dayPath } from "@/lib/dataFlow";
+import { canDoTask, defaultDueDate, type MyTaskItem, type TaskKind } from "@/lib/myTasks";
 import { resolvePermissions, roleNames, scopeContextFor } from "@/lib/permissions";
 import type { TaskAssignment, UserProfile, Workshop } from "@/types";
 import { Save, Send } from "lucide-react";
@@ -44,7 +44,7 @@ interface AssignForm {
   source: TaskAssignment["source"];
   taskKey: string;
   /** Loại cảnh báo của việc máy phát hiện ("" = việc tay / không rõ) — để báo người nhận thiếu quyền. */
-  taskKind: FlowWarning["kind"] | "";
+  taskKind: TaskKind | "";
   /** Bản gốc khi sửa — nằm trong form để hộp mở lại từ nháp (sau tải lại trang) vẫn đủ. */
   original: TaskAssignment | null;
   title: string;

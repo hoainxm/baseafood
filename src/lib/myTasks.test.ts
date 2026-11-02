@@ -149,3 +149,138 @@ describe("buildMyTasks", () => {
     expect(countMyOpenAssignments(xs, "u-keeper", TODAY)).toEqual({ open: 2, overdue: 1 });
   });
 });
+
+// ---------- ba-spec 59 — Việc của tôi theo nhóm trang + admin xem như (AC-1…AC-10) ----------
+import { groupTasks, parseViewAs, planningTaskWarnings, taskGroupOf, viewAsContext, type TaskWarning } from "./myTasks";
+import type { PlanningAttention } from "./dashboardAttention";
+import type { AppRole, RolePermission, UserPermission } from "@/types";
+
+const T59 = "2026-11-02";
+const plan = (p: Partial<PlanningAttention> & Pick<PlanningAttention, "id" | "kind" | "module">): PlanningAttention => ({
+  level: "reminder",
+  title: p.id,
+  detail: "",
+  date: "2026-10-28",
+  workshop: "",
+  path: "/planning-import",
+  ...p,
+});
+const rp = (roleId: string, resource: string, action: string, scope = "all"): RolePermission => ({ id: `${roleId}|${resource}|${action}`, roleId, resource, action, scope });
+const ROLES59: AppRole[] = [
+  { id: "planner", name: "Nhân viên Kế hoạch" },
+  { id: "warehouse-keeper", name: "Thủ kho nhập hàng" },
+  { id: "frozen-workshop-manager", name: "Quản đốc xưởng Đông" },
+].map((r, i) => ({ ...r, sortOrder: i }) as unknown as AppRole);
+const ROWS59: RolePermission[] = [
+  rp("planner", "import-plans", "update"),
+  rp("planner", "export-plans", "update"),
+  rp("planner", "production-orders", "update"),
+  rp("warehouse-keeper", "import-plans.receiving", "update"),
+  rp("frozen-workshop-manager", "imports", "lock", "workshop"),
+  rp("frozen-workshop-manager", "wip", "lock", "workshop"),
+];
+const PLAN_ROWS = planningTaskWarnings([
+  plan({ id: "p1", module: "import", kind: "import-missing-docs" }),
+  plan({ id: "p2", module: "import", kind: "import-awaiting-quantity" }),
+  plan({ id: "p3", module: "production-order", kind: "order-draft-overdue", path: "/planning-production" }),
+]);
+const asRole = (roleId: string) => viewAsContext({ kind: "role", roleId }, { appRoles: ROLES59, rolePermissionRows: ROWS59, userPermissionRows: [], profiles: [] })!;
+const mineOf = (warnings: readonly TaskWarning[], ctx: ReturnType<typeof asRole>) =>
+  buildMyTasks({ warnings, assignments: [], userId: ctx.userId || "x", permissions: ctx.permissions, scopeContext: ctx.scopeContext, today: T59 }).mine;
+
+describe("ba-spec 59 AC-1 — việc Kế hoạch theo quyền từng mục", () => {
+  it("planner (import-plans.update): Thiếu chứng từ + Chờ thực nhập; thủ kho (receiving): chỉ Chờ thực nhập; Nháp quá ngày SX cần production-orders", () => {
+    const planner = mineOf(PLAN_ROWS, asRole("planner"));
+    const keeper = mineOf(PLAN_ROWS, asRole("warehouse-keeper"));
+    expect(planner.map((k) => k.kind).sort()).toEqual(["import-awaiting-quantity", "import-missing-docs", "order-draft-overdue"]);
+    expect(keeper.map((k) => k.kind)).toEqual(["import-awaiting-quantity"]);
+  });
+});
+
+describe("ba-spec 59 AC-2 — hạn việc Kế hoạch", () => {
+  it("Chờ thực nhập về 28/10 ⇒ hạn 31/10, quá hạn 2 ngày ngày 02/11", () => {
+    const k = mineOf(PLAN_ROWS, asRole("warehouse-keeper"))[0];
+    expect(k.dueDate).toBe("2026-10-31");
+    expect(k.urgency).toBe("overdue");
+    expect(k.overdueDays).toBe(2);
+  });
+  it("Còn tiền chưa về: không hạn nhưng vẫn ở Cần làm (không phải Để biết)", () => {
+    const rows = planningTaskWarnings([plan({ id: "u", module: "export", kind: "export-unpaid", date: "", path: "/planning-export" })]);
+    const ctx = viewAsContext({ kind: "role", roleId: "x" }, { appRoles: [{ id: "x", name: "x", sortOrder: 0 } as unknown as AppRole], rolePermissionRows: [rp("x", "export-plans.payments", "update")], userPermissionRows: [], profiles: [] })!;
+    const k = mineOf(rows, ctx)[0];
+    expect(k.dueDate).toBe("");
+    expect(k.urgency).toBe("upcoming");
+  });
+});
+
+describe("ba-spec 59 AC-3 — nhóm theo tài nguyên quyền", () => {
+  it("Nhập hàng · Kho · Kế hoạch/Xuất khẩu · Kế hoạch/Lệnh sản xuất", () => {
+    const ks = [
+      taskGroupOf({ kind: "imports-unlocked", path: "/imports" }),
+      taskGroupOf({ kind: "oversold", path: "/warehouse" }),
+      taskGroupOf({ kind: "export-overdue", path: "/planning-export" }),
+      taskGroupOf({ kind: "order-unlinked", path: "/planning-production" }),
+    ];
+    expect(ks.map((k) => k.group)).toEqual(["imports", "warehouse", "planning", "planning"]);
+    expect(ks.map((k) => k.page)).toEqual(["", "", "export", "production-order"]);
+  });
+  it("việc giao tay theo màn của đường mở", () => {
+    expect(taskGroupOf({ kind: "manual", path: "/planning-import?contract=c1" })).toEqual({ group: "planning", page: "import" });
+    expect(taskGroupOf({ kind: "manual", path: "" })).toEqual({ group: "other", page: "" });
+  });
+});
+
+describe("ba-spec 59 AC-4 — vai chỉ thấy nhóm được phân", () => {
+  it("planner ⇒ chỉ nhóm Kế hoạch dù có việc mọi nhóm", () => {
+    const all: TaskWarning[] = [...PLAN_ROWS, warning({ id: "c1", kind: "imports-unlocked" }), warning({ id: "c2", kind: "production-unlocked", path: "/wip" })];
+    expect([...new Set(groupTasks(mineOf(all, asRole("planner"))).map((g) => g.group))]).toEqual(["planning"]);
+  });
+});
+
+describe("ba-spec 59 AC-5 — xem như vai = người chỉ có vai đó", () => {
+  it("quản đốc xưởng Đông: cùng id việc", () => {
+    const all: TaskWarning[] = [warning({ id: "d", kind: "imports-unlocked", workshop: "Đông" }), warning({ id: "c", kind: "imports-unlocked", workshop: "Cá" }), ...PLAN_ROWS];
+    const src = { appRoles: ROLES59, rolePermissionRows: ROWS59, userPermissionRows: [], profiles: [{ id: "u1", fullName: "Người P", username: "p", roles: ["frozen-workshop-manager" as const] }] };
+    const role = viewAsContext({ kind: "role", roleId: "frozen-workshop-manager" }, src)!;
+    const user = viewAsContext({ kind: "user", userId: "u1" }, src)!;
+    expect(mineOf(all, role).map((k) => k.id)).toEqual(["d"]);
+    expect(mineOf(all, user).map((k) => k.id)).toEqual(mineOf(all, role).map((k) => k.id));
+  });
+});
+
+describe("ba-spec 59 AC-6 — xem như người gồm chỉnh riêng + việc được giao", () => {
+  it("planner bị chặn riêng production-orders.update ⇒ không việc Lệnh SX; có 1 việc giao cho người đó", () => {
+    const deny: UserPermission = { id: "q|production-orders|update", userId: "q", resource: "production-orders", action: "update", effect: "deny", scope: "all" };
+    const ctx = viewAsContext({ kind: "user", userId: "q" }, { appRoles: ROLES59, rolePermissionRows: ROWS59, userPermissionRows: [deny], profiles: [{ id: "q", fullName: "Q", username: "q", roles: ["planner"] }] })!;
+    const r = buildMyTasks({ warnings: PLAN_ROWS, assignments: [assignment({ id: "a1", source: "manual", assigneeId: "q" })], userId: ctx.userId, permissions: ctx.permissions, scopeContext: ctx.scopeContext, today: T59 });
+    expect(r.mine.filter((k) => k.group.page === "production-order")).toHaveLength(0);
+    expect(r.assigned).toHaveLength(1);
+  });
+});
+
+describe("ba-spec 59 AC-9 — tổng hợp theo nhóm cho admin", () => {
+  it("2 nhóm, đếm quá hạn đúng, thứ tự nhóm hệ thống", () => {
+    const admin = resolvePermissions({ roles: ["admin"], isAdmin: true });
+    const all: TaskWarning[] = [
+      ...PLAN_ROWS.slice(0, 2),
+      warning({ id: "i1", kind: "imports-unlocked", date: "2026-10-30" }),
+      warning({ id: "i2", kind: "imports-unlocked", date: T59 }),
+      warning({ id: "i3", kind: "changed-after-lock", date: T59 }),
+    ];
+    const mine = buildMyTasks({ warnings: all, assignments: [], userId: "admin", permissions: admin, scopeContext: scopeContextFor(["admin"]), today: T59 }).mine;
+    expect(groupTasks(mine).map((g) => ({ group: g.group, page: g.page, count: g.items.length, overdue: g.overdue }))).toEqual([
+      { group: "imports", page: "", count: 3, overdue: 1 },
+      // Thiếu chứng từ + Chờ thực nhập về 28/10 ⇒ hạn 31/10 ⇒ cả hai quá hạn ngày 02/11.
+      { group: "planning", page: "import", count: 2, overdue: 2 },
+    ]);
+  });
+});
+
+describe("ba-spec 59 AC-10 — chỉ admin có Xem như", () => {
+  it("người thường ⇒ null; admin đọc đúng vai / người; tham số hỏng ⇒ null", () => {
+    expect(parseViewAs("role:planner", false)).toBeNull();
+    expect(parseViewAs("role:planner", true)).toEqual({ kind: "role", roleId: "planner" });
+    expect(parseViewAs("user:u1", true)).toEqual({ kind: "user", userId: "u1" });
+    expect(parseViewAs("abc", true)).toBeNull();
+  });
+});

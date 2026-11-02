@@ -1,6 +1,7 @@
 > Load khi: sửa màn `/my-tasks` "Việc của tôi", luật hạn / quá hạn, giao việc (`task_assignments`), chuông header, link mở thẳng ngày (`?date=&workshop=`).
 covers: src/features/my-tasks/MyTasksScreen.tsx, src/features/my-tasks/AssignTaskDialog.tsx, src/features/my-tasks/index.ts, src/lib/myTasks.ts, supabase/migrations/0070_task_assignments.sql
-last_verified: 2026-10-31
+last_verified: 2026-11-02
+<!-- updated: 2026-11-02 — ba-spec [59](59-my-tasks-by-role.ba-spec.md) ĐÃ BUILD: việc Kế hoạch (Nhập khẩu · Lệnh SX · Xuất khẩu) + HĐ đại lý vào Việc của tôi theo quyền từng mục; gom theo nhóm trang (`RESOURCE_GROUP_LABELS`); admin mặc định tổng hợp theo nhóm; admin "xem như" vai trò / người dùng (chỉ xem, không ghi). Hạn việc Kế hoạch: 59 R3; quyền: 59 R2. -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): thêm ô Tra việc, người giao, người nhận. Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->
 ttl_days: 90
 <!-- updated: 2026-10-19 (b) — thêm nguồn việc thứ hai: `buildDocumentWarnings` (lib/documents.ts) — chứng nhận / hồ sơ năng lực còn ≤ 60 ngày hoặc đã hết hạn, CHỈ tài liệu người xem được (phòng ban); loại `document-expiring` (`DUE_OFFSET_DAYS` = 60 ⇒ hạn = ngày hết hạn), cần quyền `documents.update`; màn nạp thêm `company_documents` + `app_roles` và đợi bảng tài liệu "ready" trước khi tự đóng việc đã giao. Xem [40-documents](40-documents.md). -->
@@ -42,7 +43,7 @@ Việc đã giao cho người A **không còn** ở "theo quyền" của ngườ
 | `yield-deviation` (để biết) | `wip.unlock` hoặc `balancing.update` |
 | `period-yield-deviation` (để biết) | `balancing.update` |
 
-Admin có mọi quyền ⇒ thấy mọi việc.
+Admin có mọi quyền ⇒ trang của admin TỔNG HỢP việc theo nhóm trang (chọn nhóm mới xem); "Xem như" vai / người để thấy đúng việc của người khác (ba-spec 59). Việc Kế hoạch / HĐ đại lý: quyền theo 59 R2.
 
 ## Hạn + quá hạn (chủ dự án chốt 2026-10-19)
 

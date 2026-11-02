@@ -7,11 +7,11 @@
 //              lib/myTasks.ts + lib/dataFlow.ts (doc docs/app-map/39-my-tasks.md). The tour only
 //              points; it never writes (R1).
 // ============================================================
-import { APPROVAL_WAIT_DAYS, PERIOD_LOCK_GRACE_DAYS, getWarningKindLabel } from "@/lib/dataFlow";
+import { APPROVAL_WAIT_DAYS, PERIOD_LOCK_GRACE_DAYS } from "@/lib/dataFlow";
 import { DOCUMENT_EXPIRY_NOTICE_DAYS } from "@/lib/documents";
 import { formatDateVN } from "@/lib/format";
 import type { PageTour, PageTourSpec, TourStep } from "@/lib/guidedTour";
-import { DONE_VISIBLE_DAYS, TASKS_START_DATE } from "@/lib/myTasks";
+import { DONE_VISIBLE_DAYS, TASKS_START_DATE, taskKindLabel } from "@/lib/myTasks";
 
 export interface MyTasksTourContext {
   can: {
@@ -19,13 +19,15 @@ export interface MyTasksTourContext {
     assign: boolean;
     /** Sửa việc đã giao. */
     editAssigned: boolean;
+    /** Admin: thanh Xem như vai / người (ba-spec 59 NV4, NV5). */
+    viewAs?: boolean;
   };
 }
 
 /** Dựng các bước theo thứ tự công việc (R2). Bước tùy chọn tự bỏ khi chỗ không có (R3). */
 export function buildMyTasksTour(ctx: MyTasksTourContext): PageTour {
   const { can } = ctx;
-  const kind = getWarningKindLabel;
+  const kind = taskKindLabel;
   const steps: TourStep[] = [
     {
       id: "intro",
@@ -74,6 +76,7 @@ export function buildMyTasksTour(ctx: MyTasksTourContext): PageTour {
       title: "Việc theo quyền của tôi",
       body:
         "Việc máy tự phát hiện mà bạn có quyền làm, trong phạm vi của bạn (quản đốc: xưởng mình; tổ trưởng: mẻ mình ghi), và chưa giao riêng cho ai. Việc đã giao cho người khác không còn ở đây để khỏi làm trùng.\n" +
+        "Việc gom theo nhóm trang được phân cho vai của bạn (Nhập hàng · Sản xuất · Kho · Bán hàng · Kế toán · Kế hoạch · Tài liệu); mỗi nhóm ghi số việc, số quá hạn, số hôm nay. Nhóm Kế hoạch tách Nhập khẩu · Lệnh sản xuất · Xuất khẩu.\n" +
         "Loại việc và hạn (hạn = ngày của việc + số ngày):\n" +
         `• ${kind("imports-unlocked")}, ${kind("production-unlocked")}, ${kind("lot-unassigned")}: chốt hoặc gắn lô trong ngày, sang hôm sau là quá hạn.\n` +
         `• ${kind("changed-after-lock")}, ${kind("oversold")}: sửa ngay trong ngày.\n` +
@@ -81,6 +84,11 @@ export function buildMyTasksTour(ctx: MyTasksTourContext): PageTour {
         `• ${kind("period-unlocked")}: ${PERIOD_LOCK_GRACE_DAYS} ngày sau ngày cuối kỳ.\n` +
         `• ${kind("document-expiring")}: báo trước ${DOCUMENT_EXPIRY_NOTICE_DAYS} ngày, hạn là ngày hết hạn của chứng nhận.\n` +
         `• ${kind("backdated")}, ${kind("yield-deviation")}, ${kind("period-yield-deviation")}: không có hạn, chỉ để biết.\n` +
+        "Việc Kế hoạch (người có quyền sửa phần đó thì được nhắc):\n" +
+        `• ${kind("export-overdue")}: hạn là hạn giao của hợp đồng. ${kind("order-draft-overdue")}, ${kind("order-unlinked")}: hạn là ngày sản xuất đầu. ${kind("order-stale-revision")}: sửa ngay.\n` +
+        `• ${kind("import-missing-docs")}, ${kind("import-awaiting-quantity")}: 3 ngày sau ngày hàng về (thủ kho nhận việc chờ thực nhập).\n` +
+        `• ${kind("invoice-awaiting")}: 10 ngày sau ngày chuyến về. ${kind("invoice-mismatch")}: sửa ngay.\n` +
+        `• ${kind("export-unpaid")} (người ghi tiền về), ${kind("export-deferred-attachment")}: không có hạn nhưng vẫn là việc cần làm. ${kind("export-over-tolerance")}, ${kind("export-under-tolerance")}: để biết.\n` +
         "Hết việc thì mục này hiện \"Không còn việc tồn\".",
     },
     {
@@ -127,6 +135,19 @@ export function buildMyTasksTour(ctx: MyTasksTourContext): PageTour {
       body:
         "Dùng khi cần giao một việc tay không do máy phát hiện. Hộp giao gồm: Việc cần làm, Người nhận, Hạn, Màn cần mở (với Nhập hàng, Sản xuất, Đóng gói thì chọn thêm Ngày cần xem và Xưởng), Ghi chú cho người nhận.\n" +
         "Lưu xong người nhận thấy ngay ở mục Được giao cho tôi; việc hiện ở mục Tôi đã giao của bạn. Đang gõ dở mà đóng hộp thì nội dung được giữ làm nháp.",
+    });
+  }
+  if (can.viewAs) {
+    // Thanh Xem như nằm ngay dưới lời chào ⇒ bước thứ hai (đúng thứ tự đọc của trang).
+    steps.splice(1, 0, {
+      id: "view-as",
+      target: "my-tasks-view-as",
+      optional: true,
+      title: "Xem như vai hoặc người (quản trị viên)",
+      body:
+        "Trang của quản trị viên mặc định tổng hợp mọi việc theo nhóm trang; chọn một nhóm để xem việc của nhóm đó.\n" +
+        "Ô Xem như: chọn Vai để thấy đúng việc một vai trò được nhắc theo ma trận đang lưu ở Vai trò & quyền (dùng khi chỉnh quyền); chọn Người để thấy đúng như một tài khoản, gồm quyền chỉnh riêng, xưởng và việc được giao cho người đó.\n" +
+        "Khi đang xem như: chỉ xem, không giao việc, không đánh dấu Xong, không thu hồi, không ghi gì. Chọn Thoát để về trang của bạn.",
     });
   }
   steps.push({

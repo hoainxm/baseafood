@@ -46,8 +46,8 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Đính kèm hồ sơ",
     needs: ["export-plans", "update"],
     actors: KH,
-    text: "Ở hồ sơ hợp đồng chọn Đính kèm hồ sơ: hợp đồng đã ký, thêm L/C nếu thanh toán L/C.",
-    done: "Đủ hồ sơ bắt buộc",
+    text: "Ở hồ sơ hợp đồng chọn Đính kèm hồ sơ: hợp đồng đã ký, thêm L/C nếu thanh toán L/C. Chưa có thì chọn Chưa có — bổ sung sau, ghi lý do: làm tiếp được, duyệt cuối vẫn cần đủ file.",
+    done: "Không còn loại hồ sơ bắt buộc nào Thiếu (Có file hoặc Bổ sung sau)",
     result: { label: CONTRACT_STATE_LABELS.shipping, tone: "source" },
   },
   {
@@ -98,7 +98,7 @@ export const EXPORT_GUIDE_CONTRACT_STATES: readonly GuideState[] = [
   {
     label: CONTRACT_STATE_LABELS.attaching,
     tone: "warning",
-    meaning: "Vừa lập, hoặc còn thiếu hồ sơ bắt buộc (thẻ Thiếu ghi rõ loại). Chưa ghi chuyến lẻ được, nhưng tạo được lịch xuất hàng (chuyến dự kiến) khi chưa có chuyến nào.",
+    meaning: "Vừa lập, hoặc còn hồ sơ bắt buộc Thiếu (thẻ Thiếu ghi rõ loại) mà chưa ghi Bổ sung sau. Chưa ghi chuyến lẻ được, nhưng tạo được lịch xuất hàng (chuyến dự kiến) khi chưa có chuyến nào.",
     next: "Đính kèm hồ sơ · Nhân viên Kế hoạch.",
   },
   {
@@ -162,6 +162,14 @@ export const exportPlanningGuide: PageGuide = {
           <li>Bước <b>Lệnh sản xuất</b> của chuyến: chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng và chuyến) hoặc <b>Gắn lệnh có sẵn</b>. Lệnh nháp chưa tính; phát hành thì bước tự xong.</li>
           <li>Dòng hàng hợp đồng có cột <b>Đã ra lệnh (kg)</b>: còn bao nhiêu kg chưa ra lệnh, vượt dung sai thì báo.</li>
           <li>NL của lệnh lấy từ các lần <b>Nhập khẩu</b> đã ghi thực nhập.</li>
+        </GuideList>
+      </GuideSection>
+      <GuideSection title="Lịch xuất hàng xếp theo ngày">
+        <GuideList>
+          <li>Chuyến xếp theo ngày xuất: ngày đóng cont, chưa có thì ETD. Chỉ hiện ngày có chuyến, từ sớm tới muộn.</li>
+          <li>Mỗi ngày ghi <b>n khách · m chuyến</b>, kg kế hoạch, tên khách; thẻ <b>n trễ</b> (trễ hạn giao) và <b>n còn thiếu</b> (chưa đủ hồ sơ).</li>
+          <li>Chọn một ngày để xem chuyến gom theo khách, chọn lại để thu. Ngày có chuyến gần nhất từ hôm nay được mở sẵn.</li>
+          <li>Chuyến mới có tháng kế hoạch nằm ở <b>Chuyến chưa có ngày</b>; ghi ngày đóng cont hoặc ETD thì chuyến tự vào lịch.</li>
         </GuideList>
       </GuideSection>
       <GuideSection title="Ai làm gì">

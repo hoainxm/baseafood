@@ -136,6 +136,7 @@ describe("AC-4 — mức của từng loại", () => {
     "export-over-tolerance": "info",
     "export-under-tolerance": "info",
     "export-unpaid": "reminder",
+    "export-deferred-attachment": "reminder",
     "import-missing-docs": "reminder",
     "import-awaiting-quantity": "reminder",
     "order-draft-overdue": "reminder",
@@ -144,7 +145,7 @@ describe("AC-4 — mức của từng loại", () => {
     "invoice-awaiting": "reminder",
     "invoice-mismatch": "error",
   };
-  test("11/11 loại theo bảng R3, có nhãn", () => {
+  test("12/12 loại theo bảng R3 (+ 58 NV5), có nhãn", () => {
     expect(PLANNING_ATTENTION_LEVELS).toEqual(expected);
     expect(Object.values(PLANNING_ATTENTION_LABELS).every((l) => l.length > 0)).toBe(true);
   });

@@ -370,6 +370,21 @@ export function usePlanningActivityStore() {
   }, []);
   return { ...base, canLogRecords: base.canLog && hasColumns === true };
 }
+/**
+ * Máy chủ đã chạy 0093 (cột export_contracts.attachment_deferrals) — chưa có thì KHÔNG cho ghi "bổ sung sau"
+ * (gửi cột lạ ⇒ kẹt hàng chờ cả bảng). Không nối máy chủ ⇒ true (localStorage giữ được trường).
+ */
+export function useExportDeferralsAvailable(): boolean {
+  const [ok, setOk] = useState<boolean>(!isServerConnected);
+  useEffect(() => {
+    let alive = true;
+    void serverHasColumn("export_contracts", "attachment_deferrals").then((v) => alive && setOk(v));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return ok;
+}
 /** Nhật ký nhóm Nhập hàng / Sản xuất (mig 0092) — thiếu bảng ⇒ không ghi. */
 export const useImportsActivities = () => useTable(IMPORTS_ACTIVITY_TABLE);
 export const useProductionActivities = () => useTable(PRODUCTION_ACTIVITY_TABLE);

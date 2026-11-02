@@ -26,6 +26,9 @@ import {
   finalReviewGate,
   finalReviewsOf,
   missingAttachmentKinds,
+  attachmentStatus,
+  blockingAttachmentKinds,
+  ATTACHMENT_STATUS_LABELS,
   requiredAttachmentKinds,
   canEditContractDirectly,
   scheduleGate,
@@ -53,11 +56,11 @@ import {
   workingRevision,
   type ExportData,
 } from "@/lib/exportPlanning";
-import { formatDateVN, formatMoney } from "@/lib/format";
+import { formatDateVN, formatMoney, formatDateTimeVN } from "@/lib/format";
 import { useGoodsTypeStore } from "@/lib/catalogRepo";
 import { goodsTypeName } from "@/lib/goodsTypes";
 import { useOrderCoverage } from "@/features/production-orders/useOrderCoverage";
-import type { ExportContract, ExportContractLine, ExportFile, ExportPayment, ExportShipment, Product } from "@/types";
+import type { ExportContract, ExportContractAttachmentKind, ExportContractLine, ExportFile, ExportPayment, ExportShipment, Product } from "@/types";
 import {
   ArrowLeft,
   Ban,
@@ -110,6 +113,9 @@ export function ContractDossier({
   onCancelContract,
   onAttach,
   onRemoveAttachment,
+  deferralsAvailable,
+  onDeferAttachment,
+  onClearDeferral,
   onFinalReview,
   onReopen,
   onDeleteContract,
@@ -143,6 +149,12 @@ export function ContractDossier({
   /** Mở hộp đính kèm hồ sơ cấp HĐ (bước Đính kèm). */
   onAttach: () => void;
   onRemoveAttachment: (f: ExportFile) => void;
+  /** Máy chủ đã chạy 0093 — mới cho ghi "bổ sung sau" (ba-spec 58). */
+  deferralsAvailable: boolean;
+  /** Ghi "bổ sung sau" (mở hộp lý do) cho một loại hồ sơ bắt buộc còn thiếu. */
+  onDeferAttachment: (kind: ExportContractAttachmentKind) => void;
+  /** Bỏ dấu "bổ sung sau" ⇒ loại về Thiếu (có Hoàn tác). */
+  onClearDeferral: (kind: ExportContractAttachmentKind) => void;
   /** Mở hộp duyệt cuối — đồng ý thì đóng HĐ (thay "Chốt HĐ" cũ). */
   onFinalReview: () => void;
   onReopen: () => void;
@@ -259,6 +271,9 @@ export function ContractDossier({
   const finalGate = finalReviewGate(data, contract.id, opts);
   const attachments = contractAttachments(data, contract.id);
   const missingKinds = missingAttachmentKinds(data, contract.id, opts);
+  // ba-spec 58: chỉ loại "Thiếu" chặn ghi chuyến; "Bổ sung sau" cho đi tiếp nhưng vẫn chặn duyệt cuối.
+  const blockingKinds = blockingAttachmentKinds(data, contract.id, opts);
+  const deferredKinds = missingKinds.filter((k) => !blockingKinds.includes(k));
   const requiredKinds = eff ? requiredAttachmentKinds(eff.terms) : [];
   const finalReviews = finalReviewsOf(data, contract.id);
   const lastFinal = finalReviews.at(-1);
@@ -276,7 +291,7 @@ export function ContractDossier({
     ? null
     : state === "attaching" && can.update
         ? "attach"
-        : state === "final-review" && can.approve
+        : state === "final-review" && can.approve && finalGate.ok
           ? "final"
           : state === "shipping" && can.create && gate.ok && (!shipments.some((s) => s.status === "open") || !coverage.covered)
             ? "ship"
@@ -286,9 +301,11 @@ export function ContractDossier({
     ? ""
     : state === "attaching" && !can.update
         ? "Chờ Nhân viên Kế hoạch đính kèm hồ sơ"
-        : state === "final-review" && !can.approve
-          ? "Chờ Trưởng / Phó phòng Kế hoạch duyệt cuối để đóng hợp đồng"
-          : "";
+        : state === "final-review" && finalGate.missingAttachments.length
+          ? `Còn thiếu hồ sơ bổ sung sau: ${finalGate.missingAttachments.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")} — đính đủ file mới duyệt cuối được`
+          : state === "final-review" && !can.approve
+            ? "Chờ Trưởng / Phó phòng Kế hoạch duyệt cuối để đóng hợp đồng"
+            : "";
 
   const menuItems: { key: string; node: React.ReactNode }[] = [];
   const menuBtn = (key: string, node: React.ReactNode) => menuItems.push({ key, node });
@@ -388,7 +405,8 @@ export function ContractDossier({
           </h2>
           <div className="flex min-w-0 flex-wrap gap-1 [&>*]:max-w-full [&>*]:whitespace-normal">
             <Tag variant={CONTRACT_STATE_TAG[state]}>{contractStateLabel(state, contract)}</Tag>
-            {isOpen && state === "attaching" && <Tag variant="warning">Thiếu: {missingKinds.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}</Tag>}
+            {isOpen && state === "attaching" && <Tag variant="warning">Thiếu: {blockingKinds.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}</Tag>}
+            {isOpen && deferredKinds.length > 0 && <Tag variant="warning">Bổ sung sau: {deferredKinds.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}</Tag>}
             {isOpen && lastFinal?.decision === "needs-revision" && <Tag variant="warning">Duyệt cuối trả về: {lastFinal.reason}</Tag>}
             {isOverdue && <Tag variant="error">Quá hạn giao {formatDateVN(deadline)}</Tag>}
             {isOpen && unmapped > 0 && <Tag variant="warning">{unmapped} dòng hàng chưa nối danh mục</Tag>}
@@ -478,15 +496,24 @@ export function ContractDossier({
         <CollapsibleSection
           tourTarget="contract-attachments"
           title="Hồ sơ đính kèm"
-          summary={missingKinds.length ? `Thiếu ${missingKinds.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}` : `Đủ hồ sơ · ${attachments.length} file`}
+          summary={
+            blockingKinds.length
+              ? `Thiếu ${blockingKinds.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}`
+              : deferredKinds.length
+                ? `Bổ sung sau ${deferredKinds.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}`
+                : `Đủ hồ sơ · ${attachments.length} file`
+          }
           defaultOpen={state === "attaching"}
         >
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            {requiredKinds.map((k) => (
-              <Tag key={k} variant={missingKinds.includes(k) ? "warning" : "done"}>
-                {CONTRACT_ATTACHMENT_LABELS[k]}: {missingKinds.includes(k) ? "còn thiếu" : "đã có"}
-              </Tag>
-            ))}
+            {requiredKinds.map((k) => {
+              const st = attachmentStatus(data, contract.id, k, opts);
+              return (
+                <Tag key={k} variant={st === "has-file" ? "done" : "warning"}>
+                  {CONTRACT_ATTACHMENT_LABELS[k]}: {ATTACHMENT_STATUS_LABELS[st]}
+                </Tag>
+              );
+            })}
             {can.update && isOpen && filesAvailable && (
               <Button size="sm" variant="outline" onClick={onAttach} title="Đính kèm thêm file hồ sơ của hợp đồng (chọn loại hồ sơ, nhiều file một lần).">
                 <Paperclip className="mr-1 h-4 w-4" aria-hidden />
@@ -494,8 +521,33 @@ export function ContractDossier({
               </Button>
             )}
           </div>
+          {requiredKinds
+            .filter((k) => attachmentStatus(data, contract.id, k, opts) !== "has-file")
+            .map((k) => {
+              const def = contract.attachmentDeferrals?.[k];
+              const deferred = attachmentStatus(data, contract.id, k, opts) === "deferred";
+              return (
+                <div key={k} className="flex min-w-0 flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2">
+                  <span className="min-w-0 flex-1 text-sm">
+                    {deferred && def
+                      ? `${CONTRACT_ATTACHMENT_LABELS[k]} bổ sung sau — ${def.reason} (${[def.by, formatDateTimeVN(def.at)].filter(Boolean).join(" · ")})`
+                      : `Chưa có ${CONTRACT_ATTACHMENT_LABELS[k]}.`}
+                  </span>
+                  {can.update && isOpen && deferralsAvailable && !deferred && (
+                    <Button size="sm" variant="outline" onClick={() => onDeferAttachment(k)} title={`Chưa có ${CONTRACT_ATTACHMENT_LABELS[k]}: ghi lý do để ghi chuyến tiếp; duyệt cuối vẫn cần đủ file.`}>
+                      Chưa có — bổ sung sau
+                    </Button>
+                  )}
+                  {can.update && isOpen && deferralsAvailable && deferred && (
+                    <Button size="sm" variant="ghost" onClick={() => onClearDeferral(k)} title="Bỏ ghi bổ sung sau — loại hồ sơ này về Thiếu, chặn ghi chuyến mới.">
+                      Bỏ ghi bổ sung sau
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
           <p className="text-sm text-muted-foreground">
-            Bắt buộc: hợp đồng đã ký{eff.terms.paymentMethod === "lc" ? " và L/C" : ""}. Đủ hồ sơ bắt buộc mới ghi chuyến được.
+            Bắt buộc: hợp đồng đã ký{eff.terms.paymentMethod === "lc" ? " và L/C" : ""}. Chưa có thì chọn Chưa có — bổ sung sau, ghi lý do: ghi chuyến và làm các bước tiếp được, nhưng duyệt cuối vẫn cần đủ file.
             {!filesAvailable ? " Đang chạy không nối máy chủ — chưa tải được file, bước này không bắt file." : ""}
           </p>
           <FileList files={attachments} caption={`Hồ sơ HĐ ${contract.contractNo}`} onPreview={onPreview} onRemove={can.update && isOpen ? onRemoveAttachment : undefined} />

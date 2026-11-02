@@ -133,10 +133,11 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       id: "shipment-table",
       target: "shipment-table",
       optional: true,
-      title: "Bảng chuyến theo khách",
+      title: "Chuyến theo ngày xuất",
       body:
-        "Mỗi khách hàng có một bảng; mỗi dòng là một chuyến: mã lô và loại chuyến, số hợp đồng, ngày đóng cont và ETD, kg kế hoạch và kg thực xuất (theo Commercial Invoice).\n" +
-        "Chọn tên cột để sắp xếp. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu, đánh dấu những dòng đã kiểm.",
+        "Chuyến của kỳ xếp theo ngày xuất: ngày đóng cont, chưa có thì ETD. Chỉ hiện ngày có chuyến, từ sớm tới muộn. Mỗi ngày ghi số khách · số chuyến · kg kế hoạch, tên các khách, và thẻ n trễ (trễ hạn giao) · n còn thiếu (chưa đủ hồ sơ).\n" +
+        "Chọn một ngày để xem chi tiết: chuyến gom theo khách, mỗi dòng là một chuyến (mã lô, loại chuyến, số hợp đồng, ngày đóng cont và ETD, kg kế hoạch và thực xuất). Chọn lại ngày để thu. Ngày có chuyến gần nhất từ hôm nay được mở sẵn.\n" +
+        "Chuyến mới có tháng kế hoạch, chưa có ngày đóng cont hay ETD, nằm ở khối Chuyến chưa có ngày bên dưới. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu.",
     }),
     plan({
       id: "shipment-progress",
@@ -223,9 +224,10 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         optional: true,
         title: "Hồ sơ đính kèm",
         body:
-          "Chặng Đính kèm của hợp đồng. Thẻ đầu khối ghi từng loại hồ sơ bắt buộc: Hợp đồng đã ký (luôn có), L/C (khi thanh toán bằng L/C) — \"đã có\" hoặc \"còn thiếu\".\n" +
+          "Chặng Đính kèm của hợp đồng. Thẻ đầu khối ghi từng loại hồ sơ bắt buộc: Hợp đồng đã ký (luôn có), L/C (khi thanh toán bằng L/C), mỗi loại ở một trong ba tình trạng: Có file · Bổ sung sau · Thiếu.\n" +
+          "Chưa có hợp đồng ký hoặc L/C chưa về: chọn Chưa có — bổ sung sau, ghi lý do. Hợp đồng ghi chuyến và làm các bước tiếp được ngay; bước 1 của chuyến ghi chờ HĐ ký / chờ L/C. Duyệt cuối, đóng hợp đồng vẫn cần đủ file. Đính file đúng loại thì dấu tự gỡ; Bỏ ghi bổ sung sau thì loại về Thiếu.\n" +
           "Nhân viên Kế hoạch chọn Đính kèm file, chọn loại hồ sơ rồi chọn một hay nhiều file. Proforma invoice và hồ sơ khác đính được nhưng không bắt buộc; chọn Hồ sơ khác thì phải ghi Tên hồ sơ.\n" +
-          "Đủ hồ sơ bắt buộc thì hợp đồng chuyển Đang ghi chuyến và nút Ghi chuyến mới hiện. Gỡ file nhầm bằng nút thùng rác, có Hoàn tác.",
+          "Không còn loại nào Thiếu (đã có file hoặc ghi bổ sung sau) thì hợp đồng chuyển Đang ghi chuyến và nút Ghi chuyến mới hiện. Gỡ file nhầm bằng nút thùng rác, có Hoàn tác.",
       }),
       dossier({
         id: "shipment-card",

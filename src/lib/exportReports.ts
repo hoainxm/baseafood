@@ -9,7 +9,9 @@
 // KHÔNG đổi luật: thực xuất (R7), trễ hạn (R15), kỳ của chuyến (R18), dung sai / khép (NV12)
 // đều gọi hàm có sẵn của lib/exportPlanning.
 import {
+  CONTRACT_ATTACHMENT_LABELS,
   STEP_TITLES,
+  deferredAttachmentKinds,
   contractClosure,
   contractCoverage,
   contractStepState,
@@ -28,7 +30,7 @@ import {
   type EvidenceOptions,
   type ExportData,
 } from "./exportPlanning";
-import type { Customer, ExportShipment } from "@/types";
+import type { Customer, ExportContractAttachmentKind, ExportShipment } from "@/types";
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 const numOr0 = (v: number | null | undefined) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
@@ -127,7 +129,7 @@ export interface CustomerRow extends ReportFigures {
   contractsSigned: number;
 }
 
-export type AttentionKind = "overdue" | "over-tolerance" | "under-tolerance" | "unpaid";
+export type AttentionKind = "overdue" | "over-tolerance" | "under-tolerance" | "unpaid" | "deferred-attachment";
 
 export interface AttentionRow {
   contractId: string;
@@ -144,6 +146,8 @@ export interface AttentionRow {
   missingContainers: number;
   /** Còn chưa về (tiền thực xuất − tiền về của HĐ). */
   outstanding: number;
+  /** Hồ sơ bắt buộc đang "bổ sung sau" (ba-spec 58 NV5) — kind "deferred-attachment". */
+  deferredKinds: ExportContractAttachmentKind[];
 }
 
 export type StepCounts = Record<1 | 2 | 3 | 4 | 5, number>;
@@ -181,6 +185,7 @@ export const ATTENTION_LABELS: Record<AttentionKind, string> = {
   "over-tolerance": "Vượt dung sai",
   "under-tolerance": "Thiếu dung sai",
   unpaid: "Còn tiền chưa về",
+  "deferred-attachment": "Hồ sơ HĐ bổ sung sau",
 };
 
 export const REPORT_STEP_TITLES: Record<1 | 2 | 3 | 4 | 5, string> = {
@@ -311,8 +316,12 @@ export function buildExportReport(
       missingKg: 0,
       missingContainers: 0,
       outstanding: 0,
+      deferredKinds: [] as ExportContractAttachmentKind[],
     };
     if (c.status !== "closed") {
+      // Hồ sơ bắt buộc đang "bổ sung sau": làm tiếp được nhưng phải đòi trước khi đóng HĐ (ba-spec 58 NV5).
+      const deferredKinds = deferredAttachmentKinds(d, c.id, evidence);
+      if (deferredKinds.length) attention.push({ ...base, kind: "deferred-attachment", deferredKinds });
       const cov = contractCoverage(d, c.id);
       if (deadline && deadline < opts.today && !cov.covered) {
         attention.push({ ...base, kind: "overdue", missingKg: cov.missingKg, missingContainers: cov.missingContainers });
@@ -335,7 +344,7 @@ export function buildExportReport(
     const left = round2(expected - received);
     if (left > 0.005) attention.push({ ...base, kind: "unpaid", outstanding: left });
   }
-  const order: Record<AttentionKind, number> = { overdue: 0, "over-tolerance": 1, "under-tolerance": 2, unpaid: 3 };
+  const order: Record<AttentionKind, number> = { overdue: 0, "deferred-attachment": 1, "over-tolerance": 2, "under-tolerance": 3, unpaid: 4 };
   attention.sort((a, b) => order[a.kind] - order[b.kind] || a.customerName.localeCompare(b.customerName, "vi") || a.contractNo.localeCompare(b.contractNo, "vi"));
 
   return { period, customerId, totals, byMonth, byCustomer, stuck, attention };
@@ -394,5 +403,7 @@ export function attentionDetail(a: AttentionRow, opts: { viewPrice: boolean; dev
       return `kg ${opts.deviationText(a.kgPct)}${opts.viewPrice ? ` · tiền ${opts.deviationText(a.amountPct)}` : ""}`;
     case "unpaid":
       return opts.viewPrice ? `còn ${m(a.outstanding)} USD chưa về` : "còn tiền chưa về";
+    case "deferred-attachment":
+      return `chưa có ${a.deferredKinds.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")} — phải đính đủ trước khi duyệt cuối`;
   }
 }

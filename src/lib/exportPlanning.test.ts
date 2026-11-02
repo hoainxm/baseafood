@@ -66,6 +66,13 @@ import {
   findOrCreateDocumentKind,
   documentKindLabel,
   requiredDocumentLabel,
+  withDeferral,
+  attachmentStatus,
+  blockingAttachmentKinds,
+  validateDeferral,
+  DEFERRED_STEP_TEXT,
+  contractStepState,
+  CONTRACT_ATTACHMENT_LABELS,
 } from "./exportPlanning";
 import type {
   ExportContract,
@@ -348,7 +355,7 @@ describe("v8 · quy trình duyệt → đính kèm → ghi chuyến → duyệt 
   it("AC-60: duyệt cuối KHÔNG phải lượt duyệt bản — không đổi bản hiệu lực; đồng ý + status closed ⇒ Đã đóng HĐ", () => {
     const d0 = closedShipmentData({ cartons: 1900, netKg: 19000, amount: 172445 });
     expect(contractState(d0, "c1")).toBe("final-review");
-    expect(finalReviewGate(d0, "c1")).toEqual({ ok: true, needsReason: false });
+    expect(finalReviewGate(d0, "c1")).toMatchObject({ ok: true, needsReason: false });
     const back = { ...d0, approvals: [...d0.approvals, approveNew("r0", "c1", "final", "needs-revision", "thiếu B/L gốc")] };
     expect(effectiveRevision(back, "c1")?.id).toBe("r0");
     expect(finalReviewsOf(back, "c1")).toHaveLength(1);
@@ -372,12 +379,12 @@ describe("v8 · quy trình duyệt → đính kèm → ghi chuyến → duyệt 
     const d = { ...d0, revisions: [...d0.revisions, revision("r1", "c1", 1, { revisedOn: "2026-10-01" })] };
     expect(effectiveRevision(d, "c1")?.id).toBe("r1");
     expect(contractState(d, "c1")).toBe("final-review");
-    expect(finalReviewGate(d, "c1")).toEqual({ ok: true, needsReason: false });
+    expect(finalReviewGate(d, "c1")).toMatchObject({ ok: true, needsReason: false });
   });
   it("AC-61: đóng sớm khi ngoài dung sai ⇒ duyệt cuối được nhưng bắt lý do; chưa có chuyến ⇒ chưa duyệt cuối", () => {
     const d = closedShipmentData({ cartons: 1500, netKg: 15000, amount: 140000 });
     expect(contractState(d, "c1")).toBe("shipping");
-    expect(finalReviewGate(d, "c1")).toEqual({ ok: true, needsReason: true });
+    expect(finalReviewGate(d, "c1")).toMatchObject({ ok: true, needsReason: true });
     const none = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], approvals: [approval("r0", "c1", "approved")] });
     expect(finalReviewGate(none, "c1").ok).toBe(false);
   });
@@ -951,5 +958,73 @@ describe("NV19 · lịch xuất hàng theo HĐ (§0d, R39–R41)", () => {
     // Có file hoặc mục Xong cũng không còn trống.
     expect(isBlankShipment({ ...d, files: [file("s2", "packaging")] }, blank[1])).toBe(false);
     expect(isBlankShipment({ ...d, items: [item("s3", "packaging", { state: "done" })] }, blank[2])).toBe(false);
+  });
+});
+
+describe("ba-spec 58 · hồ sơ HĐ \"bổ sung sau\" (mig 0093)", () => {
+  const approveNew = (revisionId: string, contractId: string) => ({ ...approval(revisionId, contractId, "approved", "2026-08-02"), stage: "contract" as const, filePath: "", fileName: "" });
+  const attach = (kind: NonNullable<ExportFile["attachmentKind"]>): ExportFile => ({ ...file("", "contract"), attachmentKind: kind });
+  const defer = (reason = "khách chưa gửi bản ký") => ({ reason, by: "Lê Quang Khiêm", at: "2026-11-02T08:00:00.000Z" });
+  const lcRev = revision("r0", "c1", 0, { terms: terms({ paymentMethod: "lc" }) });
+  const ttBase = () => data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], approvals: [approveNew("r0", "c1")] });
+
+  it("AC-1: bổ sung sau HĐ ký ⇒ cổng ghi chuyến mở, HĐ rời Chờ đính kèm", () => {
+    const d0 = ttBase();
+    const d = { ...d0, contracts: [withDeferral(d0.contracts[0], "signed-contract", defer())] };
+    expect(shipmentGate(d, "c1").ok).toBe(true);
+    expect(contractState(d, "c1")).not.toBe("attaching");
+    expect(attachmentStatus(d, "c1", "signed-contract")).toBe("deferred");
+  });
+  it("AC-2: L/C chưa ghi bổ sung sau vẫn chặn, lý do nêu L/C", () => {
+    const c = withDeferral(contract("c1"), "signed-contract", defer());
+    const d = data({ contracts: [c], revisions: [lcRev], approvals: [approveNew("r0", "c1")] });
+    expect(shipmentGate(d, "c1")).toMatchObject({ ok: false, missing: ["lc"] });
+    expect(blockingAttachmentKinds(d, "c1")).toEqual(["lc"]);
+  });
+  it("AC-3: lý do rỗng ⇒ lỗi khóa reason; lý do toàn khoảng trắng không tính là bổ sung sau", () => {
+    expect(validateDeferral("  ").map((i) => i.key)).toEqual(["reason"]);
+    expect(validateDeferral("L/C chưa mở")).toEqual([]);
+    const d0 = ttBase();
+    const d = { ...d0, contracts: [{ ...d0.contracts[0], attachmentDeferrals: { "signed-contract": defer("   ") } }] };
+    expect(shipmentGate(d, "c1").ok).toBe(false);
+  });
+  it("AC-4: bước 1 của chuyến Đang làm, chữ chờ HĐ ký", () => {
+    const d0 = ttBase();
+    const d = { ...d0, contracts: [withDeferral(d0.contracts[0], "signed-contract", defer())], shipments: [shipment("s", "c1")] };
+    expect(stepState(d, d.shipments[0], 1)).toBe("in-progress");
+    expect(DEFERRED_STEP_TEXT["signed-contract"]).toBe("chờ HĐ ký");
+    expect(DEFERRED_STEP_TEXT.lc).toBe("chờ L/C");
+  });
+  it("AC-5: đính file đúng loại ⇒ Có file, bước 1 xong", () => {
+    const d0 = ttBase();
+    const d = { ...d0, contracts: [withDeferral(d0.contracts[0], "signed-contract", defer())], files: [attach("signed-contract")] };
+    expect(attachmentStatus(d, "c1", "signed-contract")).toBe("has-file");
+    expect(contractStepState(d, "c1")).toBe("done");
+  });
+  it("AC-6: gỡ file khi dấu đã gỡ (lúc đính) ⇒ về Thiếu, chặn ghi chuyến", () => {
+    const d0 = ttBase();
+    const cleared = withDeferral(withDeferral(d0.contracts[0], "signed-contract", defer()), "signed-contract", null);
+    const d = { ...d0, contracts: [cleared], files: [] };
+    expect(cleared.attachmentDeferrals).toEqual({});
+    expect(attachmentStatus(d, "c1", "signed-contract")).toBe("missing");
+    expect(shipmentGate(d, "c1").ok).toBe(false);
+  });
+  it("AC-7: còn bổ sung sau ⇒ không duyệt cuối được, nêu HĐ đã ký", () => {
+    const d0 = ttBase();
+    const d = { ...d0, contracts: [withDeferral(d0.contracts[0], "signed-contract", defer())], shipments: [shipment("s", "c1")] };
+    const g = finalReviewGate(d, "c1");
+    expect(g.ok).toBe(false);
+    expect(g.missingAttachments).toEqual(["signed-contract"]);
+    expect(CONTRACT_ATTACHMENT_LABELS[g.missingAttachments[0]]).toBe("Hợp đồng đã ký");
+  });
+  it("AC-10: bản sửa mới không mất dấu (dấu nằm trên HĐ)", () => {
+    const d0 = ttBase();
+    const d = {
+      ...d0,
+      contracts: [withDeferral(d0.contracts[0], "signed-contract", defer())],
+      revisions: [...d0.revisions, revision("r1", "c1", 1)],
+      approvals: [...d0.approvals, approveNew("r1", "c1")],
+    };
+    expect(shipmentGate(d, "c1").ok).toBe(true);
   });
 });

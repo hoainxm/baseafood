@@ -1,11 +1,13 @@
 // ============================================================
 // Tên file: src/features/export-planning/MonthView.tsx
-// Tên tiếng Việt: Xuất khẩu theo tháng — chuyến gom theo khách, 6 bước, HĐ chưa ghi chuyến
+// Tên tiếng Việt: Lịch xuất hàng — chuyến xếp theo NGÀY xuất, 6 bước, HĐ chưa ghi chuyến
 // Description: Period plan (NV11): view by month / week / date range, customer filter (cards follow it),
 //              document-number search (shipments + contracts without shipments), 4 stat cards,
-//              shipments grouped by customer, pending contracts, Excel export.
+//              shipments listed by export day (ba-spec 57: n customers · m shipments per day, open a day
+//              to see its shipments grouped by customer), undated shipments, pending contracts, Excel export.
 // ============================================================
 import { useMemo, useState } from "react";
+import { buildDaySchedule, defaultOpenDay, type ScheduleCustomer } from "@/lib/exportDaySchedule";
 import {
   Button,
   ChoiceGroup,
@@ -54,8 +56,12 @@ import {
 import { progressText, shipmentProgress } from "./progress";
 import { formatDateVN } from "@/lib/format";
 import type { Customer, ExportContract, ExportItemState } from "@/types";
-import { AlarmClock, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, CircleCheck, Container, Eye, FileSpreadsheet, ListChecks } from "lucide-react";
+import { AlarmClock, CalendarCheck, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Container, Eye, FileSpreadsheet, ListChecks } from "lucide-react";
 import { StepBar } from "./parts";
+
+const WEEKDAYS = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+/** "Thứ 3, 03/11/2026" — tiêu đề một ngày của lịch. */
+const dayHeading = (iso: string) => `${WEEKDAYS[new Date(`${iso}T00:00:00Z`).getUTCDay()]}, ${formatDateVN(iso)}`;
 
 /** Kỳ hiện tại cùng loại với kỳ đang xem (tháng này / tuần này / hôm nay). */
 function currentPeriodOf(kind: Period["kind"], today: string): Period {
@@ -90,6 +96,23 @@ export function MonthView({
   const plan = useMemo(() => buildPeriodPlan(period, data, customers, today, opts, customerFilter), [period, data, customers, today, filesAvailable, customerFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   const groups = plan.groups;
   const pending = plan.pendingContracts;
+  // ba-spec 57: chuyến xếp theo ngày xuất. Ngày mở sẵn = ngày có chuyến đầu tiên ≥ hôm nay (R9); đổi kỳ /
+  // lọc khách ⇒ tính lại ngày mở sẵn. Mở nhiều ngày cùng lúc được.
+  const schedule = useMemo(() => buildDaySchedule(groups), [groups]);
+  const scheduleKey = `${period.from}_${period.to}_${customerFilter}`;
+  const [openState, setOpenState] = useState<{ key: string; days: ReadonlySet<string> } | null>(null);
+  const openDays: ReadonlySet<string> =
+    openState?.key === scheduleKey ? openState.days : new Set([defaultOpenDay(schedule.days, today)].filter((x): x is string => !!x));
+  const toggleDay = (date: string) => {
+    const next = new Set(openDays);
+    if (next.has(date)) next.delete(date);
+    else next.add(date);
+    setOpenState({ key: scheduleKey, days: next });
+  };
+  /** Dòng đầu tiên đang hiện (ngày mở đầu tiên, rồi khối chưa có ngày) — mốc tour "Tiến độ" + "Mở". */
+  const firstVisibleRow =
+    schedule.days.find((d) => openDays.has(d.date))?.customers[0]?.rows[0] ?? schedule.undated[0]?.rows[0];
+  const markKey = period.kind === "month" ? period.from.slice(0, 7) : `${period.from}_${period.to}`;
   const current = currentPeriodOf(period.kind, today);
   const isCurrent = current.from === period.from && current.to === period.to;
   const periodNoun = period.kind === "month" ? "tháng" : period.kind === "week" ? "tuần" : "khoảng";
@@ -197,7 +220,7 @@ export function MonthView({
       render: (r) => {
         const p = shipmentProgress(data, r.shipment, opts);
         return (
-          <div data-tour={r === groups[0]?.rows[0] ? "shipment-progress" : undefined} className="grid min-w-0 gap-1.5 lg:min-w-56">
+          <div data-tour={r === firstVisibleRow ? "shipment-progress" : undefined} className="grid min-w-0 gap-1.5 lg:min-w-56">
             <StepBar steps={p.steps} />
             <span className={`text-sm ${p.next === null ? "font-semibold text-success" : "text-foreground"}`}>{progressText(p)}</span>
             {(r.late || (!r.shipment.bookingNo && !r.shipment.containerNo)) && (
@@ -260,6 +283,23 @@ export function MonthView({
       },
     },
   ];
+
+  /** Chuyến của một ngày (hoặc chưa có ngày) — mỗi khách một bảng nhỏ, đủ cột tiến độ như trước (R6). */
+  const customerTables = (list: readonly ScheduleCustomer[], markPrefix: string) =>
+    list.map((c) => (
+      <div key={c.customerId} className="grid min-w-0 gap-2">
+        <h4 className="font-semibold">
+          {c.customerName} <span className="tnum font-normal text-muted-foreground">· {c.rows.length} chuyến</span>
+        </h4>
+        <RecordTable
+          columns={columns(false)}
+          rows={c.rows}
+          getKey={(r) => r.shipment.id}
+          rowMarkKey={`export-plan:${markPrefix}:${c.customerId}`}
+          actions={(r) => openButton(r.contract.id, r.shipment.id, r === firstVisibleRow)}
+        />
+      </div>
+    ));
 
   /** `tourMark`: nút Mở đầu tiên của lịch — chỗ "Mở hồ sơ" của hướng dẫn từng bước. */
   const openButton = (contractId: string, shipmentId?: string, tourMark = false) => (
@@ -380,24 +420,48 @@ export function MonthView({
               description="Lập hợp đồng → duyệt → đính kèm hồ sơ rồi Ghi chuyến — chuyến xếp theo ngày đóng cont (chưa có thì ETD, rồi tháng kế hoạch)."
             />
           )}
-          {groups.map((g, gi) => (
-            <section key={g.customerId} data-tour={gi === 0 ? "shipment-table" : undefined} className="grid gap-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="font-semibold">{g.customerName}</h3>
-                <span className="tnum text-sm text-muted-foreground">
-                  {g.rows.length} chuyến · {g.rows.filter((r) => r.closed).length} đủ hồ sơ · KH {formatNumber(g.plannedKg)} kg
-                  {g.actualKg ? ` · thực xuất ${formatNumber(g.actualKg)} kg` : ""}
-                </span>
-              </div>
-              <RecordTable
-                columns={columns(false)}
-                rows={g.rows}
-                getKey={(r) => r.shipment.id}
-                rowMarkKey={`export-plan:${period.kind === "month" ? period.from.slice(0, 7) : `${period.from}_${period.to}`}:${g.customerId}`}
-                actions={(r) => openButton(r.contract.id, r.shipment.id, gi === 0 && r === g.rows[0])}
-              />
+          {schedule.days.length > 0 && (
+            <section data-tour="shipment-table" className="grid min-w-0 gap-3">
+              <h3 className="font-semibold">Chuyến theo ngày xuất</h3>
+              <ol className="grid min-w-0 gap-3">
+                {schedule.days.map((day) => {
+                  const isOpen = openDays.has(day.date);
+                  return (
+                    <li key={day.date} className="grid min-w-0 rounded-xl border border-border">
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        onClick={() => toggleDay(day.date)}
+                        title={isOpen ? "Thu chi tiết ngày này." : "Xem các chuyến của ngày này, gom theo khách."}
+                        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-4 py-3 text-left hover:bg-muted press-feedback"
+                      >
+                        <ChevronDown aria-hidden className={`size-5 shrink-0 text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+                        <span className="tnum font-semibold">{dayHeading(day.date)}</span>
+                        <span className="tnum text-muted-foreground">
+                          {day.customerCount} khách · {day.shipmentCount} chuyến · KH {formatNumber(day.plannedKg)} kg
+                        </span>
+                        {day.lateCount > 0 && <Tag variant="error">{day.lateCount} trễ</Tag>}
+                        {day.missingCount > 0 && <Tag variant="warning">{day.missingCount} còn thiếu</Tag>}
+                        <span className="basis-full min-w-0 pl-8 text-sm text-muted-foreground">{day.customers.map((c) => c.customerName).join(" · ")}</span>
+                      </button>
+                      {isOpen && (
+                        <div className="grid min-w-0 gap-4 border-t border-border px-4 py-3">
+                          {customerTables(day.customers, `${markKey}:${day.date}`)}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
             </section>
-          ))}
+          )}
+          {schedule.undated.length > 0 && (
+            <section data-tour={schedule.days.length ? undefined : "shipment-table"} className="grid min-w-0 gap-3">
+              <h3 className="font-semibold">Chuyến chưa có ngày</h3>
+              <p className="text-sm text-muted-foreground">Chuyến mới có tháng kế hoạch, chưa có ngày đóng cont hay ETD. Ghi ngày ở hồ sơ thì chuyến tự vào danh sách theo ngày.</p>
+              {customerTables(schedule.undated, `${markKey}:undated`)}
+            </section>
+          )}
           {pending.length > 0 && (
             <section data-tour="pending-contracts" className="grid gap-3">
               <h3 className="font-semibold">Hợp đồng chưa ghi đủ chuyến</h3>
@@ -406,7 +470,7 @@ export function MonthView({
                 rows={pending}
                 getKey={(p) => p.contract.id}
                 rowMarkKey={`export-plan-pending:${period.kind === "month" ? period.from.slice(0, 7) : `${period.from}_${period.to}`}`}
-                actions={(p) => openButton(p.contract.id, undefined, !groups.length && p === pending[0])}
+                actions={(p) => openButton(p.contract.id, undefined, !firstVisibleRow && p === pending[0])}
               />
             </section>
           )}

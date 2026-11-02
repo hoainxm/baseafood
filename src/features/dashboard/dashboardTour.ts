@@ -97,7 +97,7 @@ export function buildDashboardTour(ctx: DashboardTourContext): PageTour {
         "Ngày hôm nay chưa tính là việc vì còn đang ghi. Việc tự hết khi sổ đã sửa xong.\n" +
         "Người được xem Phòng Kế hoạch, hóa đơn đại lý thấy thêm việc, cột Việc ghi tên màn trước (Nhập khẩu · Lệnh sản xuất · Xuất khẩu · Hóa đơn đại lý):\n" +
         "• Sổ sai: Theo bản HĐ trước (hợp đồng đã sửa mà lệnh chưa theo) · Chuyến lệch HĐ đại lý (hóa đơn lệch sổ chuyến chưa xử lý).\n" +
-        "• Chưa làm: Quá hạn giao (hết hạn giao mà chưa ghi đủ chuyến) · Còn tiền chưa về (chỉ người được xem giá) · Thiếu chứng từ · Chờ thực nhập · Nháp quá ngày SX · Chưa gắn chuyến · Chuyến chờ HĐ đại lý (đã về quá 10 ngày chưa có hóa đơn).\n" +
+        "• Chưa làm: Quá hạn giao (hết hạn giao mà chưa ghi đủ chuyến) · Hồ sơ HĐ bổ sung sau (hợp đồng ký / L/C ghi bổ sung sau, phải đính đủ trước khi duyệt cuối) · Còn tiền chưa về (chỉ người được xem giá) · Thiếu chứng từ · Chờ thực nhập · Nháp quá ngày SX · Chưa gắn chuyến · Chuyến chờ HĐ đại lý (đã về quá 10 ngày chưa có hóa đơn).\n" +
         "• Để biết: Vượt dung sai · Thiếu dung sai (kg hoặc tiền thực xuất ra ngoài dung sai hợp đồng).\n" +
         "Các việc này theo luật của từng màn: hết khi màn đó xử lý xong (đủ chứng từ, ghi kg, phát hành lệnh, gắn hóa đơn…).",
     },

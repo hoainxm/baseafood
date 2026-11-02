@@ -13,6 +13,9 @@ import {
   STEP_TITLES,
   SUB_STEP_LABELS,
   CONTRACT_ATTACHMENT_LABELS,
+  DEFERRED_STEP_TEXT,
+  attachmentStatus,
+  blockingAttachmentKinds,
   containerIdentityOk,
   contractStepState,
   documentItems,
@@ -36,6 +39,8 @@ export interface ShipmentProgress {
   missing: string[];
   /** Số bước 1–5 đã xong / không áp dụng. */
   settledCount: number;
+  /** Bước 1 chỉ còn hồ sơ "bổ sung sau" ⇒ "chờ HĐ ký" / "chờ L/C" (ba-spec 58 R5); bước tiếp tính từ bước 2. */
+  contractNote: string;
 }
 
 const settled = (s: ExportItemState) => s === "done" || s === "not-applicable";
@@ -45,9 +50,13 @@ export function shipmentProgress(d: ExportData, s: ExportShipment, opts: Evidenc
     STEP_NOS.map((n) => [n, n === 1 ? contractStepState(d, s.contractId, opts) : stepState(d, s, n, opts)]),
   ) as Record<StepNo, ExportItemState>;
   const core: StepNo[] = [1, 2, 3, 4, 5];
-  const next = core.find((n) => !settled(steps[n])) ?? null;
+  // Bước 1 chỉ chờ hồ sơ "bổ sung sau" ⇒ không chặn: bước tiếp tìm từ bước 2, chữ chờ ghi kèm (ba-spec 58 R5).
+  const deferredOnly =
+    !settled(steps[1]) && !!effectiveRevision(d, s.contractId) && !blockingAttachmentKinds(d, s.contractId, opts).length;
+  const next = core.find((n) => !settled(steps[n]) && !(n === 1 && deferredOnly)) ?? null;
   const missing = next ? stepMissing(d, s, next) : [];
-  return { steps, next, missing, settledCount: core.filter((n) => settled(steps[n])).length };
+  const contractNote = deferredOnly ? stepMissing(d, s, 1).join(", ") : "";
+  return { steps, next, missing, settledCount: core.filter((n) => settled(steps[n])).length, contractNote };
 }
 
 /** Những mục còn thiếu của MỘT bước (bước đã xong ⇒ rỗng). Câu chữ người dùng đọc. */
@@ -56,7 +65,10 @@ export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string
     case 1:
       // Bước 1 = HĐ có bản hiệu lực + đủ hồ sơ đính kèm (không còn bước duyệt HĐ — 2026-10-29).
       return effectiveRevision(d, s.contractId)
-        ? missingAttachmentKinds(d, s.contractId).map((k) => `hồ sơ HĐ: ${CONTRACT_ATTACHMENT_LABELS[k]}`)
+        ? missingAttachmentKinds(d, s.contractId).map((k) =>
+            // "Bổ sung sau" (ba-spec 58 R5): bước đang làm, ghi "chờ HĐ ký" / "chờ L/C" — không chặn các bước sau.
+            attachmentStatus(d, s.contractId, k) === "deferred" ? (DEFERRED_STEP_TEXT[k] ?? `chờ ${CONTRACT_ATTACHMENT_LABELS[k]}`) : `hồ sơ HĐ: ${CONTRACT_ATTACHMENT_LABELS[k]}`,
+          )
         : ["bản hợp đồng có hiệu lực"];
     case 2:
       return ["lệnh sản xuất"];
@@ -80,12 +92,13 @@ export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string
 
 /** "Bước tiếp: Đóng cont — còn hình ảnh đóng cont, tờ khai" / "Khép kín". */
 export function progressText(p: ShipmentProgress): string {
-  if (p.next === null) return "Đủ hồ sơ — xong bước 1–5";
+  if (p.next === null) return p.contractNote ? `Đủ hồ sơ — ${p.contractNote}` : "Đủ hồ sơ — xong bước 1–5";
   const head = `Bước tiếp: ${STEP_TITLES[p.next - 1]}`;
   // "Bước tiếp: Lệnh sản xuất — còn lệnh sản xuất" chỉ lặp tên bước (nhãn v5 e) ⇒ bỏ phần sau.
-  if (!p.missing.length || (p.missing.length === 1 && p.missing[0] === STEP_TITLES[p.next - 1].toLowerCase())) return head;
+  const note = p.contractNote ? ` · ${p.contractNote}` : "";
+  if (!p.missing.length || (p.missing.length === 1 && p.missing[0] === STEP_TITLES[p.next - 1].toLowerCase())) return head + note;
   const shown = p.missing.slice(0, 2).join(", ");
-  return `${head} — còn ${shown}${p.missing.length > 2 ? ` và ${p.missing.length - 2} mục khác` : ""}`;
+  return `${head} — còn ${shown}${p.missing.length > 2 ? ` và ${p.missing.length - 2} mục khác` : ""}${note}`;
 }
 
 /** Màu thẻ trạng thái hợp đồng — mọi màn dùng chung. */

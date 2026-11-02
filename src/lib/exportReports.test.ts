@@ -2,7 +2,7 @@
 // (INV 234/26: 22.214 kg · 194.557,60 USD, B/L on board 26/09/2026) là số THẬT trên app ngày 21/10/2026.
 import { describe, expect, it } from "vitest";
 import { EMPTY_EXPORT_DATA, blankItem, deviationText, type ExportData } from "./exportPlanning";
-import { buildExportReport, buildReportExcel, monthReportPeriod, onTimeRate, parseReportPeriod, quarterPeriod, shiftReportPeriod, yearPeriod } from "./exportReports";
+import { attentionDetail, buildExportReport, buildReportExcel, monthReportPeriod, onTimeRate, parseReportPeriod, quarterPeriod, shiftReportPeriod, yearPeriod } from "./exportReports";
 import type { ExportContract, ExportContractLine, ExportContractRevision, ExportPayment, ExportShipment, ExportStepItem } from "@/types";
 
 let seq = 0;
@@ -170,5 +170,27 @@ describe("AC-45 — Excel báo cáo không có tiền khi không quyền xem gi�
     expect(cells).not.toContain("194557.6");
     expect(cells).not.toContain("Còn tiền chưa về");
     expect(cells).toContain("kg thừa 16,9%");
+  });
+});
+
+describe("ba-spec 58 AC-8 — hồ sơ HĐ bổ sung sau là việc cần đốc", () => {
+  const base = lot165();
+  const newFlow = { ...base.approvals[0], stage: "contract" as const, filePath: "", fileName: "" };
+  const d: ExportData = {
+    ...base,
+    approvals: [newFlow],
+    contracts: [{ ...base.contracts[0], attachmentDeferrals: { "signed-contract": { reason: "khách chưa gửi bản ký", by: "KH", at: T0 } } }],
+  };
+  const r = buildExportReport(d, monthReportPeriod("2026-09"), { customers, today: TODAY });
+  it("đúng 1 việc, nêu Hợp đồng đã ký", () => {
+    const rows = r.attention.filter((a) => a.kind === "deferred-attachment");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].deferredKinds).toEqual(["signed-contract"]);
+    expect(attentionDetail(rows[0], { viewPrice: false, deviationText })).toContain("Hợp đồng đã ký");
+  });
+  it("đính file ⇒ hết việc", () => {
+    const withFile: ExportData = { ...d, files: [{ id: "f1", contractId: "c1", shipmentId: "", stepItemId: "", step: "contract", attachmentKind: "signed-contract", filePath: "x.pdf", fileName: "x.pdf", caption: "", uploadedBy: "KH", createdAt: T0 } as ExportData["files"][number]] };
+    const r2 = buildExportReport(withFile, monthReportPeriod("2026-09"), { customers, today: TODAY });
+    expect(r2.attention.filter((a) => a.kind === "deferred-attachment")).toHaveLength(0);
   });
 });

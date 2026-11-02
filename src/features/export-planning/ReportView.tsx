@@ -43,7 +43,7 @@ import type { Customer } from "@/types";
 import { AlarmClock, BarChart3, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, Container, Eye, FileSpreadsheet, FileSignature, Wallet, Weight } from "lucide-react";
 
 const PERIOD_NOUN: Record<ReportPeriodKind, string> = { month: "tháng", quarter: "quý", year: "năm" };
-const ATTENTION_TAG = { overdue: "error", "over-tolerance": "error", "under-tolerance": "warning", unpaid: "warning" } as const;
+const ATTENTION_TAG = { overdue: "error", "over-tolerance": "error", "under-tolerance": "warning", unpaid: "warning", "deferred-attachment": "warning" } as const;
 
 export function ReportView({
   data,

@@ -1303,6 +1303,18 @@ export interface ExportContract {
   closeReason: string;
   note: string;
   createdAt: string;
+  /**
+   * Hồ sơ bắt buộc ghi "bổ sung sau" (mig 0093, ba-spec 58): mở ghi chuyến, vẫn chặn duyệt cuối. Có file đúng
+   * loại thì gỡ dấu. `undefined` = máy chủ chưa có cột / HĐ chưa từng ghi dấu ⇒ không gửi cột.
+   */
+  attachmentDeferrals?: Partial<Record<ExportContractAttachmentKind, AttachmentDeferral>>;
+}
+
+/** Một dấu "bổ sung sau" của một loại hồ sơ HĐ: lý do bắt buộc, người + giờ ghi. */
+export interface AttachmentDeferral {
+  reason: string;
+  by: string;
+  at: string;
 }
 
 /** Một bản hợp đồng — KHÔNG ghi đè (KH-R7). Bản hiệu lực = bản `approved` mới nhất. */

@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
-import { useCustomerProductNameStore, useCustomers, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
+import { useCustomerProductNameStore, useCustomers, useExportDeferralsAvailable, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNamesDialog";
 import { useAuth } from "@/lib/auth";
@@ -24,6 +24,8 @@ import {
   documentKindLabel,
   finalReviewGate,
   missingAttachmentKinds,
+  validateDeferral,
+  withDeferral,
   shipmentGate,
   shipmentGateText,
   buildMonthExcel,
@@ -54,7 +56,7 @@ import {
   workingRevision,
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
-import { ROLES, type ExportActivity, type ExportContract, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportStepItem } from "@/types";
+import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportStepItem } from "@/types";
 import { BarChart3, CalendarDays, FilePlus2, FileText, FolderLock, Route } from "lucide-react";
 import { ContractDossier } from "./ContractDossier";
 import { ContractFormDialog, type ContractFormTarget, type ContractSavePayload } from "./ContractFormDialog";
@@ -596,19 +598,49 @@ export default function ExportPlanningScreen() {
     );
   };
 
+  /** ba-spec 58: máy chủ đã chạy 0093 thì mới cho ghi "bổ sung sau" (chưa có cột ⇒ gửi lên kẹt hàng chờ). */
+  const deferralsAvailable = useExportDeferralsAvailable();
+
+  /** Ghi "bổ sung sau" cho một loại hồ sơ bắt buộc còn thiếu (R1–R3): mở ghi chuyến, vẫn chặn duyệt cuối. */
+  const doDefer = (c: ExportContract, kind: ExportContractAttachmentKind, reason: string) => {
+    if (validateDeferral(reason).length) return;
+    const prevC = d.contracts;
+    const next = withDeferral(c, kind, { reason, by: recordedBy, at: new Date().toISOString() });
+    if (!store.saveContracts(prevC.map((x) => (x.id === c.id ? next : x)))) return;
+    const what = `Ghi bổ sung sau: ${CONTRACT_ATTACHMENT_LABELS[kind]} của HĐ ${c.contractNo} — ${reason.trim()}`;
+    track(c.id, "", "update", what);
+    notify.saved(`Đã ghi ${CONTRACT_ATTACHMENT_LABELS[kind]} bổ sung sau — ghi chuyến được, duyệt cuối vẫn cần đủ file`, undoTracked(c.id, "", what, () => store.saveContracts(prevC)));
+  };
+
+  /** Bỏ dấu "bổ sung sau" bằng tay (R8) ⇒ loại về Thiếu; có Hoàn tác. */
+  const doClearDeferral = (c: ExportContract, kind: ExportContractAttachmentKind) => {
+    const prevC = d.contracts;
+    if (!store.saveContracts(prevC.map((x) => (x.id === c.id ? withDeferral(c, kind, null) : x)))) return;
+    const what = `Bỏ ghi bổ sung sau: ${CONTRACT_ATTACHMENT_LABELS[kind]} của HĐ ${c.contractNo}`;
+    track(c.id, "", "update", what);
+    notify.saved(`Đã bỏ ghi bổ sung sau — ${CONTRACT_ATTACHMENT_LABELS[kind]} về Thiếu`, undoTracked(c.id, "", what, () => store.saveContracts(prevC)));
+  };
+
   /** Bước Đính kèm (mig 0079): hồ sơ cấp HĐ — đủ loại bắt buộc thì mở bước Ghi chuyến. */
   const saveAttachments = (rows: ExportFile[]): boolean => {
     const prev = d.files;
+    const prevC = d.contracts;
     const r0 = rows[0];
     if (!r0 || !store.saveFiles([...prev, ...rows])) return false;
     const c = d.contracts.find((x) => x.id === r0.contractId);
+    // Đính file đúng loại đang "bổ sung sau" ⇒ gỡ dấu (R7) — gỡ file sau này thì loại về Thiếu, không về Bổ sung sau.
+    const attachedKind = r0.attachmentKind;
+    if (c && attachedKind && c.attachmentDeferrals?.[attachedKind]) store.saveContracts(prevC.map((x) => (x.id === c.id ? withDeferral(c, attachedKind, null) : x)));
     const kind = CONTRACT_ATTACHMENT_LABELS[r0.attachmentKind || "other"];
     const what = `Đính kèm ${rows.length} file ${kind} vào HĐ ${c?.contractNo ?? ""}: ${rows.map((r) => r.fileName).join(", ")}`;
     track(r0.contractId, "", "attach", what);
     const missing = missingAttachmentKinds({ ...d, files: [...prev, ...rows] }, r0.contractId, opts);
     notify.saved(
       `Đã đính kèm ${rows.length} file ${kind}${missing.length ? ` — còn thiếu ${missing.map((k) => CONTRACT_ATTACHMENT_LABELS[k]).join(", ")}` : " — đủ hồ sơ, ghi chuyến được"}`,
-      undoTracked(r0.contractId, "", what, () => store.saveFiles(prev)),
+      undoTracked(r0.contractId, "", what, () => {
+        store.saveFiles(prev);
+        store.saveContracts(prevC);
+      }),
     );
     setAttachTarget(null);
     return true;
@@ -873,6 +905,17 @@ export default function ExportPlanningScreen() {
           }
           onAttach={() => setAttachTarget({ contractId: contract.id, contractNo: contract.contractNo, missing: missingAttachmentKinds(d, contract.id, opts) })}
           onRemoveAttachment={removeFile}
+          deferralsAvailable={deferralsAvailable}
+          onDeferAttachment={(kind) =>
+            setReasonTarget({
+              title: `Chưa có ${CONTRACT_ATTACHMENT_LABELS[kind]} — bổ sung sau`,
+              description:
+                "Ghi chuyến và làm các bước tiếp được ngay; bước 1 của chuyến ghi chờ hồ sơ. Duyệt cuối, đóng hợp đồng vẫn cần đính đủ file. Đính file đúng loại thì dấu tự gỡ.",
+              confirmLabel: "Ghi bổ sung sau",
+              onConfirm: (reason) => doDefer(contract, kind, reason),
+            })
+          }
+          onClearDeferral={(kind) => doClearDeferral(contract, kind)}
           onFinalReview={() => {
             const eff = effectiveRevision(d, contract.id);
             const g = finalReviewGate(d, contract.id, opts);

@@ -9,6 +9,7 @@
 // gọi, không tự tính lại. Đổi luật ⇒ sửa test cùng thư mục (exportPlanning.test.ts).
 import { formatDateVN } from "./format";
 import type {
+  AttachmentDeferral,
   Customer,
   ExportContract,
   ExportActivity,
@@ -865,6 +866,69 @@ export function missingAttachmentKinds(
   return requiredAttachmentKinds(eff.terms).filter((k) => !have.has(k));
 }
 
+/* ---------- ba-spec 58: hồ sơ bắt buộc "bổ sung sau" (mig 0093) ---------- */
+
+/** Tình trạng một loại hồ sơ bắt buộc của HĐ: Có file · Bổ sung sau (có lý do) · Thiếu (R1). */
+export type AttachmentStatus = "has-file" | "deferred" | "missing";
+
+export const ATTACHMENT_STATUS_LABELS: Record<AttachmentStatus, string> = {
+  "has-file": "Có file",
+  deferred: "Bổ sung sau",
+  missing: "Thiếu",
+};
+
+/** Chữ của bước 1 trên thanh tiến độ khi hồ sơ đang "bổ sung sau" (R5). */
+export const DEFERRED_STEP_TEXT: Partial<Record<ExportContractAttachmentKind, string>> = {
+  "signed-contract": "chờ HĐ ký",
+  lc: "chờ L/C",
+};
+
+const deferralsOf = (d: Pick<ExportData, "contracts">, contractId: string) => d.contracts.find((c) => c.id === contractId)?.attachmentDeferrals ?? {};
+
+/** Loại bắt buộc chưa có file NHƯNG đã ghi "bổ sung sau" (có lý do). */
+export function deferredAttachmentKinds(
+  d: Pick<ExportData, "contracts" | "files" | "revisions" | "approvals">,
+  contractId: string,
+  opts: EvidenceOptions = WITH_FILES,
+): ExportContractAttachmentKind[] {
+  const def = deferralsOf(d, contractId);
+  return missingAttachmentKinds(d, contractId, opts).filter((k) => !!def[k]?.reason.trim());
+}
+
+/** Loại bắt buộc chưa có file VÀ chưa ghi "bổ sung sau" — CHỈ những loại này chặn ghi chuyến (R3, R4). */
+export function blockingAttachmentKinds(
+  d: Pick<ExportData, "contracts" | "files" | "revisions" | "approvals">,
+  contractId: string,
+  opts: EvidenceOptions = WITH_FILES,
+): ExportContractAttachmentKind[] {
+  const def = deferralsOf(d, contractId);
+  return missingAttachmentKinds(d, contractId, opts).filter((k) => !def[k]?.reason.trim());
+}
+
+/** Tình trạng một loại hồ sơ bắt buộc (R1). Loại không bắt buộc theo điều khoản ⇒ "has-file" (không cần). */
+export function attachmentStatus(
+  d: Pick<ExportData, "contracts" | "files" | "revisions" | "approvals">,
+  contractId: string,
+  kind: ExportContractAttachmentKind,
+  opts: EvidenceOptions = WITH_FILES,
+): AttachmentStatus {
+  if (!missingAttachmentKinds(d, contractId, opts).includes(kind)) return "has-file";
+  return deferralsOf(d, contractId)[kind]?.reason.trim() ? "deferred" : "missing";
+}
+
+/** Kiểm lý do "bổ sung sau" (R2): bắt buộc, không rỗng. */
+export function validateDeferral(reason: string): ValidationIssue[] {
+  return reason.trim() ? [] : [{ key: "reason", label: "Lý do", message: "Ghi lý do chưa có hồ sơ (vd khách chưa gửi bản ký, L/C chưa mở)" }];
+}
+
+/** HĐ sau khi ghi (deferral) hoặc gỡ (null) dấu "bổ sung sau" của MỘT loại. Gỡ hết ⇒ `{}` (vẫn gửi cột để xóa trên máy chủ). */
+export function withDeferral(c: ExportContract, kind: ExportContractAttachmentKind, deferral: AttachmentDeferral | null): ExportContract {
+  const next = { ...(c.attachmentDeferrals ?? {}) };
+  if (deferral) next[kind] = { ...deferral, reason: deferral.reason.trim() };
+  else delete next[kind];
+  return { ...c, attachmentDeferrals: next };
+}
+
 /** Bước 1 của chuyến theo HĐ: có bản hiệu lực VÀ đã đính kèm đủ hồ sơ bắt buộc (mig 0079; trước là "có file ký" — A4). */
 export function contractStepState(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): ExportItemState {
   const eff = effectiveRevision(d, contractId);
@@ -1046,7 +1110,8 @@ export function contractState(d: ExportData, contractId: string, opts: EvidenceO
   const c = d.contracts.find((x) => x.id === contractId);
   if (!c || c.status === "cancelled") return "cancelled";
   if (c.status === "closed") return "closed";
-  if (!effectiveRevision(d, contractId) || missingAttachmentKinds(d, contractId, opts).length) return "attaching";
+  // Chỉ loại "Thiếu" giữ HĐ ở Chờ đính kèm; "Bổ sung sau" cho đi tiếp (ba-spec 58 R4).
+  if (!effectiveRevision(d, contractId) || blockingAttachmentKinds(d, contractId, opts).length) return "attaching";
   return contractClosure(d, contractId, opts).closed ? "final-review" : "shipping";
 }
 
@@ -1067,7 +1132,8 @@ export function shipmentGate(d: ExportData, contractId: string, opts: EvidenceOp
   const c = d.contracts.find((x) => x.id === contractId);
   if (!c || c.status !== "open") return { ok: false, reason: "not-open", missing: [] };
   if (!effectiveRevision(d, contractId)) return { ok: false, reason: "no-revision", missing: [] };
-  const missing = missingAttachmentKinds(d, contractId, opts);
+  // "Bổ sung sau" mở cổng; chỉ loại còn Thiếu mới chặn (ba-spec 58 R3).
+  const missing = blockingAttachmentKinds(d, contractId, opts);
   return missing.length ? { ok: false, reason: "attachments-missing", missing } : { ok: true };
 }
 
@@ -1185,11 +1251,18 @@ export function finalReviewsOf(d: Pick<ExportData, "approvals">, contractId: str
  * Duyệt cuối được khi HĐ còn mở, đã qua bước Đính kèm và có ít nhất một chuyến còn mở. HĐ chưa xuất đủ
  * trong dung sai (đóng sớm: khách giảm lượng, phụ kiện…) ⇒ bắt lý do.
  */
-export function finalReviewGate(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): { ok: boolean; needsReason: boolean } {
+export function finalReviewGate(
+  d: ExportData,
+  contractId: string,
+  opts: EvidenceOptions = WITH_FILES,
+): { ok: boolean; needsReason: boolean; missingAttachments: ExportContractAttachmentKind[] } {
   const st = contractState(d, contractId, opts);
-  if (st !== "shipping" && st !== "final-review") return { ok: false, needsReason: false };
-  if (!openShipmentsOf(d, contractId).length) return { ok: false, needsReason: false };
-  return { ok: true, needsReason: st !== "final-review" };
+  if (st !== "shipping" && st !== "final-review") return { ok: false, needsReason: false, missingAttachments: [] };
+  if (!openShipmentsOf(d, contractId).length) return { ok: false, needsReason: false, missingAttachments: [] };
+  // Đóng HĐ phải đủ FILE hồ sơ bắt buộc — "bổ sung sau" cũng chặn (ba-spec 58 R6).
+  const missingAttachments = missingAttachmentKinds(d, contractId, opts);
+  if (missingAttachments.length) return { ok: false, needsReason: false, missingAttachments };
+  return { ok: true, needsReason: st !== "final-review", missingAttachments: [] };
 }
 
 /** Nhật ký thao tác của MỘT hợp đồng, MỚI trước. */

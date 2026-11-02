@@ -2231,6 +2231,8 @@ export const EXPORT_CONTRACT_TABLE: TableMapping<ExportContract> = {
     cancel_reason: x.cancelReason,
     close_reason: x.closeReason,
     note: x.note,
+    // mig 0093: chỉ gửi khi HĐ có trường — máy chủ chưa chạy 0093 thì HĐ không có dấu, không kẹt hàng chờ.
+    ...(x.attachmentDeferrals !== undefined ? { attachment_deferrals: x.attachmentDeferrals } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -2243,6 +2245,9 @@ export const EXPORT_CONTRACT_TABLE: TableMapping<ExportContract> = {
     closeReason: s(r.close_reason),
     note: s(r.note),
     createdAt: s(r.created_at),
+    ...(r.attachment_deferrals && typeof r.attachment_deferrals === "object" && Object.keys(r.attachment_deferrals as object).length
+      ? { attachmentDeferrals: r.attachment_deferrals as ExportContract["attachmentDeferrals"] }
+      : {}),
   }),
 };
 

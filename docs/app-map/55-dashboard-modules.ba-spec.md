@@ -3,6 +3,7 @@
 > Load khi: sửa `/dashboard` để thêm / bớt khối của module mới, đổi luật "việc cần đốc" lấy từ Phòng Kế hoạch hay hóa đơn đại lý, hoặc đổi quyền xem từng khối.
 covers: src/features/dashboard, src/lib/dashboardAttention.ts
 last_verified: 2026-11-02
+<!-- updated: 2026-11-02 (b) — thêm loại việc Xuất khẩu "Hồ sơ HĐ bổ sung sau" (`export-deferred-attachment`, mức Chưa làm — ba-spec 58 NV5): 12 loại. -->
 ttl_days: 90
 status: v1 (2026-11-02) — bản đầu. Chỉ ĐỌC dữ liệu đã có, không bảng / cột / quyền mới.
 

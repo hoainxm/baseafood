@@ -222,8 +222,11 @@ describe("file tải lên", () => {
   it("cách xem: PDF / ảnh xem ngay, Word / Excel tải về", () => {
     expect(filePreviewKind("QT.PDF")).toBe("pdf");
     expect(filePreviewKind("scan.jpeg")).toBe("image");
-    expect(filePreviewKind("mau.docx")).toBe("download");
     expect(filePreviewKind("khong-duoi")).toBe("download");
+  });
+  it("AC-1 (ba-spec 61): Word / Excel / văn bản xem trong app, zip / heic chỉ tải về", () => {
+    const names = ["HD-01.DOC", "bao-gia.Docx", "ke-hoach.xlsx", "x.xls", "a.csv", "ghi-chu.txt", "anh.JPG", "scan.pdf", "goi.zip", "IMG_1.heic"];
+    expect(names.map(filePreviewKind)).toEqual(["doc", "docx", "sheet", "sheet", "text", "text", "image", "pdf", "download", "download"]);
   });
   it("tên file an toàn cho đường dẫn (bỏ dấu, ký tự lạ)", () => {
     expect(safeFileName("Quy trình đơn hàng (bản ký).PDF")).toBe("Quy-trinh-don-hang-ban-ky.pdf");

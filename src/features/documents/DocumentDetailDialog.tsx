@@ -163,15 +163,26 @@ export function DocumentDetailDialog({
           <Tag variant="warning">Chưa có PDF</Tag>
         )}
         {v.sourcePath ? (
-          <Button
-            size={isCurrent ? "default" : "sm"}
-            variant="outline"
-            onClick={() => void openDocumentFile(v.sourcePath, v.sourceFileName || undefined)}
-            title="Tải file gốc (Word / Excel) của lần ban hành này về máy."
-          >
-            <Download className="mr-2 h-4 w-4" aria-hidden />
-            Tải file gốc
-          </Button>
+          <>
+            <Button
+              size={isCurrent ? "default" : "sm"}
+              variant="outline"
+              onClick={() => onPreview({ path: v.sourcePath, name: v.sourceFileName || v.sourcePath.split("/").pop() || "File gốc", caption: `File gốc · ${caption(v)}` })}
+              title="Xem file gốc (Word / Excel) ngay trong app, không cần tải về."
+            >
+              <Eye className="mr-2 h-4 w-4" aria-hidden />
+              Xem file gốc
+            </Button>
+            <Button
+              size={isCurrent ? "default" : "sm"}
+              variant="outline"
+              onClick={() => void openDocumentFile(v.sourcePath, v.sourceFileName || undefined)}
+              title="Tải file gốc (Word / Excel) của lần ban hành này về máy."
+            >
+              <Download className="mr-2 h-4 w-4" aria-hidden />
+              Tải file gốc
+            </Button>
+          </>
         ) : (
           canAttach && (
             <AttachFileButton

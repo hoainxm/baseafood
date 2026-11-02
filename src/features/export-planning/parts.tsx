@@ -4,11 +4,12 @@
 // Description: Shared UI bits for the export planning screens: step state dots, file preview,
 //              multi-file picker, vertical file list.
 // ============================================================
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, FormDialog, ProcessingState, Tag, notify, type TagVariant } from "@/design-system";
+import { useRef, useState, type ReactNode } from "react";
+import { Button, FormDialog, Tag, notify, type TagVariant } from "@/design-system";
 import { CONTRACT_FLOW_STAGES, ITEM_STATE_LABELS, STEP_TITLES, contractFlowIndex, type ContractState, type StepNo } from "@/lib/exportPlanning";
 import { DEMO_PLACEHOLDER_PREFIX, EXPORT_FILE_ACCEPT, getExportFileUrl } from "@/lib/exportFileStorage";
-import { filePreviewKind } from "@/lib/documents";
+import { FileViewer } from "@/features/shared/FileViewer";
+import { downloadFileFrom, openFileView } from "@/features/shared/fileViewSources";
 import { formatDateTimeVN } from "@/lib/format";
 import type { ExportActivity, ExportFile, ExportItemState } from "@/types";
 import { Check, ChevronDown, CircleDashed, Download, ExternalLink, Eye, FileText, Image as ImageIcon, Minus, Paperclip, Trash2, X } from "lucide-react";
@@ -66,45 +67,16 @@ export interface PreviewTarget {
   caption: string;
 }
 
-async function openExportFile(path: string, downloadName?: string) {
-  if (path.startsWith(DEMO_PLACEHOLDER_PREFIX)) {
-    notify.warning("Đây là file giữ chỗ của bộ demo — không có file thật để mở.");
-    return;
-  }
-  const w = window.open("", "_blank");
-  const url = await getExportFileUrl(path, 600, downloadName);
-  if (!url) {
-    w?.close();
-    notify.error("Không mở được file — tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.");
-    return;
-  }
-  if (w) {
-    w.opener = null;
-    w.location.href = url;
-  } else window.location.assign(url);
+/** File giữ chỗ của bộ demo — không có file thật để mở / tải. */
+function warnPlaceholder(path: string): boolean {
+  if (!path.startsWith(DEMO_PLACEHOLDER_PREFIX)) return false;
+  notify.warning("Đây là file giữ chỗ của bộ demo — không có file thật để mở.");
+  return true;
 }
 
-/** Xem file ngay trong app: PDF / ảnh hiện tại chỗ, Word / Excel / zip tải về. */
+/** Xem file ngay trong app (ba-spec 61): PDF, ảnh, Word, Excel, văn bản hiện tại chỗ; zip… tải về. */
 export function ExportFilePreview({ file, onClose }: { file: PreviewTarget | null; onClose: () => void }) {
   const isPlaceholder = !!file?.path.startsWith(DEMO_PLACEHOLDER_PREFIX);
-  const kind = file && !isPlaceholder ? filePreviewKind(file.path) : "download";
-  const [result, setResult] = useState<{ path: string; url: string | null } | null>(null);
-
-  useEffect(() => {
-    if (!file || kind === "download") return;
-    let isCancelled = false;
-    void getExportFileUrl(file.path, 600).then((url) => {
-      if (!isCancelled) setResult({ path: file.path, url });
-    });
-    return () => {
-      isCancelled = true;
-    };
-  }, [file, kind]);
-
-  const url = result && file && result.path === file.path ? result.url : null;
-  const state: "loading" | "ready" | "error" =
-    kind === "download" ? "ready" : !result || !file || result.path !== file.path ? "loading" : url ? "ready" : "error";
-
   return (
     <FormDialog
       open={!!file}
@@ -117,11 +89,11 @@ export function ExportFilePreview({ file, onClose }: { file: PreviewTarget | nul
         file &&
         !isPlaceholder && (
           <>
-            <Button variant="outline" onClick={() => void openExportFile(file.path)} title="Mở file này trên tab mới của trình duyệt (để in hoặc xem toàn màn hình).">
+            <Button variant="outline" onClick={() => !warnPlaceholder(file.path) && void openFileView("export", file.path, file.name)} title="Xem file này trên tab mới của trình duyệt (để in hoặc xem toàn màn hình) — không tải về.">
               <ExternalLink className="mr-2 h-4 w-4" aria-hidden />
               Mở tab mới
             </Button>
-            <Button variant="outline" onClick={() => void openExportFile(file.path, file.name)} title="Tải file này về máy.">
+            <Button variant="outline" onClick={() => !warnPlaceholder(file.path) && void downloadFileFrom("export", file.path, file.name)} title="Tải file này về máy.">
               <Download className="mr-2 h-4 w-4" aria-hidden />
               Tải về
             </Button>
@@ -131,24 +103,10 @@ export function ExportFilePreview({ file, onClose }: { file: PreviewTarget | nul
     >
       {file && (
         <div className="py-2">
-          {isPlaceholder && <p className="rounded-lg bg-muted px-4 py-3">File giữ chỗ của bộ demo — trình diễn trạng thái, không có file thật.</p>}
-          {!isPlaceholder && state === "loading" && <ProcessingState text="Đang mở file…" />}
-          {!isPlaceholder && state === "error" && (
-            <p role="alert" className="rounded-lg bg-destructive-surface px-4 py-3">
-              Không mở được file: tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.
-            </p>
-          )}
-          {state === "ready" && kind === "pdf" && url && (
-            <>
-              <iframe title={file.name} src={url} className="h-[min(75dvh,calc(100dvh-16rem))] min-h-80 w-full rounded-lg border border-border bg-muted" />
-              <p className="text-sm text-muted-foreground">Trên iPhone / iPad khung có thể chỉ hiện trang đầu — chọn Mở tab mới để xem đủ các trang.</p>
-            </>
-          )}
-          {state === "ready" && kind === "image" && url && (
-            <img src={url} alt={file.name} className="mx-auto max-h-[min(75dvh,calc(100dvh-16rem))] max-w-full rounded-lg border border-border object-contain" />
-          )}
-          {!isPlaceholder && state === "ready" && kind === "download" && (
-            <p className="rounded-lg bg-muted px-4 py-3">File này không xem được ngay trong trình duyệt. Bấm Tải về để mở trên máy.</p>
+          {isPlaceholder ? (
+            <p className="rounded-lg bg-muted px-4 py-3">File giữ chỗ của bộ demo — trình diễn trạng thái, không có file thật.</p>
+          ) : (
+            <FileViewer fileKey={file.path} name={file.name || file.path} getUrl={() => getExportFileUrl(file.path, 600)} />
           )}
         </div>
       )}

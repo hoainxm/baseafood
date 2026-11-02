@@ -52,9 +52,13 @@ import { callName, checkDisplayName } from "@/lib/personName";
 import { emailToUsername } from "@/lib/username";
 
 // Việc của tôi — việc cần làm, hạn, giao việc
+/** Trang có route nhưng không nằm trong cây điều hướng — tiêu đề header riêng. */
+const EXTRA_PAGE_TITLES: Record<string, string> = { "file-view": "Xem file" };
+
 const MyTasksScreen = lazy(() => import("@/features/my-tasks"));
 // Tài liệu công ty — quy trình, biểu mẫu, chứng nhận, hồ sơ năng lực (mig 0072)
 const DocumentsScreen = lazy(() => import("@/features/documents"));
+const FileViewScreen = lazy(() => import("@/features/shared/FileViewScreen"));
 const ExportPlanningScreen = lazy(() => import("@/features/export-planning"));
 const ImportPlanningScreen = lazy(() => import("@/features/import-planning"));
 const ProductionOrderScreen = lazy(() => import("@/features/production-orders"));
@@ -235,7 +239,7 @@ function ShellLayout() {
       active={seg}
       activeTab={seg === "catalog" ? normalizeCatalogTab(searchParams.get("tab")) : undefined}
       onSelect={(id) => navigate(`/${id}`)}
-      title={current?.label ?? ""}
+      title={current?.label ?? EXTRA_PAGE_TITLES[seg] ?? ""}
       account={username}
       guide={
         guide
@@ -374,6 +378,7 @@ export default function App() {
 
             <Route path="/my-tasks" element={<MyTasksScreen />} />
             <Route path="/documents" element={<DocumentsScreen />} />
+            <Route path="/file-view" element={<FileViewScreen />} />
             <Route path="/planning-export" element={<ExportPlanningScreen />} />
             <Route path="/planning-import" element={<ImportPlanningScreen />} />
             <Route path="/planning-production" element={<ProductionOrderScreen />} />

@@ -20,6 +20,7 @@ const PAGE_TOUR_EXEMPT: Record<string, string> = {
   roles: "quản trị vai trò & quyền — chỉ admin",
   audit: "nhật ký thao tác — trang tra cứu của quản trị",
   kit: "trang mẫu giao diện cho người phát triển",
+  "file-view": "trang xem một file ở tab mới (ba-spec 61) — không có thao tác nghiệp vụ, chỉ đọc + Tải về",
 };
 
 function listFiles(dir: string, ext: RegExp): string[] {

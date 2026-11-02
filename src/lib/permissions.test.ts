@@ -229,6 +229,7 @@ describe("sổ đăng ký tài nguyên khớp code", () => {
       [...app.matchAll(/<Route\s+path="\/([a-z-]+)[^"]*"\s+element=\{<(?!Navigate)/g)].map((m) => m[1])
     );
     segs.delete("kit"); // trang bộ giao diện cho dev, không phải màn nghiệp vụ
+    segs.delete("file-view"); // trang xem file ở tab mới (ba-spec 61) — quyền là quyền lấy link có hạn của nguồn file, không phải màn riêng
     for (const seg of segs) expect(PERMISSION_NAV_IDS, seg).toContain(seg);
     expect(segs.size).toBeGreaterThan(10);
   });

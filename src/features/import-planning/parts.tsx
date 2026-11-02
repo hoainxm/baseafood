@@ -4,15 +4,14 @@
 // Description: Shared UI bits for the import planning screens: state tags, file preview (bucket
 //              `import-files`), vertical file list.
 // ============================================================
-import { useEffect, useState } from "react";
-import { Button, FormDialog, ProcessingState, Tag, notify, type TagVariant } from "@/design-system";
+import { Button, FormDialog, Tag, type TagVariant } from "@/design-system";
 import { CONTRACT_STATE_LABELS, RECEIPT_STATE_LABELS, lineProduct, type ImportContractState, type ImportData, type ReceiptState } from "@/lib/importPlanning";
 import { DEMO_PLACEHOLDER_PREFIX, getImportFileUrl } from "@/lib/importFileStorage";
-import { filePreviewKind } from "@/lib/documents";
+import { FileViewer } from "@/features/shared/FileViewer";
+import { downloadFileFrom, openFileView } from "@/features/shared/fileViewSources";
 import { formatDateTimeVN } from "@/lib/format";
 import type { ImportContractLine, ImportFile } from "@/types";
 import { Download, ExternalLink, Eye, FileText, Trash2 } from "lucide-react";
-import { openInNewTab } from "@/lib/openInNewTab";
 
 const RECEIPT_STATE_TAG: Record<ReceiptState, TagVariant> = {
   "missing-docs": "warning",
@@ -48,34 +47,9 @@ export interface ImportPreviewTarget {
   caption?: string;
 }
 
-async function openImportFile(path: string, downloadName?: string) {
-  // Mở tab trống trước khi chờ link — gọi window.open sau await thì Safari iPhone / iPad chặn.
-  if (!(await openInNewTab(() => getImportFileUrl(path, 600, downloadName)))) {
-    notify.error("Không mở được file — tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.");
-  }
-}
-
-/** Xem file trong app (PDF / ảnh); loại khác ⇒ Tải về. File giữ chỗ của demo ⇒ câu giải thích. */
+/** Xem file trong app (ba-spec 61): PDF, ảnh, Word, Excel, văn bản hiện tại chỗ; loại khác ⇒ Tải về. File giữ chỗ của demo ⇒ câu giải thích. */
 export function ImportFilePreview({ file, onClose }: { file: ImportPreviewTarget | null; onClose: () => void }) {
   const isPlaceholder = !!file?.path.startsWith(DEMO_PLACEHOLDER_PREFIX);
-  const kind = file && !isPlaceholder ? filePreviewKind(file.path) : "download";
-  const [result, setResult] = useState<{ path: string; url: string | null } | null>(null);
-
-  useEffect(() => {
-    if (!file || kind === "download") return;
-    let isCancelled = false;
-    void getImportFileUrl(file.path, 600).then((url) => {
-      if (!isCancelled) setResult({ path: file.path, url });
-    });
-    return () => {
-      isCancelled = true;
-    };
-  }, [file, kind]);
-
-  const url = result && file && result.path === file.path ? result.url : null;
-  const state: "loading" | "ready" | "error" =
-    kind === "download" ? "ready" : !result || !file || result.path !== file.path ? "loading" : url ? "ready" : "error";
-
   return (
     <FormDialog
       open={!!file}
@@ -88,11 +62,11 @@ export function ImportFilePreview({ file, onClose }: { file: ImportPreviewTarget
         file &&
         !isPlaceholder && (
           <>
-            <Button variant="outline" onClick={() => void openImportFile(file.path)} title="Mở file này trên tab mới của trình duyệt (để in hoặc xem toàn màn hình).">
+            <Button variant="outline" onClick={() => void openFileView("import", file.path, file.name)} title="Xem file này trên tab mới của trình duyệt (để in hoặc xem toàn màn hình) — không tải về.">
               <ExternalLink className="mr-2 h-4 w-4" aria-hidden />
               Mở tab mới
             </Button>
-            <Button variant="outline" onClick={() => void openImportFile(file.path, file.name)} title="Tải file này về máy.">
+            <Button variant="outline" onClick={() => void downloadFileFrom("import", file.path, file.name)} title="Tải file này về máy.">
               <Download className="mr-2 h-4 w-4" aria-hidden />
               Tải về
             </Button>
@@ -102,24 +76,10 @@ export function ImportFilePreview({ file, onClose }: { file: ImportPreviewTarget
     >
       {file && (
         <div className="py-2">
-          {isPlaceholder && <p className="rounded-lg bg-muted px-4 py-3">File giữ chỗ của bộ demo — trình diễn trạng thái, không có file thật.</p>}
-          {!isPlaceholder && state === "loading" && <ProcessingState text="Đang mở file…" />}
-          {!isPlaceholder && state === "error" && (
-            <p role="alert" className="rounded-lg bg-destructive-surface px-4 py-3">
-              Không mở được file: tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.
-            </p>
-          )}
-          {state === "ready" && kind === "pdf" && url && (
-            <>
-              <iframe title={file.name} src={url} className="h-[min(75dvh,calc(100dvh-16rem))] min-h-80 w-full rounded-lg border border-border bg-muted" />
-              <p className="text-sm text-muted-foreground">Trên iPhone / iPad khung có thể chỉ hiện trang đầu — chọn Mở tab mới để xem đủ các trang.</p>
-            </>
-          )}
-          {state === "ready" && kind === "image" && url && (
-            <img src={url} alt={file.name} className="mx-auto max-h-[min(75dvh,calc(100dvh-16rem))] max-w-full rounded-lg border border-border object-contain" />
-          )}
-          {!isPlaceholder && state === "ready" && kind === "download" && (
-            <p className="rounded-lg bg-muted px-4 py-3">File này không xem được ngay trong trình duyệt. Chọn Tải về để mở trên máy.</p>
+          {isPlaceholder ? (
+            <p className="rounded-lg bg-muted px-4 py-3">File giữ chỗ của bộ demo — trình diễn trạng thái, không có file thật.</p>
+          ) : (
+            <FileViewer fileKey={file.path} name={file.name || file.path} getUrl={() => getImportFileUrl(file.path, 600)} />
           )}
         </div>
       )}

@@ -867,7 +867,7 @@ Oracle hành vi: [ba-spec 53](../../docs/app-map/53-filters.ba-spec.md). Logic s
 
 **Mốc giờ nhật ký / lịch sử (từ 2026-11-02):** mọi chỗ hiện lúc thao tác (nhật ký, lịch sử xuất file, đăng nhập lần cuối, khoá kỳ, file đính, in tem, nháp) dùng `formatDateTimeVN` của `lib/format.ts` ⇒ "dd/mm/yyyy HH:mm" theo giờ máy. Cấm ghép `formatDateVN(iso.slice(0, 10))` (ngày UTC) với giờ máy, cấm `toLocaleString` tự do (giờ đứng trước, có giây, không đủ 0).
 
-**Xem / mở file (từ 2026-11-02):** khung PDF trong hộp cao `h-[min(75dvh,calc(100dvh-16rem))] min-h-80` + dòng nhắc iPhone / iPad chỉ hiện trang đầu ⇒ "Mở tab mới". Mở file ở tab mới qua `openInNewTab` (`lib/openInNewTab.ts`) — gọi `window.open` sau `await` thì Safari iOS chặn.
+**Xem / mở file (từ 2026-11-02):** MỌI hộp xem file đính kèm dùng `features/shared/FileViewer` (ba-spec 61) — PDF, ảnh, Word (.docx đúng trang qua `DocxPreview`; .doc chữ + bảng), Excel (tab theo sheet, trần 1.000 dòng), .csv / .txt; chỉ zip / heic… mới "Tải về". "Mở tab mới" gọi `openFileView` (`features/shared/fileViewSources.ts`): PDF / ảnh trỏ link có hạn, loại khác mở trang `#/file-view` của app — link Storage của Word / Excel làm trình duyệt TẢI file. **Cấm** nhúng Office Online / Google Docs viewer (lộ file nội bộ). Khung PDF trong hộp cao `h-[min(75dvh,calc(100dvh-16rem))] min-h-80` + dòng nhắc iPhone / iPad chỉ hiện trang đầu ⇒ "Mở tab mới". Mở file ở tab mới qua `openInNewTab` (`lib/openInNewTab.ts`) — gọi `window.open` sau `await` thì Safari iOS chặn.
 
 Màn cũ đã đủ lọc (Nhật ký thao tác, Tài liệu, Sổ chuyến Nhập hàng…) giữ nguyên; màn THÊM lọc từ 2026-10-31 dùng khung này.
 

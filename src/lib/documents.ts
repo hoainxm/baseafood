@@ -280,11 +280,21 @@ export function checkDocumentFile(file: { name: string; size: number }, kind: "p
   return allowed.includes(ext) ? null : `File "${file.name}" không đúng loại (${kind === "pdf" ? "chỉ PDF" : "Word, Excel hoặc ảnh"})`;
 }
 
-/** Cách xem một file trong app: PDF / ảnh xem ngay trong khung, file khác (Word, Excel) tải về. */
-export function filePreviewKind(fileName: string): "pdf" | "image" | "download" {
+/**
+ * Cách xem một file trong app (ba-spec 61 R1) — theo đuôi tên, không phân biệt hoa thường:
+ * PDF / ảnh hiện thẳng từ link có hạn; Word / Excel / văn bản app tải bytes rồi dựng nội dung;
+ * còn lại (zip, heic…) chỉ tải về.
+ */
+export type FilePreviewKind = "pdf" | "image" | "docx" | "doc" | "sheet" | "text" | "download";
+
+export function filePreviewKind(fileName: string): FilePreviewKind {
   const ext = fileName.toLowerCase().split(".").pop() ?? "";
   if (ext === "pdf") return "pdf";
   if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return "image";
+  if (ext === "docx") return "docx";
+  if (ext === "doc") return "doc";
+  if (ext === "xls" || ext === "xlsx") return "sheet";
+  if (ext === "csv" || ext === "txt") return "text";
   return "download";
 }
 

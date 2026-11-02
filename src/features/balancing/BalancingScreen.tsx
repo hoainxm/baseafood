@@ -739,8 +739,10 @@ function PeriodDetail({
         {/* Nguyên liệu vào (A–E) | Bán thành phẩm (F–J): HAI CỘT BẰNG NHAU (người dùng chốt
             2026-10-19: rộng bằng nhau cho trực quan) — lưới 2 cột `minmax(0,1fr)`, cả cặp nhận
             phần bề ngang còn dư của hàng, Ghi chú cố định bên phải. Hai khối cao bằng nhau
-            (`auto-rows-fr`) ⇒ đường kẻ dọc giữa chạy hết. */}
-        <div className="w-full min-w-0 xl:grid xl:w-auto xl:max-w-full xl:grow xl:basis-auto xl:auto-rows-fr xl:grid-cols-2">
+            (`auto-rows-fr`) ⇒ đường kẻ dọc giữa chạy hết.
+            Trần = hàng TRỪ bề rộng Ghi chú (w-56 = 14rem): cột kéo rộng (bảng w-max) thì bảng cuộn
+            ngang trong khung của nó, KHÔNG nở cặp khối đẩy Ghi chú xuống dòng (người dùng 2026-11-02). */}
+        <div className="w-full min-w-0 xl:grid xl:w-auto xl:max-w-[calc(100%-14rem)] xl:grow xl:basis-auto xl:auto-rows-fr xl:grid-cols-2">
         <div className="min-w-0">
           <MaterialGrid
             grid={grid}

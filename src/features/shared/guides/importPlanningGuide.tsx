@@ -5,6 +5,7 @@
 //              your work, 5 steps with who + done condition, receipt / contract states, product
 //              mapping, who-does-what. Tour: import-planning/importTour.ts.
 // ============================================================
+import { ActivityGuideSection } from "./ActivityGuideSection";
 import { CONTRACT_STATE_LABELS, RECEIPT_STATE_LABELS } from "@/lib/importPlanning";
 import type { PageGuide } from "../guideContent";
 import type { GuideActor, GuideFlowStep, GuideState } from "./flowGuide";
@@ -173,6 +174,7 @@ export const importPlanningGuide: PageGuide = {
           <li>HĐ còn chưa về = kg các hợp đồng đang mở còn chưa nhập, không theo kỳ. Lần nhập cần chú ý: thiếu chứng từ, hoặc đã về kho mà chưa ghi thực nhập.</li>
         </GuideList>
       </GuideSection>
+      <ActivityGuideSection where="Cuối hồ sơ hợp đồng nhập" what="lập / sửa HĐ, ghi lần nhập, chứng từ, file, thực nhập, kiểm mẫu, hủy / đóng / mở lại — cả của các lần nhập." />
       <GuideSection title="Mẹo">
         <GuideList>
           <li><b>Còn lại</b> của dòng hàng = kg hợp đồng − tổng thực nhập các lần nhập chưa hủy. Về nhiều hơn thì hiện <b>vượt x kg</b>, vẫn lưu được.</li>

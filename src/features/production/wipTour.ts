@@ -242,6 +242,18 @@ export function buildWipTour(ctx: WipTourContext): PageTour {
     }),
   );
 
+  steps.push(
+    ledger({
+      id: "activity",
+      target: "wip-activity",
+      optional: true,
+      title: "Nhật ký thao tác của ngày",
+      body:
+        "Khi xem một ngày, một xưởng, cuối trang là nhật ký của ngày đó: ghi / sửa / xóa thành phẩm, bán nội địa, hàng đông lạnh, gửi báo cáo, chốt và mở lại ngày (kèm lý do).\n" +
+        "Mỗi dòng: giờ · người · việc đã làm, mới nhất trước. Người ghi và giờ ghi do máy chủ đặt; dòng không sửa, không xóa được — Hoàn tác cũng ghi thêm một dòng.",
+    }),
+  );
+
   if (can.lock) {
     steps.push(
       ledger({

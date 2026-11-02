@@ -23,6 +23,8 @@ import {
 import { LotInputPicker, LotQrLabels } from "@/features/shared";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useFormDraft } from "@/lib/formDraft";
+import { dayRecordId, entriesOf, useProductionActivityLog } from "@/features/shared/activityLog";
+import { ActivityLogBlock } from "@/features/shared/ActivityLogBlock";
 import { useAuth } from "@/lib/auth";
 import { formatFinishedGoodLotLabel, buildLotNode } from "@/lib/lotTraceability";
 import {
@@ -232,6 +234,8 @@ export default function PackagingScreen() {
   /* Tự lưu NHÁP phiếu đóng gói đang gõ (quy tắc 17, lib/formDraft.ts) — quay lại trang là
      hộp phiếu tự mở lại đúng số đang gõ dở. Lưu xong / Hủy ⇒ nháp tự xoá. */
   const { profile } = useAuth();
+  // Nhật ký nhóm Sản xuất (ba-spec 56): hồ sơ = ngày đóng gói × phân xưởng (Q3).
+  const productionLog = useProductionActivityLog(profile?.fullName || profile?.username || "Máy này");
   const packagingDraft = useFormDraft({
     form: "packaging",
     account: profile?.username ?? "",
@@ -299,6 +303,14 @@ export default function PackagingScreen() {
       note: form.note,
     };
     persist([...rows, p]);
+    productionLog.log([
+      {
+        recordType: "packaging-day",
+        recordId: dayRecordId(p.date, p.workshop),
+        action: "create",
+        summary: `Đóng gói ${productNameOf(p.fromProductId)} ${kg(p.inputKg)} → ${productNameOf(p.toProductId)} ${kg(p.outputKg)}${p.warehouse ? ` · kho ${p.warehouse}` : ""}`,
+      },
+    ]);
     notify.saved(
       `Đã đóng gói: ${productNameOf(p.fromProductId)} ${kg(p.inputKg)} → ${productNameOf(p.toProductId)} ${kg(p.outputKg)}`,
       undefined,
@@ -311,7 +323,13 @@ export default function PackagingScreen() {
   const remove = (r: Packaging) => {
     const prevRows = rows;
     persist(rows.filter((x) => x.id !== r.id));
-    notify.deleted(`Đã xóa phiếu đóng gói ${productNameOf(r.toProductId)}`, () => persist(prevRows));
+    const what = `Xóa phiếu đóng gói ${productNameOf(r.fromProductId)} ${kg(r.inputKg)} → ${productNameOf(r.toProductId)} ${kg(r.outputKg)}`;
+    const ref = { recordType: "packaging-day" as const, recordId: dayRecordId(r.date, r.workshop) };
+    productionLog.log([{ ...ref, action: "delete", summary: what }]);
+    notify.deleted(`Đã xóa phiếu đóng gói ${productNameOf(r.toProductId)}`, () => {
+      persist(prevRows);
+      productionLog.log([{ ...ref, action: "undo", summary: `Hoàn tác: ${what}` }]);
+    });
   };
 
   const columns: RecordTableColumn<Packaging>[] = [
@@ -525,6 +543,16 @@ export default function PackagingScreen() {
         <div data-tour="packaging-table">
           <RecordTable columns={columns} rows={view} getKey={(r) => r.id} rowMarkKey="dong-goi" />
         </div>
+      )}
+
+      {isSingleDay && workshop !== "Tất cả" && (
+        <section className="rounded-xl border-2 border-border p-4">
+          <ActivityLogBlock
+            title={`Nhật ký thao tác — đóng gói ngày ${formatDateVN(effectiveFrom)} · xưởng ${workshop}`}
+            entries={entriesOf(productionLog.entries, "packaging-day", dayRecordId(effectiveFrom, workshop))}
+            tourTarget="packaging-activity"
+          />
+        </section>
       )}
 
       {/* Dialog ghi phiếu */}

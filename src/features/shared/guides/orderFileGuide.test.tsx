@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { COMPOSED_STATUS_LABELS, fieldSourceLabel } from "@/lib/documentComposer";
 import { productionOrderForm as F } from "@/lib/documentTypes/productionOrderForm";
-import { OrderFileGuideSection } from "./productionOrderGuide";
+import { OrderFileGuideSection } from "./OrderFileGuideSection";
 
 describe("AC-17 — hướng dẫn file LSX nhắc đủ nhãn", () => {
   test("3 trạng thái + 3 cờ + 5 nguồn ô, thiếu == 0", () => {

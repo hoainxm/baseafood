@@ -30,37 +30,17 @@ import {
   type StatCardData,
 } from "@/design-system";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
+import { TABLE_LABELS } from "@/lib/catalogRepo";
 import { FileSpreadsheet, History, RefreshCw, Users } from "lucide-react";
 
-/** Nhãn tiếng Việt của bảng (đối tượng bị tác động). */
-const TABLE_LABELS: Record<string, string> = {
-  material_imports: "Nhập nguyên liệu",
-  import_shipments: "Chuyến nhập",
-  daily_locks: "Chốt ngày nhập",
-  scraps: "Phế liệu",
-  production_wips: "Sản xuất BTP",
-  production_locks: "Chốt ngày sản xuất",
-  packagings: "Đóng gói BTP → TP",
-  balancing_periods: "Kỳ cân đối",
-  balancing_inputs: "Nguyên liệu vào (cân đối)",
-  balancing_outputs: "Thành phẩm ra (cân đối)",
-  sales_invoices: "Phiếu bán",
-  sales_items: "Dòng bán",
-  sales_orders: "Đơn đặt",
-  order_items: "Dòng đơn đặt",
-  export_orders: "Lệnh xuất",
-  export_items: "Dòng lệnh xuất",
-  products: "Mặt hàng",
-  customers: "Khách hàng",
-  suppliers: "Đại lý",
-  material_types: "Loại nguyên liệu",
+/** Nhãn tiếng Việt của bảng: lấy chung từ tầng dữ liệu (mọi bảng đang đồng bộ) + vài nhãn chỉ có ở nhật ký. */
+const AUDIT_ONLY_LABELS: Record<string, string> = {
   finished_goods: "Thành phẩm (danh mục)",
   user_profiles: "Người dùng",
-  material_opening_stock: "Tồn đầu nguyên liệu",
-  finished_goods_opening_stock: "Tồn đầu thành phẩm",
   auth: "Đăng nhập / xuất",
 };
-const tableLabel = (e: string) => TABLE_LABELS[e] ?? e;
+const ENTITY_LABELS: Record<string, string> = { ...TABLE_LABELS, ...AUDIT_ONLY_LABELS };
+const tableLabel = (e: string) => ENTITY_LABELS[e] ?? e;
 
 const ACTION_LABELS: Record<string, string> = {
   create: "Thêm",
@@ -94,10 +74,14 @@ function formatDate(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("vi-VN");
 }
 
-function monthStart(): string {
-  const t = todayIso();
-  return `${t.slice(0, 7)}-01`;
+/** Mặc định xem 30 ngày gần nhất (gồm hôm nay) — đầu tháng vẫn thấy việc của tháng trước. */
+function daysAgo(n: number): string {
+  const d = new Date(`${todayIso()}T00:00:00`);
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+/** Mỗi lần tải / tải thêm. */
+const PAGE = 1000;
 
 /**
  * Nhật ký thao tác — chỉ Admin. Đọc audit_log (server) hoặc buffer (localStorage).
@@ -105,7 +89,7 @@ function monthStart(): string {
  * client. Xem chi tiết trước→sau trong hộp thoại. Xuất Excel.
  */
 export default function AuditLogScreen() {
-  const [fromDate, setFromDate] = useState(monthStart());
+  const [fromDate, setFromDate] = useState(daysAgo(29));
   const [toDate, setToDate] = useState(todayIso());
   const [actionFilter, setActionFilter] = useState("");
   const [entity, setEntity] = useState("");
@@ -115,11 +99,15 @@ export default function AuditLogScreen() {
   const [rows, setRows] = useState<AuditEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [detail, setDetail] = useState<AuditEntry | null>(null);
+  // Tải thêm: số dòng đọc tăng theo từng 1000, đổi bộ lọc thì về 1000 (khóa theo bộ lọc, không cần effect).
+  const filterKey = [fromDate, toDate, actionFilter, entity].join("|");
+  const [limitFor, setLimitFor] = useState({ key: filterKey, n: PAGE });
+  const limit = limitFor.key === filterKey ? limitFor.n : PAGE;
 
   useEffect(() => {
     let isCancelled = false;
     setIsLoading(true);
-    readAuditLog({ fromDate, toDate, action: actionFilter || undefined, entity: entity || undefined, limit: 1000 })
+    readAuditLog({ fromDate, toDate, action: actionFilter || undefined, entity: entity || undefined, limit })
       .then((r) => {
         if (!isCancelled) setRows(r);
       })
@@ -129,11 +117,13 @@ export default function AuditLogScreen() {
     return () => {
       isCancelled = true;
     };
-  }, [fromDate, toDate, actionFilter, entity]);
+  }, [fromDate, toDate, actionFilter, entity, limit]);
+  /** Đọc đủ số dòng giới hạn ⇒ có thể còn thao tác cũ hơn chưa hiện. */
+  const isTruncated = rows.length >= limit;
 
   const reload = () => {
     setIsLoading(true);
-    readAuditLog({ fromDate, toDate, action: actionFilter || undefined, entity: entity || undefined, limit: 1000 })
+    readAuditLog({ fromDate, toDate, action: actionFilter || undefined, entity: entity || undefined, limit })
       .then(setRows)
       .finally(() => setIsLoading(false));
   };
@@ -144,11 +134,13 @@ export default function AuditLogScreen() {
     return [{ value: "", label: "Tất cả người" }, ...[...set].sort().map((u) => ({ value: u, label: u }))];
   }, [rows]);
 
+  // Đối tượng: MỌI bảng có nhật ký (không chỉ bảng có trong số dòng đang tải — lỗi cũ: 1000 dòng mới nhất
+  // không có Hợp đồng xuất khẩu thì không lọc được Hợp đồng xuất khẩu) + bảng lạ có trong nhật ký.
   const entityOptions: ComboboxOption[] = useMemo(() => {
-    const set = new Set(rows.map((r) => r.entity).filter(Boolean));
+    const set = new Set([...Object.keys(ENTITY_LABELS), ...rows.map((r) => r.entity).filter(Boolean)]);
     return [
       { value: "", label: "Tất cả đối tượng" },
-      ...[...set].sort().map((e) => ({ value: e, label: tableLabel(e) })),
+      ...[...set].map((e) => ({ value: e, label: tableLabel(e) })).sort((a, b) => a.label.localeCompare(b.label, "vi")),
     ];
   }, [rows]);
 
@@ -265,6 +257,21 @@ export default function AuditLogScreen() {
         </div>
       </div>
 
+      {!isLoading && isTruncated && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warning-surface px-4 py-2 text-sm">
+          <span>
+            Đang hiện {limit.toLocaleString("vi-VN")} thao tác mới nhất trong khoảng ngày này — còn thao tác cũ hơn chưa hiện. Tải thêm, hoặc thu hẹp khoảng ngày / chọn Đối tượng.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setLimitFor({ key: filterKey, n: limit + PAGE })}
+            title="Đọc thêm 1.000 thao tác cũ hơn trong cùng khoảng ngày và bộ lọc."
+          >
+            Tải thêm 1.000
+          </Button>
+        </div>
+      )}
       {isLoading ? (
         <TableSkeleton />
       ) : view.length === 0 ? (

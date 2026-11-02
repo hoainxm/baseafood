@@ -3,6 +3,7 @@
 // Tên tiếng Việt: React Hooks & Repository thao tác với dữ liệu Danh mục
 // Description: Catalog Data Access Hooks & Local Storage / Supabase Repository
 // ============================================================
+import { useEffect, useState } from "react";
 import { uid } from "@/lib/db";
 import {
   SALES_ITEM_TABLE,
@@ -24,6 +25,9 @@ import {
   DOCUMENT_TEMPLATE_TABLE,
   COMPOSED_DOCUMENT_TABLE,
   COMPOSED_DOCUMENT_EXPORT_TABLE,
+  IMPORTS_ACTIVITY_TABLE,
+  PRODUCTION_ACTIVITY_TABLE,
+  serverHasColumn,
   SUPPLIER_INVOICE_TABLE,
   SUPPLIER_INVOICE_LINE_TABLE,
   ACCOUNTING_CODE_MAP_TABLE,
@@ -350,6 +354,33 @@ export function useExportActivityStore() {
   const canLog = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
   return { activities, setActivities, canLog };
 }
+/**
+ * Nhật ký nhóm Kế hoạch (ba-spec 56): cùng bảng export_activity_log. `canLogRecords` = máy chủ đã chạy 0092
+ * (có cột record_type) — chưa có thì KHÔNG ghi dòng Nhập khẩu / Lệnh SX (kẹt hàng chờ cả bảng); dòng HĐ xuất vẫn ghi.
+ */
+export function usePlanningActivityStore() {
+  const base = useExportActivityStore();
+  const [hasColumns, setHasColumns] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void serverHasColumn("export_activity_log", "record_type").then((ok) => alive && setHasColumns(ok));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return { ...base, canLogRecords: base.canLog && hasColumns === true };
+}
+/** Nhật ký nhóm Nhập hàng / Sản xuất (mig 0092) — thiếu bảng ⇒ không ghi. */
+export const useImportsActivities = () => useTable(IMPORTS_ACTIVITY_TABLE);
+export const useProductionActivities = () => useTable(PRODUCTION_ACTIVITY_TABLE);
+export function useImportsActivityStore() {
+  const [entries, setEntries, meta] = useImportsActivities();
+  return { entries, setEntries, canLog: !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error)) };
+}
+export function useProductionActivityStore() {
+  const [entries, setEntries, meta] = useProductionActivities();
+  return { entries, setEntries, canLog: !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error)) };
+}
 /** Tên hàng theo khách (mig 0077) — dùng qua `useCustomerProductNameStore` để biết máy chủ đã có bảng chưa. */
 export const useCustomerProductNames = () => useTable(CUSTOMER_PRODUCT_NAME_TABLE);
 
@@ -449,5 +480,5 @@ export const useRolePermissions = () => useTable(ROLE_PERMISSION_TABLE);
 export const useUserPermissions = () => useTable(USER_PERMISSION_TABLE);
 
 /** Nạp bộ demo hàng loạt không ghi nhật ký (lib/repo.ts) — chỉ DemoPackLoader dùng. */
-export { setAuditPaused } from "@/lib/repo";
+export { setAuditPaused, TABLE_LABELS } from "@/lib/repo";
 export { mergeProductsOnServer, undoProductMergeOnServer, isServerConnected } from "@/lib/repo";

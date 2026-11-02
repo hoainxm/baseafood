@@ -15,6 +15,9 @@ import type {
   Workshop,
 } from "@/types";
 import { isBackdatedWip, hasSplitComponents, blockSpec, BSF1_WAREHOUSES } from "@/types";
+import type { ExportActivityAction } from "@/types";
+import { dayRecordId, entriesOf, useProductionActivityLog } from "@/features/shared/activityLog";
+import { ActivityLogBlock } from "@/features/shared/ActivityLogBlock";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
@@ -173,6 +176,10 @@ export default function WipProductionScreen() {
   // Người thao tác = tài khoản đang đăng nhập — gắn vào dòng khi lưu để lưu vết ai gửi.
   const { profile } = useAuth();
   const operator = recordName(profile);
+  // Nhật ký nhóm Sản xuất (ba-spec 56): hồ sơ = ngày SX × phân xưởng (Q3), mỗi thao tác một câu.
+  const productionLog = useProductionActivityLog(operator);
+  const logDay = (date: string, ws: string, action: ExportActivityAction, summary: string) =>
+    productionLog.log([{ recordType: "production-day", recordId: dayRecordId(date, ws), action, summary }]);
 
   /** Phân quyền lớp 2 (spec role-permissions §5): ẩn nút không có quyền. Gắn lô /
    *  bán nội địa / bột tẩm là thêm-sửa trên "wip"; Gửi báo cáo + In tem = export. */
@@ -887,6 +894,21 @@ export default function WipProductionScreen() {
     const newBatterKg = newWips.reduce((s, r) => s + sumBatterKg(r.batterKg), 0);
     const newDomesticKg = newDomesticSales.reduce((s, r) => s + r.quantityKg, 0);
     const newFrozenKg = newFrozenLines.reduce((s, r) => s + r.inKg, 0);
+    logDay(
+      session.productionDate,
+      session.workshop,
+      "create",
+      [
+        newWips.length > 0 && `Ghi ${newWips.length} thành phẩm · ${kg(newTotal)} (${[...new Set(newWips.map((r) => productNameOf(r.productId)))].join(", ")})`,
+        newBatterKg > 0 && `bột tẩm ${kg(newBatterKg)}`,
+        newDomesticSales.length > 0 && `bán nội địa ${kg(newDomesticKg)}`,
+        newFrozenLines.length > 0 && `hàng đông lạnh ${kg(newFrozenKg)} vào Hàng tạm`,
+        lottedBatchCount > 0 && `gắn lô NL ${lottedBatchCount} mẻ`,
+        session.postingDate && session.postingDate !== session.productionDate && `ghi bù ngày ${formatDateVN(session.postingDate)}`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
     notify.saved(
       [
         newWips.length > 0 && `Đã lưu ${newWips.length} thành phẩm · ${kg(newTotal)}`,
@@ -975,16 +997,21 @@ export default function WipProductionScreen() {
           ? edit.processingType
           : (products.find((m) => m.id === edit.productId)?.processingType ?? "").trim(),
     };
+    const before = rows.find((r) => r.id === edit.id);
     persist(rows.map((r) => (r.id === edit.id ? record : r)));
+    logDay(record.productionDate, record.workshop, "update", `Sửa ${productNameOf(record.productId)}${before && before.quantityKg !== record.quantityKg ? `: ${kg(before.quantityKg)} → ${kg(record.quantityKg)}` : ""}${before && before.productId !== record.productId ? ` (trước là ${productNameOf(before.productId)})` : ""}`);
     notify.saved("Đã lưu thay đổi");
     setEdit(null);
   };
   const remove = (r: WipProductionItem) => {
     const prevRows = rows;
     persist(rows.filter((x) => x.id !== r.id));
-    notify.deleted(`Đã xóa ${productNameOf(r.productId)} — ${kg(r.quantityKg)}`, () =>
-      persist(prevRows)
-    );
+    const what = `Xóa ${productNameOf(r.productId)} — ${kg(r.quantityKg)}`;
+    logDay(r.productionDate, r.workshop, "delete", what);
+    notify.deleted(`Đã xóa ${productNameOf(r.productId)} — ${kg(r.quantityKg)}`, () => {
+      persist(prevRows);
+      logDay(r.productionDate, r.workshop, "undo", `Hoàn tác: ${what}`);
+    });
   };
 
   /* ---- Sửa / bỏ một dòng BÁN NỘI ĐỊA đã ghi ---- */
@@ -1009,15 +1036,19 @@ export default function WipProductionScreen() {
       customerName: editingDomesticSale.customerName.trim(),
     };
     persistDomesticSales(domesticSales.map((r) => (r.id === record.id ? record : r)));
+    logDay(record.saleDate, record.workshop, "update", `Sửa bán nội địa ${record.materialTypeName} — ${kg(record.quantityKg)}${record.customerName ? ` · ${record.customerName}` : ""}`);
     notify.saved("Đã lưu thay đổi bán nội địa");
     setEditingDomesticSale(null);
   };
   const removeDomesticSale = (r: DomesticSaleItem) => {
     const prevRows = domesticSales;
     persistDomesticSales(domesticSales.filter((x) => x.id !== r.id));
-    notify.deleted(`Đã bỏ bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)}`, () =>
-      persistDomesticSales(prevRows)
-    );
+    const what = `Bỏ bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)}`;
+    logDay(r.saleDate, r.workshop, "delete", what);
+    notify.deleted(`Đã bỏ bán nội địa ${r.materialTypeName} — ${kg(r.quantityKg)}`, () => {
+      persistDomesticSales(prevRows);
+      logDay(r.saleDate, r.workshop, "undo", `Hoàn tác: ${what}`);
+    });
   };
   /** Bỏ một lô hàng đông lạnh khỏi Sổ kho tháng — chỉ khi chưa lấy ra / chưa dồn tháng. */
   const removeFrozenLine = (l: MonthlyStockLine) => {
@@ -1028,7 +1059,12 @@ export default function WipProductionScreen() {
     }
     const prevLedger = monthlyStock;
     setMonthlyStock(removeFrozenLot(monthlyStock, l.id));
-    notify.deleted(`Đã bỏ ${l.itemName} — ${kg(l.inKg)} khỏi Hàng tạm (Sổ kho tháng)`, () => setMonthlyStock(prevLedger));
+    const what = `Bỏ hàng đông lạnh ${l.itemName} — ${kg(l.inKg)} khỏi Hàng tạm (Sổ kho tháng)`;
+    logDay(l.importDate || effectiveFrom, activeWorkshop, "delete", what);
+    notify.deleted(`Đã bỏ ${l.itemName} — ${kg(l.inKg)} khỏi Hàng tạm (Sổ kho tháng)`, () => {
+      setMonthlyStock(prevLedger);
+      logDay(l.importDate || effectiveFrom, activeWorkshop, "undo", `Hoàn tác: ${what}`);
+    });
   };
   const frozenColumns: RecordTableColumn<MonthlyStockLine>[] = [
     { key: "ngay", header: "Ngày SX", render: (l) => formatDateVN(l.importDate), getSortValue: (l) => l.importDate },
@@ -1134,6 +1170,7 @@ export default function WipProductionScreen() {
     setSentReports(next);
     // mốc "đã gửi" chỉ là phản hồi tại chỗ — lưu hụt (chặn cookie) thì thôi
     writeDevicePref(KEY_WIP_REPORT, JSON.stringify(next));
+    if (isSingleDayWorkshop) logDay(effectiveFrom, activeWorkshop, "update", `Gửi báo cáo thành phẩm — tổng ${kg(periodTotal)} (${periodView.length} dòng)`);
     notify.saved(
       `Đã gửi báo cáo thành phẩm ${rangeDescription} · ${workshop} lên hệ thống`
     );
@@ -1197,6 +1234,12 @@ export default function WipProductionScreen() {
       leftoverByMaterial,
     };
     persistLocks(bg ? locks.map((c) => (c.id === bg.id ? sale : c)) : [...locks, sale]);
+    logDay(
+      effectiveFrom,
+      activeWorkshop,
+      "close",
+      `Chốt ngày SX — tổng ${kg(actualTotal)}${leftoverTotal > 0 ? ` · còn dở ${kg(leftoverTotal)}` : ""}${batchesWithoutLot.length > 0 ? ` · ${batchesWithoutLot.length} mẻ chưa gắn lô, lý do: ${waiverReason.trim()}` : ""}${lockNote.trim() ? ` · ghi chú: ${lockNote.trim()}` : ""}`,
+    );
     notify.saved(
       `Đã chốt SX ${formatDateVN(effectiveFrom)} · xưởng ${activeWorkshop} — ${kg(actualTotal)}` +
         (leftoverTotal > 0 ? ` · còn dở ${kg(leftoverTotal)}` : "") +
@@ -1220,6 +1263,7 @@ export default function WipProductionScreen() {
         c.id === bg.id ? { ...c, isLocked: false, reopenReason } : c
       )
     );
+    logDay(effectiveFrom, activeWorkshop, "reopen", `Mở lại ngày SX đã chốt · lý do: ${reopenReason.trim()}`);
     notify.warning(`Đã mở lại SX ${formatDateVN(effectiveFrom)} · xưởng ${activeWorkshop}`);
     setIsConfirmingReopen(false);
     setReopenReason("");
@@ -1996,6 +2040,16 @@ export default function WipProductionScreen() {
             )
           )}
         </div>
+      )}
+
+      {isSingleDayWorkshop && (
+        <section className="rounded-xl border-2 border-border p-4">
+          <ActivityLogBlock
+            title={`Nhật ký thao tác — ngày ${formatDateVN(effectiveFrom)} · xưởng ${activeWorkshop}`}
+            entries={entriesOf(productionLog.entries, "production-day", dayRecordId(effectiveFrom, activeWorkshop))}
+            tourTarget="wip-activity"
+          />
+        </section>
       )}
 
       {/* A4 — Báo cáo công việc ngày: gom theo (xưởng × người thao tác) + Gửi lên

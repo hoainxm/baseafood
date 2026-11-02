@@ -5,6 +5,7 @@
 //              "next step" action, line progress, receipts with document checklist + quantities.
 // ============================================================
 import { useEffect, useState } from "react";
+import { ActivityLogBlock, type ActivityLogRow } from "@/features/shared/ActivityLogBlock";
 import { Button, Popover, PopoverContent, PopoverTrigger, RecordTable, Tag, formatNumber, type RecordTableColumn } from "@/design-system";
 import { CollapsibleSection } from "@/features/export-planning/parts";
 import { formatDateVN, formatMoney } from "@/lib/format";
@@ -101,12 +102,15 @@ function Info({ label, children }: { label: string; children: React.ReactNode })
 
 export function ImportDossier({
   data,
+  activity,
   contract,
   focusReceiptId,
   can,
   actions,
 }: {
   data: ImportData;
+  /** Nhật ký thao tác của HĐ nhập + các lần nhập (ba-spec 56) — mới nhất trước. */
+  activity: readonly ActivityLogRow[];
   contract: ImportContract;
   focusReceiptId: string;
   can: DossierCan;
@@ -312,6 +316,8 @@ export function ImportDossier({
           <ReceiptCard key={r.id} data={data} receipt={r} index={i + 1} contractOpen={isOpen} can={can} actions={actions} isFirst={i === 0} />
         ))}
       </section>
+
+      <ActivityLogBlock entries={activity} tourTarget="import-activity" />
     </div>
   );
 }

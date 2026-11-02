@@ -27,6 +27,7 @@ import type {
   ProductionOrderMaterial,
   ProductionOrderShipment,
   ComposedDocument,
+  ActivityLogEntry,
   ComposedDocumentExport,
   DocumentTemplate,
   SupplierInvoice,
@@ -179,6 +180,9 @@ export interface DemoBundle {
   documentTemplates: DocumentTemplate[];
   composedDocuments: ComposedDocument[];
   composedDocumentExports: ComposedDocumentExport[];
+  /** Nhật ký nhóm Nhập hàng / Sản xuất (mig 0092, ba-spec 56) — bộ demo để TRỐNG: thao tác trong demo tự sinh dòng. */
+  importsActivities: ActivityLogEntry[];
+  productionActivities: ActivityLogEntry[];
   /** Hóa đơn đại lý gắn chuyến (mig 0090, ba-spec 51) — dựng từ chuyến demo (lib/supplierInvoiceDemo.ts):
    *  khớp, HĐ gộp 2 chuyến, lệch giá, HĐ không có chuyến, chuyến chờ HĐ; file là đường dẫn GIỮ CHỖ. */
   supplierInvoices: SupplierInvoice[];
@@ -787,6 +791,8 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     documentTemplates: [],
     composedDocuments: formDemo.documents,
     composedDocumentExports: formDemo.exports,
+    importsActivities: [],
+    productionActivities: [],
     supplierInvoices: invoiceDemo.invoices,
     supplierInvoiceLines: invoiceDemo.lines,
     accountingCodeMaps: invoiceDemo.codeMaps,

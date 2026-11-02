@@ -150,6 +150,17 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
       }),
     );
   }
+  steps.push(
+    dossier({
+      id: "activity",
+      target: "import-activity",
+      optional: true,
+      title: "Nhật ký thao tác của hợp đồng",
+      body:
+        "Cuối hồ sơ là nhật ký: lập / sửa HĐ, ghi lần nhập, chứng từ, file, thực nhập, kiểm mẫu, hủy / đóng / mở lại — cả của các lần nhập.\n" +
+        "Mỗi dòng: giờ · người · việc đã làm, mới nhất trước. Người ghi và giờ ghi do máy chủ đặt; dòng không sửa, không xóa được — Hoàn tác cũng ghi thêm một dòng.",
+    }),
+  );
   return { title: "Nhập khẩu", steps, onExit: ctx.backToList };
 }
 

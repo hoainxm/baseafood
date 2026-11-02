@@ -6,6 +6,7 @@
 //              docs/app-map/34-btp-san-xuat-kho.ba-spec.md + docs/spec/qr-truy-xuat-lo.md §6d.
 //              ba-spec 43 v4 R14.
 // ============================================================
+import { ActivityGuideSection } from "./ActivityGuideSection";
 import type { PageGuide } from "../guideContent";
 import { GuideList, GuideSection, GuideSteps } from "./parts";
 
@@ -51,6 +52,7 @@ export const packagingGuide: PageGuide = {
         </GuideList>
       </GuideSection>
 
+      <ActivityGuideSection where="Xem một ngày và chọn một xưởng, dưới sổ phiếu" what="ghi phiếu đóng gói, xóa phiếu của ngày · xưởng đó." />
       <GuideSection title="Gắn lô BTP và in tem">
         <GuideList>
           <li>

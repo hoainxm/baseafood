@@ -137,6 +137,17 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
         "Chuyến chưa có mã số lô nhận mã của lệnh; chuyến có mã khác thì hiện Lệch MSL. Hủy lệnh thì chuyến được nhả.",
     }),
   );
+  steps.push(
+    dossier({
+      id: "activity",
+      target: "order-activity",
+      title: "Nhật ký thao tác của lệnh",
+      body:
+        "Cuối hồ sơ là nhật ký của lệnh: lập, sửa (kèm lần sửa, lý do), NL nhập khẩu dự kiến, phát hành, gắn / bỏ gắn chuyến, giữ theo bản cũ, hủy.\n" +
+        "Việc làm đổi chuyến xuất (phát hành, gắn chuyến, chép mã số lô) cũng ghi vào nhật ký của hồ sơ hợp đồng xuất.\n" +
+        "Mỗi dòng: giờ · người · việc đã làm, mới nhất trước. Người ghi và giờ ghi do máy chủ đặt; dòng không sửa, không xóa được — Hoàn tác cũng ghi thêm một dòng.",
+    }),
+  );
   return { title: "Lệnh sản xuất", steps, onExit: ctx.backToList };
 }
 

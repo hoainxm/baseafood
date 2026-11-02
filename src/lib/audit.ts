@@ -113,23 +113,82 @@ function fromRow(r: Record<string, unknown>): AuditEntry {
 }
 
 let isFlushing = false;
-async function flush(): Promise<void> {
-  if (!supabase || isFlushing) return;
-  const buf = docBuffer();
-  if (buf.length === 0) return;
-  isFlushing = true;
-  try {
-    const sentIds = new Set(buf.map((r) => r.id));
-    const { error } = await supabase.from("audit_log").insert(buf.map(toRow));
-    if (!error) {
-      // Chỉ xóa đúng dòng đã gửi — dòng mới thêm lúc đang gửi vẫn giữ.
-      saveBuffer(docBuffer().filter((r) => !sentIds.has(r.id)));
+/** Có entry mới trong lúc đang đẩy ⇒ đẩy thêm một lượt ngay khi lượt này xong. */
+let flushAgain = false;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+/** Mỗi lượt gửi tối đa chừng này dòng — buffer dồn cả nghìn dòng không thành một yêu cầu quá lớn. */
+export const AUDIT_BATCH = 200;
+const RETRY_MS = 30_000;
+
+export interface AuditSendResult {
+  ok: boolean;
+  /** Máy chủ báo trùng khóa (23505): có dòng đã lên ở lần gửi trước mà mất phản hồi. */
+  duplicate?: boolean;
+}
+
+/**
+ * Đẩy hết buffer theo từng lô (hàm thuần — test được, không đụng mạng / localStorage).
+ * Đọc lại buffer sau mỗi lô ⇒ entry thêm vào LÚC ĐANG GỬI cũng được đẩy luôn (lỗi cũ: thao tác ghi 2 bảng
+ * liền nhau, dòng thứ hai nằm kẹt dưới máy tới lần thao tác / tải trang sau — 2026-11-02, file Lệnh xuất
+ * của tghung). Lô báo trùng khóa ⇒ gửi lại từng dòng, dòng trùng coi như đã lên (RLS không cho
+ * `on conflict do nothing` vì chỉ admin đọc được audit_log). Trả `true` khi buffer đã sạch.
+ */
+export async function drainAuditBuffer(
+  io: { read: () => AuditEntry[]; write: (rows: AuditEntry[]) => void; send: (rows: AuditEntry[]) => Promise<AuditSendResult> },
+  batchSize = AUDIT_BATCH,
+): Promise<boolean> {
+  for (let round = 0; round < 1000; round++) {
+    const batch = io.read().slice(0, batchSize);
+    if (!batch.length) return true;
+    const sent = new Set<string>();
+    const res = await io.send(batch);
+    if (res.ok) batch.forEach((r) => sent.add(r.id));
+    else if (res.duplicate) {
+      for (const r of batch) {
+        const one = await io.send([r]);
+        if (!one.ok && !one.duplicate) break;
+        sent.add(r.id);
+      }
     }
+    // Chỉ xóa đúng dòng đã lên — dòng mới thêm lúc đang gửi vẫn giữ.
+    if (sent.size) io.write(io.read().filter((r) => !sent.has(r.id)));
+    if (sent.size < batch.length) return false;
+  }
+  return io.read().length === 0;
+}
+
+async function sendRows(rows: AuditEntry[]): Promise<AuditSendResult> {
+  if (!supabase) return { ok: false };
+  const { error } = await supabase.from("audit_log").insert(rows.map(toRow));
+  return error ? { ok: false, duplicate: error.code === "23505" } : { ok: true };
+}
+
+function scheduleRetry(): void {
+  if (retryTimer || typeof window === "undefined") return;
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    void flush();
+  }, RETRY_MS);
+}
+
+async function flush(): Promise<void> {
+  if (!supabase) return;
+  if (isFlushing) {
+    flushAgain = true;
+    return;
+  }
+  isFlushing = true;
+  flushAgain = false;
+  let isDrained = false;
+  try {
+    isDrained = await drainAuditBuffer({ read: docBuffer, write: saveBuffer, send: sendRows });
   } catch {
-    /* giữ buffer, thử lại lần sau — im lặng */
+    /* giữ buffer, thử lại sau — im lặng */
   } finally {
     isFlushing = false;
   }
+  if (!isDrained) scheduleRetry();
+  else if (flushAgain && docBuffer().length) void flush();
 }
 
 /** Ghi một loạt entry nhật ký. Không throw — lỗi nuốt để không chặn nghiệp vụ. */
@@ -225,8 +284,11 @@ export async function readAuditLog(filter: AuditLogFilter = {}): Promise<AuditEn
     .slice(0, gioiHan);
 }
 
-// Đẩy hàng chờ khi mở app + khi vừa có mạng lại.
+// Đẩy hàng chờ khi mở app, khi vừa có mạng lại, khi quay lại tab (máy ngủ / chuyển tab lâu); lượt hụt tự thử lại sau 30 giây.
 void flush();
 if (typeof window !== "undefined") {
   window.addEventListener("online", () => void flush());
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void flush();
+  });
 }

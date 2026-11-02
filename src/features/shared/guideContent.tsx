@@ -14,6 +14,7 @@ import { qcGuide } from "./guides/qcGuide";
 import { reconciliationGuide } from "./guides/reconciliationGuide";
 import { warehouseNxtGuide } from "./guides/warehouseNxtGuide";
 import { wipGuide } from "./guides/wipGuide";
+import { ActivityGuideSection } from "./guides/ActivityGuideSection";
 
 /**
  * Nội dung "Hướng dẫn sử dụng" cho từng trang, mở từ nút "?" trên header.
@@ -159,6 +160,10 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
     description: "Ghi sổ nguyên liệu về xưởng mỗi ngày.",
     content: (
       <>
+        <ActivityGuideSection
+          where="Xem một ngày, một xưởng, cuối trang"
+          what="ghi / sửa / xóa chuyến (ghi bù sau chốt có đánh dấu), phế liệu, đổi loại nguyên liệu, chốt và mở lại ngày (kèm lý do), việc theo hóa đơn đại lý."
+        />
         <Section title="Ghi một chuyến hàng">
           <Step>
             <li>

@@ -27,10 +27,11 @@ import {
   type SummaryTableColumn,
   type TagVariant,
 } from "@/design-system";
-import type { AccountingCodeMap, DailyLock, ImportShipment, MaterialImportItem, MaterialType, Supplier, SupplierInvoice, SupplierInvoiceLine, Workshop } from "@/types";
+import type { AccountingCodeMap, DailyLock, ExportActivityAction, ImportShipment, MaterialImportItem, MaterialType, Supplier, SupplierInvoice, SupplierInvoiceLine, Workshop } from "@/types";
+import { dayRecordId, type ActivityInput } from "@/features/shared/activityLog";
 import { useSupplierInvoiceStore } from "@/lib/catalogRepo";
 import { newId } from "@/lib/store";
-import { formatDateVN, num, todayISO } from "@/lib/format";
+import { formatDateVN, kg, num, todayISO } from "@/lib/format";
 import { ALL, activeFilterCount, countedLabel, matchesSearch, matchesValue, statusOptions } from "@/lib/recordFilters";
 import {
   IMPORT_CHANGE_LABELS,
@@ -128,6 +129,8 @@ export interface SupplierInvoicePanelProps {
   canCreateTrip: boolean;
   canUpdateTrip: boolean;
   operator: string;
+  /** Nhật ký nhóm Nhập hàng (ba-spec 56 R4): việc theo hóa đơn ghi vào hồ sơ ngày × xưởng của chuyến — bộ ghi của màn cha. */
+  onLog: (items: ActivityInput[]) => void;
 }
 
 const monthStart = (iso: string) => `${iso.slice(0, 8)}01`;
@@ -156,6 +159,15 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
   const [tripTarget, setTripTarget] = useState<CreateTripTarget | null>(null);
 
   const tripById = useMemo(() => new Map(p.trips.map((t) => [t.id, t])), [p.trips]);
+  /** Một dòng nhật ký cho mỗi ngày × xưởng có dòng chuyến bị chạm. */
+  const logTripDays = (tripLineIds: readonly string[], action: ExportActivityAction, summary: (n: number) => string) => {
+    const days = new Map<string, number>();
+    for (const id of tripLineIds) {
+      const t = tripById.get(id);
+      if (t) days.set(dayRecordId(t.deliveryDate, t.workshop), (days.get(dayRecordId(t.deliveryDate, t.workshop)) ?? 0) + 1);
+    }
+    p.onLog([...days.entries()].map(([recordId, n]) => ({ recordType: "intake-day" as const, recordId, action, summary: summary(n) })));
+  };
   const invoiceById = useMemo(() => new Map(invoices.map((i) => [i.id, i])), [invoices]);
   const maps = useMemo(() => buildCodeMaps(codeMaps), [codeMaps]);
   const isLocked = (date: string, ws: Workshop) => p.locks.some((l) => l.lockDate === date && l.workshop === ws && l.isLocked);
@@ -244,6 +256,14 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
       store.setInvoices([...invoices.filter((i) => !nextInv.has(i.id)), ...nextInv.values()]);
       if (planLines.length) store.setLines([...lines.filter((l) => !planLineIds.has(l.id)), ...planLines]);
       const linked = planLines.filter((l) => l.tripLineId).length;
+      for (const inv of nextInv.values()) {
+        const own = planLines.filter((l) => l.invoiceId === inv.id && l.tripLineId);
+        logTripDays(
+          own.map((l) => l.tripLineId),
+          "attach",
+          (n) => `Gắn hóa đơn ${inv.invoiceNo} (${inv.supplierName}) — ${n} dòng sổ chi tiết khớp chuyến${inv.filePath ? " · có PDF" : ""}`,
+        );
+      }
       notify.saved(`Đã gắn ${nextInv.size} hóa đơn${planLines.length ? ` · ${linked}/${planLines.length} dòng có chuyến` : ""}`);
       if (uploadErrors.length) notify.error(`Chưa lưu được ${uploadErrors.length} file PDF (hóa đơn vẫn ghi số): ${uploadErrors.join(" · ")}`);
       setLedger(null);
@@ -338,15 +358,21 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
     const prevLines = lines;
     p.persistTrips(p.trips.map((t) => (t.id === trip.id ? next : t)));
     store.setLines(lines.map((l) => (l.id === row.line.id ? { ...l, resolution: "updated", resolutionReason: "", resolvedBy: p.operator, resolvedAt: new Date().toISOString() } : l)));
+    const what = `Cập nhật dòng ${trip.materialTypeName} của chuyến ${trip.supplierName} theo hóa đơn ${row.invoice.invoiceNo}: ${kg(trip.quantityKg)} → ${kg(next.quantityKg)}`;
+    logTripDays([trip.id], "update", () => what);
     notify.saved(`Đã cập nhật chuyến ${formatDateVN(trip.deliveryDate)} theo HĐ ${row.invoice.invoiceNo}`, () => {
       p.persistTrips(prevTrips);
       store.setLines(prevLines);
+      logTripDays([trip.id], "undo", () => `Hoàn tác: ${what}`);
     });
   };
 
   const explain = (lineId: string, reason: string) => {
     if (!guardWrite()) return;
     store.setLines(lines.map((l) => (l.id === lineId ? { ...l, resolution: "explained", resolutionReason: reason, resolvedBy: p.operator, resolvedAt: new Date().toISOString() } : l)));
+    const line = lines.find((l) => l.id === lineId);
+    const inv = line ? invoiceById.get(line.invoiceId) : undefined;
+    if (line) logTripDays([line.tripLineId], "update", () => `Giữ số xưởng, không theo hóa đơn ${inv?.invoiceNo ?? ""} · lý do: ${reason}`);
     notify.saved("Đã lưu lý do giữ số xưởng");
   };
 
@@ -370,9 +396,13 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
       );
       store.setLines(lines.map((l) => (m.has(l.id) ? { ...l, tripLineId: m.get(l.id)!.tripLineId } : l)));
     }
+    const touched = prevLines.filter((l) => l.invoiceId === inv.id && l.tripLineId).map((l) => l.tripLineId);
+    const what = classification === "not-trip" ? `Hóa đơn ${inv.invoiceNo} (${inv.supplierName}) xếp vào Không thuộc chuyến — bỏ ghép` : `Hóa đơn ${inv.invoiceNo} (${inv.supplierName}) bỏ xếp Không thuộc chuyến, ghép lại`;
+    logTripDays(touched, "update", () => what);
     notify.saved(classification === "not-trip" ? `HĐ ${inv.invoiceNo} xếp vào Không thuộc chuyến` : `HĐ ${inv.invoiceNo} bỏ xếp, đã ghép lại`, () => {
       store.setInvoices(prevInv);
       store.setLines(prevLines);
+      logTripDays(touched, "undo", () => `Hoàn tác: ${what}`);
     });
   };
 
@@ -414,10 +444,21 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
     p.persistTrips([...p.trips, ...made.flatMap((m) => m.items)]);
     const links = new Map(made.flatMap((m) => [...m.links.entries()]));
     store.setLines(lines.map((l) => (links.has(l.id) ? { ...l, tripLineId: links.get(l.id)! } : l)));
+    const dayLog = (action: ExportActivityAction, prefix = "") =>
+      p.onLog(
+        made.map((m) => ({
+          recordType: "intake-day" as const,
+          recordId: dayRecordId(m.shipment.deliveryDate, m.shipment.workshop),
+          action,
+          summary: `${prefix}Tạo chuyến ghi bù ${m.shipment.supplierName}${m.shipment.lotCode ? ` (lô ${m.shipment.lotCode})` : ""} theo hóa đơn ${inv.invoiceNo} — ${kg(m.items.reduce((s, x) => s + x.quantityKg, 0))}`,
+        })),
+      );
+    dayLog("create");
     notify.saved(`Đã tạo ${made.length} chuyến ghi bù theo HĐ ${inv.invoiceNo}`, () => {
       p.persistShipments(prev.shipments);
       p.persistTrips(prev.trips);
       store.setLines(prev.lines);
+      dayLog("undo", "Hoàn tác: ");
     });
   };
 

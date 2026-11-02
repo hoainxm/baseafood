@@ -8,14 +8,14 @@
 // Oracle hành vi: docs/app-map/48-production-order.ba-spec.md · giao diện: 49-production-order-ui.design-spec.md.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, notify, todayIso } from "@/design-system";
+import { Button, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { usePageTour, usePageTourControl } from "@/features/shared/PageTourProvider";
 import { ReasonDialog, type ReasonTarget } from "@/features/export-planning/RecordDialogs";
 import { newId } from "@/lib/store";
 import { cancelOrder, issueOrder, keepOldRevision, shipmentsWithLot, visibleOrders } from "@/lib/productionOrder";
-import type { ProductionOrder, ProductionOrderMaterial, ProductionOrderShipment } from "@/types";
+import type { ExportActivityAction, ProductionOrder, ProductionOrderMaterial, ProductionOrderShipment } from "@/types";
 import { BarChart3, ClipboardList, FilePlus2, FolderLock, Route } from "lucide-react";
 import { parseReportPeriod, type ReportPeriod } from "@/lib/exportReports";
 import { buildOrderReport, buildOrderReportExcel } from "@/lib/productionOrderReports";
@@ -26,6 +26,8 @@ import { OrderFileComposer } from "./OrderFileComposer";
 import { OrderDossier, OrderListView } from "./OrderViews";
 import { buildProductionOrderTour, pickTourOrder } from "./productionOrderTour";
 import { useProductionOrderData, type ProductionOrderData } from "./useProductionOrderData";
+import { contractInput, shipmentLabel, type ContractActivityInput } from "./useContractActivity";
+import { entriesOf, usePlanningActivityLog } from "@/features/shared/activityLog";
 
 /** Hai tab luôn nằm cạnh nhau, chữ được xuống dòng (khuôn Xuất khẩu / Nhập khẩu). */
 const TAB_TRIGGER = "h-auto min-h-9 whitespace-normal px-3 max-sm:[&>svg]:hidden sm:whitespace-nowrap sm:px-4";
@@ -37,6 +39,11 @@ export default function ProductionOrderScreen() {
   const can = useCan("production-orders");
   const isAdmin = useCan("admin").view;
   const store = useProductionOrderData();
+  // Nhật ký nhóm Kế hoạch (ba-spec 56): MỘT bộ ghi cho cả dòng của lệnh lẫn dòng của hồ sơ HĐ xuất mà việc ở đây
+  // làm đổi (như làm ở trang Xuất khẩu) — hai bộ ghi cùng bảng sẽ đè dòng của nhau.
+  const planningLog = usePlanningActivityLog(by);
+  const logOrder = (orderId: string, action: ExportActivityAction, summary: string, contract: ContractActivityInput[] = []) =>
+    planningLog.log([{ recordType: "production-order", recordId: orderId, action, summary }, ...contract.map(contractInput)]);
   const d = store.data;
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -103,10 +110,17 @@ export default function ProductionOrderScreen() {
     const keep = new Set(p.lines.map((l) => l.id));
     const orphan = prev.materials.filter((m) => m.orderId === order.id && !keep.has(m.orderLineId));
     if (orphan.length) store.saveMaterials(prev.materials.filter((m) => !orphan.includes(m)));
+    const wasRevision = order.revisionNo > (prev.orders.find((o) => o.id === order.id)?.revisionNo ?? 0);
+    const what = p.isNew ? `Lập lệnh sản xuất ${order.orderNo} (Nháp)` : wasRevision ? `Sửa lệnh sản xuất ${order.orderNo} lần ${order.revisionNo}${order.revisionReason ? ` — ${order.revisionReason}` : ""}` : "";
+    const orderWhat = p.isNew
+      ? `Lập lệnh ${order.orderNo} (Nháp) từ HĐ ${order.contractNo}: ${p.lines.length} dòng hàng`
+      : `${wasRevision ? `Sửa lần ${order.revisionNo}${order.revisionReason ? ` — ${order.revisionReason}` : ""}` : "Sửa lệnh"}${p.changes.length ? `: ${p.changes.join("; ")}` : ""}`;
+    logOrder(order.id, p.isNew ? "create" : "update", orderWhat, what ? [{ contractId: order.contractId, action: p.isNew ? "create" : "update", summary: what }] : []);
     const undo = () => {
       store.saveOrders(prev.orders);
       store.saveLines(prev.lines);
       store.saveMaterials(prev.materials);
+      logOrder(order.id, "undo", `Hoàn tác: ${orderWhat}`, what ? [{ contractId: order.contractId, action: "undo", summary: `Hoàn tác: ${what}` }] : []);
     };
     notify.saved(
       p.isNew
@@ -127,7 +141,14 @@ export default function ProductionOrderScreen() {
   const saveMaterials = (orderLineId: string, rows: ProductionOrderMaterial[]): boolean => {
     const prev = dataRef.current;
     if (!store.saveMaterials([...prev.materials.filter((m) => m.orderLineId !== orderLineId), ...rows])) return false;
-    notify.saved(`Đã lưu NL nhập khẩu dự kiến (${rows.length} lần nhập)`, () => store.saveMaterials(prev.materials));
+    const line = prev.lines.find((l) => l.id === orderLineId);
+    const kgSum = rows.reduce((s, m) => s + (m.kg ?? 0), 0);
+    const what = `NL nhập khẩu dự kiến dòng ${line?.productName || line?.description || ""}: ${rows.length} lần nhập, ${formatNumber(kgSum)} kg${rows.length ? ` (${rows.map((m) => m.label).join("; ")})` : ""}`;
+    if (line) logOrder(line.orderId, "update", what);
+    notify.saved(`Đã lưu NL nhập khẩu dự kiến (${rows.length} lần nhập)`, () => {
+      store.saveMaterials(prev.materials);
+      if (line) logOrder(line.orderId, "undo", `Hoàn tác: ${what}`);
+    });
     setMaterialTarget(null);
     return true;
   };
@@ -144,21 +165,50 @@ export default function ProductionOrderScreen() {
     // MSL của lệnh chép sang chuyến chưa có MSL (AC-9).
     const changed = shipmentsWithLot(next, prev.exportData.shipments.filter((s) => shipmentIds.includes(s.id)));
     if (changed.length) store.saveShipments(prev.exportData.shipments.map((s) => changed.find((c) => c.id === s.id) ?? s));
+    // Nhật ký HĐ xuất: mỗi chuyến một dòng (bước Lệnh sản xuất tự xong / gắn / bỏ gắn, MSL chép sang).
+    const ship = (sid: string) => prev.exportData.shipments.find((s) => s.id === sid);
+    const lotNote = (sid: string) => (changed.some((c) => c.id === sid) ? ` · chuyến nhận mã số lô ${next.lotCode}` : "");
+    const removed = prev.links.filter((l) => l.orderId === o.id && !shipmentIds.includes(l.shipmentId)).map((l) => l.shipmentId);
+    const entries: ContractActivityInput[] =
+      mode === "issue"
+        ? shipmentIds.length
+          ? shipmentIds.map((sid) => ({ contractId: o.contractId, shipmentId: sid, action: "update" as const, summary: `Phát hành lệnh sản xuất ${o.orderNo} — bước Lệnh sản xuất của chuyến ${shipmentLabel(ship(sid))} xong${lotNote(sid)}` }))
+          : [{ contractId: o.contractId, action: "update", summary: `Phát hành lệnh sản xuất ${o.orderNo} (chưa gắn chuyến)` }]
+        : [
+            ...added.map((l) => ({
+              contractId: o.contractId,
+              shipmentId: l.shipmentId,
+              action: "attach" as const,
+              summary: `Gắn lệnh sản xuất ${o.orderNo} vào chuyến ${shipmentLabel(ship(l.shipmentId))}${o.status === "issued" ? " — bước Lệnh sản xuất xong" : ""}${lotNote(l.shipmentId)}`,
+            })),
+            ...removed.map((sid) => ({ contractId: o.contractId, shipmentId: sid, action: "detach" as const, summary: `Bỏ gắn lệnh sản xuất ${o.orderNo} khỏi chuyến ${shipmentLabel(ship(sid))}` })),
+          ];
+    const orderWhat =
+      mode === "issue"
+        ? `Phát hành lệnh${shipmentIds.length ? ` · gắn ${shipmentIds.map((sid) => shipmentLabel(ship(sid))).join(", ")}` : " (chưa gắn chuyến)"}`
+        : [added.length && `Gắn chuyến ${added.map((l) => shipmentLabel(ship(l.shipmentId))).join(", ")}`, removed.length && `bỏ gắn ${removed.map((sid) => shipmentLabel(ship(sid))).join(", ")}`].filter(Boolean).join(" · ");
+    if (orderWhat) logOrder(o.id, mode === "issue" ? "update" : added.length ? "attach" : "detach", orderWhat, entries);
     notify.saved(
       mode === "issue" ? `Đã phát hành lệnh ${o.orderNo}${shipmentIds.length ? ` · gắn ${shipmentIds.length} chuyến` : ""}` : `Đã lưu chuyến gắn của lệnh ${o.orderNo}`,
       () => {
         store.saveOrders(prev.orders);
         store.saveLinks(prev.links);
         if (changed.length) store.saveShipments(prev.exportData.shipments);
+        if (orderWhat)
+          logOrder(o.id, "undo", `Hoàn tác: ${orderWhat}`, entries.length ? [{ contractId: o.contractId, action: "undo", summary: `Hoàn tác: ${mode === "issue" ? `phát hành lệnh sản xuất ${o.orderNo}` : `gắn chuyến của lệnh sản xuất ${o.orderNo}`}` }] : []);
       },
     );
     return true;
   };
 
-  const saveStatus = (next: ProductionOrder, message: string) => {
+  const saveStatus = (next: ProductionOrder, message: string, orderWhat: string, action: ExportActivityAction, activity?: ContractActivityInput) => {
     const prev = dataRef.current;
     if (!store.saveOrders(upsert(prev.orders, next))) return;
-    notify.saved(message, () => store.saveOrders(prev.orders));
+    logOrder(next.id, action, orderWhat, activity ? [activity] : []);
+    notify.saved(message, () => {
+      store.saveOrders(prev.orders);
+      logOrder(next.id, "undo", `Hoàn tác: ${orderWhat}`, activity ? [{ contractId: activity.contractId, action: "undo", summary: `Hoàn tác: ${activity.summary}` }] : []);
+    });
   };
 
   /* ---------- Báo cáo: xuất Excel (không toast — QT 13) ---------- */
@@ -211,6 +261,7 @@ export default function ProductionOrderScreen() {
       {order ? (
         <OrderDossier
           data={d}
+          activity={entriesOf(planningLog.entries, "production-order", order.id)}
           order={order}
           canWrite={canWrite}
           isRecipient={isRecipient}
@@ -226,7 +277,7 @@ export default function ProductionOrderScreen() {
                 confirmLabel: "Giữ nguyên",
                 onConfirm: (why) => {
                   const res = keepOldRevision(order, d.exportData, why);
-                  if (res.ok) saveStatus(res.order, `Đã giữ lệnh ${order.orderNo} theo bản cũ`);
+                  if (res.ok) saveStatus(res.order, `Đã giữ lệnh ${order.orderNo} theo bản cũ`, `Giữ nguyên theo bản HĐ cũ — lý do: ${why}`, "update");
                 },
               }),
             onCancel: () =>
@@ -237,7 +288,10 @@ export default function ProductionOrderScreen() {
                 destructive: true,
                 onConfirm: (why) => {
                   const res = cancelOrder(order, why);
-                  if (res.ok) saveStatus(res.order, `Đã hủy lệnh ${order.orderNo}`);
+                  if (!res.ok) return;
+                  const freed = d.links.filter((l) => l.orderId === order.id).length;
+                  const what = `Hủy lệnh sản xuất ${order.orderNo}${freed ? ` — nhả ${freed} chuyến` : ""} · lý do: ${why}`;
+                  saveStatus(res.order, `Đã hủy lệnh ${order.orderNo}`, `Hủy lệnh${freed ? `, nhả ${freed} chuyến` : ""} · lý do: ${why}`, "cancel", { contractId: order.contractId, action: "cancel", summary: what });
                 },
               }),
             onPrint: () => setParam({ print: "1" }),

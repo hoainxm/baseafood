@@ -179,6 +179,9 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   document_templates: null,
   composed_documents: null,
   composed_document_exports: null,
+  // Nhật ký theo nhóm trang (mig 0092): RLS theo tài nguyên của nhóm, chỉ thêm.
+  imports_activity_log: null,
+  production_activity_log: null,
 };
 
 export interface WriteDenial {

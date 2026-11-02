@@ -52,6 +52,8 @@ import type {
   CompanyDocument,
   DocumentVersion,
   ExportActivity,
+  ActivityLogEntry,
+  ActivityRecordType,
   ImportContract,
   ImportContractLine,
   ImportDocument,
@@ -2507,7 +2509,10 @@ export const EXPORT_ACTIVITY_TABLE: TableMapping<ExportActivity> = {
   table: "export_activity_log",
   localKey: "bsf.export-activity-log.v1",
   getKey: theoId,
-  refColumns: ["contract_id", "shipment_id"],
+  refColumns: ["contract_id", "shipment_id", "record_id", "parent_id"],
+  // Dòng HĐ xuất gửi DẠNG CŨ (không có record_*): máy chủ chưa chạy 0092 vẫn nhận, chạy rồi thì trigger tự điền
+  // record_id = contract_id. Chỉ dòng hồ sơ khác (Nhập khẩu, Lệnh SX) mới gửi 4 cột mới — và chỉ ghi khi máy chủ
+  // đã có cột (usePlanningActivityStore.canLogRecords), không thì kẹt hàng chờ cả bảng.
   toRow: (x) => ({
     id: x.id,
     contract_id: x.contractId,
@@ -2516,17 +2521,78 @@ export const EXPORT_ACTIVITY_TABLE: TableMapping<ExportActivity> = {
     summary: x.summary,
     actor: x.actor,
     created_at: x.createdAt || new Date().toISOString(),
+    ...(x.recordType && x.recordType !== "export-contract"
+      ? { record_type: x.recordType, record_id: x.recordId ?? "", parent_type: x.parentType ?? "", parent_id: x.parentId ?? "" }
+      : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
     contractId: s(r.contract_id),
     shipmentId: s(r.shipment_id),
+    recordType: (s(r.record_type) || "export-contract") as ActivityRecordType,
+    recordId: s(r.record_id) || s(r.contract_id),
+    parentType: s(r.parent_type) as ActivityRecordType | "",
+    parentId: s(r.parent_id),
     action: (ACTIVITY_ACTION_VALUES.has(s(r.action)) ? s(r.action) : "update") as ExportActivity["action"],
     summary: s(r.summary),
     actor: s(r.actor),
     createdAt: s(r.created_at),
   }),
 };
+
+/* ---------- Nhật ký thao tác theo nhóm trang (mig 0092, ba-spec 56) ---------- */
+
+function activityTable(table: string, localKey: string): TableMapping<ActivityLogEntry> {
+  return {
+    table,
+    localKey,
+    getKey: theoId,
+    refColumns: ["record_id", "parent_id"],
+    toRow: (x) => ({
+      id: x.id,
+      record_type: x.recordType,
+      record_id: x.recordId,
+      parent_type: x.parentType,
+      parent_id: x.parentId,
+      action: x.action,
+      summary: x.summary,
+      actor: x.actor,
+      created_at: x.createdAt || new Date().toISOString(),
+    }),
+    fromRow: (r) => ({
+      id: s(r.id),
+      recordType: s(r.record_type) as ActivityRecordType,
+      recordId: s(r.record_id),
+      parentType: s(r.parent_type) as ActivityRecordType | "",
+      parentId: s(r.parent_id),
+      action: (ACTIVITY_ACTION_VALUES.has(s(r.action)) ? s(r.action) : "update") as ExportActivity["action"],
+      summary: s(r.summary),
+      actor: s(r.actor),
+      createdAt: s(r.created_at),
+    }),
+  };
+}
+/** Nhóm Nhập hàng (chuyến nhập, chốt ngày, hóa đơn đại lý). */
+export const IMPORTS_ACTIVITY_TABLE = activityTable("imports_activity_log", "bsf.imports-activity-log.v1");
+/** Nhóm Sản xuất (sản xuất thành phẩm, đóng gói). */
+export const PRODUCTION_ACTIVITY_TABLE = activityTable("production_activity_log", "bsf.production-activity-log.v1");
+
+/** Máy chủ đã có cột chưa (dò một lần mỗi phiên). Chạy không máy chủ ⇒ có. */
+const columnProbe = new Map<string, Promise<boolean>>();
+export function serverHasColumn(table: string, column: string): Promise<boolean> {
+  if (!supabase) return Promise.resolve(true);
+  const key = `${table}.${column}`;
+  let p = columnProbe.get(key);
+  if (!p) {
+    const client = supabase;
+    p = (async () => {
+      const { error } = await client.from(table).select(column).limit(1);
+      return !error;
+    })();
+    columnProbe.set(key, p);
+  }
+  return p;
+}
 
 /** Tên hàng theo khách (mig 0077) — tên in trên chứng từ xuất khẩu của từng khách cho từng mặt hàng. */
 export const CUSTOMER_PRODUCT_NAME_TABLE: TableMapping<CustomerProductName> = {
@@ -3294,7 +3360,8 @@ export const ACCOUNTING_CODE_MAP_TABLE: TableMapping<AccountingCodeMap> = {
 };
 
 /** Nhãn tiếng Việt của bảng — cho câu tóm tắt nhật ký dễ đọc. */
-const TABLE_LABELS: Record<string, string> = {
+/** Tên tiếng Việt của từng bảng — dùng cho nhật ký (tóm tắt "Thêm …", cột Đối tượng ở /audit). Bảng mới PHẢI có dòng ở đây. */
+export const TABLE_LABELS: Readonly<Record<string, string>> = {
   material_imports: "Nhập nguyên liệu",
   import_shipments: "Chuyến nhập",
   daily_locks: "Chốt ngày nhập",
@@ -3338,7 +3405,9 @@ const TABLE_LABELS: Record<string, string> = {
   export_step_items: "Bước của chuyến xuất khẩu",
   export_files: "File hồ sơ xuất khẩu",
   export_payments: "Gửi chứng từ / tiền về",
-  export_activity_log: "Nhật ký hợp đồng xuất khẩu",
+  export_activity_log: "Nhật ký Kế hoạch (HĐ xuất, HĐ nhập, lệnh sản xuất)",
+  imports_activity_log: "Nhật ký Nhập hàng",
+  production_activity_log: "Nhật ký Sản xuất",
   customer_product_names: "Tên hàng theo khách",
   export_document_kinds: "Loại chứng từ xuất khẩu",
   import_suppliers: "NCC nhập khẩu",
@@ -3412,7 +3481,7 @@ function logChanges<T>(mapping: TableMapping<T>, prev: T[], next: T[]): void {
   // trăm dòng một buổi, ghi nhật ký từng cú tô chỉ làm ngập /audit.
   if (mapping.table === "row_marks") return;
   // Nhật ký hợp đồng xuất khẩu (mig 0079) đã LÀ nhật ký — chép sang audit_log chỉ nhân đôi.
-  if (mapping.table === "export_activity_log") return;
+  if (mapping.table === "export_activity_log" || mapping.table === "imports_activity_log" || mapping.table === "production_activity_log") return;
   const label = TABLE_LABELS[mapping.table] ?? mapping.table;
   const prevByKey = new Map(prev.map((x) => [mapping.getKey(x), x]));
   const nextMap = new Map(next.map((x) => [mapping.getKey(x), x]));

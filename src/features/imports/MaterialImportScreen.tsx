@@ -14,6 +14,7 @@ import type {
   Category,
 } from "@/types";
 import { isBackdatedImport, calculateImportAmount } from "@/types";
+import type { ExportActivityAction } from "@/types";
 import { newId } from "@/lib/store";
 import { uid } from "@/lib/db";
 import {
@@ -58,6 +59,8 @@ import {
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { formatMaterialLotLabel } from "@/lib/lotTraceability";
 import { useAuth } from "@/lib/auth";
+import { dayRecordId, entriesOf, useImportsActivityLog } from "@/features/shared/activityLog";
+import { ActivityLogBlock } from "@/features/shared/ActivityLogBlock";
 import { DailyTaskReminder, LotLabelPrint, BlankDailyImportSlip } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
@@ -137,6 +140,10 @@ export default function MaterialImportScreen() {
   // Người đang đăng nhập → gắn làm "người ghi" của chuyến khi lưu.
   const { profile } = useAuth();
   const operator = recordName(profile);
+  // Nhật ký nhóm Nhập hàng (ba-spec 56): hồ sơ = ngày × phân xưởng (Q3), mỗi thao tác một câu.
+  const importsLog = useImportsActivityLog(operator);
+  const logDay = (date: string, ws: string, action: ExportActivityAction, summary: string) =>
+    importsLog.log([{ recordType: "intake-day", recordId: dayRecordId(date, ws), action, summary }]);
   // Phân quyền lớp 2 (spec role-permissions §5): nút không có quyền thì ẩn hẳn.
   const allowed = useCan("imports");
   const canViewPrice = allowed["view-price"];
@@ -777,9 +784,14 @@ export default function MaterialImportScreen() {
     }
     const before = scraps;
     persistScraps([...scraps, ...added]);
+    const what = `Ghi phế liệu từ ảnh phiếu: ${added.map((x) => `${x.name} ${kg(x.quantityKg)}`).join(", ")}`;
+    logDay(date, workshop, "create", what);
     notify.saved(
       `Đã ghi phế liệu ${added.map((x) => `${x.name} ${kg(x.quantityKg)}`).join(", ")} — ngày ${formatDateVN(date)}`,
-      () => persistScraps(before)
+      () => {
+        persistScraps(before);
+        logDay(date, workshop, "undo", `Hoàn tác: ${what}`);
+      }
     );
     return added.length;
   };
@@ -904,6 +916,13 @@ export default function MaterialImportScreen() {
 
     const newTotal = validRows.reduce((s, d) => s + d.quantityKg, 0);
     const savedShipment = shipmentId ? nextShipments.find((c) => c.id === shipmentId) : undefined;
+    const lockAtSave = lockRecordOf(session.deliveryDate, session.workshop);
+    logDay(
+      session.deliveryDate,
+      session.workshop,
+      isEditingShipment ? "update" : "create",
+      `${isEditingShipment ? "Sửa" : "Ghi"} chuyến ${session.supplierName}${savedShipment?.lotCode ? ` (lô ${savedShipment.lotCode})` : ""} — ${validRows.length} loại · ${kg(newTotal)}${session.licensePlate ? ` · xe ${session.licensePlate}` : ""}${lockAtSave?.isLocked ? " · ghi bù sau chốt" : ""}`
+    );
     notify.saved(
       `Đã lưu chuyến ${session.supplierName} — ${validRows.length} loại · ${kg(newTotal)}`,
       undefined,
@@ -961,11 +980,15 @@ export default function MaterialImportScreen() {
     persist(rows.filter((r) => !ids.has(r.id)));
     if (sessionShipmentId)
       persistShipments(shipments.filter((c) => c.id !== sessionShipmentId));
+    const what = `Xóa chuyến ${session?.supplierName || ""} — ${editRowIds.length} dòng`;
+    const dayOf = session ? { date: session.deliveryDate, ws: session.workshop } : null;
+    if (dayOf) logDay(dayOf.date, dayOf.ws, "delete", what);
     notify.deleted(
       `Đã xóa chuyến ${session?.supplierName || ""} — ${editRowIds.length} dòng`,
       () => {
         persist(prevRows);
         persistShipments(prevShipment);
+        if (dayOf) logDay(dayOf.date, dayOf.ws, "undo", `Hoàn tác: ${what}`);
       }
     );
     resetSession();
@@ -997,9 +1020,14 @@ export default function MaterialImportScreen() {
     if (!result.changed) return true;
     const before = scraps;
     persistScraps(result.next);
+    const what = `Lưu phế liệu cân cuối ngày — ${kg(scrapDraftTotalKg(scrapDraft))}`;
+    logDay(scrapDate, scrapWorkshop, "update", what);
     notify.saved(
       `Đã lưu phế liệu ngày ${formatDateVN(scrapDate)} · xưởng ${scrapWorkshop} — ${kg(scrapDraftTotalKg(scrapDraft))}`,
-      () => persistScraps(before)
+      () => {
+        persistScraps(before);
+        logDay(scrapDate, scrapWorkshop, "undo", `Hoàn tác: ${what}`);
+      }
     );
     return true;
   };
@@ -1035,6 +1063,7 @@ export default function MaterialImportScreen() {
     persistLocks(
       bg ? locks.map((c) => (c.id === bg.id ? lockRecord : c)) : [...locks, lockRecord]
     );
+    logDay(effectiveFrom, viewedWorkshop, "close", `Chốt ngày — tổng ${kg(actualTotal)}${lockNote.trim() ? ` · ghi chú: ${lockNote.trim()}` : ""}`);
     notify.saved(
       `Đã chốt ngày ${formatDateVN(effectiveFrom)} · xưởng ${viewedWorkshop} — ${kg(actualTotal)}`
     );
@@ -1060,6 +1089,7 @@ export default function MaterialImportScreen() {
         c.id === bg.id ? { ...c, isLocked: false, reopenReason } : c
       )
     );
+    logDay(effectiveFrom, viewedWorkshop, "reopen", `Mở lại ngày đã chốt · lý do: ${reopenReason.trim()}`);
     notify.warning(
       `Đã mở lại ngày ${formatDateVN(effectiveFrom)} · xưởng ${viewedWorkshop} — sửa xong nhớ chốt lại`
     );
@@ -1648,6 +1678,15 @@ export default function MaterialImportScreen() {
         </div>
 
         {lockSection}
+        {isSingleDayWorkshop && (
+          <section className="rounded-xl border-2 border-border bg-card p-4">
+            <ActivityLogBlock
+              title={`Nhật ký thao tác — ngày ${formatDateVN(effectiveFrom)} · xưởng ${viewedWorkshop}`}
+              entries={entriesOf(importsLog.entries, "intake-day", dayRecordId(effectiveFrom, viewedWorkshop))}
+              tourTarget="imports-activity"
+            />
+          </section>
+        )}
       </div>
     </div>
   );
@@ -1774,9 +1813,17 @@ export default function MaterialImportScreen() {
             persist(
               rows.map((r) => (dropIds.has(r.id) ? { ...r, materialTypeName: targetType } : r))
             );
-            notify.saved(`Đã đổi ${ids.length} chuyến sang "${targetType}"`, () =>
-              persist(prevRows)
-            );
+            // Nhật ký: mỗi ngày × xưởng bị đổi một dòng.
+            const days = new Map<string, { date: string; ws: string; n: number }>();
+            for (const r of prevRows.filter((x) => dropIds.has(x.id))) {
+              const k = `${r.deliveryDate}|${r.workshop}`;
+              days.set(k, { date: r.deliveryDate, ws: r.workshop, n: (days.get(k)?.n ?? 0) + 1 });
+            }
+            importsLog.log([...days.values()].map((x) => ({ recordType: "intake-day" as const, recordId: dayRecordId(x.date, x.ws), action: "update" as const, summary: `Đổi loại nguyên liệu ${x.n} dòng sang "${targetType}"` })));
+            notify.saved(`Đã đổi ${ids.length} chuyến sang "${targetType}"`, () => {
+              persist(prevRows);
+              importsLog.log([...days.values()].map((x) => ({ recordType: "intake-day" as const, recordId: dayRecordId(x.date, x.ws), action: "undo" as const, summary: `Hoàn tác: đổi loại nguyên liệu ${x.n} dòng sang "${targetType}"` })));
+            });
             setIsTypeChangeOpen(false);
           }}
         />
@@ -1794,6 +1841,7 @@ export default function MaterialImportScreen() {
 
       {mode === "invoices" && (
         <SupplierInvoicePanel
+          onLog={importsLog.log}
           trips={rows}
           persistTrips={persist}
           shipments={shipments}

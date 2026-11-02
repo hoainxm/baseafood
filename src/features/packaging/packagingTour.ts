@@ -103,6 +103,16 @@ export function buildPackagingTour(ctx: PackagingTourContext): PageTour {
   }
 
   steps.push({
+    id: "activity",
+    target: "packaging-activity",
+    optional: true,
+    title: "Nhật ký thao tác",
+    body:
+      "Khi xem một ngày và chọn một xưởng, dưới sổ phiếu là nhật ký đóng gói của ngày đó: ghi phiếu, xóa phiếu.\n" +
+      "Mỗi dòng: giờ · người · việc đã làm, mới nhất trước. Người ghi và giờ ghi do máy chủ đặt; dòng không sửa, không xóa được — Hoàn tác cũng ghi thêm một dòng.",
+  });
+
+  steps.push({
     id: "outro",
     title: "Hoàn tất hướng dẫn",
     body:

@@ -188,7 +188,8 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
         "• Chưa chốt: còn ghi, sửa, xóa chuyến bình thường.\n" +
         "• Đã chốt: chuyến và phế liệu của ngày · xưởng đã khóa; “lúc chốt … kg” là tổng tại lúc chốt — con số đã gửi đi không bị đổi.\n" +
         "• “Còn ghi bù +… kg sau chốt”: sau khi chốt có chuyến ghi bù làm tổng đổi. Số này = tổng hiện tại − tổng lúc chốt; kế toán đối chiếu lại số đã gửi.\n" +
-        "Tổng ngày luôn tính cả ngày của xưởng, không theo bộ lọc đang xem.",
+        "Tổng ngày luôn tính cả ngày của xưởng, không theo bộ lọc đang xem.\n" +
+        "Cuối trang là Nhật ký thao tác của ngày · xưởng: ghi / sửa / xóa chuyến (ghi bù sau chốt có đánh dấu), phế liệu, chốt / mở lại (kèm lý do), việc theo hóa đơn đại lý. Người + giờ do máy chủ đặt, dòng không sửa không xóa được.",
     }),
   );
 
@@ -215,6 +216,8 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
       }),
     );
   }
+
+
 
   steps.push(
     report({

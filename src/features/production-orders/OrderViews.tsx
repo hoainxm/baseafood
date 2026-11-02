@@ -5,6 +5,7 @@
 //              material, linked shipments, requirements) of /planning-production (design-spec 49).
 // ============================================================
 import { useState } from "react";
+import { ActivityLogBlock, type ActivityLogRow } from "@/features/shared/ActivityLogBlock";
 import {
   Button,
   Combobox,
@@ -229,12 +230,15 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export function OrderDossier({
   data,
+  activity,
   order,
   canWrite,
   isRecipient,
   actions,
 }: {
   data: ProductionOrderData;
+  /** Nhật ký thao tác của lệnh (ba-spec 56) — mới nhất trước. */
+  activity: readonly ActivityLogRow[];
   order: ProductionOrder;
   canWrite: boolean;
   isRecipient: boolean;
@@ -513,6 +517,8 @@ export function OrderDossier({
           </dl>
         </section>
       )}
+
+      <ActivityLogBlock entries={activity} tourTarget="order-activity" />
     </div>
   );
 }

@@ -1442,6 +1442,30 @@ export interface ExportFile {
 }
 
 /** Loại thao tác trong nhật ký hợp đồng (mig 0079). */
+/** Loại hồ sơ của dòng nhật ký (ba-spec 56 R2). Sổ theo ngày: hồ sơ = ngày × phân xưởng, id "yyyy-mm-dd|<xưởng>". */
+export type ActivityRecordType =
+  | "export-contract"
+  | "import-contract"
+  | "import-receipt"
+  | "production-order"
+  | "intake-day"
+  | "supplier-invoice"
+  | "production-day"
+  | "packaging-day";
+
+/** Dòng nhật ký của nhóm Nhập hàng / Sản xuất (mig 0092) — chỉ thêm; người + giờ do máy chủ đóng dấu. */
+export interface ActivityLogEntry {
+  id: string;
+  recordType: ActivityRecordType;
+  recordId: string;
+  parentType: ActivityRecordType | "";
+  parentId: string;
+  action: ExportActivityAction;
+  summary: string;
+  actor: string;
+  createdAt: string;
+}
+
 export type ExportActivityAction =
   | "create"
   | "update"
@@ -1465,6 +1489,12 @@ export interface ExportActivity {
   id: string;
   contractId: string;
   shipmentId: string;
+  /** Mig 0092 — bảng này là nhật ký CHUNG của nhóm Kế hoạch (ba-spec 56 R1): hồ sơ của dòng. Trống = HĐ xuất (contractId). */
+  recordType?: ActivityRecordType;
+  recordId?: string;
+  /** Hồ sơ cha (lần nhập thuộc HĐ nhập…) — khối nhật ký của hồ sơ cha hiện cả dòng con. */
+  parentType?: ActivityRecordType | "";
+  parentId?: string;
   action: ExportActivityAction;
   summary: string;
   actor: string;

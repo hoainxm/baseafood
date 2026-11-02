@@ -6,6 +6,7 @@
 //              Source: docs/app-map/34-btp-san-xuat-kho.ba-spec.md + 35-btp-ui.design-spec.md.
 //              ba-spec 43 v4 R14.
 // ============================================================
+import { ActivityGuideSection } from "./ActivityGuideSection";
 import type { PageGuide } from "../guideContent";
 import { GuideList, GuideSection, GuideSteps } from "./parts";
 
@@ -84,6 +85,7 @@ export const wipGuide: PageGuide = {
         </p>
       </GuideSection>
 
+      <ActivityGuideSection where="Xem một ngày, một xưởng, cuối trang" what="ghi / sửa / xóa thành phẩm, bán nội địa, hàng đông lạnh, gửi báo cáo, chốt và mở lại ngày (kèm lý do)." />
       <GuideSection title="Chốt ngày">
         <GuideSteps>
           <li>

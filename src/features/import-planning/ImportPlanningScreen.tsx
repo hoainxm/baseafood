@@ -17,7 +17,9 @@ import { ReasonDialog, type ReasonTarget } from "@/features/export-planning/Reco
 import { newId } from "@/lib/store";
 import { closeGate, contractProgress, documentLabel, requiredDocumentStubs, type ImportData } from "@/lib/importPlanning";
 import { hasImportStorage } from "@/lib/importFileStorage";
-import type { ImportContract, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, ImportSampleCheck } from "@/types";
+import type { ExportActivityAction, ImportContract, ImportDocument, ImportFile, ImportReceipt, ImportReceiptLine, ImportSampleCheck } from "@/types";
+import { formatDateVN } from "@/lib/format";
+import { entriesOf, usePlanningActivityLog } from "@/features/shared/activityLog";
 import { mergeSamples } from "@/lib/importSampleChecks";
 import { SampleCheckDialog, type SampleDialogTarget, type SampleSavePayload } from "./SampleChecks";
 import { BarChart3, FilePlus2, FileText, FolderLock, Route, Ship } from "lucide-react";
@@ -50,6 +52,25 @@ export default function ImportPlanningScreen() {
   const today = todayIso();
   const { profile } = useAuth();
   const recordedBy = profile?.fullName || profile?.username || "Máy này";
+  // Nhật ký nhóm Kế hoạch (ba-spec 56): mỗi thao tác một câu vào hồ sơ HĐ nhập (lần nhập = hồ sơ con).
+  const planningLog = usePlanningActivityLog(recordedBy);
+  type LogRef = { contractId: string; receiptId?: string };
+  const logImport = (ref: LogRef, action: ExportActivityAction, summary: string) =>
+    planningLog.log([
+      ref.receiptId
+        ? { recordType: "import-receipt", recordId: ref.receiptId, parentType: "import-contract", parentId: ref.contractId, action, summary }
+        : { recordType: "import-contract", recordId: ref.contractId, action, summary },
+    ]);
+  /** Ghi nhật ký ngay + trả hàm Hoàn tác có kèm dòng "Hoàn tác: …". */
+  const logged = (ref: LogRef, action: ExportActivityAction, summary: string, undo: () => void) => {
+    logImport(ref, action, summary);
+    return () => {
+      undo();
+      logImport(ref, "undo", `Hoàn tác: ${summary}`);
+    };
+  };
+  const receiptName = (r: Pick<ImportReceipt, "containerNo" | "arrivalDate" | "expectedDate"> | undefined) =>
+    !r ? "lần nhập" : r.containerNo ? `lần nhập cont ${r.containerNo}` : `lần nhập ${formatDateVN(r.arrivalDate || r.expectedDate)}`;
   const can = useCan("import-plans");
   const receivingCan = useCan("import-plans.receiving");
   const store = useImportData();
@@ -123,13 +144,17 @@ export default function ImportPlanningScreen() {
     // Đổi tên đối tác / số HĐ ⇒ chép lại vào lần nhập (thủ kho đọc bản chép).
     const stale = prev.receipts.filter((r) => r.contractId === p.contract.id && (r.contractNo !== p.contract.contractNo || r.supplierName !== p.contract.supplierName));
     if (stale.length) store.saveReceipts(prev.receipts.map((r) => (r.contractId === p.contract.id ? { ...r, contractNo: p.contract.contractNo, supplierName: p.contract.supplierName } : r)));
-    notify.saved(p.isNew ? `Đã lập HĐ nhập ${p.contract.contractNo} — việc tiếp: Ghi lần nhập khi hàng sắp về` : `Đã lưu HĐ nhập ${p.contract.contractNo}`, () => {
-      store.saveContracts(prev.contracts);
-      store.saveLines(prev.lines);
-      store.saveReceiptLines(prev.receiptLines);
-      store.saveFiles(prev.files);
-      store.saveReceipts(prev.receipts);
-    });
+    const what = `${p.isNew ? "Lập" : "Sửa"} HĐ nhập ${p.contract.contractNo} — ${p.contract.supplierName}, ${p.lines.length} dòng hàng${p.files.length ? ` · đính ${p.files.length} file` : ""}`;
+    notify.saved(
+      p.isNew ? `Đã lập HĐ nhập ${p.contract.contractNo} — việc tiếp: Ghi lần nhập khi hàng sắp về` : `Đã lưu HĐ nhập ${p.contract.contractNo}`,
+      logged({ contractId: p.contract.id }, p.isNew ? "create" : "update", what, () => {
+        store.saveContracts(prev.contracts);
+        store.saveLines(prev.lines);
+        store.saveReceiptLines(prev.receiptLines);
+        store.saveFiles(prev.files);
+        store.saveReceipts(prev.receipts);
+      }),
+    );
     setContractForm(null);
     if (p.isNew) setParam({ contract: p.contract.id, receipt: "" });
     return true;
@@ -140,10 +165,14 @@ export default function ImportPlanningScreen() {
     if (!store.saveReceipts(upsert(prev.receipts, r))) return false;
     const c = prev.contracts.find((x) => x.id === r.contractId);
     if (isNew) store.saveDocuments([...prev.documents, ...requiredDocumentStubs(r.id, c?.importType ?? "", newId, new Date().toISOString())]);
-    notify.saved(isNew ? `Đã ghi lần nhập — việc tiếp: đính Invoice, Packing List, tờ khai` : "Đã lưu lần nhập", () => {
-      store.saveReceipts(prev.receipts);
-      if (isNew) store.saveDocuments(prev.documents);
-    });
+    const what = `${isNew ? "Ghi" : "Sửa"} ${receiptName(r)}${r.blNo ? ` · B/L ${r.blNo}` : ""}`;
+    notify.saved(
+      isNew ? `Đã ghi lần nhập — việc tiếp: đính Invoice, Packing List, tờ khai` : "Đã lưu lần nhập",
+      logged({ contractId: r.contractId, receiptId: r.id }, isNew ? "create" : "update", what, () => {
+        store.saveReceipts(prev.receipts);
+        if (isNew) store.saveDocuments(prev.documents);
+      }),
+    );
     setReceiptForm(null);
     return true;
   };
@@ -152,10 +181,15 @@ export default function ImportPlanningScreen() {
     const prev = dataRef.current;
     if (!store.saveDocuments(upsert(prev.documents, doc))) return false;
     if (files.length) store.saveFiles([...prev.files, ...files]);
-    notify.saved(`Đã lưu ${documentLabel(doc)}${files.length ? ` · ${files.length} file` : ""}`, () => {
-      store.saveDocuments(prev.documents);
-      if (files.length) store.saveFiles(prev.files);
-    });
+    const docReceipt = prev.receipts.find((x) => x.id === doc.receiptId);
+    const what = `Lưu ${documentLabel(doc)} của ${receiptName(docReceipt)}${files.length ? ` · đính ${files.length} file` : ""}`;
+    notify.saved(
+      `Đã lưu ${documentLabel(doc)}${files.length ? ` · ${files.length} file` : ""}`,
+      logged({ contractId: docReceipt?.contractId ?? "", receiptId: doc.receiptId }, files.length ? "attach" : "update", what, () => {
+        store.saveDocuments(prev.documents);
+        if (files.length) store.saveFiles(prev.files);
+      }),
+    );
     setDocTarget(null);
     return true;
   };
@@ -164,16 +198,23 @@ export default function ImportPlanningScreen() {
     const prev = dataRef.current;
     if (!store.saveDocuments(prev.documents.filter((x) => x.id !== doc.id))) return;
     store.saveFiles(prev.files.filter((f) => f.documentId !== doc.id));
-    notify.deleted(`Đã xóa ${documentLabel(doc)}`, () => {
-      store.saveDocuments(prev.documents);
-      store.saveFiles(prev.files);
-    });
+    const docReceipt = prev.receipts.find((x) => x.id === doc.receiptId);
+    notify.deleted(
+      `Đã xóa ${documentLabel(doc)}`,
+      logged({ contractId: docReceipt?.contractId ?? "", receiptId: doc.receiptId }, "delete", `Xóa ${documentLabel(doc)} của ${receiptName(docReceipt)}`, () => {
+        store.saveDocuments(prev.documents);
+        store.saveFiles(prev.files);
+      }),
+    );
   };
 
   const removeFile = (f: ImportFile) => {
     const prev = dataRef.current;
     if (!store.saveFiles(prev.files.filter((x) => x.id !== f.id))) return;
-    notify.deleted(`Đã gỡ file ${f.fileName}`, () => store.saveFiles(prev.files));
+    notify.deleted(
+      `Đã gỡ file ${f.fileName}`,
+      logged({ contractId: f.contractId, receiptId: f.receiptId || undefined }, "detach", `Gỡ file ${f.fileName}`, () => store.saveFiles(prev.files)),
+    );
   };
 
   /* ---------- Kiểm mẫu của kho (v4, NI11) ---------- */
@@ -191,10 +232,14 @@ export default function ImportPlanningScreen() {
     if (!store.saveSampleChecks(next)) return false;
     if (p.files.length) store.saveFiles([...prev.files, ...p.files]);
     const msg = p.editId ? "Đã lưu mẫu kiểm" : `Đã lưu ${p.samples.length} mẫu kiểm của kho`;
-    notify.saved(msg, () => {
-      store.saveSampleChecks(rows);
-      if (p.files.length) store.saveFiles(prev.files);
-    });
+    const sampleReceipt = prev.receipts.find((x) => x.id === p.receiptId);
+    notify.saved(
+      msg,
+      logged({ contractId: sampleReceipt?.contractId ?? "", receiptId: p.receiptId }, p.editId ? "update" : "create", `${p.editId ? "Sửa 1 mẫu kiểm" : `Ghi ${p.samples.length} mẫu kiểm của kho`} — ${receiptName(sampleReceipt)}${p.files.length ? ` · đính ${p.files.length} file` : ""}`, () => {
+        store.saveSampleChecks(rows);
+        if (p.files.length) store.saveFiles(prev.files);
+      }),
+    );
     setSampleTarget(null);
     return true;
   };
@@ -203,14 +248,19 @@ export default function ImportPlanningScreen() {
     const prev = dataRef.current;
     const rows = prev.sampleChecks ?? [];
     if (!store.saveSampleChecks(rows.filter((x) => x.id !== s.id))) return;
-    notify.deleted(`Đã xóa mẫu ${s.sampleNo || ""}${s.size ? ` · ${s.size}` : ""}`.trim(), () => store.saveSampleChecks(rows));
+    const label = `mẫu ${s.sampleNo || ""}${s.size ? ` · ${s.size}` : ""}`.trim();
+    notify.deleted(`Đã xóa ${label}`, logged({ contractId: s.contractId, receiptId: s.receiptId }, "delete", `Xóa ${label}`, () => store.saveSampleChecks(rows)));
   };
 
   const saveQuantity = (receiptId: string, rows: ImportReceiptLine[]): boolean => {
     const prev = dataRef.current;
     if (!store.saveReceiptLines([...prev.receiptLines.filter((x) => x.receiptId !== receiptId), ...rows])) return false;
     const kg = rows.reduce((s, x) => s + (x.kg ?? 0), 0);
-    notify.saved(`Đã ghi thực nhập ${formatNumber(kg)} kg`, () => store.saveReceiptLines(prev.receiptLines));
+    const qtyReceipt = prev.receipts.find((x) => x.id === receiptId);
+    notify.saved(
+      `Đã ghi thực nhập ${formatNumber(kg)} kg`,
+      logged({ contractId: qtyReceipt?.contractId ?? "", receiptId }, "update", `Ghi thực nhập ${formatNumber(kg)} kg — ${receiptName(qtyReceipt)}`, () => store.saveReceiptLines(prev.receiptLines)),
+    );
     setQtyTarget(null);
     return true;
   };
@@ -218,7 +268,10 @@ export default function ImportPlanningScreen() {
   const setReceiptStatus = (r: ImportReceipt, status: ImportReceipt["status"], cancelReason: string) => {
     const prev = dataRef.current;
     if (!store.saveReceipts(prev.receipts.map((x) => (x.id === r.id ? { ...x, status, cancelReason } : x)))) return;
-    notify.saved(status === "cancelled" ? "Đã hủy lần nhập" : "Đã khôi phục lần nhập", () => store.saveReceipts(prev.receipts));
+    notify.saved(
+      status === "cancelled" ? "Đã hủy lần nhập" : "Đã khôi phục lần nhập",
+      logged({ contractId: r.contractId, receiptId: r.id }, status === "cancelled" ? "cancel" : "restore", status === "cancelled" ? `Hủy ${receiptName(r)} · lý do: ${cancelReason}` : `Khôi phục ${receiptName(r)}`, () => store.saveReceipts(prev.receipts)),
+    );
   };
 
   const doDeleteReceipt = (r: ImportReceipt) => {
@@ -226,11 +279,14 @@ export default function ImportPlanningScreen() {
     if (!store.saveReceipts(prev.receipts.filter((x) => x.id !== r.id))) return;
     store.saveDocuments(prev.documents.filter((x) => x.receiptId !== r.id));
     store.saveReceiptLines(prev.receiptLines.filter((x) => x.receiptId !== r.id));
-    notify.deleted("Đã xóa lần nhập", () => {
-      store.saveReceipts(prev.receipts);
-      store.saveDocuments(prev.documents);
-      store.saveReceiptLines(prev.receiptLines);
-    });
+    notify.deleted(
+      "Đã xóa lần nhập",
+      logged({ contractId: r.contractId }, "delete", `Xóa ${receiptName(r)}`, () => {
+        store.saveReceipts(prev.receipts);
+        store.saveDocuments(prev.documents);
+        store.saveReceiptLines(prev.receiptLines);
+      }),
+    );
   };
 
   const setContractStatus = (c: ImportContract, patch: Partial<ImportContract>, message: string, cascadeCancel = false) => {
@@ -238,10 +294,15 @@ export default function ImportPlanningScreen() {
     if (!store.saveContracts(prev.contracts.map((x) => (x.id === c.id ? { ...x, ...patch } : x)))) return;
     if (cascadeCancel)
       store.saveReceipts(prev.receipts.map((r) => (r.contractId === c.id && r.status !== "cancelled" ? { ...r, status: "cancelled" as const, cancelReason: patch.cancelReason ?? "" } : r)));
-    notify.saved(message, () => {
-      store.saveContracts(prev.contracts);
-      if (cascadeCancel) store.saveReceipts(prev.receipts);
-    });
+    const reason = patch.cancelReason || patch.closeReason;
+    const action: ExportActivityAction = patch.status === "cancelled" ? "cancel" : patch.status === "closed" ? "close" : "reopen";
+    notify.saved(
+      message,
+      logged({ contractId: c.id }, action, `${message.replace(/^Đã /, "").replace(/^./, (x) => x.toUpperCase())}${reason ? ` · lý do: ${reason}` : ""}`, () => {
+        store.saveContracts(prev.contracts);
+        if (cascadeCancel) store.saveReceipts(prev.receipts);
+      }),
+    );
   };
 
   const doDeleteContract = (c: ImportContract) => {
@@ -250,11 +311,14 @@ export default function ImportPlanningScreen() {
     store.saveLines(prev.lines.filter((l) => l.contractId !== c.id));
     store.saveFiles(prev.files.filter((f) => f.contractId !== c.id));
     setParam({ contract: "", receipt: "" });
-    notify.deleted(`Đã xóa HĐ nhập ${c.contractNo}`, () => {
-      store.saveContracts(prev.contracts);
-      store.saveLines(prev.lines);
-      store.saveFiles(prev.files);
-    });
+    notify.deleted(
+      `Đã xóa HĐ nhập ${c.contractNo}`,
+      logged({ contractId: c.id }, "delete", `Xóa HĐ nhập ${c.contractNo}`, () => {
+        store.saveContracts(prev.contracts);
+        store.saveLines(prev.lines);
+        store.saveFiles(prev.files);
+      }),
+    );
   };
 
   const openClose = (c: ImportContract) => {
@@ -348,6 +412,7 @@ export default function ImportPlanningScreen() {
       {contract ? (
         <ImportDossier
           data={d}
+          activity={entriesOf(planningLog.entries, "import-contract", contract.id)}
           contract={contract}
           focusReceiptId={focusReceiptId}
           can={dossierCan}

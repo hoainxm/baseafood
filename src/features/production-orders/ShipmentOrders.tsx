@@ -16,6 +16,9 @@ import { linesOfOrder, orderTotals, shipmentsWithLot, visibleOrders } from "@/li
 import type { ExportShipment } from "@/types";
 import { ClipboardList, FilePlus2, Link2 } from "lucide-react";
 import { OrderStatusTag } from "./OrderViews";
+import { contractInput, shipmentLabel } from "./useContractActivity";
+import { usePlanningActivityLog } from "@/features/shared/activityLog";
+import { useAuth } from "@/lib/auth";
 
 export function ShipmentOrders({ shipment, isCancelled }: { shipment: ExportShipment; isCancelled: boolean }) {
   const can = useCan("production-orders");
@@ -26,6 +29,9 @@ export function ShipmentOrders({ shipment, isCancelled }: { shipment: ExportShip
   const [shipments, setShipments] = useExportShipments();
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
+  const { profile } = useAuth();
+  // Nhật ký nhóm Kế hoạch (ba-spec 56): dòng của hồ sơ HĐ xuất + dòng của từng lệnh vừa gắn.
+  const planningLog = usePlanningActivityLog(profile?.fullName || profile?.username || "Máy này");
   if (!can.view) return null;
 
   const canWrite = can.create || can.update;
@@ -47,9 +53,20 @@ export function ShipmentOrders({ shipment, isCancelled }: { shipment: ExportShip
     const first = orders.find((o) => o.id === picked[0]);
     const changed = first ? shipmentsWithLot(first, [shipment]) : [];
     if (changed.length) setShipments(shipments.map((s) => changed.find((c) => c.id === s.id) ?? s));
+    // Nhật ký HĐ xuất (mig 0079): gắn lệnh ở chuyến cũng là việc trên hồ sơ HĐ.
+    const nos = picked.map((id) => orders.find((o) => o.id === id)).filter((o): o is NonNullable<typeof o> => !!o);
+    const what = `Gắn lệnh sản xuất ${nos.map((o) => o.orderNo).join(", ")} vào chuyến ${shipmentLabel(shipment)}${nos.some((o) => o.status === "issued") ? " — bước Lệnh sản xuất xong" : ""}${changed.length && first ? ` · chuyến nhận mã số lô ${first.lotCode}` : ""}`;
+    planningLog.log([
+      contractInput({ contractId: shipment.contractId, shipmentId: shipment.id, action: "attach", summary: what }),
+      ...nos.map((o) => ({ recordType: "production-order" as const, recordId: o.id, action: "attach" as const, summary: `Gắn chuyến ${shipmentLabel(shipment)} (từ hồ sơ chuyến xuất)` })),
+    ]);
     notify.saved(`Đã gắn ${picked.length} lệnh sản xuất vào chuyến`, () => {
       setLinks([...prevLinks]);
       if (changed.length) setShipments([...prevShipments]);
+      planningLog.log([
+        contractInput({ contractId: shipment.contractId, shipmentId: shipment.id, action: "undo", summary: `Hoàn tác: ${what}` }),
+        ...nos.map((o) => ({ recordType: "production-order" as const, recordId: o.id, action: "undo" as const, summary: `Hoàn tác: gắn chuyến ${shipmentLabel(shipment)}` })),
+      ]);
     });
     setPicking(false);
   };

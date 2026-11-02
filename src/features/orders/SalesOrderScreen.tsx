@@ -34,7 +34,6 @@ import { ALL, activeFilterCount, countedLabel, filterRows, matchesSearch, matche
 import {
   RequiredLegend,
   Button,
-  ChoiceGroup,
   Combobox,
   Dialog,
   DialogContent,
@@ -472,13 +471,14 @@ export default function SalesOrderScreen() {
           onClearAll={clearFilters}
           resultText={`Đang hiện ${shownOrders.length.toLocaleString("vi-VN")} / ${don.length.toLocaleString("vi-VN")} đơn`}
         >
-          <ChoiceGroup
+          <Combobox
             label="Trạng thái"
             hideRequiredMark
             value={statusFilter}
             onChange={setStatusFilter}
             options={statusChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
-            columns={4}
+            clearable={false}
+            className="min-w-[14rem] flex-1"
           />
           <Combobox
             label="Khách hàng"

@@ -10,7 +10,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Button,
-  ChoiceGroup,
   Combobox,
   FilterBar,
   SearchField,
@@ -82,7 +81,8 @@ import { buildMyTasksTour } from "./myTasksTour";
 const URGENCY_TAGS: Record<TaskUrgency, (x: MyTaskItem) => { text: string; variant: TagVariant }> = {
   overdue: (x) => ({ text: `Quá hạn ${x.overdueDays} ngày`, variant: "error" }),
   today: () => ({ text: "Hạn hôm nay", variant: "warning" }),
-  upcoming: (x) => ({ text: `Hạn ${formatDateVN(x.dueDate)}`, variant: "pending" }),
+  // Việc cần làm mà không có hạn (Còn tiền chưa về, Hồ sơ HĐ bổ sung sau — ba-spec 59 R3) ⇒ "Chưa có hạn".
+  upcoming: (x) => ({ text: x.dueDate ? `Hạn ${formatDateVN(x.dueDate)}` : "Chưa có hạn", variant: "pending" }),
   info: () => ({ text: "Để biết", variant: "muted" }),
 };
 
@@ -525,7 +525,7 @@ export default function MyTasksScreen() {
       </div>
 
       <FilterBar data-tour="my-tasks-filter" activeCount={activeFilterCount([query])} onClearAll={() => setQuery("")}>
-        <ChoiceGroup label="Lọc theo hạn" hideRequiredMark value={filter} onChange={(v) => setFilter(v as UrgencyFilter)} options={FILTERS} columns={4} />
+        <Combobox label="Lọc theo hạn" hideRequiredMark value={filter} onChange={(v) => setFilter(v as UrgencyFilter)} options={FILTERS} clearable={false} className="min-w-[14rem] flex-1" />
         <SearchField label="Tra việc, người giao, người nhận" value={query} onChange={setQuery} />
       </FilterBar>
 

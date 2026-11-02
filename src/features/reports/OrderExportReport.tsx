@@ -24,7 +24,6 @@ import {
   FilterBar,
   NoMatchState,
   SearchField,
-  ChoiceGroup,
   PrintSheet,
   TableSkeleton,
   Table,
@@ -337,14 +336,15 @@ export default function OrderExportReport() {
             options={customerOptions}
           />
         </div>
-        <ChoiceGroup
+        <Combobox
           label="Trạng thái đơn"
           hideRequiredMark
           value={statusFilter}
           onChange={setStatusFilter}
           options={statusChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
-          columns={4}
-        />
+            clearable={false}
+            className="min-w-[14rem] flex-1"
+          />
         <SearchField label="Tra mặt hàng, quy cách, khách" value={query} onChange={setQuery} />
       </FilterBar>
 

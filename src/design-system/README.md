@@ -855,7 +855,7 @@ Oracle hành vi: [ba-spec 53](../../docs/app-map/53-filters.ba-spec.md). Logic s
 
 | Luật | Làm thế nào |
 |---|---|
-| Sổ dài (cỡ L) có **kỳ xem + ô tra + lọc đối tượng chính** (khách / đại lý / xưởng); bảng có cột trạng thái lọc được theo trạng thái | `FilterBar` bọc hàng ô lọc; ô tra = `SearchField` (nhãn "Tra …" nói rõ tra gì); trạng thái = `ChoiceGroup` / `Combobox` với `statusOptions` + `countedLabel` ("Đang gom (3)") |
+| Sổ dài (cỡ L) có **kỳ xem + ô tra + lọc đối tượng chính** (khách / đại lý / xưởng); bảng có cột trạng thái lọc được theo trạng thái | `FilterBar` bọc hàng ô lọc; ô tra = `SearchField` (nhãn "Tra …" nói rõ tra gì); trạng thái / kênh / hạn = **`Combobox` (danh sách thả xuống)** với `statusOptions` + `countedLabel` ("Đang gom (3)"), `clearable={false}`, `className="min-w-[14rem] flex-1"` — **không** dùng `ChoiceGroup` (hàng nút) trong `FilterBar` (từ 2026-11-02: hàng nút chiếm chỗ, xuống nhiều dòng ở điện thoại). `ChoiceGroup` chỉ còn cho ô NHẬP của form và chọn kỳ xem |
 | Ô tra bỏ dấu, không phân hoa thường, mọi từ phải có | `matchesSearch(q, ...cộtChữ)` |
 | Nhiều điều kiện = AND | `filterRows(rows, [điềuKiện…])`, ô một giá trị dùng `matchesValue(chọn, giáTrị)` với `ALL` = "" là Tất cả |
 | Có điều kiện đang bật ⇒ "Bỏ hết bộ lọc (N)" + số dòng khớp | `FilterBar activeCount={activeFilterCount([...])} onClearAll resultText="Đang hiện 12 / 40 phiếu"` — KHÔNG đếm kỳ xem; bỏ lọc giữ kỳ |

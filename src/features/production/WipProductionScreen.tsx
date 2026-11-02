@@ -51,7 +51,6 @@ import {
   RequiredLegend,
   Button,
   ConfirmDelete,
-  ChoiceGroup,
   Combobox,
   DateField,
   DateRangeField,
@@ -1735,14 +1734,15 @@ export default function WipProductionScreen() {
           ]}
           className="min-w-[220px] flex-1"
         />
-        <ChoiceGroup
+        <Combobox
           label="Nhập kho"
           hideRequiredMark
           value={stockFilter}
           onChange={setStockFilter}
           options={stockChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
-          columns={3}
-        />
+            clearable={false}
+            className="min-w-[14rem] flex-1"
+          />
         <Combobox
           label="Khách hàng"
           hideRequiredMark

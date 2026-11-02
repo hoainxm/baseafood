@@ -7,7 +7,6 @@ import { useMemo, useState } from "react";
 import {
   SummaryTable,
   BarChart,
-  ChoiceGroup,
   Combobox,
   FilterBar,
   DateField,
@@ -195,14 +194,15 @@ export default function SalesReport() {
         <div className="min-w-[14rem] flex-1">
           <Combobox label="Khách hàng" hideRequiredMark clearable={false} value={customerFilter} onChange={(v) => setCustomerFilter(v || ALL)} options={customerChoices} />
         </div>
-        <ChoiceGroup
+        <Combobox
           label="Kênh bán"
           hideRequiredMark
           value={channelFilter}
           onChange={setChannelFilter}
           options={[{ value: ALL, label: "Tất cả" }, ...SALES_CHANNELS.map((k) => ({ value: k, label: k }))]}
-          columns={3}
-        />
+            clearable={false}
+            className="min-w-[14rem] flex-1"
+          />
       </FilterBar>
 
       <div data-tour="sales-report-stats">

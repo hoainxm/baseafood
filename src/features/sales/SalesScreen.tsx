@@ -74,7 +74,6 @@ import { sumSalesAmountByChannel } from "@/lib/salesTotals";
 import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { ALL, activeFilterCount, filterRows, matchesSearch, matchesValue } from "@/lib/recordFilters";
 import {
-  CalendarRange,
   CircleCheck,
   FileText,
   Link2,
@@ -83,7 +82,6 @@ import {
   Scale,
   ShoppingCart,
   Truck,
-  Warehouse,
   X,
 } from "lucide-react";
 
@@ -617,38 +615,23 @@ export default function SalesScreen() {
   ] : [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-foreground">Bán hàng</h1>
-            {isReadOnly && <ReadOnlyBadge />}
-          </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">Bán hàng</h1>
+      {/* Nút chính nằm CÙNG HÀNG với tab Sổ bán hàng · Báo cáo (SalesTab là khung `relative`) — tiêu đề trang
+          đã ở header, không lặp lại; điện thoại thì nút xuống dưới tab như thường. */}
+      {(isReadOnly || allowed.create) && (
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:absolute sm:right-0 sm:top-0">
+          {isReadOnly && <ReadOnlyBadge />}
+          {allowed.create && (
+            <Button
+              data-tour="sales-create"
+              title="Mở form ghi một phiếu bán mới: chọn khách, kênh bán, rồi thêm từng dòng mặt hàng." onClick={openAdd}>
+              <Plus />
+              Ghi phiếu bán
+            </Button>
+          )}
         </div>
-        {allowed.create && (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            data-tour="sales-create"
-            title="Mở form ghi một phiếu bán mới: chọn khách, kênh bán, rồi thêm từng dòng mặt hàng." size="lg" onClick={openAdd}>
-            <Plus />
-            Ghi phiếu bán
-          </Button>
-        </div>
-        )}
-      </div>
-
-      <div data-tour="sales-stats">
-      <StatCardGrid
-        className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-        cards={[
-          { label: "Đang xem", value: rangeDescription, icon: CalendarRange, color: "neutral" },
-          { label: "Phân xưởng", value: workshop, icon: Warehouse, color: "neutral" },
-          { label: filterCount ? "Số phiếu · theo bộ lọc" : "Số phiếu", value: groupedView.length, numeric: true, icon: Truck, color: "brand" },
-          { label: filterCount ? "Số dòng · theo bộ lọc" : "Số dòng", value: view.length, numeric: true, icon: FileText, color: "brand" },
-          { label: filterCount ? "Tổng bán · theo bộ lọc" : "Tổng bán", value: kg(total), numeric: true, icon: Scale, color: "success" },
-        ]}
-      />
-      </div>
+      )}
 
       {/* Bộ lọc — kỳ + xưởng + khách / kênh / ô tra (ba-spec 53) */}
       <FilterBar
@@ -664,10 +647,10 @@ export default function SalesScreen() {
             value={period}
             onChange={(v) => setPeriod(v as ViewPeriod)}
             options={PERIOD_OPTIONS}
-            className="min-w-[13rem]"
+            className="min-w-[10rem]"
           />
 
-          <div className="min-w-[220px] flex-1">
+          <div className="min-w-[13rem] flex-1">
             {period === "custom" ? (
               <DateRangeField
                 label="Khoảng ngày xuất bán"
@@ -713,7 +696,7 @@ export default function SalesScreen() {
               ...WORKSHOPS.map((p) => ({ value: p, label: p })),
               { value: "Tất cả", label: "Tất cả" },
             ]}
-            className="min-w-[220px] flex-1"
+            className="min-w-[10rem] flex-1"
           />
           <Combobox
             label="Khách hàng"
@@ -722,18 +705,29 @@ export default function SalesScreen() {
             value={customerFilter}
             onChange={(v) => setCustomerFilter(v || ALL)}
             options={customerFilterOptions}
-            className="min-w-[220px] flex-1"
+            className="min-w-[12rem] flex-1"
           />
-          <ChoiceGroup
+          <Combobox
             label="Kênh bán"
             hideRequiredMark
             value={channelFilter}
             onChange={(v) => setChannelFilter(v)}
             options={[{ value: ALL, label: "Tất cả" }, ...SALES_CHANNELS.map((k) => ({ value: k, label: k }))]}
-            columns={3}
+            clearable={false}
+            className="min-w-[10rem] flex-1"
           />
           <SearchField label="Tra khách, mặt hàng, quy cách, ghi chú" value={query} onChange={setQuery} />
       </FilterBar>
+
+      <div data-tour="sales-stats">
+      <StatCardGrid
+        cards={[
+          { label: filterCount ? "Số phiếu · theo bộ lọc" : "Số phiếu", value: groupedView.length, numeric: true, icon: Truck, color: "brand" },
+          { label: filterCount ? "Số dòng · theo bộ lọc" : "Số dòng", value: view.length, numeric: true, icon: FileText, color: "brand" },
+          { label: filterCount ? "Tổng bán · theo bộ lọc" : "Tổng bán", value: kg(total), numeric: true, icon: Scale, color: "success" },
+        ]}
+      />
+      </div>
 
       {/* Sổ: mỗi phiếu một cụm */}
       {isLoading ? (

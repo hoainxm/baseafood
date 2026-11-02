@@ -922,14 +922,15 @@ export default function UserManagementScreen({
             <SearchField label="Tra tên đăng nhập, họ tên, vai trò" value={q} onChange={setQ} />
             <Combobox label="Vai trò" hideRequiredMark clearable={false} value={roleFilter} onChange={(v) => setRoleFilter(v || ALL)} options={roleChoices} className="min-w-[14rem] flex-1" />
             {accounts.isAvailable && (
-              <ChoiceGroup
+              <Combobox
                 label="Trạng thái tài khoản"
                 hideRequiredMark
                 value={stateFilter}
                 onChange={setStateFilter}
                 options={stateChoices.map((o) => ({ value: o.value, label: countedLabel(o) }))}
-                columns={4}
-              />
+            clearable={false}
+            className="min-w-[14rem] flex-1"
+          />
             )}
           </FilterBar>
 

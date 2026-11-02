@@ -27,7 +27,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  ChoiceGroup,
   EmptyState,
   FilterBar,
   NoMatchState,
@@ -697,16 +696,18 @@ export default function WarehouseNxtScreen() {
             />
           </div>
           <SearchField label="Tra mã, tên hàng" value={query} onChange={(v) => { setQuery(v); setSelected(new Set()); }} />
-          <ChoiceGroup
+          <Combobox
             label="Dòng"
             hideRequiredMark
-            value={movingOnly}
-            onChange={(v) => { setMovingOnly(v); setSelected(new Set()); }}
+            value={movingOnly || "all"}
+            onChange={(v) => {
+              setMovingOnly(v === "all" ? "" : v); setSelected(new Set()); }}
             options={[
-              { value: "", label: "Tất cả mã" },
+              { value: "all", label: "Tất cả mã" },
               { value: "moving", label: "Có phát sinh / còn tồn" },
             ]}
-            columns={2}
+            clearable={false}
+            className="min-w-[14rem] flex-1"
           />
           {periodRows.length > 0 && canWrite && (
             <div className="flex flex-wrap items-center gap-3">

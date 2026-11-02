@@ -175,6 +175,10 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   production_order_lines: null,
   production_order_materials: null,
   production_order_shipments: null,
+  // Bộ soạn văn bản (mig 0091): RLS theo cột `resource` của dòng (Lệnh sản xuất ⇒ production-orders); khuôn chỉ quản trị.
+  document_templates: null,
+  composed_documents: null,
+  composed_document_exports: null,
 };
 
 export interface WriteDenial {

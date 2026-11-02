@@ -89,6 +89,7 @@ export { ProportionBar, type ProportionSegment } from "./patterns/ProportionBar"
 export { PipelineStages, type PipelineStage } from "./patterns/PipelineStages";
 export { TimeSeriesChart, type ChartSeries, type SeriesColor } from "./patterns/TimeSeriesChart";
 export { PrintSheet, LabelPrintSheet, PrintTh, PrintTd, type PrintLabel } from "./patterns/PrintSheet";
+export { DocxPreview, DocxPrintSheet } from "./patterns/DocxPreview";
 export { ThinkingDots, ProcessingState, TableSkeleton } from "./patterns/Loading";
 export { notify } from "./patterns/notify";
 

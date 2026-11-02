@@ -62,6 +62,9 @@ src/features/*                 ← màn nghiệp vụ
    nên làm NGAY sau khi lưu (vd in tem lô vừa ghi) truyền tham số thứ ba
    `notify.saved(msg, onUndo?, { label, onClick })` — nút hiện trên toast.
    Bản in A4 dọc (VD lệnh sản xuất QTI-KH-01-04): `PrintSheet landscape={false}` — mặc định vẫn khổ ngang.
+   File Word sinh từ khuôn (bộ soạn văn bản, ba-spec 54): `DocxPreview file={bytes}` vẽ đúng trang Word trên màn (thư viện
+   `docx-preview` nạp động); `DocxPrintSheet` in đúng các trang đó ra giấy / PDF (`@page docx` A4 dọc, lề 0 — lề do file Word quyết).
+   Không dựng lại bố cục Word bằng HTML: xem trước PHẢI là chính file sẽ xuất.
    In tem nhãn: `LabelPrintSheet` nhận `tems[]` để in nhiều tem một lượt (mỗi tem một trang đúng khổ).
    Mỗi tem có `copies` (số bản in, VD mỗi block một tem — mặc định 1): xem trước hiện MỘT tem
    kèm ô "Số tem" sửa được, bản sao ẩn trên màn (`.print-tem-sao`) chỉ hiện khi in; tem in

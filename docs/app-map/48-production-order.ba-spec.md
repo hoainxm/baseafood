@@ -2,7 +2,9 @@
 
 > Load khi: xây hoặc sửa Lệnh sản xuất của Phòng Kế hoạch: lập lệnh từ dòng hàng hợp đồng xuất, gắn nguyên liệu nhập khẩu dự kiến, phát hành tới phân xưởng / kho, gắn chuyến xuất (bước 2 của chuyến), in mẫu QTI-KH-01-04.
 covers: src/features/production-orders/**, src/lib/productionOrder.ts, src/lib/productionOrderDemo.ts, supabase/migrations/0088_production_orders.sql, src/lib/exportPlanning.ts
-last_verified: 2026-10-30
+last_verified: 2026-11-02
+<!-- updated: 2026-11-02 (bộ soạn 54 P3) — hồ sơ lệnh thêm nút "File Word / PDF" (`&file=1`) mở bộ soạn file LSX đủ 42 ô của mẫu (ba-spec 54); bản in gọn `OrderPrint` giữ nguyên (54 A2). -->
+<!-- updated: 2026-10-31 (bộ soạn 54) — gom luật ghi ngày SX "02, 03, 04/11/2026" thành `formatProductionDates` ở `lib/productionOrder.ts` (bản in `OrderPrint` + file LSX của ba-spec 54 cùng dùng); hành vi bản in không đổi. -->
 <!-- re-verified: 2026-10-30 15:40 — R17 / AC-16: test productionOrder (31) xanh; preview demo lập lệnh 1.10 từ dòng HĐ 21.26 ⇒ xem trước + hồ sơ + bản in có "Dài 1.5 - 3.5 cm/pc · 330 – 370 miếng/kg · Tỉ lệ 80% râu 20% thân · 4kg/CTN x 2/Bundle" và "Ghi chú: Không dùng hàng da giấy"; dữ liệu thử đã gỡ. -->
 <!-- updated: 2026-10-30 (NL dòng) — R17 / AC-16: Quy cách dòng lệnh gồm chiều dài · số miếng / kg · tỉ lệ từ dòng HĐ (`contractLineSpec`), ghi chú dòng HĐ ⇒ `note` dòng lệnh. -->
 <!-- updated: 2026-10-30 (lọc + khác) — bỏ bộ lọc trạng thái 5 lựa chọn (chỉ còn Xem / Ẩn lệnh đã hủy, design-spec 49); Nafi chọn "Khác" ⇒ bắt ghi chỉ tiêu (nafiNote). -->

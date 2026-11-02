@@ -7,17 +7,10 @@
 // ============================================================
 import { PrintSheet, PrintTd, PrintTh, formatNumber } from "@/design-system";
 import { formatDateVN } from "@/lib/format";
-import { expiryDate, lineCartons, linesOfOrder, orderLineKg, orderTotals } from "@/lib/productionOrder";
+import { expiryDate, formatProductionDates, lineCartons, linesOfOrder, orderLineKg, orderTotals } from "@/lib/productionOrder";
 import type { ProductionOrder, ProductionOrderLine } from "@/types";
 
 const longDate = (iso: string) => (iso ? `Ngày ${Number(iso.slice(8, 10))} Tháng ${Number(iso.slice(5, 7))} Năm ${iso.slice(0, 4)}` : "");
-const shortDates = (ds: readonly string[]) => {
-  const sorted = [...ds].sort();
-  if (!sorted.length) return "";
-  const sameMonth = sorted.every((d) => d.slice(0, 7) === sorted[0].slice(0, 7));
-  return sameMonth ? `${sorted.map((d) => d.slice(8, 10)).join(", ")}/${sorted[0].slice(5, 7)}/${sorted[0].slice(0, 4)}` : sorted.map(formatDateVN).join(", ");
-};
-
 function Line({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[13rem_minmax(0,1fr)] gap-2 py-0.5">
@@ -65,7 +58,7 @@ export function OrderPrint({ order, allLines, onClose }: { order: ProductionOrde
                 <PrintTd right>{formatNumber(lineCartons(l) ?? 0)}</PrintTd>
                 <PrintTd right>{formatNumber(orderLineKg(l))}</PrintTd>
                 {i === 0 && <PrintTd rowSpan={lines.length}>{order.lotCode}</PrintTd>}
-                {i === 0 && <PrintTd rowSpan={lines.length}>NSX: {shortDates(order.productionDates)}</PrintTd>}
+                {i === 0 && <PrintTd rowSpan={lines.length}>NSX: {formatProductionDates(order.productionDates)}</PrintTd>}
               </tr>
             ))}
             <tr>

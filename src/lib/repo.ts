@@ -63,6 +63,11 @@ import type {
   ProductionOrderMaterial,
   ProductionOrderRequirements,
   ProductionOrderShipment,
+  ComposedDocument,
+  ComposedDocumentExport,
+  DocumentTemplate,
+  DocumentValues,
+  FieldSources,
   SupplierInvoice,
   SupplierInvoiceLine,
   AccountingCodeMap,
@@ -3088,6 +3093,101 @@ export const PRODUCTION_ORDER_SHIPMENT_TABLE: TableMapping<ProductionOrderShipme
   fromRow: (r) => ({ id: s(r.id), orderId: s(r.order_id), shipmentId: s(r.shipment_id), createdAt: s(r.created_at) }),
 };
 
+/* ---------- Bộ soạn văn bản từ mẫu (mig 0091, ba-spec 54) ---------- */
+
+const jsonObject = <T>(v: unknown): T => (v && typeof v === "object" && !Array.isArray(v) ? (v as T) : ({} as T));
+export const DOCUMENT_TEMPLATE_TABLE: TableMapping<DocumentTemplate> = {
+  table: "document_templates",
+  localKey: "bsf.document-templates.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    doc_type: x.docType,
+    version_no: x.versionNo,
+    file_name: x.fileName,
+    file_path: x.filePath,
+    tags: x.tags,
+    status: x.status,
+    uploaded_by: x.uploadedBy,
+    uploaded_at: x.uploadedAt || null,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    docType: s(r.doc_type),
+    versionNo: numOrNull(r.version_no) ?? 1,
+    fileName: s(r.file_name),
+    filePath: s(r.file_path),
+    tags: stringList(r.tags),
+    status: s(r.status) === "retired" ? "retired" : "active",
+    uploadedBy: s(r.uploaded_by),
+    uploadedAt: s(r.uploaded_at),
+  }),
+};
+
+export const COMPOSED_DOCUMENT_TABLE: TableMapping<ComposedDocument> = {
+  table: "composed_documents",
+  localKey: "bsf.composed-documents.v1",
+  getKey: theoId,
+  refColumns: ["source_id", "product_ids"],
+  toRow: (x) => ({
+    id: x.id,
+    doc_type: x.docType,
+    source_type: x.sourceType,
+    source_id: x.sourceId,
+    source_ref: x.sourceRef,
+    resource: x.resource,
+    field_values: x.values,
+    field_sources: x.fieldSources,
+    source_revision_no: x.sourceRevisionNo,
+    customer_key: x.customerKey,
+    product_ids: x.productIds,
+    created_by: x.createdBy,
+    updated_by: x.updatedBy,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    docType: s(r.doc_type),
+    sourceType: s(r.source_type),
+    sourceId: s(r.source_id),
+    sourceRef: s(r.source_ref),
+    resource: s(r.resource),
+    values: jsonObject<DocumentValues>(r.field_values),
+    fieldSources: jsonObject<FieldSources>(r.field_sources),
+    sourceRevisionNo: numOrNull(r.source_revision_no) ?? 0,
+    customerKey: s(r.customer_key),
+    productIds: stringList(r.product_ids),
+    createdBy: s(r.created_by),
+    createdAt: s(r.created_at),
+    updatedBy: s(r.updated_by),
+    updatedAt: s(r.updated_at),
+  }),
+};
+
+export const COMPOSED_DOCUMENT_EXPORT_TABLE: TableMapping<ComposedDocumentExport> = {
+  table: "composed_document_exports",
+  localKey: "bsf.composed-document-exports.v1",
+  getKey: theoId,
+  refColumns: ["document_id", "template_id"],
+  toRow: (x) => ({
+    id: x.id,
+    document_id: x.documentId,
+    format: x.format,
+    template_id: x.templateId,
+    snapshot: x.snapshot,
+    exported_by: x.exportedBy,
+    exported_at: x.exportedAt || null,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    documentId: s(r.document_id),
+    format: s(r.format) === "pdf" ? "pdf" : "docx",
+    templateId: s(r.template_id),
+    snapshot: jsonObject<DocumentValues>(r.snapshot),
+    exportedBy: s(r.exported_by),
+    exportedAt: s(r.exported_at),
+  }),
+};
+
 /* ---------- Hóa đơn đại lý gắn chuyến (mig 0090, ba-spec 51) ---------- */
 
 export const SUPPLIER_INVOICE_TABLE: TableMapping<SupplierInvoice> = {
@@ -3254,6 +3354,9 @@ const TABLE_LABELS: Record<string, string> = {
   production_order_lines: "Dòng lệnh sản xuất",
   production_order_materials: "NL nhập khẩu dự kiến của lệnh sản xuất",
   production_order_shipments: "Lệnh sản xuất gắn chuyến xuất",
+  document_templates: "Khuôn Word văn bản",
+  composed_documents: "Bản soạn văn bản",
+  composed_document_exports: "Lần xuất văn bản",
   supplier_invoices: "Hóa đơn đại lý",
   supplier_invoice_lines: "Dòng hóa đơn đại lý",
   accounting_code_maps: "Ánh xạ mã kế toán",

@@ -1789,3 +1789,71 @@ export interface ProductionOrderShipment {
   shipmentId: string;
   createdAt: string;
 }
+
+/* ---------- Bộ soạn văn bản từ mẫu (ba-spec 54) ---------- */
+
+/** Một dòng của ô bảng (vd. bảng hàng của LSX). */
+export type DocumentRow = Record<string, string | number | null>;
+/** Giá trị một ô: chữ / ngày yyyy-mm-dd / lựa chọn ⇒ string · đánh dấu ⇒ boolean · bảng ⇒ dòng. */
+export type DocumentFieldValue = string | boolean | DocumentRow[];
+export type DocumentValues = Record<string, DocumentFieldValue>;
+/** R3: ô lấy từ đâu. `ref` = số văn bản lần trước khi kind = "previous". */
+export type FieldSourceKind = "source" | "previous" | "default" | "manual" | "empty";
+export interface FieldSource {
+  kind: FieldSourceKind;
+  ref?: string;
+}
+export type FieldSources = Record<string, FieldSource>;
+
+/** Khuôn Word quản trị tải lên (R13) — không xóa, chỉ ngưng. */
+export interface DocumentTemplate {
+  id: string;
+  /** Khóa loại văn bản ("production-order-form"). */
+  docType: string;
+  versionNo: number;
+  fileName: string;
+  /** Đường dẫn trong bucket `document-templates`. */
+  filePath: string;
+  /** Thẻ đọc được trong khuôn ("orderNo", "lines.kg"…). */
+  tags: string[];
+  status: "active" | "retired";
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+/** Bản soạn — một bản mỗi nguồn × loại văn bản (R12). */
+export interface ComposedDocument {
+  id: string;
+  docType: string;
+  /** Loại bản ghi nguồn ("production-order"). */
+  sourceType: string;
+  sourceId: string;
+  /** Số nguồn để gọi tên (số lệnh "19.10"). */
+  sourceRef: string;
+  /** Tài nguyên quyền của loại văn bản (R15) — RLS đọc cột này. */
+  resource: string;
+  values: DocumentValues;
+  fieldSources: FieldSources;
+  /** Lần sửa của nguồn lúc điền / lấy lại (R10). */
+  sourceRevisionNo: number;
+  /** Để tìm "lần trước cùng khách + mặt hàng" (R2). */
+  customerKey: string;
+  productIds: string[];
+  createdBy: string;
+  createdAt: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+/** Một lần xuất (R9) — không sửa, không xóa (R17). */
+export interface ComposedDocumentExport {
+  id: string;
+  documentId: string;
+  format: "docx" | "pdf";
+  /** id khuôn đã dùng; khuôn gốc = "builtin:<loại văn bản>". */
+  templateId: string;
+  /** Ảnh chụp toàn bộ giá trị lúc xuất (R14). */
+  snapshot: DocumentValues;
+  exportedBy: string;
+  exportedAt: string;
+}

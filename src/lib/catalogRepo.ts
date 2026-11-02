@@ -21,6 +21,9 @@ import {
   PRODUCTION_ORDER_LINE_TABLE,
   PRODUCTION_ORDER_MATERIAL_TABLE,
   PRODUCTION_ORDER_SHIPMENT_TABLE,
+  DOCUMENT_TEMPLATE_TABLE,
+  COMPOSED_DOCUMENT_TABLE,
+  COMPOSED_DOCUMENT_EXPORT_TABLE,
   SUPPLIER_INVOICE_TABLE,
   SUPPLIER_INVOICE_LINE_TABLE,
   ACCOUNTING_CODE_MAP_TABLE,
@@ -413,6 +416,10 @@ export const useProductionOrders = () => useTable(PRODUCTION_ORDER_TABLE);
 export const useProductionOrderLines = () => useTable(PRODUCTION_ORDER_LINE_TABLE);
 export const useProductionOrderMaterials = () => useTable(PRODUCTION_ORDER_MATERIAL_TABLE);
 export const useProductionOrderShipments = () => useTable(PRODUCTION_ORDER_SHIPMENT_TABLE);
+/** Bộ soạn văn bản (mig 0091, ba-spec 54): khuôn Word, bản soạn, lần xuất. */
+export const useDocumentTemplates = () => useTable(DOCUMENT_TEMPLATE_TABLE);
+export const useComposedDocuments = () => useTable(COMPOSED_DOCUMENT_TABLE);
+export const useComposedDocumentExports = () => useTable(COMPOSED_DOCUMENT_EXPORT_TABLE);
 /** Hóa đơn đại lý gắn chuyến (mig 0090, ba-spec 51) — luật ở lib/supplierInvoice.ts. */
 export const useSupplierInvoices = () => useTable(SUPPLIER_INVOICE_TABLE);
 export const useSupplierInvoiceLines = () => useTable(SUPPLIER_INVOICE_LINE_TABLE);

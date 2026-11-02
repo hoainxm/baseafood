@@ -20,7 +20,7 @@ import type {
   ProductionOrderShipment,
 } from "@/types";
 import { effectiveRevision, lineKg as contractLineKg, type ExportData } from "./exportPlanning";
-import { num } from "./format";
+import { formatDateVN, num } from "./format";
 
 export const ORDER_STATUS_LABELS: Record<ProductionOrder["status"], string> = {
   draft: "Nháp",
@@ -64,6 +64,14 @@ export function lineKg(l: Pick<ProductionOrderLine, "units" | "unitKind" | "cart
 
 /** kg dòng dùng để tính: ô kg đã lưu, trống thì tự tính. */
 export const orderLineKg = (l: ProductionOrderLine): number => l.kg ?? lineKg(l) ?? 0;
+
+/** Ngày SX như LSX giấy: cùng tháng gộp "02, 03, 04/11/2026"; khác tháng ghi từng ngày dd/mm/yyyy. */
+export function formatProductionDates(ds: readonly string[]): string {
+  const sorted = [...ds].filter(Boolean).sort();
+  if (!sorted.length) return "";
+  const sameMonth = sorted.every((d) => d.slice(0, 7) === sorted[0].slice(0, 7));
+  return sameMonth ? `${sorted.map((d) => d.slice(8, 10)).join(", ")}/${sorted[0].slice(5, 7)}/${sorted[0].slice(0, 4)}` : sorted.map(formatDateVN).join(", ");
+}
 
 /** Quy cách dòng lệnh từ dòng HĐ (R17): Size · Dài · Số miếng · Tỉ lệ · Packing — như ô Quy cách của LSX giấy. */
 export function contractLineSpec(cl: Pick<ExportContractLine, "size" | "packing" | "pieceLength" | "partRatio" | "piecesPerKg">): string {

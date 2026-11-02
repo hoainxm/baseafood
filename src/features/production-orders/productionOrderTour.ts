@@ -106,6 +106,15 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
       body: "Khách, thị trường, mã số lô, các ngày sản xuất, ngày giao, hạn sử dụng, người và ngày phát hành. In lệnh ra A4 đúng mẫu QTI-KH-01-04, không có giá.",
     }),
     dossier({
+      id: "file",
+      target: "order-file",
+      title: "File Lệnh sản xuất Word / PDF",
+      body: ctx.can.write
+        ? "Soạn file đúng mẫu QTI-KH-01-04 ngay trên app thay vì gõ Word bên ngoài: app điền sẵn từ lệnh và từ file lần trước cùng khách, mặt hàng; sửa ô sai (lệnh trên app không đổi), xem trước, rồi Xuất Word hoặc Xuất PDF.\n" +
+          "Trạng thái file: Nháp → Đã xuất; sửa sau lần xuất thì là Sửa sau lần xuất. Mỗi lần xuất được lưu, tải lại đúng file đã gửi xưởng."
+        : "Mở file Lệnh sản xuất Word / PDF Phòng Kế hoạch đã xuất: xem trước, tải Word hoặc in / lưu PDF đúng bản đã gửi.",
+    }),
+    dossier({
       id: "lines",
       target: "order-lines",
       title: "Dòng hàng",

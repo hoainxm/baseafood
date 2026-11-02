@@ -40,7 +40,7 @@ import {
 } from "@/lib/productionOrder";
 import { effectiveRevision } from "@/lib/exportPlanning";
 import type { ExportShipment, ProductionOrder } from "@/types";
-import { ArrowLeft, Ban, ChevronDown, ClipboardList, Eye, Link2, Pencil, Printer, Send, ShieldCheck, Wheat } from "lucide-react";
+import { ArrowLeft, Ban, ChevronDown, ClipboardList, Eye, FileText, Link2, Pencil, Printer, Send, ShieldCheck, Wheat } from "lucide-react";
 import { monthText, shipmentLabel } from "./orderText";
 import type { ProductionOrderData } from "./useProductionOrderData";
 
@@ -212,6 +212,8 @@ export interface DossierActions {
   onKeepOld: () => void;
   onCancel: () => void;
   onPrint: () => void;
+  /** Soạn / tải file LSX Word / PDF (ba-spec 54). */
+  onCompose: () => void;
   onMaterials: (orderLineId: string) => void;
   onOpenContract: () => void;
 }
@@ -300,6 +302,15 @@ export function OrderDossier({
           <Button variant="outline" onClick={actions.onPrint} title="In lệnh A4 đúng mẫu QTI-KH-01-04 (không in giá).">
             <Printer className="mr-2 h-4 w-4" aria-hidden />
             In lệnh
+          </Button>
+          <Button
+            variant="outline"
+            data-tour="order-file"
+            onClick={actions.onCompose}
+            title={canWrite ? "Soạn file Lệnh sản xuất Word / PDF đúng mẫu QTI-KH-01-04: app điền sẵn từ lệnh, sửa ô sai, xem trước, xuất Word hoặc PDF." : "Xem và tải file Lệnh sản xuất Word / PDF Phòng Kế hoạch đã xuất."}
+          >
+            <FileText className="mr-2 h-4 w-4" aria-hidden />
+            File Word / PDF
           </Button>
           {canWrite && isLive && (
             <Popover open={menuOpen} onOpenChange={setMenuOpen}>

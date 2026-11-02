@@ -67,3 +67,20 @@ html[data-print-preview] .scroll-nice {
 .print-landscape {
   page: landscape;
 }
+
+/* File Word in ra PDF (bộ soạn văn bản, ba-spec 54): lề do chính file Word quyết (trang docx-preview đã có lề) ⇒
+   @page lề 0, A4 dọc; mỗi trang Word một trang giấy, bỏ bóng / khoảng cách của khung xem trước. */
+@page docx {
+  size: A4 portrait;
+  margin: 0;
+}
+.print-docx {
+  page: docx;
+}
+@media print {
+  .print-docx section.docx {
+    box-shadow: none !important;
+    margin: 0 !important;
+    break-after: page;
+  }
+}

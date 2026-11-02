@@ -26,6 +26,9 @@ import type {
   ProductionOrderLine,
   ProductionOrderMaterial,
   ProductionOrderShipment,
+  ComposedDocument,
+  ComposedDocumentExport,
+  DocumentTemplate,
   SupplierInvoice,
   SupplierInvoiceLine,
   AccountingCodeMap,
@@ -87,6 +90,7 @@ import { listDatesInRange, subtractDays } from "@/lib/dataFlow";
 import { buildExportDemo, type ExportDemoPack } from "@/lib/exportPlanningDemo";
 import { buildImportDemo } from "@/lib/importPlanningDemo";
 import { buildProductionOrderDemo } from "@/lib/productionOrderDemo";
+import { buildProductionOrderFormDemo } from "@/lib/documentTypes/productionOrderForm";
 import { buildSupplierInvoiceDemo } from "@/lib/supplierInvoiceDemo";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 
@@ -171,6 +175,10 @@ export interface DemoBundle {
   productionOrderLines: ProductionOrderLine[];
   productionOrderMaterials: ProductionOrderMaterial[];
   productionOrderShipments: ProductionOrderShipment[];
+  /** Bộ soạn văn bản (mig 0091, ba-spec 54) — 1 bản soạn file LSX đã xuất 1 lần; khuôn để TRỐNG (file khuôn nằm ở Storage, demo dùng khuôn gốc). */
+  documentTemplates: DocumentTemplate[];
+  composedDocuments: ComposedDocument[];
+  composedDocumentExports: ComposedDocumentExport[];
   /** Hóa đơn đại lý gắn chuyến (mig 0090, ba-spec 51) — dựng từ chuyến demo (lib/supplierInvoiceDemo.ts):
    *  khớp, HĐ gộp 2 chuyến, lệch giá, HĐ không có chuyến, chuyến chờ HĐ; file là đường dẫn GIỮ CHỖ. */
   supplierInvoices: SupplierInvoice[];
@@ -715,6 +723,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
 
   const importDemo = buildImportDemo(tc.today, n.products);
   const orderDemo = buildProductionOrderDemo(tc.today, exportDemo, importDemo, n.products, [...customers, ...exportDemo.extraCustomers]);
+  const formDemo = buildProductionOrderFormDemo(orderDemo.orders, orderDemo.lines, `${tc.today}T09:00:00.000Z`);
   const invoiceDemo = buildSupplierInvoiceDemo(imports, tc.today);
 
   return {
@@ -775,6 +784,9 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     productionOrderLines: orderDemo.lines,
     productionOrderMaterials: orderDemo.materials,
     productionOrderShipments: orderDemo.shipments,
+    documentTemplates: [],
+    composedDocuments: formDemo.documents,
+    composedDocumentExports: formDemo.exports,
     supplierInvoices: invoiceDemo.invoices,
     supplierInvoiceLines: invoiceDemo.lines,
     accountingCodeMaps: invoiceDemo.codeMaps,

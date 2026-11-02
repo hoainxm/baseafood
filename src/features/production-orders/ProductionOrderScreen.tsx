@@ -22,6 +22,7 @@ import { buildOrderReport, buildOrderReportExcel } from "@/lib/productionOrderRe
 import { OrderReportView } from "./OrderReportView";
 import { IssueDialog, MaterialDialog, OrderFormDialog, type IssueTarget, type MaterialTarget, type OrderFormTarget, type OrderSavePayload } from "./OrderDialogs";
 import { OrderPrint } from "./OrderPrint";
+import { OrderFileComposer } from "./OrderFileComposer";
 import { OrderDossier, OrderListView } from "./OrderViews";
 import { buildProductionOrderTour, pickTourOrder } from "./productionOrderTour";
 import { useProductionOrderData, type ProductionOrderData } from "./useProductionOrderData";
@@ -34,6 +35,7 @@ export default function ProductionOrderScreen() {
   const { profile } = useAuth();
   const by = profile?.fullName || profile?.username || "Máy này";
   const can = useCan("production-orders");
+  const isAdmin = useCan("admin").view;
   const store = useProductionOrderData();
   const d = store.data;
   const navigate = useNavigate();
@@ -48,6 +50,8 @@ export default function ProductionOrderScreen() {
   const reportPeriod = parseReportPeriod(params.get("report"), today, "month");
   const orderId = params.get("order") ?? "";
   const printing = params.get("print") === "1";
+  // Bộ soạn file LSX Word / PDF (ba-spec 54): `?order=…&file=1`.
+  const composing = params.get("file") === "1";
   const setParam = (patch: Record<string, string>, replace = false) => {
     const next = new URLSearchParams(params);
     for (const [k, v] of Object.entries(patch)) {
@@ -194,6 +198,8 @@ export default function ProductionOrderScreen() {
   }
 
   if (printing && order) return <OrderPrint order={order} allLines={d.lines} onClose={() => setParam({ print: "" })} />;
+  if (composing && order)
+    return <OrderFileComposer data={d} order={order} canWrite={canWrite} isAdmin={isAdmin} by={by} onBack={() => setParam({ file: "" })} />;
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
@@ -235,6 +241,7 @@ export default function ProductionOrderScreen() {
                 },
               }),
             onPrint: () => setParam({ print: "1" }),
+            onCompose: () => setParam({ file: "1" }),
             onMaterials: (lineId) => {
               const line = d.lines.find((l) => l.id === lineId);
               if (line) setMaterialTarget({ order, line });

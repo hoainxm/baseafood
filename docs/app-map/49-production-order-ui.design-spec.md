@@ -2,7 +2,8 @@
 
 > Load khi: chỉnh giao diện Lệnh sản xuất `/planning-production` (danh sách lệnh, hồ sơ lệnh, hộp lập / sửa / phát hành / hủy, NL nhập khẩu dự kiến, bản in QTI-KH-01-04, phần nơi nhận) hoặc chỗ lệnh hiện ở Xuất khẩu (dòng hàng HĐ, bước 2 của chuyến).
 covers: src/features/production-orders/**, src/features/export-planning/ShipmentPanel.tsx, src/features/export-planning/ContractDossier.tsx
-last_verified: 2026-10-30
+last_verified: 2026-11-02
+<!-- updated: 2026-11-02 — hồ sơ lệnh: nút `outline` "File Word / PDF" cạnh "In lệnh" (mốc `order-file`, mọi người xem được lệnh đều thấy; Phòng KH soạn, nơi nhận chỉ xem / tải bản đã xuất). Trang soạn `&file=1` = `features/document-composer/DocumentComposerView` (ô theo nhóm của mẫu + nhãn nguồn từng ô, xem trước Word bên phải ở màn rộng / bên dưới ở màn hẹp, Lưu · Xuất Word · Xuất PDF, Lịch sử xuất file, khối Khuôn Word chỉ quản trị). -->
 <!-- updated: 2026-10-30 (NL dòng) — dòng lệnh: ghi chú dòng (từ HĐ) hiện "Ghi chú: …" dưới tên hàng ở bảng hồ sơ lệnh và bản in; hộp lập / sửa lệnh hiện xem trước "Quy cách: … / Ghi chú: …" dưới mỗi dòng đã chọn (ba-spec 48 R17). -->
 <!-- updated: 2026-10-30 (báo cáo) — đầu trang có Tabs **Lệnh · Báo cáo** (`?view=reports&report=<kỳ>`, ba-spec [50](50-planning-reports.ba-spec.md) RP2): `ReportPeriodBar` + lọc Khách hàng + Xuất Excel (ai xem được lệnh đều xuất được — không có giá); 4 thẻ (lệnh · kg ra lệnh · NL nhập khẩu đã dành · cần chú ý); bảng Theo tháng · Theo khách · Theo mặt hàng · NL nhập khẩu đã dành (thẻ "vượt") · Lệnh cần chú ý. -->
 <!-- updated: 2026-10-30 (lọc) — bỏ bộ lọc trạng thái 5 lựa chọn; thay bằng nút Xem / Ẩn lệnh đã hủy (chủ dự án: "5 cái đang hơi nhiều và thừa thãi"). -->

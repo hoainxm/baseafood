@@ -42,9 +42,9 @@ import { useCan } from "@/features/shared/PermissionProvider";
 
 /** Cột tiền của khối BTP — ẩn khi không có quyền `balancing.view-price`. */
 const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
-/** Bề rộng (px) cột bảng CHÍNH khối Xuất khẩu — gọn để A–L vừa một màn. Phần dư chia theo tỷ lệ
- *  ⇒ Lượng nhẹ, T.tiền nặng (kế toán 2026-11-02: "nhỏ cái số lượng, to cái số tiền"). */
-const MAIN_COLUMN_WIDTHS: Record<string, number> = { khach: 112, luong: 60, donGia: 80, thanhTien: 136 };
+/** Bề rộng (px) cột Khách (ô chọn) ở bảng CHÍNH khối Xuất khẩu. Cột số tự VỪA số dài nhất
+ *  (EditableGrid compact, người dùng chốt 2026-11-02) — không đặt tay ở đây. */
+const MAIN_COLUMN_WIDTHS: Record<string, number> = { khach: 112 };
 import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react";
 
 export function WipGrid({
@@ -375,7 +375,7 @@ export function WipGrid({
      Bảng THEO NGÀY (cột M–W): các ngày · Tổng · Trả · Nợ · Ghi chú dòng (2026-10-19). */
   const mainColumns = displayColumns
     .filter((c) => !["tra", "no", "ghiChu"].includes(c.key) && c.group !== DAY_COLUMN_GROUPS.days)
-    // Bề rộng gần cột F–J file Excel (đủ "Seachemot", "11.591", "10,81", "120.894,1").
+    // Cột Khách (ô chọn) giữ bề rộng đặt; cột số tự VỪA số dài nhất (EditableGrid compact).
     .map((c) => ({ ...c, minWidth: MAIN_COLUMN_WIDTHS[c.key] ?? c.minWidth }));
   const dayColumns = displayColumns.filter((c) => ["tra", "no", "ghiChu"].includes(c.key) || c.group === DAY_COLUMN_GROUPS.days);
 
@@ -503,7 +503,6 @@ export function WipGrid({
           rowMarkKey="can-doi-tp"
           compact
           rowHeaderMinWidth={128}
-          columnWidthsKey="balancing-finished-good-main"
           onCellCommit={writeCell}
           footer={
             <tr className="bg-muted font-semibold">
@@ -546,7 +545,6 @@ export function WipGrid({
                 columns={dayColumns}
                 rows={gridRows}
                 rowMarkKey="can-doi-tp"
-                columnWidthsKey="balancing-finished-good-days"
                 onCellCommit={writeCell}
                 onPasteBlock={pasteBlock}
                 footer={

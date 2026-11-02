@@ -13,6 +13,7 @@ import { useTopScrollbar } from "./topScrollbar";
 import { useFloatingTableHead } from "./floatingTableHead";
 import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
 import { ColumnResizeHandle, measureFitWidth, useColumnWidths } from "./columnResize";
+import { fitColumnWidth } from "./gridFitWidth";
 import { RotateCcw } from "lucide-react";
 
 /**
@@ -154,10 +155,10 @@ export function EditableGrid<R>({
   rowMarkKey?: string;
   /**
    * Lưới GỌN cho bảng phải đứng CẠNH bảng khác trên một màn (VD bảng chính Cân đối A–L:
-   * Nguyên liệu · Xuất khẩu · Ghi chú cạnh nhau để chụp gửi): cột tên KHÔNG đòi bề rộng theo
-   * chữ dài nhất (chỉ `rowHeaderMinWidth`); khung chứa rộng hơn thì MỌI cột giãn theo tỷ lệ
-   * (cột tên giãn ⇒ ô chọn lô / kho hiện đủ chữ); ô số co về đúng `minWidth` của cột (ô nhập mặc định của
-   * trình duyệt rộng ~20 ký tự, tự kéo cột nở to); tên cột được xuống dòng.
+   * Nguyên liệu · Xuất khẩu · Ghi chú cạnh nhau để chụp gửi): cột SỐ rộng VỪA giá trị dài nhất
+   * của cột + đệm ô (`gridFitWidth`, người dùng chốt 2026-11-02 — không giãn theo khung); cột tên
+   * (tối thiểu `rowHeaderMinWidth`) ăn phần bề ngang còn dư; cột ô điều khiển (`renderCell`, VD
+   * chọn khách) giữ `minWidth`; tên cột được xuống dòng.
    */
   compact?: boolean;
   /** Lưới gọn: bề rộng TỐI THIỂU cột tên (px, gồm cả đệm). Mặc định 128. */
@@ -184,10 +185,21 @@ export function EditableGrid<R>({
   );
   /** Có cột giãn ⇒ cột khác co vừa nội dung (width 1% + minWidth) để cột giãn ăn phần còn lại. */
   const hasFillColumn = visibleColumns.some((c) => c.fill);
+  /** Lưới gọn: bề rộng VỪA số dài nhất của từng cột số (cột ô điều khiển `renderCell` bỏ qua). */
+  const fitWidths = React.useMemo(() => {
+    const out: Record<string, string> = {};
+    if (!compact) return out;
+    const dataRows = rows.filter((h) => !h.groupTitle);
+    for (const c of visibleColumns) {
+      if (!c.renderCell) out[c.key] = fitColumnWidth(dataRows.map((h) => c.getValue(h.data)));
+    }
+    return out;
+  }, [compact, rows, visibleColumns]);
   /* Bề rộng người dùng KÉO (kiểu Excel): cột đã chỉnh giữ ĐÚNG bề rộng đó; bảng đã có cột
      chỉnh thì co theo tổng bề rộng (w-max) thay vì giãn hết khung — giãn khung thì phần dư
      lại chia vào cột vừa chỉnh, kéo bao nhiêu cũng không ra đúng cỡ. */
-  const resize = useColumnWidths(columnWidthsKey);
+  // Lưới gọn KHÔNG cho kéo cột (luật bề rộng vừa giá trị, README § Lưới GỌN) — bỏ qua khoá.
+  const resize = useColumnWidths(compact ? undefined : columnWidthsKey);
   const widthKeyOf = (c: GridColumn<R>) => c.widthKey ?? c.key;
   const customWidthStyle = (px: number | undefined): React.CSSProperties | undefined =>
     px ? { width: px, minWidth: px, maxWidth: px } : undefined;
@@ -198,13 +210,15 @@ export function EditableGrid<R>({
       ? c.fill
         ? { minWidth: c.minWidth ?? 160 }
         : { width: "1%", minWidth: c.minWidth }
-      : c.minWidth
-        ? // Lưới gọn: ĐẶT bề rộng ⇒ cột co đúng cỡ, tên cột dài tự xuống dòng (bảng co theo
-          // nội dung thì tên cột không xuống dòng, cột nở theo cả câu tên).
-          compact
-          ? { width: c.minWidth, minWidth: c.minWidth }
-          : { minWidth: c.minWidth }
-        : undefined);
+      : compact && fitWidths[c.key]
+        ? // Lưới gọn: cột số VỪA giá trị dài nhất; tên cột dài tự xuống dòng, chữ dài hơn số
+          // thì trình duyệt tự nới tới đúng chữ (min-content), không bao giờ cắt.
+          { width: fitWidths[c.key], minWidth: fitWidths[c.key] }
+        : c.minWidth
+          ? compact
+            ? { width: c.minWidth, minWidth: c.minWidth }
+            : { minWidth: c.minWidth }
+          : undefined);
   /** Bề rộng đang thấy của mọi cột (đọc từ hàng tên cột) — chốt lại khi bắt đầu kéo. */
   const currentWidths = (th: HTMLTableCellElement): Record<string, number> => {
     const cells = th.parentElement instanceof HTMLTableRowElement ? Array.from(th.parentElement.cells) : [];
@@ -352,10 +366,9 @@ export function EditableGrid<R>({
               scope="col"
               style={{
                 ...(hasFillColumn ? { width: "1%" } : {}),
-                // Lưới gọn: cột tên cũng ĐẶT bề rộng ⇒ mọi cột đều có bề rộng đặt, khung giãn thì
-                // phần dư chia THEO TỶ LỆ cho mọi cột (như kéo rộng bảng Excel) — không dồn hết
-                // vào cột tên để cột số vẫn sát mức tối thiểu.
-                ...(compact ? { width: rowHeaderMinWidth, minWidth: rowHeaderMinWidth } : {}),
+                // Lưới gọn: cột tên KHÔNG đặt bề rộng (chỉ tối thiểu) ⇒ là cột tự do duy nhất, phần
+                // bề ngang dư của khung dồn hết vào đây; cột số đứng yên ở bề rộng vừa giá trị.
+                ...(compact ? { minWidth: rowHeaderMinWidth } : {}),
                 // Bề rộng người dùng KÉO thắng mọi mặc định ở trên.
                 ...customWidthStyle(resize.widths[ROW_HEADER_WIDTH_KEY]),
               }}

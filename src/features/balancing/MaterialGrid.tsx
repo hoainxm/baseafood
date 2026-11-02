@@ -70,10 +70,6 @@ const PRICE_ROW_SUFFIX = "::price";
 const priceRowId = (rowId: string) => `${rowId}${PRICE_ROW_SUFFIX}`;
 /** Hàng "Giá (đ/kg)" THEO NGÀY (chỉ xem) dưới dòng sổ nhập ở bảng theo ngày — không có ở bảng chính. */
 const DAY_PRICE_ROW_SUFFIX = "::day-price";
-/** Bề rộng (px) cột bảng CHÍNH khối NL — gọn để A–L (NL · Xuất khẩu · Ghi chú) vừa một màn.
- *  Khung rộng ⇒ phần dư chia theo TỶ LỆ các số này: kế toán 2026-11-02 "nhỏ cái số lượng, to cái
- *  số tiền" ⇒ Số lượng / Tỷ lệ nhẹ, T.tiền nặng (số kg ngắn, số tiền tới 13 ký tự). */
-const MAIN_COLUMN_WIDTHS: Record<string, number> = { soLuong: 60, donGia: 84, thanhTien: 160, tyLe: 44 };
 
 /** Cắt hậu tố size để gom "2 da lớn"/"2 da nhỏ" về một họ — CHỈ dùng cho nút Gộp,
     KHÔNG đổi `getMaterialFamily` (logic hút) để tránh đụng khớp họ khi hút. */
@@ -563,7 +559,10 @@ export function MaterialGrid({
       minWidth: 104,
       /* Gửi đông: đơn giá lưu là bình quân KHÔNG làm tròn (T.tiền khớp Σ kg×giá ngày) — chỉ
          HIỆN tròn đồng. Ô chỉ ghi khi người dùng gõ nên số hiện tròn không đè số lưu. */
-      getValue: (h) => (h.stockLineKind === "freeze-deposit" && h.unitPrice != null ? Math.round(h.unitPrice) : h.unitPrice),
+      /* Dòng sổ nhập cũng HIỆN tròn đồng (renderValue) — trả số tròn để cột đo bề rộng đúng số đang
+         thấy (ô khoá, không ghi). */
+      getValue: (h) =>
+        (h.stockLineKind === "freeze-deposit" || h.fromImports) && h.unitPrice != null ? Math.round(h.unitPrice) : h.unitPrice,
       /* Dòng sổ nhập (+ dòng con chuyến): giá ĐÚNG theo chuyến — cùng một giá thì hiện giá đó,
          nhiều giá ⇒ "theo chuyến" (không hiện số bình quân, chốt 2026-10-20). */
       renderValue: (h) => {
@@ -705,9 +704,8 @@ export function MaterialGrid({
      ngày cuối) · Đơn giá · T.tiền · Tỷ lệ. Bảng THEO NGÀY: các ngày (+ Chuyển kỳ cũ) · Ghi
      chú dòng. Hai bảng dùng chung cột, dòng, đường ghi — chỉ chia cột (2026-10-19). */
   const mainColumns = displayColumns
-    .filter((c) => c.group === DAY_COLUMN_GROUPS.daysCollapsedOnly || (!c.group && c.key !== "ghiChu"))
-    // Bề rộng gần cột A–E file Excel: đủ số dài nhất ("-3.000", "145.000", "3.356.750.000").
-    .map((c) => ({ ...c, minWidth: MAIN_COLUMN_WIDTHS[c.key] ?? c.minWidth }));
+    // Bề rộng cột số: VỪA số dài nhất của cột (EditableGrid compact) — không đặt tay, không kéo.
+    .filter((c) => c.group === DAY_COLUMN_GROUPS.daysCollapsedOnly || (!c.group && c.key !== "ghiChu"));
   const dayColumns = displayColumns.filter((c) => c.group === DAY_COLUMN_GROUPS.days || c.key === "ghiChu");
 
   /* Gửi đông ⇄ còn dở khai ở Sản xuất: cả hai cùng ghi, màn đối chiếu. Gửi đông có
@@ -1283,7 +1281,6 @@ export function MaterialGrid({
         compact
         // Ô tên khối NL chứa ô chọn lô / kho / NL gửi ⇒ tối thiểu rộng hơn khối Xuất khẩu.
         rowHeaderMinWidth={160}
-        columnWidthsKey="balancing-material-main"
         onCellCommit={writeCell}
         footer={
           <tr className="bg-muted font-semibold">
@@ -1321,7 +1318,6 @@ export function MaterialGrid({
               columns={dayColumns}
               rows={dayGridRows}
               rowMarkKey="can-doi-nl"
-              columnWidthsKey="balancing-material-days"
               onCellCommit={writeCell}
               onPasteBlock={pasteBlock}
               footer={

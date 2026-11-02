@@ -351,16 +351,25 @@ Luật khi dùng:
   ô tick tô màu (tô ở dòng cha). Màn tự chèn dòng con ngay dưới dòng cha khi người
   dùng mở (VD tách theo đại lý). Có dòng con thì `onPasteBlock` phải tính dòng theo
   THỨ TỰ TRÊN MÀN (kể cả dòng con) và bỏ qua ô dòng con — kẻo dán trượt số.
-- **Lưới GỌN — prop `compact`** (2026-10-19): cho bảng phải đứng CẠNH bảng khác trên một
-  màn (bảng chính Cân đối A–L). Cột tên không đòi bề rộng theo chữ dài nhất
-  (`contain: inline-size`, tối thiểu `rowHeaderMinWidth` px, `px-2`), ô số co về `minWidth`
-  của cột (ô `<input>` không đòi bề rộng mặc định ~20 ký tự). MỌI cột (kể cả cột tên) ĐẶT bề
-  rộng = mức tối thiểu ⇒ tên cột dài tự xuống dòng, và khi khung chứa giãn thì phần dư chia
-  THEO TỶ LỆ cho mọi cột (như kéo rộng bảng Excel) — đừng chặn cứng cột tên (ô chọn bị cắt)
-  cũng đừng để cột tên ăn hết phần dư (cột số sát tối thiểu, tên cột gãy chữ). Ô điều khiển
-  trong ô (Combobox) bọc `w-full min-w-* [contain:inline-size]` để giãn theo cột. Khối chứa lưới gọn co theo bảng: tiêu đề / nút đặt
-  `w-0 min-w-full` để không kéo khối rộng hơn bảng. Lưới thường đừng bật (cột tên hẹp làm
-  tên dài gãy dòng).
+- **Lưới GỌN — prop `compact`** (2026-10-19, luật bề rộng đổi 2026-11-02): cho bảng phải đứng
+  CẠNH bảng khác trên một màn (bảng chính Cân đối A–L). **Luật bề rộng cột (người dùng chốt
+  2026-11-02 — đừng phá):**
+  1. **Cột SỐ rộng VỪA giá trị dài nhất của cột + đệm ô** — bằng hoặc hơn một chút, KHÔNG giãn
+     theo khung, KHÔNG cho kéo (`columnWidthsKey` cấm ở lưới gọn). Lưới tự tính trong
+     `patterns/gridFitWidth.ts` (đơn vị `ch`: chữ số 1 · dấu chấm/phẩy 0,5 · dấu trừ 0,75 +
+     `1rem + 2px`) từ `getValue` của mọi dòng ⇒ màn **không** đặt `minWidth` / bảng bề rộng tay
+     cho cột số. `getValue` phải trả ĐÚNG số đang hiện (ô khoá có `renderValue` làm tròn ⇒
+     `getValue` cũng làm tròn), không thì cột rộng theo số dài hơn số thấy.
+  2. Tên cột dài hơn số ⇒ tên cột tự xuống dòng; từ dài nhất của tên cột là mức sàn (trình duyệt
+     tự nới, không bao giờ cắt). Dòng tổng là ô chữ ⇒ cũng tự nới.
+  3. **Cột TÊN dòng là cột tự do duy nhất**: chỉ `minWidth = rowHeaderMinWidth`, KHÔNG đặt
+     `width` ⇒ ăn hết phần bề ngang dư của khung (`contain: inline-size` — không đòi bề rộng theo
+     chữ dài nhất). Cột ô điều khiển (`renderCell`, VD Combobox chọn khách) giữ `minWidth` đặt ở
+     màn, bọc `w-full min-w-* [contain:inline-size]`.
+  4. Khung hẹp hơn tổng bề rộng ⇒ bảng cuộn ngang TRONG khung của nó (thanh trên + dưới), khung
+     bên cạnh không bị đẩy xuống dòng (VD cặp khối Cân đối có trần `calc(100% - <bề rộng Ghi chú>)`).
+  Khối chứa lưới gọn: tiêu đề / nút đặt `w-0 min-w-full` để không kéo khối rộng hơn bảng.
+  Lưới thường đừng bật (cột tên hẹp làm tên dài gãy dòng).
 - **Kéo giãn cột kiểu Excel — prop `columnWidthsKey`** (2026-10-19, `patterns/columnResize.tsx`):
   truyền khoá ỔN ĐỊNH tiếng Anh của bảng ⇒ mỗi tên cột có mép kéo ở cạnh phải (vạch nắm mờ LUÔN
   hiện — trong suốt thì người dùng không biết kéo được, 2026-11-02): KÉO để đổi bề
@@ -369,7 +378,8 @@ Luật khi dùng:
   — cài đặt trình bày, KHÔNG toast, không ghi sổ. Bắt đầu kéo ⇒ chốt bề rộng ĐANG THẤY của mọi
   cột (kéo một cột không làm cột khác nhảy); bảng đã chỉnh thì co theo tổng bề rộng (`w-max`).
   Cột cùng `GridColumn.widthKey` dùng chung bề rộng (VD mọi cột ngày `"day"` — kỳ khác ngày vẫn
-  giữ). Đang bật ở bốn lưới Cân đối. Đổi bố cục bảng làm bề rộng đã lưu lỗi thời ⇒ tăng
+  giữ). **Không bảng nào bật** từ 2026-11-02 (Cân đối bỏ kéo — người dùng chốt cột cố định vừa
+  giá trị, xem Lưới GỌN); KHÔNG bật cho lưới `compact`. Đổi bố cục bảng làm bề rộng đã lưu lỗi thời ⇒ tăng
   phiên bản khoá (đang `v2`, 2026-10-20). Cột không nên phình: `GridColumn.fixedWidth`.
 - **Một lưới, hai bảng:** cần bảng tổng + bảng chia ngày của CÙNG dòng thì dựng hai
   `EditableGrid` từ cùng `rows` / `onCellCommit`, chia `columns` (cùng `rowMarkKey` ⇒ màu dòng

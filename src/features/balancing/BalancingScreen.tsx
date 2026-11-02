@@ -740,9 +740,10 @@ function PeriodDetail({
             2026-10-19: rộng bằng nhau cho trực quan) — lưới 2 cột `minmax(0,1fr)`, cả cặp nhận
             phần bề ngang còn dư của hàng, Ghi chú cố định bên phải. Hai khối cao bằng nhau
             (`auto-rows-fr`) ⇒ đường kẻ dọc giữa chạy hết.
-            Trần = hàng TRỪ bề rộng Ghi chú (w-56 = 14rem): cột kéo rộng (bảng w-max) thì bảng cuộn
-            ngang trong khung của nó, KHÔNG nở cặp khối đẩy Ghi chú xuống dòng (người dùng 2026-11-02). */}
-        <div className="w-full min-w-0 xl:grid xl:w-auto xl:max-w-[calc(100%-14rem)] xl:grow xl:basis-auto xl:auto-rows-fr xl:grid-cols-2">
+            Trần = hàng TRỪ bề rộng Ghi chú (w-72 = 18rem): bảng rộng hơn khung thì cuộn ngang
+            trong khung của nó, KHÔNG nở cặp khối đẩy Ghi chú xuống dòng (người dùng 2026-11-02).
+            Cột số rộng VỪA số dài nhất (EditableGrid compact), không cho kéo — người dùng chốt 2026-11-02. */}
+        <div className="w-full min-w-0 xl:grid xl:w-auto xl:max-w-[calc(100%-18rem)] xl:grow xl:basis-auto xl:auto-rows-fr xl:grid-cols-2">
         <div className="min-w-0">
           <MaterialGrid
             grid={grid}
@@ -804,8 +805,9 @@ function PeriodDetail({
         </div>
         </div>
         {/* Ghi chú (K–L): MỘT cột dọc nhãn · số như bảng giấy, rộng cố định (người dùng chốt
-            2026-10-19: không tách hai cột) — phần bề ngang dư dồn cho hai khối nhập. */}
-        <div className="w-full border-t-2 border-border xl:w-56 xl:flex-none xl:border-t-0 xl:border-l-2">
+            2026-10-19: không tách hai cột) — phần bề ngang dư dồn cho hai khối nhập. 14 → 18rem
+            (2026-11-02): chữ Ghi chú to lên một bậc, khung cũ làm nhãn gãy 2–3 dòng. */}
+        <div className="w-full border-t-2 border-border xl:w-72 xl:flex-none xl:border-t-0 xl:border-l-2">
           <ResultNote
             unpricedRowCount={findUnpricedMaterialRows(grid.materialRows).length}
             period={period}
@@ -1044,9 +1046,9 @@ function KV({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border py-1.5">
-      <span className="min-w-0 text-sm text-muted-foreground">{k}</span>
+      <span className="min-w-0 text-base text-muted-foreground">{k}</span>
       <span
-        className={`tnum shrink-0 whitespace-nowrap text-right text-base ${
+        className={`tnum shrink-0 whitespace-nowrap text-right text-lg ${
           strong ? "font-semibold" : "font-medium"
         } ${tone === "profit" ? "text-success" : tone === "loss" ? "text-destructive" : strong ? "text-primary" : ""}`}
       >
@@ -1090,7 +1092,7 @@ function KeyValueInput({
           unit={unit}
           value={value}
           onChange={onChange}
-          className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1 [&>div:last-child]:w-44"
+          className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1 [&>div:last-child]:w-44 [&_input]:text-lg [&_label]:text-base"
         />
       )}
       {(changed || note) && (
@@ -1106,8 +1108,8 @@ function KeyValueInput({
 function KeyValueFrame({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <span className="min-w-0 text-sm text-muted-foreground">{k}</span>
-      <span className="tnum shrink-0 whitespace-nowrap text-right text-base font-medium">{v}</span>
+      <span className="min-w-0 text-base text-muted-foreground">{k}</span>
+      <span className="tnum shrink-0 whitespace-nowrap text-right text-lg font-medium">{v}</span>
     </div>
   );
 }

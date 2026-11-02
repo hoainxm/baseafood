@@ -8,7 +8,7 @@
 import { useMemo, useState } from "react";
 import type { LotKind, Workshop } from "@/types";
 import { LotQrLabels, useTraceData } from "@/features/shared";
-import { kg, formatDateVN } from "@/lib/format";
+import { kg, formatDateVN, formatDateTimeVN } from "@/lib/format";
 import { TRACE_KIND_LABELS, listLotsToPrint, lotKey, summarizeLabelPrints, type LotNode } from "@/lib/lotTraceability";
 import { useLabelPrints } from "@/lib/catalogRepo";
 import { Button, ChoiceGroup, DateRangeField, EmptyState, Tag, addDays, todayIso, notify, toneByName, GroupLabel } from "@/design-system";
@@ -163,7 +163,7 @@ export function BulkLabelPrint() {
                         {(() => {
                           const t = daIn.get(lotKey(n.kind as LotKind, n.id));
                           return t ? (
-                            <Tag variant="done">Đã in {t.labelCount} tem · {formatDateVN(t.lastPrint.printedAt.slice(0, 10))}</Tag>
+                            <Tag variant="done">Đã in {t.labelCount} tem · {formatDateTimeVN(t.lastPrint.printedAt)}</Tag>
                           ) : (
                             <Tag variant="pending">Chưa in tem</Tag>
                           );

@@ -7,14 +7,12 @@
 // hiện dải nhỏ này (không toast — quy tắc 13) để người dùng biết số trên form CHƯA vào
 // sổ và bỏ được nếu không cần.
 import { Button } from "@/design-system";
-import { formatDateVN } from "@/lib/format";
+import { formatDateTimeVN } from "@/lib/format";
 
 export function DraftRestoredNotice({ savedAt, onDiscard }: { savedAt: string | null; onDiscard: () => void }) {
   if (!savedAt) return null;
-  const d = new Date(savedAt);
-  const time = Number.isNaN(d.getTime())
-    ? ""
-    : ` lúc ${d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} ${formatDateVN(savedAt.slice(0, 10))}`;
+  const at = formatDateTimeVN(savedAt);
+  const time = at ? ` lúc ${at}` : "";
   return (
     <div role="status" className="flex flex-wrap items-center gap-2 rounded-lg bg-info-surface px-4 py-2 text-sm">
       <p className="min-w-0 flex-1">

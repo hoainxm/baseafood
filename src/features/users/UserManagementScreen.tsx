@@ -83,6 +83,7 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
+import { formatDateTimeVN } from "@/lib/format";
 
 /** Biểu tượng từng nhóm — nhóm lấy từ `lib/userDirectory.ts` (một nguồn phòng ban, quy tắc ở đó). */
 const GROUP_ICONS: Record<string, LucideIcon> = {
@@ -162,10 +163,7 @@ function RolePicker({
 /** "15/10/2026 09:45" theo giờ máy; rỗng ⇒ "chưa đăng nhập". */
 function formatSignIn(iso: string): string {
   if (!iso) return "chưa đăng nhập";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return formatDateTimeVN(iso) || iso;
 }
 
 /**

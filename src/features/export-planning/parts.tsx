@@ -9,7 +9,7 @@ import { Button, FormDialog, ProcessingState, Tag, notify, type TagVariant } fro
 import { CONTRACT_FLOW_STAGES, ITEM_STATE_LABELS, STEP_TITLES, contractFlowIndex, type ContractState, type StepNo } from "@/lib/exportPlanning";
 import { DEMO_PLACEHOLDER_PREFIX, EXPORT_FILE_ACCEPT, getExportFileUrl } from "@/lib/exportFileStorage";
 import { filePreviewKind } from "@/lib/documents";
-import { formatDateVN } from "@/lib/format";
+import { formatDateTimeVN } from "@/lib/format";
 import type { ExportActivity, ExportFile, ExportItemState } from "@/types";
 import { Check, ChevronDown, CircleDashed, Download, ExternalLink, Eye, FileText, Image as ImageIcon, Minus, Paperclip, Trash2, X } from "lucide-react";
 
@@ -138,9 +138,14 @@ export function ExportFilePreview({ file, onClose }: { file: PreviewTarget | nul
               Không mở được file: tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.
             </p>
           )}
-          {state === "ready" && kind === "pdf" && url && <iframe title={file.name} src={url} className="h-[75dvh] w-full rounded-lg border border-border bg-muted" />}
+          {state === "ready" && kind === "pdf" && url && (
+            <>
+              <iframe title={file.name} src={url} className="h-[min(75dvh,calc(100dvh-16rem))] min-h-80 w-full rounded-lg border border-border bg-muted" />
+              <p className="text-sm text-muted-foreground">Trên iPhone / iPad khung có thể chỉ hiện trang đầu — chọn Mở tab mới để xem đủ các trang.</p>
+            </>
+          )}
           {state === "ready" && kind === "image" && url && (
-            <img src={url} alt={file.name} className="mx-auto max-h-[75dvh] max-w-full rounded-lg border border-border object-contain" />
+            <img src={url} alt={file.name} className="mx-auto max-h-[min(75dvh,calc(100dvh-16rem))] max-w-full rounded-lg border border-border object-contain" />
           )}
           {!isPlaceholder && state === "ready" && kind === "download" && (
             <p className="rounded-lg bg-muted px-4 py-3">File này không xem được ngay trong trình duyệt. Bấm Tải về để mở trên máy.</p>
@@ -244,7 +249,7 @@ export function FileList({
       <ul className="grid min-w-0 grid-cols-[minmax(0,1fr)] divide-y divide-border rounded-lg border border-border">
         {shown.map((f) => {
           const name = f.fileName || "file";
-          const meta = [f.layerNo != null ? `Lớp ${f.layerNo}` : "", f.caption, f.uploadedBy, f.createdAt ? formatDateVN(f.createdAt.slice(0, 10)) : ""].filter(Boolean).join(" · ");
+          const meta = [f.layerNo != null ? `Lớp ${f.layerNo}` : "", f.caption, f.uploadedBy, formatDateTimeVN(f.createdAt)].filter(Boolean).join(" · ");
           const Icon = isImageName(name) ? ImageIcon : FileText;
           return (
             <li key={f.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2">
@@ -393,8 +398,7 @@ export function ActivityList({ items, shipmentLabel }: { items: readonly ExportA
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
       <ol className="grid min-w-0 grid-cols-[minmax(0,1fr)] divide-y divide-border rounded-lg border border-border">
         {shown.map((a) => {
-          const at = a.createdAt ? new Date(a.createdAt) : null;
-          const when = at && !Number.isNaN(at.getTime()) ? `${formatDateVN(a.createdAt.slice(0, 10))} ${at.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}` : "";
+          const when = formatDateTimeVN(a.createdAt);
           const ship = a.shipmentId ? shipmentLabel(a.shipmentId) : "";
           return (
             <li key={a.id} className="grid min-w-0 gap-0.5 px-3 py-2">

@@ -36,6 +36,19 @@ export function formatDateVN(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
+/**
+ * Mốc thời gian của nhật ký / lịch sử (ISO đầy đủ, vd `createdAt`) → "dd/mm/yyyy HH:mm" theo GIỜ MÁY.
+ * Mọi chỗ hiện log dùng hàm này (đủ ngày tháng năm + giờ phút). Đừng ghép `slice(0, 10)` (ngày UTC)
+ * với giờ máy — thao tác sau 0h giờ VN sẽ bị ghi lùi một ngày. Rỗng / hỏng ⇒ "".
+ */
+export function formatDateTimeVN(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 /** Tiền ngoại tệ (USD…) đủ 2 số lẻ kiểu vi-VN: 194557.6 → "194.557,60"; null → "". */
 export function formatMoney(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "";

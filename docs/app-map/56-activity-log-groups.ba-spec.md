@@ -3,6 +3,8 @@
 > Load khi: thêm hoặc sửa khối "Nhật ký thao tác" trong hồ sơ của một trang nghiệp vụ (như hồ sơ hợp đồng xuất khẩu); thêm bảng nhật ký cho một nhóm trang; rà vì sao một thao tác không có trong nhật ký.
 covers: src/lib/audit.ts, src/features/audit/AuditLogScreen.tsx, src/features/production-orders/useContractActivity.ts, src/features/shared/activityLog.ts, src/features/shared/ActivityLogBlock.tsx, src/features/shared/activityCoverage.test.ts, supabase/migrations/0092_group_activity_logs.sql
 last_verified: 2026-11-02
+<!-- updated: 2026-11-02 (d) — DB thật: 14 dòng audit_log 28/10 15:32–16:00 (máy của Khiêm, dùng chung tài khoản admin) đổi actor sang `lqkhiem`; `export_contract_revisions.recorded_by` (1) + `export_files.uploaded_by` (2) "Admin" → "Lê Quang Khiêm". Tách theo `device_id` (máy Khiêm dùng `lqkhiem` ngày 30/10). Script + hoàn tác: ../ops/fix-2026-11-02-khiem-admin-log.sql; trigger 0048 để lại 3 dòng "[SQL trực tiếp]". -->
+<!-- updated: 2026-11-02 (c) — mốc giờ nhật ký (`ActivityLogBlock`, `ActivityList` Xuất khẩu, `AuditLogScreen`) đổi sang `formatDateTimeVN` (lib/format.ts): luôn "dd/mm/yyyy HH:mm" theo giờ máy; sửa lỗi cũ ngày lấy UTC (`slice(0,10)`) ghép giờ máy ⇒ thao tác 0h–7h giờ VN bị ghi lùi một ngày. -->
 <!-- re-verified: 2026-11-02 — P1–P3: PGlite 0001→0092 (+ chạy 0092 lần 2) 16/16 (AC-6); `activityCoverage.test.ts` 9 test = AC-4 + AC-5 (7 màn, mọi notify.saved/deleted có ghi nhật ký, miễn danh mục); `audit.test.ts` AC-1; build / lint / naming xanh, 1283 test. Chưa thử tay AC-2, AC-3, AC-7. -->
 ttl_days: 90
 status: v1 ĐÃ CHỐT + ĐÃ BUILD đợt 1 2026-11-02 (P0–P3). Mig `0092` CHƯA chạy DB thật (đổi RLS export_activity_log — dòng HĐ xuất giữ nguyên điều kiện). Chưa thử tay trên app.

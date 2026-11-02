@@ -135,6 +135,7 @@ import {
   type ShipmentGroup,
 } from "./importHelpers";
 import { recordName } from "@/lib/personName";
+import { openInNewTab } from "@/lib/openInNewTab";
 
 export default function MaterialImportScreen() {
   // Người đang đăng nhập → gắn làm "người ghi" của chuyến khi lưu.
@@ -829,9 +830,8 @@ export default function MaterialImportScreen() {
   /** Mở ảnh phiếu đã đính (signed URL có hạn) để đối chiếu tay. */
   const viewScanImage = async () => {
     if (!session?.scanPath) return;
-    const url = await getPhotoUrl(session.scanPath);
-    if (url) window.open(url, "_blank", "noopener");
-    else notify.error("Chưa xem được ảnh (cần đăng nhập máy chủ).");
+    if (!(await openInNewTab(() => getPhotoUrl(session.scanPath))))
+      notify.error("Chưa xem được ảnh (cần đăng nhập máy chủ).");
   };
 
   /**

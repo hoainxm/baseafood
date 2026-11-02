@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { num, kg, formatDateVN, todayISO, chuan0, formatMoney } from "@/lib/format";
+import { num, kg, formatDateVN, formatDateTimeVN, todayISO, chuan0, formatMoney } from "@/lib/format";
 
 describe("num", () => {
   it("null/undefined/NaN ⇒ chuỗi rỗng (không phải '0')", () => {
@@ -49,5 +49,21 @@ describe("formatMoney", () => {
     expect(formatMoney(10.5)).toBe("10,50");
     expect(formatMoney(0)).toBe("0,00");
     expect(formatMoney(null)).toBe("");
+  });
+});
+
+describe("formatDateTimeVN — mốc nhật ký đủ ngày giờ", () => {
+  it("giờ máy, đủ 0 đầu", () => {
+    const d = new Date(2026, 10, 2, 9, 5);
+    expect(formatDateTimeVN(d.toISOString())).toBe("02/11/2026 09:05");
+  });
+  it("ngày theo giờ máy, không theo UTC (sau 0h giờ máy vẫn đúng ngày)", () => {
+    const d = new Date(2026, 10, 3, 0, 30);
+    expect(formatDateTimeVN(d.toISOString())).toBe("03/11/2026 00:30");
+  });
+  it("rỗng / hỏng ⇒ chuỗi rỗng", () => {
+    expect(formatDateTimeVN("")).toBe("");
+    expect(formatDateTimeVN(null)).toBe("");
+    expect(formatDateTimeVN("abc")).toBe("");
   });
 });

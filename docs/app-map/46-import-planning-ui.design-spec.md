@@ -2,7 +2,8 @@
 
 > Load khi: chỉnh giao diện màn Nhập khẩu `/planning-import` (lô nhập theo tháng, danh sách hợp đồng nhập, hồ sơ HĐ, hộp lần nhập / chứng từ / thực nhập / đóng HĐ, phần thủ kho).
 covers: src/features/import-planning/**
-last_verified: 2026-10-31
+last_verified: 2026-11-02
+<!-- updated: 2026-11-02 — thanh tab chặn `max-w-full` + xuống dòng ở iPad dọc; hộp xem file như 40; "Mở tab mới" / "Tải về" mở tab trống trước khi chờ link (`lib/openInNewTab.ts`) — Safari iPhone / iPad từng chặn, bấm không thấy gì; file đính hiện "dd/mm/yyyy HH:mm". -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): Lô nhập thêm Trạng thái lần nhập (kèm số lô), ô Tra số chứng từ đổi sang SearchField; thẻ số vẫn của cả tháng. Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->
 <!-- updated: 2026-10-30 (báo cáo) — tab thứ ba **Báo cáo** (`?view=reports&report=<kỳ>`, ba-spec [50](50-planning-reports.ba-spec.md) RP1): thanh `ReportPeriodBar` (Tháng / Quý / Năm, mặc định tháng hiện tại) + lọc Đối tác + `outline` Xuất Excel; 4 `StatCardGrid` (lần nhập · thực nhập · trị giá theo tiền tệ hoặc HĐ ký khi không có quyền giá · đủ hồ sơ); bảng Theo tháng (kỳ > 1 tháng) · Theo đối tác (+ HĐ còn chưa về) · Theo mặt hàng (+ đơn giá bình quân) · Theo loại hình · Lần nhập cần chú ý (Mở ⇒ hồ sơ HĐ tại lần nhập). Không toast. -->
 <!-- updated: 2026-10-30 (form) — hộp Hợp đồng nhập: hai khối "1 Hợp đồng", "2 Dòng hàng" dùng `FormSection` chung (vòng số + dòng gợi ý), thay h3 trần "1 · Hợp đồng". -->

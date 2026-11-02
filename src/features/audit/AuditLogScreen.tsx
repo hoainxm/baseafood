@@ -32,6 +32,7 @@ import {
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { TABLE_LABELS } from "@/lib/catalogRepo";
 import { FileSpreadsheet, History, RefreshCw, Users } from "lucide-react";
+import { formatDateTimeVN } from "@/lib/format";
 
 /** Nhãn tiếng Việt của bảng: lấy chung từ tầng dữ liệu (mọi bảng đang đồng bộ) + vài nhãn chỉ có ở nhật ký. */
 const AUDIT_ONLY_LABELS: Record<string, string> = {
@@ -70,8 +71,7 @@ const ACTION_OPTIONS: ComboboxOption[] = [
 
 function formatDate(iso: string): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("vi-VN");
+  return formatDateTimeVN(iso) || iso;
 }
 
 /** Mặc định xem 30 ngày gần nhất (gồm hôm nay) — đầu tháng vẫn thấy việc của tháng trước. */

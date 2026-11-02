@@ -63,7 +63,7 @@ import {
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { num, formatDateVN } from "@/lib/format";
+import { num, formatDateVN, formatDateTimeVN } from "@/lib/format";
 import {
   ChevronLeft,
   Columns2,
@@ -859,7 +859,7 @@ function PeriodDetail({
           </p>
           {period.isLocked && (
             <p className="text-base text-muted-foreground">
-              Khoá lúc {period.lockedAt ? new Date(period.lockedAt).toLocaleString("vi-VN") : "—"}
+              Khoá lúc {formatDateTimeVN(period.lockedAt) || "—"}
               {period.lockNote ? ` · ${period.lockNote}` : ""}
             </p>
           )}

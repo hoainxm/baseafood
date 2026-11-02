@@ -284,7 +284,7 @@ export function checkDocumentFile(file: { name: string; size: number }, kind: "p
 export function filePreviewKind(fileName: string): "pdf" | "image" | "download" {
   const ext = fileName.toLowerCase().split(".").pop() ?? "";
   if (ext === "pdf") return "pdf";
-  if (["jpg", "jpeg", "png"].includes(ext)) return "image";
+  if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return "image";
   return "download";
 }
 

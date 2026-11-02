@@ -23,7 +23,7 @@ import {
   type TagVariant,
 } from "@/design-system";
 import { MonthNav } from "@/features/import-planning/ImportViews";
-import { formatDateVN } from "@/lib/format";
+import { formatDateVN, formatDateTimeVN } from "@/lib/format";
 import {
   ORDER_STATUS_LABELS,
   STALE_REVISION_LABEL,
@@ -394,7 +394,7 @@ export function OrderDossier({
           <span className="tnum">{expiry ? formatDateVN(expiry) : "—"}</span>
           <span className="block text-sm text-muted-foreground">{order.shelfLifeMonths} tháng từ tháng sản xuất đầu</span>
         </Row>
-        <Row label="Phát hành">{order.issuedAt ? `${order.issuedBy || "—"} · ${formatDateVN(order.issuedAt.slice(0, 10))}` : "Chưa phát hành"}</Row>
+        <Row label="Phát hành">{order.issuedAt ? `${order.issuedBy || "—"} · ${formatDateTimeVN(order.issuedAt)}` : "Chưa phát hành"}</Row>
       </dl>
 
       <section data-tour="order-lines" className="grid min-w-0 gap-2">

@@ -5,13 +5,14 @@
 //              `import-files`), vertical file list.
 // ============================================================
 import { useEffect, useState } from "react";
-import { Button, FormDialog, ProcessingState, Tag, type TagVariant } from "@/design-system";
+import { Button, FormDialog, ProcessingState, Tag, notify, type TagVariant } from "@/design-system";
 import { CONTRACT_STATE_LABELS, RECEIPT_STATE_LABELS, lineProduct, type ImportContractState, type ImportData, type ReceiptState } from "@/lib/importPlanning";
 import { DEMO_PLACEHOLDER_PREFIX, getImportFileUrl } from "@/lib/importFileStorage";
 import { filePreviewKind } from "@/lib/documents";
-import { formatDateVN } from "@/lib/format";
+import { formatDateTimeVN } from "@/lib/format";
 import type { ImportContractLine, ImportFile } from "@/types";
 import { Download, ExternalLink, Eye, FileText, Trash2 } from "lucide-react";
+import { openInNewTab } from "@/lib/openInNewTab";
 
 const RECEIPT_STATE_TAG: Record<ReceiptState, TagVariant> = {
   "missing-docs": "warning",
@@ -48,8 +49,10 @@ export interface ImportPreviewTarget {
 }
 
 async function openImportFile(path: string, downloadName?: string) {
-  const url = await getImportFileUrl(path, 600, downloadName);
-  if (url) window.open(url, "_blank", "noopener");
+  // Mở tab trống trước khi chờ link — gọi window.open sau await thì Safari iPhone / iPad chặn.
+  if (!(await openInNewTab(() => getImportFileUrl(path, 600, downloadName)))) {
+    notify.error("Không mở được file — tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.");
+  }
 }
 
 /** Xem file trong app (PDF / ảnh); loại khác ⇒ Tải về. File giữ chỗ của demo ⇒ câu giải thích. */
@@ -106,9 +109,14 @@ export function ImportFilePreview({ file, onClose }: { file: ImportPreviewTarget
               Không mở được file: tài khoản không được xem file này, hoặc file đã bị gỡ khỏi máy chủ.
             </p>
           )}
-          {state === "ready" && kind === "pdf" && url && <iframe title={file.name} src={url} className="h-[75dvh] w-full rounded-lg border border-border bg-muted" />}
+          {state === "ready" && kind === "pdf" && url && (
+            <>
+              <iframe title={file.name} src={url} className="h-[min(75dvh,calc(100dvh-16rem))] min-h-80 w-full rounded-lg border border-border bg-muted" />
+              <p className="text-sm text-muted-foreground">Trên iPhone / iPad khung có thể chỉ hiện trang đầu — chọn Mở tab mới để xem đủ các trang.</p>
+            </>
+          )}
           {state === "ready" && kind === "image" && url && (
-            <img src={url} alt={file.name} className="mx-auto max-h-[75dvh] max-w-full rounded-lg border border-border object-contain" />
+            <img src={url} alt={file.name} className="mx-auto max-h-[min(75dvh,calc(100dvh-16rem))] max-w-full rounded-lg border border-border object-contain" />
           )}
           {!isPlaceholder && state === "ready" && kind === "download" && (
             <p className="rounded-lg bg-muted px-4 py-3">File này không xem được ngay trong trình duyệt. Chọn Tải về để mở trên máy.</p>
@@ -136,7 +144,7 @@ export function ImportFileList({
     <ul className="grid min-w-0 grid-cols-[minmax(0,1fr)] divide-y divide-border rounded-lg border border-border">
       {files.map((f) => {
         const name = f.fileName || "file";
-        const meta = [f.uploadedBy, f.createdAt ? formatDateVN(f.createdAt.slice(0, 10)) : ""].filter(Boolean).join(" · ");
+        const meta = [f.uploadedBy, formatDateTimeVN(f.createdAt)].filter(Boolean).join(" · ");
         return (
           <li key={f.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2">
             <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />

@@ -458,7 +458,7 @@ export default function ImportPlanningScreen() {
             <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
               <p className="max-w-3xl text-muted-foreground">Hợp đồng nhập, chứng từ từng lô hàng về và số lượng thực nhập. Khác Nhập hàng nguyên liệu trong nước.</p>
               <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" ? v : "" }, true)}>
-                <TabsList data-tour="import-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
+                <TabsList data-tour="import-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
                   <TabsTrigger value="month" className={TAB_TRIGGER} title="Lô nhập của tháng, gom theo đối tác, kèm chứng từ còn thiếu.">
                     <Ship className="mr-2 h-4 w-4" aria-hidden />
                     Lô nhập

@@ -863,6 +863,11 @@ Oracle hành vi: [ba-spec 53](../../docs/app-map/53-filters.ba-spec.md). Logic s
 | Tổng / thẻ số tính theo **dòng đang hiện**, ghi "theo bộ lọc" khi đang lọc | Tính tổng từ mảng đã lọc |
 | Không lưu, không toast; ô lọc không có Thêm mới / bút chì, nhãn "Tất cả …", `hideRequiredMark` | Ngoại lệ ô lọc ở § Ô chọn danh mục |
 | Bảng gộp theo bộ lọc ⇒ ghép điều kiện vào `rowMarkKey` | § Tô màu dòng |
+| Ô lọc xuống hai hàng không được tràn viền (2026-11-02: `ChoiceGroup` 4 cột ở `/users` đè tiêu đề nhóm) | `FilterBar` ép con `h-auto` — `Field` mặc định `h-full`, nằm trong hàng flex xuống dòng sẽ cao bằng cả khung. Hàng ô tự dựng ngoài `FilterBar` mà có `Field` + xuống dòng: thêm `[&>*]:h-auto` |
+
+**Mốc giờ nhật ký / lịch sử (từ 2026-11-02):** mọi chỗ hiện lúc thao tác (nhật ký, lịch sử xuất file, đăng nhập lần cuối, khoá kỳ, file đính, in tem, nháp) dùng `formatDateTimeVN` của `lib/format.ts` ⇒ "dd/mm/yyyy HH:mm" theo giờ máy. Cấm ghép `formatDateVN(iso.slice(0, 10))` (ngày UTC) với giờ máy, cấm `toLocaleString` tự do (giờ đứng trước, có giây, không đủ 0).
+
+**Xem / mở file (từ 2026-11-02):** khung PDF trong hộp cao `h-[min(75dvh,calc(100dvh-16rem))] min-h-80` + dòng nhắc iPhone / iPad chỉ hiện trang đầu ⇒ "Mở tab mới". Mở file ở tab mới qua `openInNewTab` (`lib/openInNewTab.ts`) — gọi `window.open` sau `await` thì Safari iOS chặn.
 
 Màn cũ đã đủ lọc (Nhật ký thao tác, Tài liệu, Sổ chuyến Nhập hàng…) giữ nguyên; màn THÊM lọc từ 2026-10-31 dùng khung này.
 

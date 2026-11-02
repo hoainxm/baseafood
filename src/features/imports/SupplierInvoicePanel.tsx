@@ -71,6 +71,7 @@ import {
 import { useCan } from "@/features/shared/PermissionProvider";
 import { DEFAULT_CATEGORY, WORKSHOPS, generateLotCode } from "./importHelpers";
 import { CreateTripDialog, ExplainMismatchDialog, type CreateTripTarget, type ExplainTarget } from "./supplierInvoiceParts";
+import { openInNewTab } from "@/lib/openInNewTab";
 
 const STATE_TAG: Record<InvoiceLineState, TagVariant> = {
   matched: "done",
@@ -463,9 +464,8 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
   };
 
   const openFile = async (inv: SupplierInvoice) => {
-    const url = await getSupplierInvoiceFileUrl(inv.filePath);
-    if (url) window.open(url, "_blank", "noopener");
-    else notify.warning(inv.filePath ? "Chưa mở được file (file mẫu của chế độ demo, hoặc chưa nối máy chủ)." : "Hóa đơn này chưa có file PDF.");
+    if (!(await openInNewTab(() => getSupplierInvoiceFileUrl(inv.filePath))))
+      notify.warning(inv.filePath ? "Chưa mở được file (file mẫu của chế độ demo, hoặc chưa nối máy chủ)." : "Hóa đơn này chưa có file PDF.");
   };
 
   /* ---------- Cột ---------- */

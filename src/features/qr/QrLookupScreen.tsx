@@ -17,7 +17,7 @@ import { BulkLabelPrint } from "./BulkLabelPrint";
 import { TraceStagesView } from "./TraceStagesView";
 import { LotRecall } from "./LotRecall";
 import { useLabelPrints } from "@/lib/catalogRepo";
-import { kg, formatDateVN } from "@/lib/format";
+import { kg, formatDateVN, formatDateTimeVN } from "@/lib/format";
 import {
   TRACE_KIND_LABELS,
   computeLotMassBalance,
@@ -307,7 +307,7 @@ export default function QrLookupScreen() {
                       <p className="flex flex-wrap items-center gap-2">
                         <Tag variant="done">Đã in {t.labelCount} tem</Tag>
                         <span className="text-muted-foreground">
-                          Lần gần nhất {formatDateVN(t.lastPrint.printedAt.slice(0, 10))}
+                          Lần gần nhất {formatDateTimeVN(t.lastPrint.printedAt)}
                           {t.lastPrint.operator ? ` · ${t.lastPrint.operator}` : ""}
                         </span>
                       </p>

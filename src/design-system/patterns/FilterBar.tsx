@@ -31,8 +31,11 @@ export function FilterBar({
   return (
     // grid-cols-[minmax(0,1fr)] + max-w-full: ô lọc không đẩy khung tràn ngang. Điện thoại: mỗi ô một hàng, bỏ
     // min-w cố định (min-width thắng max-width — ô min-w-[16rem] = 333 px ở 130 % vẫn tràn nếu chỉ chặn max-w).
+    // [&>*]:h-auto: `Field` có h-full — trong hàng flex xuống dòng nằm ở ô lưới (chiều cao xác định) nó cao bằng CẢ
+    // khung, hàng đầu phình ra và hàng sau tràn khỏi viền, đè lên khối bên dưới (trang Người dùng 2026-11-02).
+    // Thẳng đáy các ô đã có items-end lo.
     <div className={cn("grid grid-cols-[minmax(0,1fr)] gap-3 rounded-xl border-2 border-border p-4", className)} {...rest}>
-      <div className="flex min-w-0 flex-wrap items-end gap-4 [&>*]:max-w-full max-sm:[&>*]:w-full max-sm:[&>*]:min-w-0">{children}</div>
+      <div className="flex min-w-0 flex-wrap items-end gap-4 [&>*]:h-auto [&>*]:max-w-full max-sm:[&>*]:w-full max-sm:[&>*]:min-w-0">{children}</div>
       {activeCount > 0 && (
         <div className="flex flex-wrap items-center gap-3">
           {resultText && <span className="tnum text-sm text-muted-foreground">{resultText}</span>}

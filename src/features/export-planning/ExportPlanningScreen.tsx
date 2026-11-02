@@ -743,7 +743,7 @@ export default function ExportPlanningScreen() {
             <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
               <p className="max-w-3xl text-muted-foreground">Mỗi chuyến container của từng khách đang ở bước nào và còn thiếu gì, tới khi hợp đồng xuất đủ.</p>
               <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" ? v : "" }, true)}>
-                <TabsList data-tour="export-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
+                <TabsList data-tour="export-tabs" className="grid w-full grid-cols-3 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
                   <TabsTrigger value="month" className={TAB_TRIGGER} title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
                     <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
                     Lịch xuất hàng

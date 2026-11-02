@@ -2,7 +2,8 @@
 
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
-last_verified: 2026-10-31
+last_verified: 2026-11-02
+<!-- updated: 2026-11-02 — thanh tab Lịch xuất hàng · Hợp đồng · Báo cáo chặn `max-w-full` + xuống dòng (iPad dọc 768px từng tràn mép phải); hộp xem file như 40 (khung PDF theo dvh + nhắc iOS); file đính và nhật ký hiện "dd/mm/yyyy HH:mm". -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): tab Hợp đồng thêm Khách hàng; ô Tra hợp đồng đổi sang SearchField (bỏ dấu). Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->
 <!-- updated: 2026-10-31 (lịch) — hộp **Tạo lịch xuất hàng** (`ScheduleDialog`, ba-spec 41 §0d NV19): mở ngay sau Lưu HĐ mới (nút đóng "Không tạo", có `title`) hoặc từ hồ sơ HĐ — mục "Tạo lịch xuất hàng" trong Thao tác khác + nút viền trong khối "Chưa ghi chuyến nào" (chỉ khi `scheduleGate` ok). Mỗi chuyến một hàng: Tháng kế hoạch * · Kg kế hoạch · Bỏ; dưới có Thêm chuyến + dòng Tổng kg / hợp đồng (lệch ⇒ chữ cảnh báo, vẫn tạo). Nút chính `save` "Tạo N chuyến". "Sửa hợp đồng" hiện khi mọi chuyến còn trống (R41); hộp xác nhận xóa HĐ ghi "kèm N chuyến dự kiến còn trống". -->
 <!-- updated: 2026-10-30 (NL dòng) — phần 4 Dòng hàng của hộp HĐ có hàng ô luôn hiện dưới hàng số lượng: Chiều dài · Tỉ lệ râu / thân / cổ · Số miếng / kg · Ghi chú dòng (Ghi chú rộng gấp đôi trên desktop; tour nói ở bước Lập hợp đồng); bảng dòng hàng ở hồ sơ HĐ thêm 3 cột Chiều dài · Tỉ lệ · Số miếng / kg (ẩn trên điện thoại) và cột phụ Ghi chú dòng (ba-spec 41 R38). -->

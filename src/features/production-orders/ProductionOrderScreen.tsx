@@ -320,7 +320,7 @@ export default function ProductionOrderScreen() {
             <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-3">
               <p className="max-w-3xl text-muted-foreground">Lệnh sản xuất ra từ dòng hàng hợp đồng xuất, gửi Ban quản đốc phân xưởng và Thủ kho.</p>
               <Tabs value={view} onValueChange={(v) => setParam({ view: v === "reports" ? v : "" }, true)}>
-                <TabsList data-tour="order-tabs" className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit">
+                <TabsList data-tour="order-tabs" className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
                   <TabsTrigger value="orders" className={TAB_TRIGGER} title="Danh sách lệnh sản xuất theo tháng.">
                     <ClipboardList className="mr-2 h-4 w-4" aria-hidden />
                     Lệnh

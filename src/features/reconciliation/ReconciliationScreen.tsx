@@ -50,7 +50,7 @@ import {
   type InvoiceMatchStatus,
 } from "@/lib/einvoiceReconciliation";
 import { groupSameTaxCodeSameDay, resolveTaxSideSheets, compareTwoInvoiceVersions } from "@/lib/twoVersionReconciliation";
-import { num } from "@/lib/format";
+import { num, formatDateTimeVN } from "@/lib/format";
 import {
   ReconciliationModePicker,
   SameDayView,
@@ -102,13 +102,7 @@ function inferPeriod(name: string): string {
   if (!m) return "";
   return m[2] ? `T${m[1].padStart(2, "0")}-${m[2]}` : `T${m[1]}`;
 }
-function formatDateTime(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
+const formatDateTime = formatDateTimeVN;
 
 /** Cuộn mượt tới một khối theo id (drill-down từ thẻ tổng) — dùng DOM id, không ref. */
 function scrollToId(id: string) {

@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { ChevronDown, History } from "lucide-react";
 import { Button } from "@/design-system";
-import { formatDateVN } from "@/lib/format";
+import { formatDateTimeVN } from "@/lib/format";
 
 const COLLAPSE_AFTER = 8;
 
@@ -33,8 +33,7 @@ export function ActivityLogBlock({ entries, title = "Nhật ký thao tác", deta
       ) : (
         <ol className="grid min-w-0 grid-cols-[minmax(0,1fr)] divide-y divide-border rounded-lg border border-border">
           {shown.map((a) => {
-            const at = a.createdAt ? new Date(a.createdAt) : null;
-            const when = at && !Number.isNaN(at.getTime()) ? `${formatDateVN(a.createdAt.slice(0, 10))} ${at.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}` : "";
+            const when = formatDateTimeVN(a.createdAt);
             return (
               <li key={a.id} className="grid min-w-0 gap-0.5 px-3 py-2">
                 <span className="break-words">{a.summary}</span>

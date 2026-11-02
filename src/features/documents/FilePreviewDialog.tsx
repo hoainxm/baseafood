@@ -71,10 +71,13 @@ export function FilePreviewDialog({ file, onClose }: { file: PreviewFile | null;
             </p>
           )}
           {state === "ready" && kind === "pdf" && url && (
-            <iframe title={file.name} src={url} className="h-[75dvh] w-full rounded-lg border border-border bg-muted" />
+            <>
+              <iframe title={file.name} src={url} className="h-[min(75dvh,calc(100dvh-16rem))] min-h-80 w-full rounded-lg border border-border bg-muted" />
+              <p className="text-sm text-muted-foreground">Trên iPhone / iPad khung có thể chỉ hiện trang đầu — chọn Mở tab mới để xem đủ các trang.</p>
+            </>
           )}
           {state === "ready" && kind === "image" && url && (
-            <img src={url} alt={file.name} className="mx-auto max-h-[75dvh] max-w-full rounded-lg border border-border object-contain" />
+            <img src={url} alt={file.name} className="mx-auto max-h-[min(75dvh,calc(100dvh-16rem))] max-w-full rounded-lg border border-border object-contain" />
           )}
           {state === "ready" && kind === "download" && (
             <p className="rounded-lg bg-muted px-4 py-3">

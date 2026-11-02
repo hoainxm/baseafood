@@ -39,6 +39,7 @@ import type { ComposedDocument, ComposedDocumentExport, DocumentValues } from "@
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { ComposerFields } from "./ComposerFields";
 import { TemplatePanel } from "./TemplatePanel";
+import { formatDateTimeVN } from "@/lib/format";
 
 export interface ComposerSourceProps<T> {
   type: DocumentTypeDef<T>;
@@ -55,10 +56,7 @@ export interface ComposerSourceProps<T> {
 }
 
 const nowIso = () => new Date().toISOString();
-const timeVN = (iso: string) => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : `${d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} ${d.toLocaleDateString("vi-VN")}`;
-};
+const timeVN = (iso: string) => formatDateTimeVN(iso) || iso;
 
 export function DocumentComposerView<T>({
   type,
@@ -333,7 +331,7 @@ export function DocumentComposerView<T>({
             <span className="font-medium">Xem trước — đúng file Word sẽ xuất</span>
             <Tag variant="source">{templateLabel(activeId)}</Tag>
           </div>
-          {previewError ? <p className="text-sm text-destructive">Khuôn Word lỗi: {previewError}</p> : <DocxPreview file={preview} className="max-h-[80vh]" />}
+          {previewError ? <p className="text-sm text-destructive">Khuôn Word lỗi: {previewError}</p> : <DocxPreview file={preview} className="max-h-[80dvh]" />}
         </div>
       </div>
 

@@ -13,7 +13,7 @@ import { useTopScrollbar } from "./topScrollbar";
 import { useFloatingTableHead } from "./floatingTableHead";
 import { useRowSelection, useRowMarkTools } from "./rowMarkSource";
 import { ColumnResizeHandle, measureFitWidth, useColumnWidths } from "./columnResize";
-import { fitColumnWidth } from "./gridFitWidth";
+import { fitColumnWidth, fitTextColumnWidth } from "./gridFitWidth";
 import { RotateCcw } from "lucide-react";
 
 /**
@@ -71,6 +71,14 @@ export interface GridColumn<R> {
    * khác). VD cột Ghi chú dòng ở Cân đối: không cần ưu tiên hiển thị, đừng để nó phình to.
    */
   fixedWidth?: number;
+  /**
+   * Lưới gọn, cột ô ĐIỀU KHIỂN (`renderCell`, VD ô chọn khách): chữ ĐANG HIỆN trong ô của dòng
+   * (tên đã chọn, hoặc chữ gợi ý "Chọn khách") ⇒ cột rộng VỪA chữ dài nhất + `fitChrome`, không
+   * cắt "…" (người dùng 2026-11-02). Không truyền ⇒ cột giữ `minWidth`.
+   */
+  fitText?: (row: R) => string;
+  /** Phần khung của ô điều khiển ngoài chữ (đệm nút, mũi tên…) — độ dài CSS, VD "3.5rem". */
+  fitChrome?: string;
   /** Căn chữ của ô khoá + tiêu đề (mặc định phải — cột số). Cột chữ dùng "left". */
   align?: "left" | "right";
   /**
@@ -158,7 +166,7 @@ export function EditableGrid<R>({
    * Nguyên liệu · Xuất khẩu · Ghi chú cạnh nhau để chụp gửi): cột SỐ rộng VỪA giá trị dài nhất
    * của cột + đệm ô (`gridFitWidth`, người dùng chốt 2026-11-02 — không giãn theo khung); cột tên
    * (tối thiểu `rowHeaderMinWidth`) ăn phần bề ngang còn dư; cột ô điều khiển (`renderCell`, VD
-   * chọn khách) giữ `minWidth`; tên cột được xuống dòng.
+   * chọn khách) khai `fitText` + `fitChrome` ⇒ vừa chữ dài nhất; tên cột được xuống dòng.
    */
   compact?: boolean;
   /** Lưới gọn: bề rộng TỐI THIỂU cột tên (px, gồm cả đệm). Mặc định 128. */
@@ -185,13 +193,18 @@ export function EditableGrid<R>({
   );
   /** Có cột giãn ⇒ cột khác co vừa nội dung (width 1% + minWidth) để cột giãn ăn phần còn lại. */
   const hasFillColumn = visibleColumns.some((c) => c.fill);
-  /** Lưới gọn: bề rộng VỪA số dài nhất của từng cột số (cột ô điều khiển `renderCell` bỏ qua). */
+  /** Lưới gọn: bề rộng VỪA số dài nhất của từng cột số; cột ô điều khiển vừa chữ dài nhất (`fitText`). */
   const fitWidths = React.useMemo(() => {
     const out: Record<string, string> = {};
     if (!compact) return out;
     const dataRows = rows.filter((h) => !h.groupTitle);
     for (const c of visibleColumns) {
-      if (!c.renderCell) out[c.key] = fitColumnWidth(dataRows.map((h) => c.getValue(h.data)));
+      // Cột chữ: vừa chữ dài nhất (+ khung ô chọn khi đang là ô điều khiển). Ô không còn vẽ chữ
+      // (kỳ chốt gỡ `renderCell`, không có `renderValue`) ⇒ đo như cột số.
+      const fitText = c.renderCell || c.renderValue ? c.fitText : undefined;
+      if (fitText)
+        out[c.key] = fitTextColumnWidth(dataRows.map((h) => fitText(h.data)), c.renderCell ? (c.fitChrome ?? "0px") : "0px");
+      else if (!c.renderCell) out[c.key] = fitColumnWidth(dataRows.map((h) => c.getValue(h.data)));
     }
     return out;
   }, [compact, rows, visibleColumns]);

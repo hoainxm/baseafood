@@ -42,9 +42,6 @@ import { useCan } from "@/features/shared/PermissionProvider";
 
 /** Cột tiền của khối BTP — ẩn khi không có quyền `balancing.view-price`. */
 const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
-/** Bề rộng (px) cột Khách (ô chọn) ở bảng CHÍNH khối Xuất khẩu. Cột số tự VỪA số dài nhất
- *  (EditableGrid compact, người dùng chốt 2026-11-02) — không đặt tay ở đây. */
-const MAIN_COLUMN_WIDTHS: Record<string, number> = { khach: 112 };
 import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react";
 
 export function WipGrid({
@@ -281,8 +278,11 @@ export function WipGrid({
       /* Chọn trong danh mục, gõ tên lạ thì tạo mới tại chỗ — nhập tự do là
          nguồn sai số liệu lớn nhất ("Hanwa" / "hanwa" / "Han wa" thành 3 khách
          khi tổng hợp cuối kỳ). */
-      // Bọc bề rộng: ô chọn tự nở theo tên khách dài ⇒ cột Khách to ra, bảng chính lố một màn.
-      // Tối thiểu 6rem; cột giãn (hai khối bằng nhau giãn đều trên màn rộng) thì ô giãn theo.
+      // Cột rộng VỪA tên khách dài nhất đang hiện (người dùng 2026-11-02: tên khách bị cắt "…" trong
+      // khi cột Mặt hàng thừa chỗ). Khung ô chọn ngoài chữ: đệm nút px-3 ×2 + mũi tên 1rem + khe
+      // + viền ≈ 3.25rem. Bọc `contain` để ô chọn không tự đòi bề rộng — cột quyết định.
+      fitText: (h) => customerOptions.find((o) => o.value === h.customerId)?.label ?? "Chọn khách",
+      fitChrome: "3.25rem",
       renderCell: (h) => (
         <div className="w-full min-w-24 [contain:inline-size]">
         <Combobox
@@ -304,7 +304,24 @@ export function WipGrid({
     /* Thứ tự theo bảng cân đối giấy: XUẤT KHẨU Lượng · Đơn giá · T.tiền đứng ngay sau
        Khách, rồi các ngày + Tổng; Trả · Nợ (thay cột Chuyển kỳ) đứng CUỐI. "Lượng" = Tổng. */
     { key: "luong", header: "Lượng (kg)", label: "Lượng", kind: "computed", minWidth: 110, getValue: (h) => h.total || null },
-    { key: "donGia", header: <>Đơn giá<br />(USD / đ nội địa)</>, label: "Đơn giá", kind: "input", group: "tien", minWidth: 112, getValue: (h) => h.unitPrice },
+    /* Tên cột NGẮN (≤ 2 dòng — cột chỉ rộng vừa số, tên dài gãy 5 dòng kéo cao cả hàng tên cột,
+       người dùng 2026-11-02); nghĩa đầy đủ để ở tooltip. */
+    {
+      key: "donGia",
+      // Đúng HAI dòng: mỗi dòng không gãy tiếp (cột hẹp vừa số thì nới vừa chữ "Đơn giá").
+      header: (
+        <span title="Đơn giá: USD với hàng xuất khẩu, đồng (VNĐ) với hàng bán nội địa.">
+          <span className="whitespace-nowrap">Đơn giá</span>
+          <br />
+          <span className="whitespace-nowrap">(USD/đ)</span>
+        </span>
+      ),
+      label: "Đơn giá",
+      kind: "input",
+      group: "tien",
+      minWidth: 112,
+      getValue: (h) => h.unitPrice,
+    },
     {
       key: "thanhTien",
       header: "T.tiền (USD)",
@@ -373,10 +390,10 @@ export function WipGrid({
     : visibleColumns;
   /* Bảng CHÍNH (cột F–J bảng cân đối giấy): Mặt hàng · Khách · Lượng · Đơn giá · T.tiền.
      Bảng THEO NGÀY (cột M–W): các ngày · Tổng · Trả · Nợ · Ghi chú dòng (2026-10-19). */
-  const mainColumns = displayColumns
-    .filter((c) => !["tra", "no", "ghiChu"].includes(c.key) && c.group !== DAY_COLUMN_GROUPS.days)
-    // Cột Khách (ô chọn) giữ bề rộng đặt; cột số tự VỪA số dài nhất (EditableGrid compact).
-    .map((c) => ({ ...c, minWidth: MAIN_COLUMN_WIDTHS[c.key] ?? c.minWidth }));
+  // Bề rộng: cột số VỪA số dài nhất, cột Khách VỪA tên khách dài nhất (EditableGrid compact).
+  const mainColumns = displayColumns.filter(
+    (c) => !["tra", "no", "ghiChu"].includes(c.key) && c.group !== DAY_COLUMN_GROUPS.days
+  );
   const dayColumns = displayColumns.filter((c) => ["tra", "no", "ghiChu"].includes(c.key) || c.group === DAY_COLUMN_GROUPS.days);
 
   const templatePeriodLabel = templatePeriod ? templatePeriod.dateRangeDescription || `${templatePeriod.startDate} – ${templatePeriod.endDate}` : "";

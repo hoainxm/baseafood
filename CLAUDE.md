@@ -62,7 +62,7 @@ Mỗi quy tắc một dòng; mẫu + ngoại lệ + checklist ở link. *(máy c
 17. **Mọi form ghi dữ liệu tự lưu NHÁP**: trên trang `useFormDraft`, trong hộp thoại `useDialogDraft`; mở lại nháp ⇒ `<DraftRestoredNotice>` (không toast); nháp không bao giờ tự ghi sổ; không lưu nháp mật khẩu — [`lib/formDraft.ts`](src/lib/formDraft.ts). *(máy chặn)*
 18. **Mọi trang nghiệp vụ có "Hướng dẫn thao tác" + hộp "?"**, cùng commit với trang: `features/<khu>/<trang>Tour.ts` (`tourSpec`, mốc `data-tour`) + hộp trong `PAGE_GUIDES`. Khu vực có trạng thái phải giải thích trạng thái, điều kiện xong, việc tiếp; tour không ghi — [`43-guided-tour`](docs/app-map/43-guided-tour.ba-spec.md) + [README § Hướng dẫn thao tác](src/design-system/README.md). *(máy chặn)*
 19. **Mọi bảng nghiệp vụ sắp được theo cột** (tăng → giảm → gốc; mỗi kiểu một cách xếp; ô trống cuối). Bảng chuẩn tự có — cột ô nhập/huy hiệu/trạng thái phải khai `sortValue` + `sortKind`; bảng tự dựng dùng `useTableSort` — [README § Sắp xếp cột](src/design-system/README.md#sắp-xếp-cột--bấm-tên-cột-mỗi-kiểu-dữ-liệu-một-cách-xếp-từ-2026-10-27). *(máy chặn)*
-20. **Lưới gọn (`EditableGrid compact`, bảng chính Cân đối): cột số rộng VỪA số dài nhất + đệm** — không giãn theo khung, không kéo giãn cột; cột tên ăn phần dư; màn không đặt bề rộng tay cho cột số — [README § Lưới GỌN](src/design-system/README.md). *(máy chặn)*
+20. **Lưới gọn (`EditableGrid compact`, bảng chính Cân đối): cột rộng VỪA giá trị dài nhất + đệm** — cột số tự đo, cột ô chọn khai `fitText`; tên cột tối đa 2 dòng (rút gọn + `title`, không giảm cỡ chữ); không giãn theo khung, không kéo cột; cột tên ăn phần dư — [README § Lưới GỌN](src/design-system/README.md). *(máy chặn)*
 
 ## Commit & deploy
 

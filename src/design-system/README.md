@@ -360,13 +360,20 @@ Luật khi dùng:
      `1rem + 2px`) từ `getValue` của mọi dòng ⇒ màn **không** đặt `minWidth` / bảng bề rộng tay
      cho cột số. `getValue` phải trả ĐÚNG số đang hiện (ô khoá có `renderValue` làm tròn ⇒
      `getValue` cũng làm tròn), không thì cột rộng theo số dài hơn số thấy.
-  2. Tên cột dài hơn số ⇒ tên cột tự xuống dòng; từ dài nhất của tên cột là mức sàn (trình duyệt
-     tự nới, không bao giờ cắt). Dòng tổng là ô chữ ⇒ cũng tự nới.
-  3. **Cột TÊN dòng là cột tự do duy nhất**: chỉ `minWidth = rowHeaderMinWidth`, KHÔNG đặt
+  2. **Tên cột TỐI ĐA 2 DÒNG.** Cột chỉ rộng vừa số ⇒ tên dài gãy 4–5 dòng, kéo cao cả hàng tên
+     cột (lỗi 2026-11-02, "Đơn giá (USD / đ nội địa)"). Tên dài thì RÚT GỌN và tự ngắt đúng hai
+     dòng: `<span className="whitespace-nowrap">Đơn giá</span><br /><span className="whitespace-nowrap">(USD/đ)</span>`;
+     nghĩa đầy đủ để ở `title` của tên cột. KHÔNG giảm cỡ chữ tên cột (quy tắc 3). Từ dài nhất / dòng
+     nowrap của tên cột là mức sàn bề rộng (trình duyệt tự nới, không cắt). Dòng tổng là ô chữ ⇒ tự nới.
+  3. **Cột ô ĐIỀU KHIỂN có chữ** (`renderCell`, VD Combobox chọn khách) khai `fitText` (chữ ĐANG
+     HIỆN: tên đã chọn, hoặc chữ gợi ý "Chọn khách") + `fitChrome` (khung nút ngoài chữ, ô chọn
+     ≈ `3.25rem`) ⇒ cột vừa chữ dài nhất, KHÔNG cắt "…" (lỗi 2026-11-02: tên khách cắt "Pea…" trong khi
+     cột Mặt hàng thừa chỗ). Chữ font tỷ lệ ước lượng DƯ trong `textWidthCh` (đã đo, có test).
+     Ô bọc `w-full min-w-* [contain:inline-size]` để ô không tự đòi bề rộng — cột quyết định.
+  4. **Cột TÊN dòng là cột tự do duy nhất**: chỉ `minWidth = rowHeaderMinWidth`, KHÔNG đặt
      `width` ⇒ ăn hết phần bề ngang dư của khung (`contain: inline-size` — không đòi bề rộng theo
-     chữ dài nhất). Cột ô điều khiển (`renderCell`, VD Combobox chọn khách) giữ `minWidth` đặt ở
-     màn, bọc `w-full min-w-* [contain:inline-size]`.
-  4. Khung hẹp hơn tổng bề rộng ⇒ bảng cuộn ngang TRONG khung của nó (thanh trên + dưới), khung
+     chữ dài nhất).
+  5. Khung hẹp hơn tổng bề rộng ⇒ bảng cuộn ngang TRONG khung của nó (thanh trên + dưới), khung
      bên cạnh không bị đẩy xuống dòng (VD cặp khối Cân đối có trần `calc(100% - <bề rộng Ghi chú>)`).
   Khối chứa lưới gọn: tiêu đề / nút đặt `w-0 min-w-full` để không kéo khối rộng hơn bảng.
   Lưới thường đừng bật (cột tên hẹp làm tên dài gãy dòng).

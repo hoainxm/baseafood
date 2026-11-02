@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitColumnWidth, formattedWidthCh, longestFormattedWidthCh } from "./gridFitWidth";
+import { fitColumnWidth, fitTextColumnWidth, formattedWidthCh, longestFormattedWidthCh, textWidthCh } from "./gridFitWidth";
 
 describe("gridFitWidth — cột số vừa giá trị dài nhất", () => {
   it("chữ số 1ch, dấu chấm / phẩy 0,5ch, dấu trừ 0,75ch", () => {
@@ -24,5 +24,34 @@ describe("gridFitWidth — cột số vừa giá trị dài nhất", () => {
 
   it("cột tiền rộng hơn cột kg theo đúng độ dài số", () => {
     expect(longestFormattedWidthCh([4121880000, 1068751000])).toBeGreaterThan(longestFormattedWidthCh([29442, 8003]));
+  });
+});
+
+describe("gridFitWidth — cột ô điều khiển vừa chữ dài nhất", () => {
+  it("chữ hoa / rộng tính rộng hơn chữ thường, chữ hẹp và khoảng trắng chưa tới nửa", () => {
+    expect(textWidthCh("ab")).toBe(1.9);
+    expect(textWidthCh("AB")).toBe(2.1);
+    expect(textWidthCh("Mw")).toBe(2.7);
+    expect(textWidthCh("i l")).toBe(1.35);
+  });
+
+  it("luôn DƯ hơn bề rộng đo thật (Be Vietnam Pro 500, đơn vị ch) — không bao giờ cắt chữ", () => {
+    const measured: Record<string, number> = { "SEACHEMOT CO., LTD": 15.78, Hanwa: 4.95, "Chọn khách": 8.47, Peacock: 6.26, JFDA: 3.69, Sasano: 5.31 };
+    for (const [name, real] of Object.entries(measured)) {
+      expect(textWidthCh(name)).toBeGreaterThanOrEqual(real);
+      expect(textWidthCh(name) - real).toBeLessThan(1.1); // dư tối đa ~11px ở chữ 15px
+    }
+  });
+
+  it("dấu tiếng Việt không làm chữ rộng thêm", () => {
+    expect(textWidthCh("Chọn khách")).toBe(textWidthCh("Chon khach"));
+  });
+
+  it("tên dài nhất quyết định bề rộng, cộng khung ô chọn + đệm ô", () => {
+    const longest = textWidthCh("SEACHEMOT CO., LTD");
+    expect(fitTextColumnWidth(["Hanwa", "SEACHEMOT CO., LTD", null, "Chọn khách"], "3.25rem")).toBe(
+      `calc(${longest}ch + 3.25rem + 1rem + 2px)`
+    );
+    expect(fitTextColumnWidth([], "3.25rem")).toBe("calc(0ch + 3.25rem + 1rem + 2px)");
   });
 });

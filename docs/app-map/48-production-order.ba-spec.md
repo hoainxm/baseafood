@@ -3,6 +3,7 @@
 > Load khi: xây hoặc sửa Lệnh sản xuất của Phòng Kế hoạch: lập lệnh từ dòng hàng hợp đồng xuất, gắn nguyên liệu nhập khẩu dự kiến, phát hành tới phân xưởng / kho, gắn chuyến xuất (bước 2 của chuyến), in mẫu QTI-KH-01-04.
 covers: src/features/production-orders/**, src/lib/productionOrder.ts, src/lib/productionOrderDemo.ts, supabase/migrations/0088_production_orders.sql, src/lib/exportPlanning.ts
 last_verified: 2026-11-02
+<!-- updated: 2026-11-02 (lối vào) — hồ sơ HĐ xuất có nút "Lập lệnh sản xuất" (ContractDossier, hiện khi HĐ mở + có bản hiệu lực + quyền production-orders.create) ⇒ `/planning-production?new=1&contract=…` mở hộp lập lệnh chọn sẵn HĐ. Trước đó LS1 ghi "từ hồ sơ HĐ" nhưng chưa có nút; lối qua bước 2 của chuyến phải chờ đính đủ hồ sơ mới ghi chuyến được. Đã thử: HĐ 99.26 "Chờ đính kèm", 0 chuyến ⇒ mở hộp chọn sẵn HĐ. -->
 <!-- updated: 2026-11-02 (nhật ký 56) — hồ sơ lệnh có khối "Nhật ký thao tác" (`record_type` production-order trong bảng chung nhóm Kế hoạch, mig 0092): lập, sửa (lần sửa + lý do + thay đổi), NL dự kiến, phát hành, gắn / bỏ gắn chuyến (cả từ khối Lệnh sản xuất của chuyến), giữ bản cũ, hủy + Hoàn tác. Một bộ ghi (`usePlanningActivityLog`) cho cả dòng của lệnh lẫn dòng của hồ sơ HĐ xuất. -->
 <!-- updated: 2026-11-02 (nhật ký) — lập / sửa sau phát hành / phát hành / gắn, bỏ gắn chuyến / hủy lệnh + Hoàn tác ghi một dòng vào nhật ký hồ sơ HĐ xuất (export_activity_log, mig 0079) qua `useContractActivity` — trước đây chỉ có ở `audit_log` của admin. -->
 <!-- updated: 2026-11-02 (bộ soạn 54 P3) — hồ sơ lệnh thêm nút "File Word / PDF" (`&file=1`) mở bộ soạn file LSX đủ 42 ô của mẫu (ba-spec 54); bản in gọn `OrderPrint` giữ nguyên (54 A2). -->
@@ -109,7 +110,7 @@ Không có handoff nào tới tổ trưởng trong đợt này (Q8).
 ### LS1 — Lập LSX · owner U1
 - **Input:** HĐ xuất có **bản hiệu lực**. Dòng hàng chọn đã **nối mặt hàng** (41 R16). Số LSX · ngày lệnh · MSL · ≥ 1 ngày SX · ngày giao · ≥ 1 dòng (dòng HĐ + số thùng hoặc số kiện).
 - **Steps:**
-  1. Chọn HĐ (từ hồ sơ HĐ hoặc từ bước 2 của chuyến).
+  1. Chọn HĐ (từ hồ sơ HĐ — nút **Lập lệnh sản xuất** cạnh việc tiếp theo, có từ 2026-11-02 — hoặc từ bước 2 của chuyến, hoặc từ trang Lệnh sản xuất). HĐ vừa lập đã có bản hiệu lực ⇒ lập lệnh được ngay, KHÔNG cần đính kèm HĐ ký hay ghi chuyến trước.
   2. Chọn dòng hàng, gõ số thùng. Tên tiếng Việt, quy cách, packing chép từ dòng HĐ và mặt hàng. Kg tự tính (R2).
   3. Ghi MSL, ngày SX, ngày giao. Thị trường / khách lấy từ HĐ. HSD tính sẵn (R7).
   4. Yêu cầu bao bì, kiểm Nafi, lưu ý: **chép từ LSX gần nhất cùng khách + cùng mặt hàng** nếu có (Q10).

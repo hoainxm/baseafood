@@ -206,6 +206,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Việc tiếp theo",
         body:
           "Nút chính là việc cần làm tiếp của hợp đồng, theo chặng và theo vai trò: Đính kèm hồ sơ · Ghi chuyến · Duyệt cuối. Chặng không phải việc của bạn thì hiện thẻ chờ, ví dụ \"Chờ Trưởng / Phó phòng Kế hoạch duyệt cuối để đóng hợp đồng\".\n" +
+          "Lập lệnh sản xuất (khi được cấp quyền Lệnh sản xuất): mở trang Lệnh sản xuất với hợp đồng này chọn sẵn — làm được ngay khi vừa lập hợp đồng, không cần chờ đính kèm hay ghi chuyến; dòng hàng phải nối mặt hàng danh mục. Ghi chuyến xong thì gắn lệnh vào chuyến ở bước Lệnh sản xuất.\n" +
           "Thao tác khác gồm các việc ít dùng: sửa hợp đồng (khi chưa có chuyến), ghi bản sửa (có hiệu lực ngay), gia hạn, đính kèm thêm, ghi thêm chuyến, ghi tiền cọc, duyệt cuối đóng sớm (kèm lý do), hủy, xóa.",
       }),
       dossier({

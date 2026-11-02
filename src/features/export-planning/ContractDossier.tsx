@@ -59,7 +59,9 @@ import {
 import { formatDateVN, formatMoney, formatDateTimeVN } from "@/lib/format";
 import { useGoodsTypeStore } from "@/lib/catalogRepo";
 import { goodsTypeName } from "@/lib/goodsTypes";
+import { useNavigate } from "react-router-dom";
 import { useOrderCoverage } from "@/features/production-orders/useOrderCoverage";
+import { useCan } from "@/features/shared/PermissionProvider";
 import type { ExportContract, ExportContractAttachmentKind, ExportContractLine, ExportFile, ExportPayment, ExportShipment, Product } from "@/types";
 import {
   ArrowLeft,
@@ -79,6 +81,7 @@ import {
   Plus,
   Trash2,
   Wallet,
+  Factory,
 } from "lucide-react";
 import { ActivityList, CollapsibleSection, ContractFlowBar, FileList, StepBar, type PreviewTarget } from "./parts";
 import { CONTRACT_STATE_TAG, progressText, shipmentProgress } from "./progress";
@@ -201,6 +204,10 @@ export function ContractDossier({
   // Loại hàng (mig 0089) — chưa chạy ⇒ không hiện cột.
   const goodsStore = useGoodsTypeStore();
   const orderCoverage = useOrderCoverage();
+  // Lập Lệnh sản xuất ngay từ hồ sơ HĐ (ba-spec 48 LS1): HĐ vừa lập đã có bản hiệu lực — không cần chờ đính kèm hay ghi chuyến.
+  const orderCan = useCan("production-orders");
+  const navigate = useNavigate();
+  const canCreateOrder = isOpen && !!eff && orderCan.create;
   const lineColumns: RecordTableColumn<ExportContractLine>[] = [
     { key: "description", header: "Tên hàng (như HĐ)", primary: true, render: (l) => <span className="font-semibold">{l.description}</span> },
     {
@@ -444,6 +451,20 @@ export function ContractDossier({
             <Button variant="lock" onClick={onFinalReview} title="Việc tiếp: hợp đồng đã xuất đủ — xem lại hồ sơ rồi đồng ý đóng hợp đồng, hoặc trả về kèm lý do.">
               <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
               Duyệt cuối
+            </Button>
+          )}
+          {canCreateOrder && (
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/planning-production?new=1&contract=${encodeURIComponent(contract.id)}`)}
+              title={
+                unmapped > 0
+                  ? `Lập lệnh sản xuất từ dòng hàng hợp đồng này. Còn ${unmapped} dòng chưa nối mặt hàng — nối trước mới chọn được dòng đó trong lệnh.`
+                  : "Lập lệnh sản xuất từ dòng hàng hợp đồng này — làm được ngay, không cần chờ đính kèm hay ghi chuyến. Ghi chuyến xong thì gắn lệnh vào chuyến ở bước Lệnh sản xuất."
+              }
+            >
+              <Factory className="mr-2 h-4 w-4" aria-hidden />
+              Lập lệnh sản xuất
             </Button>
           )}
           {waitingText && <Tag variant="pending">{waitingText}</Tag>}

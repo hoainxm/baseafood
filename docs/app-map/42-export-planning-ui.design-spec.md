@@ -3,6 +3,7 @@
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
 last_verified: 2026-11-02
+<!-- updated: 2026-11-02 (lập HĐ) — chân hộp Lập HĐ: Hủy · Lưu & lập lệnh sản xuất (save, chỉ lập mới + quyền Lệnh SX) · Lưu hợp đồng (save). -->
 <!-- updated: 2026-11-02 (lệnh SX) — hàng việc tiếp theo ở hồ sơ HĐ thêm nút phụ (outline) "Lập lệnh sản xuất" cạnh nút chính (Đính kèm hồ sơ / Ghi chuyến / Duyệt cuối) — ba-spec 48 LS1. -->
 <!-- updated: 2026-11-02 (xem file) — hộp xem chứng từ dùng `FileViewer` chung (ba-spec 61): Word / Excel / văn bản xem ngay trong app; "Mở tab mới" mở trang `#/file-view`, không tải về. -->
 <!-- updated: 2026-11-02 (d) — File booking (ba-spec 60): hộp Ghi / Sửa chuyến có `FilePicker` "Đính file booking" dưới ô Số booking (chỉ khi máy chủ chạy 0094 + có kho file); bước 4 có hàng "File booking" không thẻ trạng thái (`ChecklistRow` `state` tùy chọn), nút "Đính file booking" (outline) mở `LoadingUploadDialog` step booking, danh sách file mới nhất đầu, gỡ có Hoàn tác. -->

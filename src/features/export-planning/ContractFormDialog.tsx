@@ -50,7 +50,7 @@ import { formatMoney } from "@/lib/format";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import { findCustomerName, lineTextAfterPick } from "@/lib/customerProductNames";
 import type { Customer, CustomerProductName, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, ExportFile, Product } from "@/types";
-import { Copy, FileSignature, Plus, Save, Trash2 } from "lucide-react";
+import { Copy, Factory, FileSignature, Plus, Save, Trash2 } from "lucide-react";
 import { FilePicker } from "./parts";
 import { useGoodsTypePicker } from "./goodsTypePicker";
 import { uploadExtraContractFiles } from "./RecordDialogs";
@@ -162,6 +162,8 @@ export interface ContractSavePayload {
   revision: ExportContractRevision;
   /** File thứ 2 trở đi chọn ở ô file HĐ (phụ lục…) ⇒ Hồ sơ đính kèm cấp HĐ (2026-10-30). */
   attachments: ExportFile[];
+  /** "Lưu & lập lệnh sản xuất": lưu xong mở ngay hộp Lập lệnh sản xuất chọn sẵn HĐ này (ba-spec 48 LS1). */
+  thenCreateOrder?: boolean;
 }
 
 export function ContractFormDialog({
@@ -176,6 +178,7 @@ export function ContractFormDialog({
   documentKindSource,
   recordedBy,
   canSeePrice,
+  canCreateOrder = false,
   onClose,
   onSave,
 }: {
@@ -194,6 +197,8 @@ export function ContractFormDialog({
   documentKindSource: DocumentKindSource;
   recordedBy: string;
   canSeePrice: boolean;
+  /** Có quyền lập Lệnh sản xuất ⇒ hộp Lập HĐ có thêm "Lưu & lập lệnh sản xuất". */
+  canCreateOrder?: boolean;
   onClose: () => void;
   onSave: (p: ContractSavePayload) => boolean;
 }) {
@@ -287,7 +292,7 @@ export function ContractFormDialog({
 
   const identityLocked = form?.mode === "revise" || (form?.mode === "edit" && form.revisionNo > 0);
 
-  const save = async () => {
+  const save = async (thenCreateOrder = false) => {
     // Không đòi `target`: tải lại trang thì hộp mở lại từ NHÁP (target rỗng) — Lưu vẫn phải chạy.
     if (!form || isUploading) return;
     const issues = validateContract(
@@ -296,6 +301,12 @@ export function ContractFormDialog({
     );
     const errs: FieldError[] = issues.map((i) => ({ field: i.label, message: i.message }));
     if (form.mode === "revise" && !form.changeSummary.trim()) errs.push({ field: "Nội dung sửa", message: "Ghi bản sửa đổi gì (VD: giảm dòng 1 còn 180 thùng)" });
+    // Lệnh sản xuất chỉ chọn được dòng đã nối mặt hàng (ba-spec 48 R1) — chặn sớm, khỏi lưu HĐ rồi mở hộp lệnh trống.
+    if (thenCreateOrder && !form.lines.some((l) => l.description.trim() && l.productId))
+      errs.push({
+        field: "Mặt hàng (danh mục)",
+        message: "Lập lệnh sản xuất cần ít nhất một dòng hàng đã chọn Mặt hàng (danh mục). Chọn ở dòng hàng, hoặc bấm Lưu hợp đồng để nối sau.",
+      });
     for (const f of file) {
       const fileErr = checkExportFile(f);
       if (fileErr) errs.push({ field: f.name, message: fileErr });
@@ -353,6 +364,7 @@ export function ContractFormDialog({
           createdAt: new Date().toISOString(),
         },
         attachments,
+        thenCreateOrder,
       });
       if (!ok) {
         void removeExportFiles(done);
@@ -423,6 +435,16 @@ export function ContractFormDialog({
           >
             Hủy
           </Button>
+          {canCreateOrder && form?.mode === "create" && (
+            <Button
+              variant="save"
+              onClick={() => void save(true)}
+              title="Lưu hợp đồng này rồi mở ngay hộp Lập lệnh sản xuất với hợp đồng chọn sẵn — không cần chờ đính kèm hay ghi chuyến. Cần ít nhất một dòng hàng đã chọn Mặt hàng (danh mục)."
+            >
+              <Factory className="mr-2 h-4 w-4" aria-hidden />
+              Lưu &amp; lập lệnh sản xuất
+            </Button>
+          )}
           <Button variant="save" onClick={() => void save()} title="Tải file (nếu có) và lưu hợp đồng / bản sửa này.">
             <Save className="mr-2 h-4 w-4" aria-hidden />
             {isUploading ? "Đang tải file…" : form?.mode === "revise" ? "Lưu bản sửa" : "Lưu hợp đồng"}

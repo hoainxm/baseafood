@@ -163,7 +163,7 @@ export const exportPlanningGuide: PageGuide = {
       </GuideSection>
       <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">
         <GuideList>
-          <li>Lập lệnh <b>ngay khi vừa lên hợp đồng</b>: ở hồ sơ hợp đồng chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng). Không cần chờ đính kèm hay ghi chuyến; dòng hàng phải nối mặt hàng danh mục.</li>
+          <li>Lập lệnh <b>ngay khi lên hợp đồng</b>: ở hộp Lập hợp đồng chọn <b>Lưu &amp; lập lệnh sản xuất</b> (lưu xong mở luôn hộp lập lệnh), hoặc về sau ở hồ sơ hợp đồng chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng). Không cần chờ đính kèm hay ghi chuyến; dòng hàng phải nối mặt hàng danh mục.</li>
           <li>Bước <b>Lệnh sản xuất</b> của chuyến: chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng và chuyến) hoặc <b>Gắn lệnh có sẵn</b>. Lệnh nháp chưa tính; phát hành thì bước tự xong.</li>
           <li>Dòng hàng hợp đồng có cột <b>Đã ra lệnh (kg)</b>: còn bao nhiêu kg chưa ra lệnh, vượt dung sai thì báo.</li>
           <li>NL của lệnh lấy từ các lần <b>Nhập khẩu</b> đã ghi thực nhập.</li>

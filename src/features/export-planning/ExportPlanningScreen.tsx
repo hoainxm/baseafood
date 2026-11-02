@@ -8,7 +8,7 @@
 // Spec: docs/spec/xuat-khau-phong-ke-hoach.md · ba-spec: docs/app-map/41-export-planning.ba-spec.md.
 // Máy chủ chặn bằng RLS riêng của mig 0075 (has_export_permission); màn ẩn nút theo useCan.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
 import { useCustomerProductNameStore, useCustomers, useExportBookingFilesAvailable, useExportDeferralsAvailable, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { extractCustomerNames } from "@/lib/customerProductNames";
@@ -114,6 +114,8 @@ export default function ExportPlanningScreen() {
   const can = useCan("export-plans");
   const loadingCan = useCan("export-plans.loading");
   const paymentsCan = useCan("export-plans.payments");
+  const orderCan = useCan("production-orders");
+  const navigate = useNavigate();
   const store = useExportData();
   const d = store.data;
   const [customers, setCustomers] = useCustomers();
@@ -263,7 +265,7 @@ export default function ExportPlanningScreen() {
     track(p.contract.id, "", p.mode === "create" ? "create" : "update", what);
     notify.saved(
       (p.mode === "create"
-        ? `Đã lập HĐ ${p.contract.contractNo} — việc tiếp: đính kèm hợp đồng đã ký`
+        ? `Đã lập HĐ ${p.contract.contractNo} — ${p.thenCreateOrder ? "đang mở Lập lệnh sản xuất; đính kèm hợp đồng đã ký sau ở hồ sơ HĐ" : "việc tiếp: đính kèm hợp đồng đã ký"}`
         : p.mode === "revise"
           ? `Đã ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo} — có hiệu lực ngay`
           : `Đã lưu sửa HĐ ${p.contract.contractNo}`) +
@@ -277,7 +279,11 @@ export default function ExportPlanningScreen() {
       }),
     );
     setContractForm(null);
-    if (p.mode === "create") {
+    if (p.mode === "create" && p.thenCreateOrder) {
+      // "Lưu & lập lệnh sản xuất" (ba-spec 48 LS1): sang Lệnh sản xuất, hộp lập lệnh chọn sẵn HĐ vừa lưu. Lịch xuất hàng
+      // tạo sau ở hồ sơ HĐ (Thao tác khác → Tạo lịch xuất hàng).
+      navigate(`/planning-production?new=1&contract=${encodeURIComponent(p.contract.id)}`);
+    } else if (p.mode === "create") {
       setParam({ contract: p.contract.id, shipment: "" });
       // NV19: HĐ mới ⇒ hỏi tạo lịch xuất hàng đi kèm (R39 dựng theo bản vừa lưu — `d` chưa kịp có HĐ này).
       if (can.create) {
@@ -986,6 +992,7 @@ export default function ExportPlanningScreen() {
         data={d}
         recordedBy={recordedBy}
         canSeePrice={can["view-price"]}
+        canCreateOrder={orderCan.create}
         onClose={() => setContractForm(null)}
         onSave={saveContract}
       />

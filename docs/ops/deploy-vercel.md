@@ -100,7 +100,7 @@ Không thao tác thêm. Mỗi branch/PR khác sinh **Preview deploy** riêng.
 Vì là SPA, tab mở cả ngày sẽ **kẹt bản cũ** cho tới khi người dùng tự tải lại — nguồn gây nhầm "đã deploy mà không thấy đổi". Cơ chế nhắc:
 
 - `vite.config.ts` tính `buildId` (ưu tiên `VERCEL_GIT_COMMIT_SHA`, local thì mốc thời gian) → **nhúng vào bundle** (`__BUILD_ID__`) **và** ghi ra `dist/version.json` (`{ "buildId": "…" }`).
-- `src/features/shared/UpdateBanner.tsx` poll `version.json` (lúc mở · mỗi 3 phút · khi quay lại tab), so với `__BUILD_ID__` bản đang chạy. Khác ⇒ hiện băng **"Đã có bản cập nhật mới — Tải lại ngay"** ở đầu vùng nội dung (AppShell).
+- `src/features/shared/UpdateBanner.tsx` poll `version.json` (lúc mở · mỗi 3 phút · khi quay lại tab), so với `__BUILD_ID__` bản đang chạy. Khác ⇒ **bật hộp giữa màn** "Đã có bản cập nhật mới" (Tải lại ngay · Để sau) — từ 2026-11-02, vì băng đầu trang kiểu cũ người dùng không để ý. "Để sau" ⇒ còn băng nhỏ ở đầu vùng nội dung (AppShell); hộp chỉ bật lại khi có bản mới HƠN nữa. Tải lại không mất phiếu gõ dở (form tự lưu nháp, quy tắc 17).
 - Chỉ có tác dụng cho các bản **từ bản này trở đi** (bản cũ chưa có cơ chế). Dev không sinh `version.json` ⇒ không báo nhầm.
 
 ## Custom domain (tùy chọn)

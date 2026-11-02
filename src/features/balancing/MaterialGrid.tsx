@@ -70,8 +70,10 @@ const PRICE_ROW_SUFFIX = "::price";
 const priceRowId = (rowId: string) => `${rowId}${PRICE_ROW_SUFFIX}`;
 /** Hàng "Giá (đ/kg)" THEO NGÀY (chỉ xem) dưới dòng sổ nhập ở bảng theo ngày — không có ở bảng chính. */
 const DAY_PRICE_ROW_SUFFIX = "::day-price";
-/** Bề rộng (px) cột bảng CHÍNH khối NL — gọn để A–L (NL · Xuất khẩu · Ghi chú) vừa một màn. */
-const MAIN_COLUMN_WIDTHS: Record<string, number> = { soLuong: 76, donGia: 84, thanhTien: 112, tyLe: 52 };
+/** Bề rộng (px) cột bảng CHÍNH khối NL — gọn để A–L (NL · Xuất khẩu · Ghi chú) vừa một màn.
+ *  Khung rộng ⇒ phần dư chia theo TỶ LỆ các số này: kế toán 2026-11-02 "nhỏ cái số lượng, to cái
+ *  số tiền" ⇒ Số lượng / Tỷ lệ nhẹ, T.tiền nặng (số kg ngắn, số tiền tới 13 ký tự). */
+const MAIN_COLUMN_WIDTHS: Record<string, number> = { soLuong: 60, donGia: 84, thanhTien: 160, tyLe: 44 };
 
 /** Cắt hậu tố size để gom "2 da lớn"/"2 da nhỏ" về một họ — CHỈ dùng cho nút Gộp,
     KHÔNG đổi `getMaterialFamily` (logic hút) để tránh đụng khớp họ khi hút. */

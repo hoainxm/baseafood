@@ -42,8 +42,9 @@ import { useCan } from "@/features/shared/PermissionProvider";
 
 /** Cột tiền của khối BTP — ẩn khi không có quyền `balancing.view-price`. */
 const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
-/** Bề rộng (px) cột bảng CHÍNH khối Xuất khẩu — gọn để A–L vừa một màn. */
-const MAIN_COLUMN_WIDTHS: Record<string, number> = { khach: 112, luong: 76, donGia: 80, thanhTien: 104 };
+/** Bề rộng (px) cột bảng CHÍNH khối Xuất khẩu — gọn để A–L vừa một màn. Phần dư chia theo tỷ lệ
+ *  ⇒ Lượng nhẹ, T.tiền nặng (kế toán 2026-11-02: "nhỏ cái số lượng, to cái số tiền"). */
+const MAIN_COLUMN_WIDTHS: Record<string, number> = { khach: 112, luong: 60, donGia: 80, thanhTien: 136 };
 import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react";
 
 export function WipGrid({

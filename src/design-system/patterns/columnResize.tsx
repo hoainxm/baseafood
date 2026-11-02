@@ -150,9 +150,11 @@ export function ColumnResizeHandle({
       title={`Kéo để đổi bề rộng cột ${label} · nhấp đúp để vừa nội dung`}
       // NẰM GỌN trong ô (không thò ra mép): thò ra dù 4px là bảng tưởng bị tràn ⇒ hiện thanh cuộn
       // ngang, thanh cuộn đòi bề rộng bằng bảng ⇒ khối Cân đối nở hết hàng, A–L vỡ hàng (lỗi 2026-10-19).
+      // Vạch nắm LUÔN hiện (mờ) ở mép phải tên cột: trong suốt thì không ai biết cột kéo được —
+      // kế toán 2026-11-02 hỏi "kéo to nhỏ được không" dù tính năng đã có từ 10-19.
       className={cn(
-        "absolute top-0 right-0 z-10 h-full w-2 cursor-col-resize touch-none select-none",
-        "after:absolute after:inset-y-1 after:right-0 after:w-0.5 after:rounded-full after:bg-transparent hover:after:bg-primary/60"
+        "absolute top-0 right-0 z-10 h-full w-2.5 cursor-col-resize touch-none select-none",
+        "after:absolute after:inset-y-2 after:right-0.5 after:w-1 after:rounded-full after:bg-muted-foreground/30 hover:after:bg-primary/70"
       )}
       onPointerDown={(e) => {
         const th = e.currentTarget.closest("th");

@@ -362,9 +362,10 @@ Luật khi dùng:
   `w-0 min-w-full` để không kéo khối rộng hơn bảng. Lưới thường đừng bật (cột tên hẹp làm
   tên dài gãy dòng).
 - **Kéo giãn cột kiểu Excel — prop `columnWidthsKey`** (2026-10-19, `patterns/columnResize.tsx`):
-  truyền khoá ỔN ĐỊNH tiếng Anh của bảng ⇒ mỗi tên cột có mép kéo ở cạnh phải: KÉO để đổi bề
+  truyền khoá ỔN ĐỊNH tiếng Anh của bảng ⇒ mỗi tên cột có mép kéo ở cạnh phải (vạch nắm mờ LUÔN
+  hiện — trong suốt thì người dùng không biết kéo được, 2026-11-02): KÉO để đổi bề
   rộng (thả tay mới lưu), NHẤP ĐÚP để vừa nội dung dài nhất, nút ↺ ở góc cột tên trả mọi cột
-  về mặc định. Nhớ theo MÁY (`lib/devicePrefs`, khoá `bsf.grid-column-widths.v1.<khoá bảng>`)
+  về mặc định. Nhớ theo MÁY (`lib/devicePrefs`, khoá `bsf.grid-column-widths.v2.<khoá bảng>`)
   — cài đặt trình bày, KHÔNG toast, không ghi sổ. Bắt đầu kéo ⇒ chốt bề rộng ĐANG THẤY của mọi
   cột (kéo một cột không làm cột khác nhảy); bảng đã chỉnh thì co theo tổng bề rộng (`w-max`).
   Cột cùng `GridColumn.widthKey` dùng chung bề rộng (VD mọi cột ngày `"day"` — kỳ khác ngày vẫn

@@ -101,6 +101,10 @@ Cảng xếp · cảng đích · loại container · tiền tệ · tài khoản
 ## Thông tin người bán trên chứng từ (ba-spec 67)
 
 Tên, địa chỉ (tiếng Anh, viết hoa), nơi lập, tên viết tắt ở chỗ ký và logo PDF / Word lấy từ **Tài liệu công ty → Thông tin công ty**; chưa có ⇒ giá trị đang in trên invoice 236/26. Tài khoản ngân hàng cũng quản lý ở đó (không còn ở tab Danh mục), invoice chọn một tài khoản như cũ.
+
+### Dòng hàng: gợi ý mặt hàng
+
+Gõ Tên hàng (như trên HĐ) hoặc Size xong ⇒ gợi ý Mặt hàng (danh mục) theo 3 bậc: tên hàng của khách (+ size) → dòng HĐ trước cùng tên (+ size; cùng khách, mới nhất thắng) → tên thương mại. Mỗi bậc thử **nguyên văn** rồi **gần đúng** (bỏ dấu, dấu câu, khoảng trắng, "gr" = "g"). Nhiều mặt hàng cùng khớp ⇒ không gợi ý. Dòng do app gợi ý ghi nguồn + "gần giống"; người dùng chọn tay thì app không đổi nữa (`suggestProductMatch`).
 ## 5. Ai được làm gì
 
 Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể khác). Admin luôn đủ quyền.

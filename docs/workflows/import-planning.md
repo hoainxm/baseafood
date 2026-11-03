@@ -100,6 +100,10 @@ sequenceDiagram
 - Thủ kho chỉ thấy lô nhập và ô ghi thực nhập, không thấy giá, hợp đồng, chứng từ (màn riêng của người chỉ có `import-plans.receiving`).
 - Hạn nhắc ở Việc của tôi: `DUE_OFFSET_DAYS` = 3 cho hai loại `import-missing-docs`, `import-awaiting-quantity`.
 
+
+### Dòng hàng: gợi ý mặt hàng
+
+Gõ tên hàng xong ⇒ gợi ý theo dòng HĐ nhập trước cùng tên (cùng NCC thắng, mới nhất) → tên tiếng Anh mặc định → tên mặt hàng; mỗi bậc nguyên văn rồi gần đúng (`suggestImportProductId`, `looseNameKey`). Ô Tên hàng hiện đủ tên dài.
 ## 5. Ai được làm gì
 
 Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể khác). Admin luôn đủ quyền.

@@ -185,6 +185,12 @@ export const exportPlanningGuide: PageGuide = {
           <li>Chuyến mới có tháng kế hoạch nằm ở mục <b>Chưa có ngày</b> cuối cột trái; ghi ngày đóng cont hoặc ETD thì chuyến tự vào lịch.</li>
         </GuideList>
       </GuideSection>
+      <GuideSection title="Dòng hàng: tên đầy đủ và gợi ý mặt hàng">
+        <GuideList>
+          <li><b>Tên hàng (như trên HĐ)</b> hiện đủ, ô tự xuống dòng — đối chiếu được với bản giấy. Ô <b>Mặt hàng (danh mục)</b> cũng hiện đủ tên.</li>
+          <li>Gõ tên (hoặc size) xong, app gợi ý mặt hàng theo tên hàng của khách → hợp đồng trước → tên thương mại; khớp cả khi khác hoa thường, dấu câu, khoảng trắng, "gr" với "g". Dòng nhắc dưới ô ghi gợi ý theo đâu, có phải tên gần giống không — kiểm lại.</li>
+        </GuideList>
+      </GuideSection>
       <GuideSection title="Sửa hợp đồng: sửa được gì, khóa khi nào">
         <GuideList>
           <li><b>Sửa hợp đồng</b> (sửa thẳng bản đang dùng): khi chưa chuyến nào có mã lô, booking, ngày, số cont hay file.</li>

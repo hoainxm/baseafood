@@ -941,6 +941,10 @@ Nhập khẩu (`MonthNav` — chỉ tháng), Nhập xuất tồn kho (kỳ = dan
 
 Hiện file Markdown của repo (sơ đồ `docs/workflows/`): khối ```mermaid vẽ thành sơ đồ (`mermaid` tải lười), bỏ dòng kỹ thuật frontmatter, link `<id>.md` ⇒ `linkFor(id)`. Bảng trong tài liệu cuộn ngang trong khung riêng (`.md-table`) — **ngoại lệ luật 14** vì là tài liệu đọc, không phải bảng nghiệp vụ. Chỉ dùng cho nội dung đóng gói lúc build, không cho chữ người dùng gõ.
 
+## Ô phải đọc HẾT để đối chiếu — không cắt chữ (từ 2026-11-03)
+
+Ô người dùng phải soát với bản giấy (tên hàng như trên HĐ, quy cách, yêu cầu vi sinh, ghi chú dòng): `Textarea rows={1} className="min-h-10"` — tự giãn theo chữ (`field-sizing-content`), tên hàng một hàng riêng trọn bề rộng; ô in lên chứng từ thì bỏ xuống dòng khi gõ / dán (`replace(/\n+/g, " ")`). Ô chọn danh mục mà tên dài: `Combobox wrapValue` — hiện trọn tên đang chọn (không "…").
+
 ## Animation & Loading → "Thinking"
 
 Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn ào*.

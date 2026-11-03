@@ -67,6 +67,7 @@ export function Combobox({
   canDelete,
   inline = false,
   className,
+  wrapValue = false,
 }: {
   label: string;
   value: string;
@@ -113,6 +114,8 @@ export function Combobox({
    */
   inline?: boolean;
   className?: string;
+  /** Hiện TRỌN chữ của mục đang chọn (xuống dòng, không cắt "…") — ô mà người dùng phải đọc hết để đối chiếu. */
+  wrapValue?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [searchText, setSearchText] = React.useState("");
@@ -185,11 +188,12 @@ export function Combobox({
               aria-required={required && !hideRequiredMark ? true : undefined}
               className={cn(
                 "h-10 min-w-0 flex-1 justify-between px-3 text-sm font-medium",
+                wrapValue && "h-auto min-h-10 py-2 text-left",
                 inline &&
                   "h-9 border-transparent bg-transparent px-2 shadow-none hover:border-input hover:bg-transparent aria-expanded:border-ring [&>svg]:opacity-0 hover:[&>svg]:opacity-100"
               )}
             >
-              <span className={cn("truncate", !selectedOption && "text-muted-foreground")}>
+              <span className={cn(wrapValue ? "whitespace-normal break-words" : "truncate", !selectedOption && "text-muted-foreground")}>
                 {selectedOption?.label ?? placeholder ?? usageHint}
               </span>
               <ChevronsUpDown className="shrink-0 text-muted-foreground" />

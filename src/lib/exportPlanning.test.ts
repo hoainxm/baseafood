@@ -1178,3 +1178,19 @@ describe("ba-spec 68 — nhật ký sửa hợp đồng", () => {
     expect(contractChangeSummary({ contract, revision: rev0 }, { contract, revision: copied }, () => "")).toHaveLength(0);
   });
 });
+
+describe("gợi ý mặt hàng gần đúng (2026-11-03)", () => {
+  it("khác dấu câu / khoảng trắng / gr-g / có dấu ⇒ vẫn gợi ý, đánh dấu gần giống; nguyên văn ⇒ không gần giống", async () => {
+    const { suggestProductMatch } = await import("./exportPlanning");
+    const { looseNameKey } = await import("./customerProductNames");
+    expect(looseNameKey("FROZEN Boiled Octopus cut 1-2 gr / pcs")).toBe(looseNameKey("frozen boiled octopus, cut 1-2g pc"));
+    expect(looseNameKey("Bạch tuộc luộc")).toBe("bach tuoc luoc");
+    const d = { contracts: [], revisions: [] };
+    const products = [{ id: "p1", tradeName: "Frozen boiled octopus cut 1-2g" }, { id: "p2", tradeName: "Frozen raw octopus tip" }];
+    expect(suggestProductMatch(d, "Frozen boiled octopus cut 1-2g", "k", products)).toEqual({ productId: "p1", source: "trade-name", loose: false });
+    expect(suggestProductMatch(d, "FROZEN BOILED OCTOPUS, CUT 1-2 GR", "k", products)).toEqual({ productId: "p1", source: "trade-name", loose: true });
+    expect(suggestProductMatch(d, "Octopus", "k", products)).toBeNull();
+    // Hai mặt hàng cùng khớp gần đúng ⇒ không đoán.
+    expect(suggestProductMatch(d, "frozen raw octopus, tip", "k", [...products, { id: "p3", tradeName: "Frozen raw octopus - tip" }])).toBeNull();
+  });
+});

@@ -440,13 +440,14 @@ export function ContractFormDialog({
                     {/* Bọc div: Field đẩy ô xuống đáy ô lưới (mt-auto) — dòng gợi ý dưới ô Mặt hàng sẽ làm lệch hai ô. */}
                     <div className="min-w-0 self-start">
                       <Field label="Tên hàng (như trên hợp đồng)" required>
-                        <Input value={l.productName} onChange={(e) => setLine(l.id, { productName: e.target.value })} onBlur={() => suggestFor(l.id)} aria-required />
+                        <Textarea rows={1} className="min-h-10" value={l.productName} onChange={(e) => setLine(l.id, { productName: e.target.value.replace(/\n+/g, " ") })} onBlur={() => suggestFor(l.id)} aria-required />
                       </Field>
                     </div>
                     {canLink ? (
                       <div className="grid min-w-0 gap-1">
                         <Combobox
                           label="Mặt hàng (danh mục)"
+                          wrapValue
                           value={l.productId}
                           onChange={(v) => {
                             // R21: ô tên hàng còn trống ⇒ điền tên tiếng Anh mặc định (không có thì tên mặt hàng).

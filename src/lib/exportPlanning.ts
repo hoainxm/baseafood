@@ -34,7 +34,7 @@ import type {
   Product,
   CustomerProductName,
 } from "@/types";
-import { extractCustomerNames, nameKey, productsByCustomerName } from "./customerProductNames";
+import { extractCustomerNames, looseNameKey, nameKey, productsByCustomerName } from "./customerProductNames";
 
 /* ---------- Đính kèm hồ sơ HĐ (bước Đính kèm, mig 0079) ---------- */
 
@@ -755,6 +755,59 @@ export interface LineMatchContext {
  * (1) tên của khách khớp tên + size · (2) tên của khách khớp tên · (3) lịch sử nối ở HĐ trước
  * (cùng khách trước, rồi bản mới nhất) · (4) tên tiếng Anh mặc định khớp. Không dịch máy.
  */
+/** Nguồn của gợi ý mặt hàng — để người dùng biết vì sao app chọn (soát lại khi "gần giống"). */
+export type ProductMatchSource = "customer-name" | "previous-contract" | "trade-name";
+export interface ProductMatch {
+  productId: string;
+  source: ProductMatchSource;
+  /** Khớp theo khóa GẦN ĐÚNG (bỏ dấu, dấu câu, "gr" = "g"…) chứ không trùng nguyên văn. */
+  loose: boolean;
+}
+
+export const PRODUCT_MATCH_SOURCE_LABELS: Record<ProductMatchSource, string> = {
+  "customer-name": "tên hàng của khách",
+  "previous-contract": "hợp đồng trước",
+  "trade-name": "tên thương mại của mặt hàng",
+};
+
+/**
+ * Gợi ý mặt hàng cho một dòng HĐ: (1) tên hàng của khách (+ size) → (2) dòng HĐ trước cùng tên (+ size), ưu tiên cùng
+ * khách, mới nhất → (3) tên thương mại. Mỗi bậc thử nguyên văn trước (`nameKey`), rồi gần đúng (`looseNameKey`).
+ * Nhiều mặt hàng cùng khớp ở một bậc ⇒ không đoán (null).
+ */
+export function suggestProductMatch(
+  d: Pick<ExportData, "contracts" | "revisions">,
+  description: string,
+  customerId: string,
+  products: readonly Pick<Product, "id" | "tradeName">[] = [],
+  ctx: LineMatchContext = {},
+): ProductMatch | null {
+  if (!nameKey(description)) return null;
+  for (const [keyOf, loose] of [[nameKey, false], [looseNameKey, true]] as const) {
+    const key = keyOf(description);
+    const byCustomer = productsByCustomerName(ctx.names ?? [], customerId, description, ctx.size ?? "", keyOf);
+    if (byCustomer.productIds.length === 1) return { productId: byCustomer.productIds[0], source: "customer-name", loose };
+    if (byCustomer.productIds.length > 1) return null;
+    const customerOf = new Map(d.contracts.map((c) => [c.id, c.customerId]));
+    let best: { productId: string; score: number; at: string } | null = null;
+    const lineSize = keyOf(ctx.size ?? "");
+    for (const r of d.revisions) {
+      for (const l of r.lines) {
+        if (!l.productId || keyOf(l.description) !== key) continue;
+        // Cùng tên khác size ⇒ thường là mặt hàng khác (iwadako 5-5.5 gr ≠ 6-7 gr) — không lấy làm gợi ý.
+        if (lineSize && keyOf(l.size) && keyOf(l.size) !== lineSize) continue;
+        const score = customerOf.get(r.contractId) === customerId ? 1 : 0;
+        if (!best || score > best.score || (score === best.score && r.createdAt > best.at)) best = { productId: l.productId, score, at: r.createdAt };
+      }
+    }
+    if (best) return { productId: best.productId, source: "previous-contract", loose };
+    const byTrade = products.filter((p) => keyOf(p.tradeName) === key);
+    if (byTrade.length === 1) return { productId: byTrade[0].id, source: "trade-name", loose };
+    if (byTrade.length > 1) return null;
+  }
+  return null;
+}
+
 export function suggestProductId(
   d: Pick<ExportData, "contracts" | "revisions">,
   description: string,
@@ -762,26 +815,7 @@ export function suggestProductId(
   products: readonly Pick<Product, "id" | "tradeName">[] = [],
   ctx: LineMatchContext = {},
 ): string {
-  const key = nameKey(description);
-  if (!key) return "";
-  const byCustomer = productsByCustomerName(ctx.names ?? [], customerId, description, ctx.size ?? "");
-  if (byCustomer.productIds.length === 1) return byCustomer.productIds[0];
-  if (byCustomer.productIds.length > 1) return "";
-  const customerOf = new Map(d.contracts.map((c) => [c.id, c.customerId]));
-  let best: { productId: string; score: number; at: string } | null = null;
-  const lineSize = nameKey(ctx.size ?? "");
-  for (const r of d.revisions) {
-    for (const l of r.lines) {
-      if (!l.productId || nameKey(l.description) !== key) continue;
-      // Cùng tên khác size ⇒ thường là mặt hàng khác (iwadako 5-5.5 gr ≠ 6-7 gr) — không lấy làm gợi ý.
-      if (lineSize && nameKey(l.size) && nameKey(l.size) !== lineSize) continue;
-      const score = customerOf.get(r.contractId) === customerId ? 1 : 0;
-      if (!best || score > best.score || (score === best.score && r.createdAt > best.at)) best = { productId: l.productId, score, at: r.createdAt };
-    }
-  }
-  if (best) return best.productId;
-  const byTrade = productsByTradeName(description, products);
-  return byTrade.length === 1 ? byTrade[0].id : "";
+  return suggestProductMatch(d, description, customerId, products, ctx)?.productId ?? "";
 }
 
 /**

@@ -3,6 +3,7 @@
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (2026-11-03 tên hàng) — phiếu HĐ phần 4: Tên hàng một hàng riêng (Textarea tự giãn); hàng dưới Mặt hàng (Combobox `wrapValue` — hiện đủ tên) · Size · Loại hàng · Quy cách (Textarea). -->
 <!-- updated: 2026-11-03 (ba-spec 69) — form HĐ mục 2: ô ngày **Hạn hợp đồng** ngay sau Hạn giao muộn nhất (hint = câu nhắc lệch hạn giao khi có); hồ sơ HĐ: dòng "Hạn hợp đồng" ở khối tóm tắt + khối điều khoản (ngày · Còn n ngày / Đã hết hạn · Chưa ghi). -->
 <!-- updated: 2026-11-03 (ba-spec 68) — hộp Ghi bản sửa / Sửa: ô Số hợp đồng không còn chỉ đọc; đổi số ⇒ dòng nhắc "nhật ký ghi số cũ → mới" dưới ô (ba-spec 68). -->
 <!-- updated: 2026-11-03 (đọc file HĐ, ba-spec 66) — hộp Lập / Sửa / Ghi bản sửa HĐ có khối **Đọc file hợp đồng** ĐẦU phiếu, trước mục 1 (`ContractReadPanel`, mốc tour `export-contract-read`): chọn file .docx / PDF → câu "Đọc từ …", số ô đã điền, khung vàng "Ô đang có giá trị khác file" (mỗi dòng nút ghost Dùng giá trị file + nút Dùng hết), khung vàng "Chỗ cần xem lại"; lựa chọn 2 ô "Đính vào hợp đồng khi Lưu" / "Chỉ để đọc". Không toast. -->

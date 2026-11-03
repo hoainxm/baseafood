@@ -133,7 +133,7 @@ export const importPlanningGuide: PageGuide = {
           <li>
             Mỗi dòng hàng nối <b>một mặt hàng</b> ở Danh mục → Mặt hàng, để Nhập khẩu, sản xuất, kho và Xuất khẩu gọi cùng một tên. Tên như trên hợp đồng giữ nguyên.
           </li>
-          <li>App tự gợi ý khi tên đó đã nối ở hợp đồng nhập trước, hoặc trùng tên tiếng Anh của đúng một mặt hàng. Gợi ý thì kiểm lại. Chưa có thì gõ tên để thêm mới ngay trong ô.</li>
+          <li>App tự gợi ý khi tên đó đã nối ở hợp đồng nhập trước, hoặc trùng tên tiếng Anh của đúng một mặt hàng — khớp cả khi khác hoa thường, dấu câu, khoảng trắng, "gr" với "g". Gợi ý thì kiểm lại. Chưa có thì gõ tên để thêm mới ngay trong ô. Ô Tên hàng hiện đủ tên dài (nhiều dòng) để đối chiếu.</li>
           <li>
             Dòng chưa nối hiện <b>Chưa nối</b>: vẫn ghi lần nhập được, nhưng <b>chưa đóng được</b> hợp đồng. Nối ở Thao tác khác → Sửa hợp đồng, kể cả hợp đồng đã đóng.
           </li>

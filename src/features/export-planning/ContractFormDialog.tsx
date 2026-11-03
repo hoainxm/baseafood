@@ -43,6 +43,9 @@ import {
   lineKg,
   rankProductsForLine,
   suggestProductId,
+  suggestProductMatch,
+  PRODUCT_MATCH_SOURCE_LABELS,
+  type ProductMatch,
   unmappedLines,
   validateContract,
   formSchedule,
@@ -240,7 +243,8 @@ export function ContractFormDialog({
   const optionPicker = useExportOptionPicker();
   const kindPicker = useDocumentKindPicker(documentKindSource);
   /** Dòng vừa được tự gợi ý mặt hàng (chỉ để hiện dòng nhắc "kiểm lại", không lưu). */
-  const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
+  // Dòng app tự gợi ý mặt hàng (+ nguồn, gần giống hay không) — người dùng chọn tay thì bỏ khỏi đây.
+  const [suggestedLines, setSuggestedLines] = useState<Map<string, ProductMatch>>(new Map());
   /**
    * Ô chọn mặt hàng của một dòng (R23 v6): mục khớp tên của khách / tên mặc định đứng đầu; dòng phụ =
    * mã · tên của khách (chưa có thì tên mặc định) ⇒ gõ tên tiếng Anh tìm được.
@@ -260,15 +264,24 @@ export function ContractFormDialog({
     return m.id;
   };
   /** Rời ô tên tiếng Anh: dòng chưa nối mà tên đã từng nối ở HĐ trước ⇒ điền sẵn mặt hàng đó. */
+  /** Gợi ý mặt hàng khi rời ô Tên hàng / Size: dòng chưa nối, hoặc nối do app gợi ý (gõ size sau ⇒ gợi ý lại cho đúng size). */
   const suggestFor = (lineId: string) => {
     setForm((f) => {
       if (!f) return f;
       const l = f.lines.find((x) => x.id === lineId);
-      if (!l || l.productId || !l.description.trim()) return f;
-      const pid = suggestProductId(data, l.description, f.customerId, products, { size: l.size, names: customerNames });
-      if (!pid || !products.some((p) => p.id === pid)) return f;
-      setSuggestedLines((s) => new Set(s).add(lineId));
-      return { ...f, lines: f.lines.map((x) => (x.id === lineId ? { ...x, productId: pid } : x)) };
+      if (!l || !l.description.trim()) return f;
+      const auto = suggestedLines.has(lineId);
+      if (l.productId && !auto) return f;
+      const m = suggestProductMatch(data, l.description, f.customerId, products, { size: l.size, names: customerNames });
+      const pid = m && products.some((p) => p.id === m.productId) ? m.productId : "";
+      setSuggestedLines((s) => {
+        const n = new Map(s);
+        if (pid && m) n.set(lineId, m);
+        else n.delete(lineId);
+        return n;
+      });
+      if (!pid && !auto) return f;
+      return { ...f, lines: f.lines.map((x) => (x.id === lineId ? { ...x, productId: pid || undefined } : x)) };
     });
   };
 
@@ -762,15 +775,24 @@ export function ContractFormDialog({
                         Bỏ dòng
                       </Button>
                     </div>
+                    {/* Tên hàng một hàng riêng, ô tự giãn theo chữ — đọc HẾT tên như trên HĐ để đối chiếu (2026-11-03). */}
+                    <Field label="Tên hàng (như trên HĐ)" required>
+                      <Textarea
+                        rows={1}
+                        className="min-h-10"
+                        value={l.description}
+                        onChange={(e) => setLine(l.id, { description: e.target.value.replace(/\n+/g, " ") })}
+                        onBlur={() => suggestFor(l.id)}
+                        aria-required
+                      />
+                    </Field>
                     <div
-                      className={`grid gap-3 sm:grid-cols-2 ${goodsPicker.isAvailable ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_minmax(0,1.1fr)]" : "lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_minmax(0,0.9fr)_minmax(0,1.2fr)]"}`}
+                      className={`grid gap-3 sm:grid-cols-2 ${goodsPicker.isAvailable ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)]" : "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.6fr)]"}`}
                     >
-                      <Field label="Tên hàng (như trên HĐ)" required>
-                        <Input value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} onBlur={() => suggestFor(l.id)} aria-required />
-                      </Field>
                       <div className="grid min-w-0 gap-1">
                         <Combobox
                           label="Mặt hàng (danh mục)"
+                          wrapValue
                           value={l.productId ?? ""}
                           onChange={(v) => {
                             // R23: tên hàng còn trống ⇒ điền tên thương mại của mặt hàng vừa chọn.
@@ -780,7 +802,7 @@ export function ContractFormDialog({
                               ...(v ? lineTextAfterPick(l, products.find((p) => p.id === v), findCustomerName(customerNames, form.customerId, v)) : {}),
                             });
                             setSuggestedLines((s) => {
-                              const n = new Set(s);
+                              const n = new Map(s);
                               n.delete(l.id);
                               return n;
                             });
@@ -792,10 +814,15 @@ export function ContractFormDialog({
                           canEdit={productEditor.canEdit}
                           editLabel={productEditor.editLabel}
                         />
-                        {suggestedLines.has(l.id) && <span className="text-sm text-muted-foreground">Gợi ý theo tên hàng của khách / HĐ trước — kiểm lại.</span>}
+                        {suggestedLines.has(l.id) && (
+                          <span className="text-sm text-muted-foreground">
+                            Gợi ý theo {PRODUCT_MATCH_SOURCE_LABELS[(suggestedLines.get(l.id) as ProductMatch).source]}
+                            {(suggestedLines.get(l.id) as ProductMatch).loose ? " (tên gần giống, không trùng nguyên văn)" : ""} — kiểm lại.
+                          </span>
+                        )}
                       </div>
                       <Field label="Size">
-                        <Input value={l.size} onChange={(e) => setLine(l.id, { size: e.target.value })} />
+                        <Input value={l.size} onChange={(e) => setLine(l.id, { size: e.target.value })} onBlur={() => suggestFor(l.id)} />
                       </Field>
                       {goodsPicker.isAvailable && (
                         <div data-tour={i === 0 ? "export-line-goods-type" : undefined} className="min-w-0">
@@ -813,7 +840,7 @@ export function ContractFormDialog({
                         </div>
                       )}
                       <Field label="Quy cách đóng gói">
-                        <Input value={l.packing} onChange={(e) => setLine(l.id, { packing: e.target.value })} />
+                        <Textarea rows={1} className="min-h-10" value={l.packing} onChange={(e) => setLine(l.id, { packing: e.target.value.replace(/\n+/g, " ") })} />
                       </Field>
                     </div>
                     <div
@@ -852,7 +879,7 @@ export function ContractFormDialog({
                         <Input value={l.piecesPerKg ?? ""} onChange={(e) => setLine(l.id, { piecesPerKg: e.target.value || undefined })} />
                       </Field>
                       <Field label="Ghi chú dòng" className="sm:col-span-3 lg:col-span-1">
-                        <Input value={l.note ?? ""} onChange={(e) => setLine(l.id, { note: e.target.value || undefined })} />
+                        <Textarea rows={1} className="min-h-10" value={l.note ?? ""} onChange={(e) => setLine(l.id, { note: e.target.value || undefined })} />
                       </Field>
                     </div>
                     {isOpen ? (
@@ -861,7 +888,7 @@ export function ContractFormDialog({
                           <Input value={l.hsCode} onChange={(e) => setLine(l.id, { hsCode: e.target.value })} />
                         </Field>
                         <Field label="Yêu cầu vi sinh / kỹ thuật">
-                          <Input value={l.microSpec} onChange={(e) => setLine(l.id, { microSpec: e.target.value })} />
+                          <Textarea rows={1} className="min-h-10" value={l.microSpec} onChange={(e) => setLine(l.id, { microSpec: e.target.value })} />
                         </Field>
                       </div>
                     ) : (

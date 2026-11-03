@@ -12,6 +12,23 @@ import type { CustomerProductName, ExportContractLine, Product } from "@/types";
 /** So tên / size: không phân hoa thường, gộp khoảng trắng (A11). */
 export const nameKey = (v: string | undefined | null) => (v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
+/**
+ * Khóa so GẦN ĐÚNG cho gợi ý mặt hàng (2026-11-03): bỏ dấu, bỏ dấu câu, "1-2 g" = "1-2g" = "1-2 gr", "pcs"/"pc".
+ * Chỉ dùng để GỢI Ý (người dùng vẫn soát) — tên hàng lưu nguyên văn như trên HĐ.
+ */
+export const looseNameKey = (v: string | undefined | null) =>
+  (v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/gi, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, " ")
+    .replace(/(\d)\s+(?=[a-z])/g, "$1")
+    .replace(/(\d)(grams?|grs?)\b/g, "$1g")
+    .replace(/\bpcs\b/g, "pc")
+    .replace(/\s+/g, " ")
+    .trim();
+
 export function namesOfCustomer<N extends Pick<CustomerProductName, "customerId">>(names: readonly N[], customerId: string): N[] {
   return customerId ? names.filter((n) => n.customerId === customerId) : [];
 }
@@ -53,18 +70,19 @@ export function productsByCustomerName(
   customerId: string,
   description: string,
   size = "",
+  keyOf: (v: string | undefined | null) => string = nameKey,
 ): { tier: 1 | 2 | null; productIds: string[] } {
-  const key = nameKey(description);
+  const key = keyOf(description);
   if (!key || !customerId) return { tier: null, productIds: [] };
-  const mine = namesOfCustomer(names, customerId).filter((n) => nameKey(n.tradeName) === key);
-  const sizeKey = nameKey(size);
+  const mine = namesOfCustomer(names, customerId).filter((n) => keyOf(n.tradeName) === key);
+  const sizeKey = keyOf(size);
   if (sizeKey) {
-    const bySize = [...new Set(mine.filter((n) => nameKey(n.sizeText) === sizeKey).map((n) => n.productId))];
+    const bySize = [...new Set(mine.filter((n) => keyOf(n.sizeText) === sizeKey).map((n) => n.productId))];
     if (bySize.length) return { tier: 1, productIds: bySize };
   }
   // Bậc 2 (khớp tên): dòng có size mà dòng tên của khách ghi size KHÁC ⇒ không phải mặt hàng đó
   // (VD tên chỉ có size 5-5.5 gr, dòng HĐ size 6-7 gr) — chỉ nhận dòng tên không ghi size.
-  const byName = [...new Set(mine.filter((n) => !sizeKey || !nameKey(n.sizeText)).map((n) => n.productId))];
+  const byName = [...new Set(mine.filter((n) => !sizeKey || !keyOf(n.sizeText)).map((n) => n.productId))];
   return byName.length ? { tier: 2, productIds: byName } : { tier: null, productIds: [] };
 }
 

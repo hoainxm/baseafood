@@ -7,6 +7,7 @@
 // ============================================================
 // Oracle: docs/app-map/45-import-planning.ba-spec.md (R1…R22, AC-3…AC-18, AC-25…AC-33). Hàm THUẦN — màn chỉ
 // gọi, không tự tính lại. Đổi luật ⇒ sửa test cùng thư mục (importPlanning.test.ts).
+import { looseNameKey } from "./customerProductNames";
 import type {
   ImportContract,
   ImportContractLine,
@@ -136,24 +137,28 @@ export function suggestImportProductId(
   products: readonly ImportProductRef[],
   excludeContractId = "",
 ): string {
-  const key = nameKey(productName);
-  if (!key) return "";
-  const known = new Set(products.map((p) => p.id));
-  const contractOf = new Map(d.contracts.map((c) => [c.id, c]));
-  let best: { productId: string; score: number; at: string } | null = null;
-  for (const l of d.lines) {
-    if (!l.productId || !known.has(l.productId) || l.contractId === excludeContractId || nameKey(l.productName) !== key) continue;
-    const c = contractOf.get(l.contractId);
-    if (!c || c.status === "cancelled") continue;
-    const score = supplierId && c.supplierId === supplierId ? 1 : 0;
-    const at = c.signedDate || c.createdAt;
-    if (!best || score > best.score || (score === best.score && at > best.at)) best = { productId: l.productId, score, at };
+  if (!nameKey(productName)) return "";
+  // Nguyên văn trước, rồi GẦN ĐÚNG (bỏ dấu, dấu câu, "gr" = "g"…) — như gợi ý của Xuất khẩu (2026-11-03).
+  for (const keyOf of [nameKey, looseNameKey]) {
+    const key = keyOf(productName);
+    const known = new Set(products.map((p) => p.id));
+    const contractOf = new Map(d.contracts.map((c) => [c.id, c]));
+    let best: { productId: string; score: number; at: string } | null = null;
+    for (const l of d.lines) {
+      if (!l.productId || !known.has(l.productId) || l.contractId === excludeContractId || keyOf(l.productName) !== key) continue;
+      const c = contractOf.get(l.contractId);
+      if (!c || c.status === "cancelled") continue;
+      const score = supplierId && c.supplierId === supplierId ? 1 : 0;
+      const at = c.signedDate || c.createdAt;
+      if (!best || score > best.score || (score === best.score && at > best.at)) best = { productId: l.productId, score, at };
+    }
+    if (best) return best.productId;
+    const byTrade = products.filter((p) => keyOf(p.tradeName) === key);
+    if (byTrade.length) return byTrade.length === 1 ? byTrade[0].id : "";
+    const byName = products.filter((p) => keyOf(p.name) === key);
+    if (byName.length) return byName.length === 1 ? byName[0].id : "";
   }
-  if (best) return best.productId;
-  const byTrade = products.filter((p) => nameKey(p.tradeName) === key);
-  if (byTrade.length) return byTrade.length === 1 ? byTrade[0].id : "";
-  const byName = products.filter((p) => nameKey(p.name) === key);
-  return byName.length === 1 ? byName[0].id : "";
+  return "";
 }
 
 /** Chọn mặt hàng khi ô tên hàng còn trống ⇒ tên tiếng Anh mặc định, không có thì tên mặt hàng (R21). */

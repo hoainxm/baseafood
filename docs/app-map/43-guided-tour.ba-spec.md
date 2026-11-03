@@ -3,6 +3,7 @@
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (b) — hộp "?" to hơn (người dùng: "ngang còn hơi ngắn"): `FormDialog size="full"` rộng tối đa 90rem, nội dung 2 cột từ lg, mục không bị cắt giữa cột; điện thoại giữ 1 cột. Nội dung hướng dẫn không đổi. -->
 <!-- updated: 2026-11-03 — tour Xuất khẩu + hộp "?" đổi lời về số thực đóng (đóng cont điền không chờ Kế hoạch, chứng từ kế thừa); tour Tổng quan "Bốn thẻ số của kỳ"; tour Việc của tôi bỏ mô tả 2 thẻ đã bỏ; tour Bán hàng bước thẻ số tùy chọn; tour NXT kho các bước nút phụ tùy chọn (điện thoại nằm trong "Thêm"). -->
 <!-- updated: 2026-11-03 — rà UX đợt 1: tour Kho dự trữ (chờ nhập → duyệt → lọc → thẻ số → bảng, bỏ nhãn thẻ "Chờ nhập"), Việc của tôi (lọc → thẻ số), Tổng quan + các sổ có kỳ (nhãn "Kỳ xem", nút ‹ ›), Nhập hàng / Sản xuất (tên tab không emoji). Test thứ tự sửa theo. -->
 ttl_days: 90

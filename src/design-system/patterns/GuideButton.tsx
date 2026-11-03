@@ -40,7 +40,8 @@ export function GuideButton({
       title={`Hướng dẫn: ${title}`}
       description={description}
       icon={HelpCircle}
-      size="lg"
+      // Rộng gần trọn màn + 2 cột từ lg (người dùng 2026-11-03: "to hơn, xem được nhiều hơn một lúc, ngang còn ngắn").
+      size="full"
       footer={<CloseButton>Đã hiểu</CloseButton>}
       trigger={
         <button
@@ -76,7 +77,8 @@ export function GuideButton({
             </Button>
           </div>
         )}
-        {children}
+        {/* Mỗi mục (GuideSection) giữ nguyên một khối, không bị cắt ngang giữa hai cột. */}
+        <div className="lg:columns-2 lg:gap-10 [&>*]:mb-5 [&>*]:break-inside-avoid [&>*:last-child]:mb-0">{children}</div>
       </div>
     </FormDialog>
   );

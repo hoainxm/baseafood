@@ -29,6 +29,7 @@ const WIDTHS = {
   md: "sm:max-w-xl", // ~36rem
   lg: "sm:max-w-3xl", // ~48rem — mặc định form
   xl: "sm:max-w-5xl", // ~64rem — nhiều cột / bảng / chart
+  full: "sm:max-w-[min(90rem,calc(100vw-2rem))]", // gần trọn màn — hộp đọc dài (Hướng dẫn "?", 2 cột từ lg)
 } as const satisfies Record<string, string>;
 
 export function FormDialog({

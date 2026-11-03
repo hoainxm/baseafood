@@ -1070,6 +1070,8 @@ ngược lên thư mục cha và đụng junction tương thích cũ bị khóa 
 
 ## Hướng dẫn thao tác — tour từng bước trên trang (`GuidedTour`, từ 2026-10-21)
 
+> Hộp "?" (`GuideButton`, từ 2026-11-03): `FormDialog size="full"` — rộng gần trọn màn (tối đa 90rem), nội dung 2 cột từ `lg`, mỗi `GuideSection` không bị cắt giữa hai cột; điện thoại 1 cột.
+
 Dẫn người dùng đi lần lượt từng khu vực của trang theo thứ tự công việc, ngay trên trang thật. Hành vi (oracle): [`docs/app-map/43-guided-tour.ba-spec.md`](../../docs/app-map/43-guided-tour.ba-spec.md). Áp dụng đầu tiên: Xuất khẩu; **từ 2026-10-22 BẮT BUỘC cho mọi trang nghiệp vụ có route, kể cả trang mới về sau (CLAUDE.md quy tắc 18)** — mỗi trang có tour + hộp "?" (`PAGE_GUIDES`).
 
 - **Tour chỉ dẫn, không ghi** (R1): lớp phủ chặn mọi cú bấm lên trang; bước chỉ được đổi CHỖ XEM (đường dẫn, `replace`). Cấm bước tự bấm nút lưu / mở hộp form.

@@ -103,14 +103,14 @@ export function LoadingView({
                   </div>
                 </div>
                 <FileList files={[...plans, ...photos]} onPreview={onPreview} caption={label} />
-                {goodsOf(s).length > 0 && (
+                {(goodsOf(s).length > 0 || canCount) && (
                   <div className="grid min-w-0 gap-2 rounded-lg border border-border px-3 py-1">
                     {goodsOf(s).map((l) => (
                       <ShipmentLineSummary key={l.id} line={l} />
                     ))}
                     <p className="tnum pb-2 text-sm">{loadingCountText(goodsOf(s))}</p>
                     {canCount && (
-                      <Button variant={loadingCountSummary(goodsOf(s)).filledCount ? "edit" : "default"} className="mb-2" onClick={() => onCount(s)} title="Đóng cont xong: ghi số kiện thực đã đóng của từng dòng hàng.">
+                      <Button variant={loadingCountSummary(goodsOf(s)).filledCount ? "edit" : "default"} className="mb-2" onClick={() => onCount(s)} title="Đóng cont xong: ghi số kiện thực đã đóng của từng dòng hàng (lấy từ dòng hàng của hợp đồng nếu chuyến chưa có hàng).">
                         <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
                         {loadingCountSummary(goodsOf(s)).filledCount ? "Sửa số thực đóng" : "Điền số thực đóng"}
                       </Button>

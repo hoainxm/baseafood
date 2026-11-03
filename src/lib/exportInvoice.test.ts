@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { ExportContractLine, ExportShipmentLine } from "@/types";
 import {
   addressLines,
+  applyLoadingCounts,
+  isDraftLoadingLine,
+  loadingCountRows,
   amountInWords,
   bankBlockLines,
   buildInvoiceDocument,
@@ -101,7 +104,7 @@ describe("exportInvoice — dòng hàng của chuyến", () => {
   });
 
   it("tổng số thực đóng: đủ khi mọi dòng có số; lệch = thực đóng − kế hoạch", () => {
-    expect(loadingCountSummary(kaiseiLines)).toEqual({ lineCount: 2, filledCount: 2, plannedUnits: 661, loadedUnits: 658, complete: true, diffUnits: -3 });
+    expect(loadingCountSummary(kaiseiLines)).toEqual({ lineCount: 2, filledCount: 2, plannedUnits: 661, loadedUnits: 658, complete: true, diffUnits: -3, unplannedCount: 0 });
     const half = loadingCountSummary([kaiseiLines[0], { ...kaiseiLines[1], loadedUnits: null }]);
     expect(half.complete).toBe(false);
     expect(half.filledCount).toBe(1);
@@ -224,5 +227,33 @@ describe("exportInvoiceExcel — file .xlsx", () => {
     const totalRow = doc.sheets[0].rows.findIndex((r) => r.role === "total") + 1;
     expect(ws?.getRow(totalRow).getCell(6).value).toBe(42442);
     expect(ws?.getRow(totalRow).getCell(3).value).toBe(658);
+  });
+});
+
+describe("đóng cont tự điền số thực đóng (feedback 2026-11-03, mig 0098)", () => {
+  const cls = [contractLine({ id: "cl1", description: "CRAB" }), contractLine({ id: "cl2", description: "OCTOPUS" })];
+  it("chuyến chưa có hàng ⇒ mỗi dòng HĐ một dòng tạm; dòng đã có không nhân đôi", () => {
+    const empty = loadingCountRows([], cls, { shipmentId: "s1", contractId: "c1" });
+    expect(empty.map((l) => l.id)).toEqual(["draft:cl1", "draft:cl2"]);
+    expect(empty.every((l) => isDraftLoadingLine(l) && l.plannedUnits == null && l.loadedUnits == null)).toBe(true);
+    const some = loadingCountRows([line({ id: "l1", contractLineId: "cl1", plannedUnits: 100, sortOrder: 10 })], cls, { shipmentId: "s1", contractId: "c1" });
+    expect(some.map((l) => l.id)).toEqual(["l1", "draft:cl2"]);
+    expect(some[1].sortOrder).toBe(11);
+  });
+  it("lưu: dòng tạm có số ⇒ dòng mới id thật, không kế hoạch; dòng tạm trống ⇒ bỏ; dòng cũ không đổi ⇒ không ghi", () => {
+    const rows = loadingCountRows([line({ id: "l1", contractLineId: "cl1", plannedUnits: 100, loadedUnits: 98 })], cls, { shipmentId: "s1", contractId: "c1" });
+    let n = 0;
+    const ctx = { by: "Kho", at: "2026-11-03T10:00:00Z", newId: () => `new${++n}` };
+    expect(applyLoadingCounts(rows, { l1: 98, "draft:cl2": null }, ctx)).toEqual([]);
+    const out = applyLoadingCounts(rows, { l1: 97, "draft:cl2": 40 }, ctx);
+    expect(out.map((l) => [l.id, l.loadedUnits, l.plannedUnits, l.loadedBy])).toEqual([
+      ["l1", 97, 100, "Kho"],
+      ["new1", 40, null, "Kho"],
+    ]);
+    expect(out[1]).toMatchObject({ contractLineId: "cl2", contractId: "c1", shipmentId: "s1", description: "OCTOPUS", note: "", expiry: "", grossKgPerUnit: null });
+  });
+  it("tóm tắt: dòng không kế hoạch không bị tính là thừa", () => {
+    const s = loadingCountSummary([line({ id: "a", plannedUnits: 100, loadedUnits: 98 }), line({ id: "b", plannedUnits: null, loadedUnits: 40 })]);
+    expect(s).toMatchObject({ filledCount: 2, loadedUnits: 138, diffUnits: -2, unplannedCount: 1, complete: true });
   });
 });

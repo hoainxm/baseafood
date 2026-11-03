@@ -91,8 +91,10 @@ export interface LoadingCountSummary {
   loadedUnits: number;
   /** Mọi dòng đã có số thực đóng (và có ≥ 1 dòng). */
   complete: boolean;
-  /** Σ thực đóng − Σ kế hoạch của các dòng đã điền (0 = khớp). */
+  /** Σ thực đóng − Σ kế hoạch của các dòng đã điền CÓ kế hoạch (0 = khớp). */
   diffUnits: number;
+  /** Dòng đã điền mà không có số kế hoạch (đóng cont tự tạo từ dòng HĐ — mig 0098) ⇒ không so kế hoạch. */
+  unplannedCount: number;
 }
 
 export function loadingCountSummary(lines: readonly ExportShipmentLine[]): LoadingCountSummary {
@@ -100,15 +102,67 @@ export function loadingCountSummary(lines: readonly ExportShipmentLine[]): Loadi
   let loaded = 0;
   let filled = 0;
   let diff = 0;
+  let unplanned = 0;
   for (const l of lines) {
     planned += l.plannedUnits ?? 0;
     if (l.loadedUnits != null) {
       filled += 1;
       loaded += l.loadedUnits;
-      diff += l.loadedUnits - (l.plannedUnits ?? 0);
+      if (l.plannedUnits != null) diff += l.loadedUnits - l.plannedUnits;
+      else unplanned += 1;
     }
   }
-  return { lineCount: lines.length, filledCount: filled, plannedUnits: planned, loadedUnits: loaded, complete: lines.length > 0 && filled === lines.length, diffUnits: round(diff, 3) };
+  return {
+    lineCount: lines.length,
+    filledCount: filled,
+    plannedUnits: planned,
+    loadedUnits: loaded,
+    complete: lines.length > 0 && filled === lines.length,
+    diffUnits: round(diff, 3),
+    unplannedCount: unplanned,
+  };
+}
+
+/** Id dòng TẠM của hộp Số thực đóng — dòng HĐ chưa có dòng trong chuyến. */
+const DRAFT_LINE_PREFIX = "draft:";
+export const isDraftLoadingLine = (l: Pick<ExportShipmentLine, "id">) => l.id.startsWith(DRAFT_LINE_PREFIX);
+
+/**
+ * Dòng của hộp Số thực đóng (feedback 2026-11-03: đóng cont điền số SAU khi đóng hàng, không chờ Phòng KH nhập
+ * Hàng của chuyến): dòng đã có của chuyến + mỗi dòng HĐ chưa có dòng trong chuyến một dòng TẠM (id `draft:<id dòng HĐ>`).
+ */
+export function loadingCountRows(
+  lines: readonly ExportShipmentLine[],
+  contractLines: readonly ExportContractLine[],
+  ctx: { shipmentId: string; contractId: string },
+): ExportShipmentLine[] {
+  const had = new Set(lines.map((l) => l.contractLineId));
+  let order = Math.max(0, ...lines.map((l) => l.sortOrder));
+  const extra = contractLines
+    .filter((cl) => !had.has(cl.id))
+    .map((cl) => shipmentLineFromContract(cl, { id: `${DRAFT_LINE_PREFIX}${cl.id}`, shipmentId: ctx.shipmentId, contractId: ctx.contractId, sortOrder: (order += 1) }));
+  return [...lines, ...extra];
+}
+
+/**
+ * Lưu hộp Số thực đóng ⇒ các dòng cần ghi: dòng đã có đổi số ⇒ cập nhật người / lúc điền; dòng TẠM có số ⇒ dòng mới
+ * (id thật, không số kế hoạch — luật mig 0098); dòng TẠM để trống ⇒ bỏ (hàng đó không đóng vào chuyến này).
+ */
+export function applyLoadingCounts(
+  rows: readonly ExportShipmentLine[],
+  counts: Readonly<Record<string, number | null>>,
+  ctx: { by: string; at: string; newId: () => string },
+): ExportShipmentLine[] {
+  const out: ExportShipmentLine[] = [];
+  for (const l of rows) {
+    const v = counts[l.id] ?? null;
+    if (isDraftLoadingLine(l)) {
+      if (v != null) out.push({ ...l, id: ctx.newId(), loadedUnits: v, loadedBy: ctx.by, loadedAt: ctx.at });
+    } else if (v !== l.loadedUnits) {
+      out.push({ ...l, loadedUnits: v, loadedBy: v == null ? "" : ctx.by, loadedAt: v == null ? "" : ctx.at });
+    }
+  }
+  return out;
 }
 
 /* ---------- Lập invoice ---------- */

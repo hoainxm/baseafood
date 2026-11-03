@@ -72,7 +72,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Ảnh và sơ đồ đóng cont",
     needs: ["export-plans.loading", "create"],
     actors: ["loader", ...KH],
-    text: "Lúc đóng cont: chụp ảnh lớp hàng, seal, số cont; đính sơ đồ container (mục 4a, 4b). Đóng xong chọn Điền số thực đóng, ghi số kiện thực đã đóng của từng dòng hàng.",
+    text: "Lúc đóng cont: chụp ảnh lớp hàng, seal, số cont; đính sơ đồ container (mục 4a, 4b). Đóng xong, bộ phận đóng cont tự Điền số thực đóng theo dòng hàng của hợp đồng (không chờ Kế hoạch), chứng từ lấy số này làm invoice.",
     done: "Có file là mục tự Xong; số thực đóng không chặn bước Đóng cont",
   },
   {

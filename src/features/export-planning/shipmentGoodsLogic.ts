@@ -10,10 +10,12 @@ import type { ExportContractLine, ExportLoadingExtraStep, ExportShipment, Export
 /** "Đã điền 2/2 dòng · 658 thùng (kế hoạch 661, thiếu 3)" — hàng Số thực đóng ở bước 4. */
 export function loadingCountText(lines: readonly ExportShipmentLine[]): string {
   const s = loadingCountSummary(lines);
-  if (!s.lineCount) return "Chuyến chưa có hàng chi tiết — Phòng KH nhập ở khối Hàng của chuyến.";
+  // Đóng cont điền số sau khi đóng hàng, chọn từ dòng hàng của HĐ — không chờ Phòng KH (feedback 2026-11-03, mig 0098).
+  if (!s.lineCount) return "Chưa điền — đóng cont xong, bộ phận đóng cont điền số kiện thực đóng theo dòng hàng của hợp đồng.";
   if (!s.filledCount) return `Chưa điền — ${s.lineCount} dòng, kế hoạch ${formatNumber(s.plannedUnits)} kiện.`;
-  const diff = s.diffUnits === 0 ? "khớp kế hoạch" : s.diffUnits < 0 ? `thiếu ${formatNumber(-s.diffUnits)} so với kế hoạch` : `thừa ${formatNumber(s.diffUnits)} so với kế hoạch`;
-  return `Đã điền ${s.filledCount}/${s.lineCount} dòng · ${formatNumber(s.loadedUnits)} kiện thực đóng (${diff}).`;
+  const compared = s.filledCount - s.unplannedCount;
+  const diff = !compared ? "" : s.diffUnits === 0 ? " (khớp kế hoạch)" : s.diffUnits < 0 ? ` (thiếu ${formatNumber(-s.diffUnits)} so với kế hoạch)` : ` (thừa ${formatNumber(s.diffUnits)} so với kế hoạch)`;
+  return `Đã điền ${s.filledCount}/${s.lineCount} dòng · ${formatNumber(s.loadedUnits)} kiện thực đóng${diff}. Chứng từ lấy số này làm invoice.`;
 }
 
 export interface ShipmentLinesTarget {
@@ -43,18 +45,21 @@ export interface LineDraft {
 export function linesFromDraft(tg: ShipmentLinesTarget, rows: readonly LineDraft[], makeId: () => string): ExportShipmentLine[] {
   const out: ExportShipmentLine[] = [];
   rows.forEach((r, i) => {
-    if (r.plannedUnits == null || r.plannedUnits <= 0) return;
-    const cl = tg.contractLines.find((c) => c.id === r.contractLineId);
-    if (!cl) return;
     const own = tg.lines.find((l) => l.id === r.lineId);
-    const base = own ?? shipmentLineFromContract(cl, { id: makeId(), shipmentId: tg.shipment.id, contractId: tg.shipment.contractId, sortOrder: 0 });
+    const planned = r.plannedUnits != null && r.plannedUnits > 0 ? r.plannedUnits : null;
+    // Dòng đóng cont đã điền số thực đóng (có thể do đóng cont tự tạo, không kế hoạch — mig 0098) KHÔNG được mất
+    // khi Phòng KH lưu mà để trống số kế hoạch.
+    if (planned == null && own?.loadedUnits == null) return;
+    const cl = tg.contractLines.find((c) => c.id === r.contractLineId);
+    const base = own ?? (cl ? shipmentLineFromContract(cl, { id: makeId(), shipmentId: tg.shipment.id, contractId: tg.shipment.contractId, sortOrder: 0 }) : null);
+    if (!base) return;
     out.push({
       ...base,
       sortOrder: (i + 1) * 10,
       description: r.description.trim(),
       size: r.size.trim(),
       packing: r.packing.trim(),
-      plannedUnits: r.plannedUnits,
+      plannedUnits: planned,
       grossKgPerUnit: r.grossKgPerUnit,
       expiry: r.expiry.trim(),
     });

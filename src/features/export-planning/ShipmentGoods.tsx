@@ -11,9 +11,9 @@ import { Button, ErrorSummary, Field, FormDialog, Input, NumberField, Tag, forma
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
-import { lineNetKg, netKgPerUnit } from "@/lib/exportInvoice";
+import { applyLoadingCounts, isDraftLoadingLine, lineNetKg, loadingCountRows, netKgPerUnit } from "@/lib/exportInvoice";
 import { linesFromDraft, type LineDraft, type ShipmentLinesTarget } from "./shipmentGoodsLogic";
-import type { ExportShipment, ExportShipmentLine } from "@/types";
+import type { ExportContractLine, ExportShipment, ExportShipmentLine } from "@/types";
 import { Boxes, ClipboardCheck, Save } from "lucide-react";
 
 export type { ShipmentLinesTarget } from "./shipmentGoodsLogic";
@@ -103,11 +103,11 @@ export function ShipmentLinesDialog({
     form.rows.forEach((r, i) => {
       if (r.plannedUnits != null && r.plannedUnits > 0 && !r.description.trim()) errs.push({ field: `Dòng ${i + 1}`, message: "Ghi tên hàng in trên invoice" });
     });
-    // Dòng kho đã điền số thực đóng mà bị bỏ ⇒ mất số của kho: chặn, bảo ghi lại số kiện.
+    // Dòng đóng cont đã điền số thực đóng: để trống kế hoạch vẫn GIỮ dòng (linesFromDraft, ba-spec 63 R4 — đóng cont
+    // có thể tự tạo dòng không kế hoạch, mig 0098). Chỉ chặn khi dòng không còn trong hộp (dòng HĐ đã bị bỏ khỏi bản HĐ).
     for (const l of tg.lines) {
-      const r = form.rows.find((x) => x.lineId === l.id);
-      if (l.loadedUnits != null && (!r || r.plannedUnits == null || r.plannedUnits <= 0))
-        errs.push({ field: lineTitle(l), message: "Kho đã điền số thực đóng cho dòng này — giữ số kiện kế hoạch (không bỏ dòng)" });
+      if (l.loadedUnits != null && !form.rows.some((x) => x.lineId === l.id))
+        errs.push({ field: lineTitle(l), message: "Đóng cont đã điền số thực đóng cho dòng này nhưng dòng hàng không còn trong hợp đồng — báo người lập HĐ" });
     }
     setErrors(errs);
     if (errs.length) return;
@@ -200,11 +200,15 @@ export interface LoadingCountTarget {
   shipment: ExportShipment;
   label: string;
   lines: readonly ExportShipmentLine[];
+  /** Dòng hàng của bản HĐ đang dùng — dòng chưa có trong chuyến hiện thành dòng TẠM để đóng cont tự điền. */
+  contractLines: readonly ExportContractLine[];
 }
 
 interface CountForm {
   key: string;
   tg: LoadingCountTarget;
+  /** Dòng đã có + dòng TẠM từ HĐ (`loadingCountRows`). */
+  rows: ExportShipmentLine[];
   counts: Record<string, number | null>;
   initial: string;
 }
@@ -218,29 +222,32 @@ export function LoadingCountDialog({
   target: LoadingCountTarget | null;
   recordedBy: string;
   onClose: () => void;
-  onSave: (lines: ExportShipmentLine[]) => boolean;
+  onSave: (shipment: ExportShipment, lines: ExportShipmentLine[]) => boolean;
 }) {
   const [form, setForm] = useState<CountForm | null>(null);
   const draft = useDialogDraft({ form: "export-loading-count", value: form, setValue: setForm, isEmpty: (f) => JSON.stringify(f.counts) === f.initial });
 
   useEffect(() => {
     if (!target) return;
-    const counts = Object.fromEntries(target.lines.map((l) => [l.id, l.loadedUnits]));
-    const fresh: CountForm = { key: target.shipment.id, tg: target, counts, initial: JSON.stringify(counts) };
+    const rows = loadingCountRows(target.lines, target.contractLines, { shipmentId: target.shipment.id, contractId: target.shipment.contractId });
+    const counts = Object.fromEntries(rows.map((l) => [l.id, l.loadedUnits]));
+    const fresh: CountForm = { key: target.shipment.id, tg: target, rows, counts, initial: JSON.stringify(counts) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
 
   const tg = target ?? form?.tg ?? null;
+  const [errors, setErrors] = useState<FieldError[]>([]);
   const save = () => {
     if (!form || !tg) return;
-    const at = new Date().toISOString();
-    const next = tg.lines.map((l) => {
-      const v = form.counts[l.id] ?? null;
-      return v === l.loadedUnits ? l : { ...l, loadedUnits: v, loadedBy: v == null ? "" : recordedBy, loadedAt: v == null ? "" : at };
-    });
-    if (onSave(next)) draft.done();
+    const next = applyLoadingCounts(form.rows, form.counts, { by: recordedBy, at: new Date().toISOString(), newId });
+    if (!next.length && !form.rows.some((l) => !isDraftLoadingLine(l))) {
+      setErrors([{ field: "loading-count", message: "Chưa điền số kiện nào — điền số thực đóng của ít nhất một dòng hàng." }]);
+      return;
+    }
+    setErrors([]);
+    if (onSave(tg.shipment, next)) draft.done();
   };
 
   return (
@@ -252,7 +259,7 @@ export function LoadingCountDialog({
         onClose();
       }}
       title="Số lượng thực đóng"
-      description={tg ? `${tg.label} — đóng cont xong, ghi số kiện thực đã đóng của từng dòng. Invoice và packing list dùng số này.` : ""}
+      description={tg ? `${tg.label} — đóng cont xong, ghi số kiện thực đã đóng của từng dòng. Hàng không đóng vào chuyến này thì để trống. Chứng từ lấy số này làm invoice và packing list.` : ""}
       icon={ClipboardCheck}
       size="lg"
       footer={
@@ -274,14 +281,16 @@ export function LoadingCountDialog({
       }
     >
       <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
+      <ErrorSummary errors={errors} />
       {form && tg && (
         <div className="grid gap-3 py-2">
-          {tg.lines.map((l) => (
+          {!form.rows.length && <p className="text-sm text-muted-foreground">Hợp đồng chưa có dòng hàng — Phòng KH nhập dòng hàng ở hợp đồng trước.</p>}
+          {form.rows.map((l) => (
             <div key={l.id} className="grid min-w-0 gap-2 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-end">
               <div className="grid min-w-0 gap-0.5">
                 <p className="font-medium break-words">{lineTitle(l)}</p>
                 <p className="tnum text-sm text-muted-foreground">
-                  Kế hoạch {l.plannedUnits != null ? formatNumber(l.plannedUnits) : "—"} {unitWord(l)}
+                  {l.plannedUnits != null ? `Kế hoạch ${formatNumber(l.plannedUnits)} ${unitWord(l)}` : "Dòng hàng của hợp đồng"}
                   {l.packing.trim() ? ` · ${l.packing.trim()}` : ""}
                 </p>
                 {l.loadedBy && (

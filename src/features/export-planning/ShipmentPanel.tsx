@@ -351,12 +351,11 @@ export function ShipmentPanel({
         !isCancelled &&
         (can.loadingCreate || can.update) && (
           <>
-            {goods.length > 0 && (
-              <Button size="sm" variant={counted.filledCount ? "edit" : "default"} onClick={onLoadingCount} title="Đóng cont xong: ghi số kiện thực đã đóng của từng dòng hàng.">
-                <ClipboardCheck className="mr-1 h-4 w-4" aria-hidden />
-                {counted.filledCount ? "Sửa số thực đóng" : "Điền số thực đóng"}
-              </Button>
-            )}
+            {/* Không chờ Phòng KH nhập Hàng của chuyến: chưa có dòng thì hộp lấy dòng hàng của HĐ (feedback 2026-11-03). */}
+            <Button size="sm" variant={counted.filledCount ? "edit" : "default"} onClick={onLoadingCount} title="Đóng cont xong: ghi số kiện thực đã đóng của từng dòng hàng (lấy từ dòng hàng của hợp đồng nếu chuyến chưa có hàng).">
+              <ClipboardCheck className="mr-1 h-4 w-4" aria-hidden />
+              {counted.filledCount ? "Sửa số thực đóng" : "Điền số thực đóng"}
+            </Button>
             {extraPhotoButton("loading-count-photos")}
           </>
         )
@@ -458,8 +457,8 @@ export function ShipmentPanel({
               </p>
               <p className="text-sm text-muted-foreground">
                 {goods.length
-                  ? `${goods.length} dòng · kế hoạch ${formatNumber(counted.plannedUnits)} kiện${counted.filledCount ? ` · thực đóng ${formatNumber(counted.loadedUnits)} (${counted.filledCount}/${goods.length} dòng)` : ""}`
-                  : "Chưa nhập chi tiết — invoice, packing list và số thực đóng của kho cần danh sách này."}
+                  ? `${goods.length} dòng${goods.some((l) => l.plannedUnits != null) ? ` · kế hoạch ${formatNumber(counted.plannedUnits)} kiện` : " · chưa có kế hoạch"}${counted.filledCount ? ` · thực đóng ${formatNumber(counted.loadedUnits)} (${counted.filledCount}/${goods.length} dòng)` : ""}`
+                  : "Chưa nhập kế hoạch (không bắt buộc) — bộ phận đóng cont vẫn điền được số thực đóng theo dòng hàng của hợp đồng ở bước Đóng cont."}
               </p>
             </div>
             {canWrite && (

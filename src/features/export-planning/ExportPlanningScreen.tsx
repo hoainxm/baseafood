@@ -472,16 +472,23 @@ export default function ExportPlanningScreen() {
     return true;
   };
 
-  const openLoadingCount = (s: ExportShipment) => setCountTarget({ shipment: s, label: goodsLabel(s), lines: shipmentLinesOf(d.shipmentLines ?? [], s.id) });
+  const openLoadingCount = (s: ExportShipment) =>
+    setCountTarget({ shipment: s, label: goodsLabel(s), lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), contractLines: workingRevision(d, s.contractId)?.lines ?? [] });
 
-  const saveLoadingCount = (lines: ExportShipmentLine[]): boolean => {
+  /** Đóng cont điền số thực đóng: cập nhật dòng đã có, thêm dòng mới lấy từ dòng HĐ (mig 0098). */
+  const saveLoadingCount = (s: ExportShipment, lines: ExportShipmentLine[]): boolean => {
+    if (!lines.length) {
+      setCountTarget(null);
+      return true;
+    }
     const prev = d.shipmentLines ?? [];
     const byId = new Map(lines.map((l) => [l.id, l]));
-    if (!store.saveShipmentLines(prev.map((l) => byId.get(l.id) ?? l))) return false;
-    const s = d.shipments.find((x) => x.id === lines[0]?.shipmentId);
-    const what = `Điền số thực đóng của chuyến ${shipName(s)}`;
-    track(s?.contractId ?? "", s?.id ?? "", "update", what);
-    notify.saved("Đã lưu số thực đóng", undoTracked(s?.contractId ?? "", s?.id ?? "", what, () => store.saveShipmentLines(prev)));
+    const added = lines.filter((l) => !prev.some((p) => p.id === l.id));
+    if (!store.saveShipmentLines([...prev.map((l) => byId.get(l.id) ?? l), ...added])) return false;
+    const what = `Điền số thực đóng của chuyến ${shipName(s)}${added.length ? ` — thêm ${added.length} dòng hàng từ hợp đồng` : ""}`;
+    track(s.contractId, s.id, "update", what);
+    // Có dòng mới ⇒ không Hoàn tác: người đóng cont không có quyền xóa dòng (policy delete), hoàn tác sẽ không gỡ được.
+    notify.saved("Đã lưu số thực đóng", added.length ? undefined : undoTracked(s.contractId, s.id, what, () => store.saveShipmentLines(prev)));
     setCountTarget(null);
     return true;
   };

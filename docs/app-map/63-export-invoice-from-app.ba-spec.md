@@ -3,6 +3,7 @@
 > Load khi: sửa khối Hàng của chuyến, hàng Số lượng thực đóng (bước 4), phần Lập invoice từ app ở mục Commercial Invoice, file Excel Invoice · Packing list · Expiry date list, danh sách Tài khoản ngân hàng.
 covers: src/lib/exportInvoice.ts, src/lib/exportInvoiceExcel.ts, src/lib/exportInvoicePdf.ts, src/lib/exportInvoiceDocx.ts, src/features/export-planning/ShipmentGoods.tsx, src/features/export-planning/shipmentGoodsLogic.ts, src/features/export-planning/InvoiceComposePanel.tsx, src/features/export-planning/invoiceDocument.ts, supabase/migrations/0096_export_shipment_lines.sql
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (c) — R11 / AC-11: đóng cont điền số thực đóng không chờ Hàng của chuyến (dòng tạm từ dòng HĐ, mig 0098); R4 giữ dòng đã điền khi KH lưu trống kế hoạch. -->
 ttl_days: 90
 status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`, cột `export_step_items.invoice_composition`, danh sách `bank-account` + 3 tài khoản; ✅ **đã chạy DB thật** (kiểm chỉ-đọc 2026-11-03); kiểm PGlite chuỗi 0001→0096 + chạy lại 2 lần + RLS theo vai đạt — AC-8 phần máy chủ đã thử trên PGlite). Hàm thuần + test `exportInvoice.test.ts` (AC-1…AC-7, vòng tròn dựng ⇄ `parseInvoiceRows`, đọc lại .xlsx bằng exceljs). Thử sandbox 2026-11-02: nhập 2 dòng → điền thực đóng 197 + 150 → lập invoice → file đọc lại ra 347 thùng · 3.470 kg · 36.060 USD; 360px × 130% không tràn. Bổ sung [41](41-export-planning.ba-spec.md) NV7–NV9 + bước 5.
 
@@ -80,8 +81,9 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 | R1 | Kg tịnh / kiện = (bó ⇒ số thùng/bó) × kg/thùng. Kiện của chứng từ = thực đóng ?? kế hoạch. Tiền dòng = kg × đơn giá, làm tròn 2 số lẻ; tổng tiền = Σ tiền dòng (file 236/26 gõ tay 530,39 ⇒ app ra 1.709,01 thay 1.709,02) |
 | R2 | Gom các dòng liền nhau cùng tên (không phân hoa thường) thành một mục có số thứ tự; mọi dòng cùng quy cách ⇒ một dòng "Packing" cuối mục, khác ⇒ sau từng size; một dòng không size ⇒ số in ở dòng tên |
 | R3 | Nhãn kiện: toàn bó BDLS / BUNDLES · toàn thùng CTNS / CARTONS · lẫn PKGS / PACKAGES. "Says" đọc tiền tiếng Anh theo tiền tệ (USD, JPY, EUR), có xu ⇒ "and … cents" |
-| R4 | Số thực đóng không chặn bước 4 / đủ hồ sơ. Dòng kho đã điền không bỏ được khỏi chuyến (báo lỗi khi lưu) |
-| R5 | U4 chỉ đổi được số thực đóng + người / giờ (trigger 0096); không thêm dòng; không đọc giá |
+| R4 | Số thực đóng không chặn bước 4 / đủ hồ sơ. Dòng kho đã điền không bỏ được khỏi chuyến: Phòng KH lưu Hàng của chuyến mà để trống số kế hoạch ⇒ dòng đó vẫn giữ (không kế hoạch) |
+| R5 | U4 sửa được số thực đóng + người / giờ của dòng đã có (trigger 0096); không đọc giá. Từ 0098: U4 **thêm** được dòng lấy từ dòng hàng HĐ, chỉ kèm số thực đóng (không số kế hoạch, kg gross, hạn dùng, ghi chú; đúng HĐ của chuyến); không xóa dòng |
+| R11 | (feedback 2026-11-03) Số lượng thực đóng do **bộ phận đóng cont** điền SAU khi đóng hàng, không chờ Phòng KH nhập Hàng của chuyến: chuyến chưa có dòng ⇒ hộp Số thực đóng lấy sẵn mọi dòng hàng của bản HĐ đang dùng (dòng tạm), để trống = không đóng vào chuyến này; lưu ⇒ dòng có số thành dòng của chuyến. **Bộ phận chứng từ** kế thừa: invoice / packing list lấy số thực đóng (R1). Dòng không kế hoạch không so "thừa / thiếu". Lưu có thêm dòng ⇒ không Hoàn tác (U4 không xóa được dòng) |
 | R6 | Máy chủ chưa chạy 0096 ⇒ ẩn khối Hàng của chuyến / Số thực đóng / Lập invoice; danh sách chọn không đưa tài khoản ngân hàng vào bảng (khỏi kẹt hàng chờ) |
 | R7 | Đơn giá sửa ở invoice chỉ lưu trong mục CI; không đổi đơn giá HĐ |
 | R9 | **PDF** (`exportInvoicePdf.ts`, `pdf-lib`): vẽ từ CÙNG bảng của file Excel ⇒ hai bản cùng số. Bố cục đo từ PDF mẫu 275/26: logo (`public/invoice-logo.jpg` — 480 px, thu từ logo gốc rõ nét `docs/brand/baseafood-logo-original.jpg`) + tên công ty, kẻ ngang, "Ba Ria, <ngày>" nghiêng canh phải, tiêu đề 22pt + số đóng khung, bảng kẻ lưới (ô cuối dòng tiêu đề phủ các cột con: "IN US. DOLLARS", "TOTAL WEIGHT"; "Trade Terms: CFR" / cảng phủ 2 cột tiền; dòng đơn vị gạch chân; TOTAL đóng khung), "Says" đậm nghiêng, chữ ký công ty bên phải, khối ngân hàng 9pt đóng khung góc trái (chừa chỗ dấu + chữ ký tay). Mỗi chứng từ cố vừa MỘT trang: tràn thì vẽ lại ở 90 % · 82 % · 75 %; vẫn tràn ⇒ sang trang, không mất dòng. Font chuẩn PDF không có chữ Việt ⇒ bỏ dấu khi in. Dấu + chữ ký giám đốc KHÔNG in (ký tay / đóng dấu trên bản in) |
@@ -118,7 +120,11 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 
 ### AC-8 — Người đóng hàng chỉ điền số thực đóng · Maps to: NV2, R5 · Test: manual (DB thật sau khi chạy 0096)
 - **Given** tài khoản chỉ có `export-plans.loading` **When** đổi `planned_units` qua API **Then** máy chủ từ chối; đổi `loaded_units` ⇒ được.
-- **Assert:** lỗi chứa "chỉ điền được số thực đóng" (1 lần); `loaded_units` sau ghi `==` số vừa gửi; thêm dòng mới ⇒ lỗi "không thêm được".
+- **Assert:** lỗi chứa "chỉ điền được số thực đóng" (1 lần); `loaded_units` sau ghi `==` số vừa gửi. Từ 0098: thêm dòng có `contract_line_id` + `loaded_units`, không kế hoạch ⇒ được (1 dòng); thêm dòng có `planned_units` / ghi chú / sai HĐ / thiếu số ⇒ lỗi "chỉ thêm được dòng lấy từ dòng hàng" (PGlite 2026-11-03: 1 được, 5 bị chặn).
+
+### AC-11 — Đóng cont điền số khi chuyến chưa có hàng · Maps to: R11, R4 · Test: unit
+- **Given** chuyến chưa có dòng hàng, HĐ có 2 dòng **When** mở hộp Số thực đóng, điền 40 cho dòng 2, để trống dòng 1, lưu **Then** chuyến có 1 dòng mới (dòng HĐ 2), số thực đóng 40, không số kế hoạch; Phòng KH lưu Hàng của chuyến để trống kế hoạch ⇒ dòng đó còn.
+- **Assert:** `loadingCountRows` ⇒ 2 dòng tạm `draft:`; `applyLoadingCounts` ⇒ `length == 1`, `plannedUnits == null`, `loadedUnits == 40`; `linesFromDraft` giữ dòng có số thực đóng `length == 1`; câu tóm tắt không có chữ "thừa" (lib/exportInvoice.test.ts, shipmentGoodsLogic.test.ts).
 
 ### AC-9 — Bản PDF theo mẫu · Maps to: NV3, R9 · Test: unit + manual
 - **Given** chuyến 275/26 **When** tải PDF **Then** mỗi chứng từ một trang, đủ chữ và số của mẫu; 15 size vẫn vừa một trang / chứng từ; 60 size thì sang trang mà không mất dòng.
@@ -141,3 +147,4 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 - 2026-11-03 — 0095 + 0096 đã chạy DB thật (kiểm chỉ-đọc); R8 ngắt địa chỉ; viết hướng dẫn thao tác.
 - 2026-11-03 — R9 + AC-9: tải bản PDF theo mẫu 275/26 (chủ dự án).
 - 2026-11-03 — R10 + AC-10: tải bản Word (chủ dự án).
+- 2026-11-03 — R11 + AC-11, R4/R5 sửa: bộ phận đóng cont tự điền số thực đóng không chờ Phòng KH; mig 0098 mở cho U4 thêm dòng lấy từ dòng HĐ (chủ dự án đồng ý, 🔴 đổi luật quyền).

@@ -119,7 +119,7 @@ Sửa doc xong ⇒ cập nhật `last_verified:` trong frontmatter. Hook pre-com
 | `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation`](docs/app-map/02-pages-navigation.md) |
 | Thêm thư mục / đổi ranh giới import | [`01-app-structure`](docs/app-map/01-app-structure.md) |
 | `index.html`, `package.json`, `vite.config.ts`, env | [`ops/deploy-vercel`](docs/ops/deploy-vercel.md) |
-| Code trong `covers:` của một sơ đồ `docs/workflows/*.md` (hiện: Xuất khẩu) | Sơ đồ đó — hook **chặn** nếu quên ([`docs/workflows/README.md`](docs/workflows/README.md), ba-spec [65](docs/app-map/65-workflow-docs.ba-spec.md)) |
+| Code trong `covers:` của một sơ đồ `docs/workflows/*.md` (đủ 10 module) | Sơ đồ đó — hook **chặn** nếu quên ([`docs/workflows/README.md`](docs/workflows/README.md), ba-spec [65](docs/app-map/65-workflow-docs.ba-spec.md)) |
 | `design-system/**`, `components/ui/**`, `tokens.css`, tô màu dòng | [`src/design-system/README.md`](src/design-system/README.md) — canonical, không nhân bản |
 
 ## Code đổi → cổng kiểm bắt buộc

@@ -7,15 +7,15 @@ Mỗi module MỘT file — đọc 5 phút là nắm: trạng thái, điều ki�
 | Module | Trang | Sơ đồ |
 |---|---|---|
 | Xuất khẩu | `/planning-export` | [export-planning.md](export-planning.md) ✅ |
-| Nhập hàng | `/imports` · `/nxt-material` | chưa có |
-| Sản xuất | `/wip` · `/packaging` · `/qc` | chưa có |
-| Kho | `/warehouse` · `/monthly-stock` · `/qr` · `/nxt-warehouse` | chưa có |
-| Kinh doanh | `/sales` · `/orders` | chưa có |
-| Báo cáo & Cân đối | `/balancing` · `/production-report` · `/export-report` · `/nxt` · `/reconciliation` | chưa có |
-| Nhập khẩu | `/planning-import` | chưa có |
-| Lệnh sản xuất | `/planning-production` | chưa có |
-| Việc của tôi · Tổng quan · Tài liệu | `/my-tasks` · `/dashboard` · `/documents` | chưa có |
-| Danh mục · Quản trị | `/catalog` · `/admin` · `/users` · `/roles` · `/audit` | chưa có |
+| Nhập hàng | `/imports` · `/nxt-material` | [imports.md](imports.md) ✅ |
+| Sản xuất | `/wip` · `/packaging` · `/qc` | [production.md](production.md) ✅ |
+| Kho | `/warehouse` · `/monthly-stock` · `/qr` · `/nxt-warehouse` | [warehouse.md](warehouse.md) ✅ |
+| Kinh doanh | `/sales` · `/orders` | [sales.md](sales.md) ✅ |
+| Báo cáo & Cân đối | `/balancing` · `/production-report` · `/export-report` · `/nxt` · `/reconciliation` | [balancing.md](balancing.md) ✅ |
+| Nhập khẩu | `/planning-import` | [import-planning.md](import-planning.md) ✅ |
+| Lệnh sản xuất | `/planning-production` | [production-orders.md](production-orders.md) ✅ |
+| Việc của tôi · Tổng quan · Tài liệu | `/my-tasks` · `/dashboard` · `/documents` | [overview.md](overview.md) ✅ |
+| Danh mục · Quản trị | `/catalog` · `/admin` · `/users` · `/roles` · `/audit` | [system.md](system.md) ✅ |
 
 Sổ đăng ký trong code: `WORKFLOW_MODULES` ở [`src/lib/workflowDocs.ts`](../../src/lib/workflowDocs.ts) — bảng này và sổ đó phải cùng danh sách.
 

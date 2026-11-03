@@ -4,7 +4,7 @@
 covers: src/lib/workflowDocs.ts, src/lib/workflowDocs.test.ts, .githooks/pre-commit, docs/workflows/README.md
 last_verified: 2026-11-03
 ttl_days: 90
-status: v1 CHỐT + ĐÃ BUILD 2026-11-03 — mẫu Xuất khẩu; 9 module còn lại làm theo đợt.
+status: v1 CHỐT + ĐÃ BUILD 2026-11-03 — đủ 10 module (Xuất khẩu làm mẫu, 9 module sau cùng ngày).
 
 ## 1. Vấn đề & JTBD
 
@@ -42,7 +42,7 @@ Chủ dự án chốt 2026-11-03: đơn vị = **module** (loại: theo trang �
 
 ## 7. Scope
 
-IN: khung, sổ đăng ký 10 module, sơ đồ Xuất khẩu, hook chặn, test. OUT (đợt sau): sơ đồ 9 module còn lại; trang Artifact tổng hợp để xem nhanh.
+IN: khung, sổ đăng ký 10 module, sơ đồ cả 10 module, hook chặn, test. OUT (đợt sau): trang Artifact tổng hợp để xem nhanh.
 
 ## 9. Rules
 
@@ -79,7 +79,8 @@ IN: khung, sổ đăng ký 10 module, sơ đồ Xuất khẩu, hook chặn, test
 ## 11. Assumptions / Open
 
 - Sơ đồ Mermaid xem được trên GitHub và VS Code (bản xem trước Markdown); trên máy không có thì đọc bảng.
-- 9 module còn lại làm theo đợt, mỗi đợt một module, theo mục "Thêm sơ đồ cho một module" ở `docs/workflows/README.md`.
+- Sơ đồ 9 module sau (2026-11-03) đối chiếu với code; chỗ tài liệu cũ lệch code ghi ở `docs/.escaped-drift.log` (Kho dự trữ: duyệt nhập kho là Quản đốc / Phó quản đốc, không phải Thủ kho).
 
 ## History
+- 2026-11-03 — đủ sơ đồ 10 module; `labels` từ hằng số `src/lib` của từng module.
 - 2026-11-03 — v1 tạo + build (chủ dự án chốt 4 câu: module · Markdown + Mermaid · chặn commit + test · Xuất khẩu trước).

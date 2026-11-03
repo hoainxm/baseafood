@@ -5,6 +5,7 @@ covers: src/features/import-planning/*, src/lib/importPlanning.ts, src/lib/impor
 tours: src/features/import-planning/importTour.ts
 guides: src/features/shared/guides/importPlanningGuide.tsx
 last_verified: 2026-11-03
+<!-- re-verified: 2026-11-03 (ba-spec 66 v1.2) — tour Lập hợp đồng nhập — đọc thêm .doc; dạng nhãn : giá trị của HĐ NCC Ấn Độ; không đổi trạng thái, không đổi quyền. -->
 ttl_days: 90
 <!-- re-verified: 2026-11-03 — khối Đọc file hợp đồng ở hộp Lập / Sửa HĐ nhập (`ImportDialogs.tsx`, `fillImportContract`) khớp đoạn "Đọc file hợp đồng" ở §1 (ba-spec 66); không đổi trạng thái, không đổi quyền. -->
 

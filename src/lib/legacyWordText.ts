@@ -4,9 +4,19 @@
 // Description: Extracts the main-document text of a binary .doc (OLE compound file) through its piece table
 //              (FIB → Clx → PlcPcd) and splits it into paragraphs / table rows. No formatting, no images —
 //              browsers have no renderer for .doc and files must not leave the app (ba-spec 61 R2, R4).
+//              Also used to READ contracts (ba-spec 66): readLegacyWord keeps the place of embedded objects
+//              ("EMBED Excel.Sheet.12" — the product table of 17-26-NEWPOINT is an Excel sheet inside the .doc)
+//              and hands back their bytes (ObjectPool/<id>/Package or Workbook).
 // ============================================================
 
 export type WordBlock = { type: "paragraph"; text: string } | { type: "row"; cells: string[] };
+/** Chỗ một đối tượng nhúng (trường `EMBED <ProgID>`) — chỉ bộ đọc hợp đồng dùng; khung xem file bỏ qua. */
+export type WordEmbedBlock = { type: "embed"; progId: string };
+/** Bảng Excel nhúng trong .doc, theo thứ tự id ObjectPool (≈ thứ tự chèn). */
+export interface WordEmbeddedWorkbook {
+  kind: "xlsx" | "xls";
+  bytes: Uint8Array;
+}
 
 const FIB_IDENT = 0xa5ec;
 const FIB_FLAGS = 0x0a;
@@ -25,6 +35,11 @@ const utf16 = new TextDecoder("utf-16le");
  * Ném lỗi tiếng Việt khi không phải file Word 97–2003, file mã hóa, hoặc định dạng Word 6/95 (không có bảng mảnh).
  */
 export async function readLegacyWordBlocks(bytes: Uint8Array): Promise<WordBlock[]> {
+  return (await readLegacyWord(bytes)).blocks.filter((b): b is WordBlock => b.type !== "embed");
+}
+
+/** Như readLegacyWordBlocks nhưng giữ chỗ đối tượng nhúng + trả bytes các bảng Excel nhúng (ba-spec 66). */
+export async function readLegacyWord(bytes: Uint8Array): Promise<{ blocks: (WordBlock | WordEmbedBlock)[]; workbooks: WordEmbeddedWorkbook[] }> {
   const { CFB } = await import("xlsx");
   let container;
   try {
@@ -43,7 +58,23 @@ export async function readLegacyWordBlocks(bytes: Uint8Array): Promise<WordBlock
   const lcbClx = view.getUint32(FIB_LCB_CLX, true);
   if (!table || !lcbClx || fcClx + lcbClx > table.length) throw new Error("Định dạng Word quá cũ (Word 6/95) — tải về để mở bằng Word.");
   const ccpText = view.getInt32(FIB_CCP_TEXT, true);
-  return wordTextToBlocks(readPieces(word, table, fcClx, lcbClx, ccpText));
+  const blocks = wordTextToBlocks(readPieces(word, table, fcClx, lcbClx, ccpText));
+  const paths: string[] = container.FullPaths;
+  const ids = [...new Set(paths.map((p) => p.match(/ObjectPool\/(_\d+)\//)?.[1]).filter((x): x is string => !!x))].sort(
+    (a, b) => Number(a.slice(1)) - Number(b.slice(1)),
+  );
+  const workbooks = ids.flatMap((id): WordEmbeddedWorkbook[] => {
+    const pkg = paths.find((p) => p.endsWith(`ObjectPool/${id}/Package`));
+    const pkgBytes = pkg ? streamBytes(CFB.find(container, pkg)) : null;
+    if (pkgBytes) return [{ kind: "xlsx", bytes: pkgBytes }];
+    const wb = paths.find((p) => p.endsWith(`ObjectPool/${id}/Workbook`));
+    const wbBytes = wb ? streamBytes(CFB.find(container, wb)) : null;
+    if (!wbBytes) return [];
+    const box = CFB.utils.cfb_new();
+    CFB.utils.cfb_add(box, "Workbook", wbBytes);
+    return [{ kind: "xls", bytes: Uint8Array.from(CFB.write(box, { type: "array" }) as ArrayLike<number>) }];
+  });
+  return { blocks, workbooks };
 }
 
 function streamBytes(entry: { content?: ArrayLike<number> } | null | undefined): Uint8Array | null {
@@ -85,10 +116,12 @@ function readPieces(word: Uint8Array, table: Uint8Array, fcClx: number, lcbClx: 
  * Chữ thô của Word → khối. `\r` hết đoạn, `\x07` hết ô (ô cuối dòng có thêm một `\x07` đánh dấu hết dòng),
  * `\x0b` xuống dòng trong đoạn, `\x0c` ngắt trang. Mã trường `\x13 lệnh \x14 kết quả \x15` chỉ giữ kết quả.
  * Ô trống ngay sau ô khác dễ bị hiểu là hết dòng (không đọc thuộc tính bảng) — chấp nhận, chữ vẫn đủ.
+ * Trường `EMBED <ProgID>` (bảng Excel, đối tượng nhúng) ⇒ khối `embed` đúng chỗ.
  */
-export function wordTextToBlocks(raw: string): WordBlock[] {
-  const blocks: WordBlock[] = [];
+export function wordTextToBlocks(raw: string): (WordBlock | WordEmbedBlock)[] {
+  const blocks: (WordBlock | WordEmbedBlock)[] = [];
   const fieldStack: boolean[] = []; // true = đang ở phần KẾT QUẢ của trường
+  const fieldCode: string[] = [];
   let cur = "";
   let cellLines: string[] = [];
   let cells: string[] = [];
@@ -102,6 +135,7 @@ export function wordTextToBlocks(raw: string): WordBlock[] {
   for (const ch of raw) {
     if (ch === "\x13") {
       fieldStack.push(false);
+      fieldCode.push("");
       continue;
     }
     if (ch === "\x14") {
@@ -110,9 +144,18 @@ export function wordTextToBlocks(raw: string): WordBlock[] {
     }
     if (ch === "\x15") {
       fieldStack.pop();
+      const embed = fieldCode.pop()?.match(/^\s*EMBED\s+(\S+)/i);
+      if (embed && !fieldStack.length) {
+        if (!cells.length) pushParagraph(cur);
+        cur = "";
+        blocks.push({ type: "embed", progId: embed[1] });
+      }
       continue;
     }
-    if (fieldStack.some((isResult) => !isResult)) continue;
+    if (fieldStack.some((isResult) => !isResult)) {
+      if (fieldStack.length && !fieldStack[fieldStack.length - 1]) fieldCode[fieldCode.length - 1] += ch;
+      continue;
+    }
 
     if (ch === "\x07") {
       const content = [...cellLines, cur].join("\n").trim();

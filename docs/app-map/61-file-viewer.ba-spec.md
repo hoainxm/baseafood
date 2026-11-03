@@ -2,7 +2,8 @@
 
 > Load khi: đổi cách xem / mở / tải file đính kèm (tài liệu công ty, chứng từ Xuất khẩu, chứng từ Nhập khẩu), thêm loại file mới cho phép đính, hoặc màn mới có nút "Xem file".
 covers: src/lib/documents.ts, src/lib/legacyWordText.ts, src/lib/sheetPreview.ts, src/lib/fileViewLink.ts, src/features/shared/FileViewer.tsx, src/features/shared/FileViewScreen.tsx, src/features/documents/FilePreviewDialog.tsx, src/features/documents/openDocumentFile.ts, src/features/export-planning/parts.tsx, src/features/import-planning/parts.tsx, src/features/shared/fileViewSources.ts, src/lib/openInNewTab.ts
-last_verified: 2026-11-02
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (ba-spec 66) — `lib/legacyWordText.ts` dùng chung cho bộ đọc hợp đồng: `wordTextToBlocks` ra thêm khối `embed` ở trường `EMBED <ProgID>`, `readLegacyWord` trả kèm bytes bảng Excel nhúng (ObjectPool). `readLegacyWordBlocks` (khung xem file) lọc bỏ khối `embed` ⇒ hành vi xem file không đổi. -->
 <!-- updated: 2026-11-02 (b) — R8 + Flow N2 mới: "Mở tab mới" = liên kết tab mới tới trang xem của app cho MỌI loại; bỏ mọi đường dự phòng thay trang đang mở (`openInNewTab` trả opened | no-url | blocked, chỉ tải về được dùng tab này); trang xem không tự rời app; AC-8. -->
 ttl_days: 180
 

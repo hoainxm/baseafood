@@ -9,12 +9,15 @@ import {
   matchParty,
   packingNetKg,
   parseContractRows,
+  rowsFromPdfItems,
   parseShipmentDeadline,
   type ExportContractFillValues,
   type ExportFillContext,
   type ReadContract,
 } from "./contractReader";
-import { rowsFromDocxXml } from "./contractFileReader";
+import { EMBED_MARKER, rowsFromDocxXml, rowsFromWordBlocks } from "./contractFileReader";
+import { wordTextToBlocks } from "./legacyWordText";
+import type { PdfTextItem } from "./invoiceReader";
 import { emptyTerms } from "./exportPlanning";
 import { EXPORT_OPTION_SEED } from "./exportOptions";
 import type { ExportContractLine } from "@/types";
@@ -49,6 +52,141 @@ const IMPORT_FIXTURE: string[][] = [
   ["2", "Frozen squid", "10,000", "", ""],
   ["Total", "", "30,000", "", "62,000.00"],
   ["Payment: T/T 30% deposit, balance against copy of B/L"],
+];
+
+// HĐ xuất gốc Baseafood (13-MAT-26, 17-26-NEWPOINT): chép từ bản scan đã ký theo đúng cách rowsFromDocxXml
+// tách bản Word (tiêu đề bảng 2 tầng, "THESELLER" viết liền, mục "II. SHIPMENT:"). Thay bằng file Word khi có.
+const MAT13: string[][] = [
+  ["SALES CONTRACT"],
+  ["No: 13-MAT-26"],
+  ["Date: October 16, 2026"],
+  ["THESELLER: BASEAFOOD 1 CO.,LTD"],
+  ["Add:321 Tran Xuan Do St., Quarter 2, Ba Ria ward, Ho Chi Minh City, S.R Viet Nam"],
+  ["THE BUYER: MATSUDA SANGYO CO.,LTD."],
+  ["Two parties have mutually agreed to sign this sale contract on the following items and conditions:"],
+  ["I.", "COMMODITY, QUANTITY, PRICE:"],
+  ["Mark", "Commodities", "Packing", "Price CNF main port", "Quantity", "", "Amount (usd)"],
+  ["", "", "", "", "Ctns", "Kgs", ""],
+  ["1", "Frozen iidako raw cut, size 1.3 – 1.8 cm, standard grade (including paper skin)", "2kg/Block x 6/PE/CTN", "8.70", "2,200", "26,400.00", "229,680.00"],
+  ["", "TOTAL", "", "", "2,200", "26,400.00", "229,680.00"],
+  ["(10% more or less in quantity and amount are allowed )"],
+  ["Hygiene and chemical standards: Meet Japanese standards (TPC: Under 100.000 CFU/gr for standard grade; Coliform < 100 Group (C.G)/ E.coli/ Salmonella/ Staphylococcus Aureus/ Vibrio: Negative)."],
+  ["II. SHIPMENT: 2 container 20 feet to Yokohama, Japan within January and March, 2027"],
+  ["III. PAYMENT: By TTR 100% value of the invoice after receiving shipping documents by mail."],
+  ["IV: DOCUMENTS: Invoice, Packing list, Health certificate issued by Baseafood 1, BL , CO form VJ."],
+  ["V. OTHERS: two parties commit themselves to fully implement all obligation stipulated in the contract. This contract is made in English with equal value by fax/email and binding on from date of signing to May 31, 2027."],
+];
+
+const NEWPOINT17: string[][] = [
+  ["SALES CONTRACT"],
+  ["No: 17-26-NEWPOINT"],
+  ["Date: November 03, 2026"],
+  ["THE SELLER: BASEAFOOD 1 CO.,LTD"],
+  ["ADD: 321 Tran Xuan Do St., Quarter 2, Ba Ria Ward, Ho Chi Minh City, S.R.Vietnam"],
+  ["THE BUYER: NEW POINT CO., LTD"],
+  ["TWO PARTIES HAVE MUTUALLY AGREED TO SIGN THIS SALE CONTRACT ON THE FOLLOWING ITEM AND CONDITIONS:"],
+  ["I.COMMODITY, QUANTITY, PRICE:"],
+  ["Item", "Product", "Packing", "Unit price", "Quantity (CTN)", "Quantity (kgs)", "Amount (USD)"],
+  ["", "", "", "(usd/kg CFR)", "", "", ""],
+  ["1", "Dried seasoned Eihire A, old recipe", "10 kgs / ctn", "14.0", "50", "500.00", "7,000.00"],
+  ["2", "Dried seasoned Octopus", "10 kgs / ctn", "18.0", "100", "1,000.00", "18,000.00"],
+  ["3", "Dried baby crab", "5 kgs / ctn", "8.7", "350", "1,750.00", "15,225.00"],
+  ["4", "Noshiika - Moisute: 30% +/-2% - Length: >=20cm", "10 kgs / ctn", "19.80", "200", "2,000.00", "39,600.00"],
+  ["", "Total", "", "", "700", "5,250.00", "79,825.00"],
+  ["More or less 10% in quantity and amount should be acceptable"],
+  ["II. SHIPMENT: 1 container 20 feet will be shipped before 10 November, 2026"],
+  ["Patial shipment: ALLOWED"],
+  ["III. PAYMENT: BY LC AT SIGHT (apply +/- 10% in amount and quantity in LC)"],
+  ["IV: DOCUMENTS REQUIRED:"],
+  ["COMMERCIAL INVOICE, PACKING LIST, BILL OF LADING, CERTIFICATE OF ORIGIN FORM VJ"],
+  ["V. OTHERS:"],
+  ["TWO PARTIES COMMIT THEMSELVES TO FULLY IMPLEMENT ALL OBLIGATION STIPULATED IN THE CONTRACT. THIS CONTRACT IS MADE IN ENGLISH WITH EQUAL VALUE BY FAX/EMAIL AND BINDING ON FROM DATE OF SIGNING TO LATEST DECEMBER 31, 2026."],
+];
+
+// HĐ nhập thật (PDF có chữ): đúng các dòng pdf.js + rowsFromTextItems ra từ "CONTRACT MSA (2) Signed.pdf"
+// và "CONTRACT-4-signed.pdf" (bỏ phần tài khoản ngân hàng). Dòng hàng ghi dạng "nhãn : giá trị".
+const MSA: string[][] = [
+  ["BA RIA-VUNG TAU SEAFOOD PROCESSING AND IMPORT-EXPORT JOIN STOCK COMPANY"],
+  ["BASEAFOOD 1 COMPANY LIMITED"],
+  ["SALES CONTRACT"],
+  ["No", ": 001N.26-MSA"],
+  ["Date: September 24, 2026"],
+  ["According to the needs and agreement between two sides."],
+  ["Today, October 05, 2026 we include:"],
+  ["THE SELLER (Party A): MSA SEA FOODS"],
+  ["Add: 61/30, ROYES TOWER, KASI GARDEN 2ND STREET, KASIMEDU, ROYAPURAM, CHENNAI - 600 013, INDIA"],
+  ["THE BUYER (PartyB):", "BASEAFOOD 1 COMPANY LIMITED"],
+  ["After disscusion, two parties have mutualy agreed to sign the sales contract on the following terms and conditions:"],
+  ["I/. ARTICLE I - COMMODITY: Party A agree to sell the following products to Party B:"],
+  ["1/. Commodity", ":", "FROZEN OCTOPUS WHOLE ROUND SHORT ARM"],
+  ["Size", ":", "100/200", "200/300", "300/500"],
+  ["Quantity", ":", "18,000.00", "5,000", "1,000", "(KGS)"],
+  ["Unit Price", ":", "4.00", "(USD/KG CFR CAT LAI PORT, HO CHI MINH CITY, VIETNAM)"],
+  ["Packing", ":", "4Kgs Net WT Blocks x 5 per Carton."],
+  ["Total", ":", "96,000.00 USD"],
+  ["Total:", "USD 96,000.00 (24,000.00 KGS / 1,200 Ctns) (+/-10% in Amount & Quantity Allowed)"],
+  ["II/.ARTICLE II - SHIPMENT:"],
+  ["-", "Time of shipment", ": ON OR BEFORE 25 OCTOBER, 2026 (accept date of shipment before issue date of LC)"],
+  ["-", "Port of Loading", ": Any Port in India"],
+  ["-", "Port of Destination : CAT LAI PORT, HO CHI MINH CITY, VIETNAM"],
+  ["III/.ARTICLE III - PAYMENT: PAYMENT: Payment by LC at sight"],
+  ["IV/.ARTICLE IV - OTHERS: Two parties commit themselves to fully implement all obligation stipulated in the contract."],
+  ["This contract is made in English , has value by fax or email and binding on from the date of signing to late December 31, 2026"],
+  ["FOR THE SELLER", "FOR THE BUYER"],
+];
+
+const KOR: string[][] = [
+  ["SALES CONTRACT"],
+  ["No", ": 001N.26-KOR"],
+  ["Date: September 24, 2026"],
+  ["THE SELLER (Party A):", "KORNISH MARINE FOODS"],
+  ["RD"],
+  ["60/44, 3", "FLOOR, JS CHAMBER, PANAMPILLY NAGAR, AVENUE, OPP. KAIRALI FLAT,"],
+  ["THE BUYER (PartyB):", "BASEAFOOD 1 COMPANY LIMITED"],
+  ["I/. ARTICLE I - COMMODITY: Party A agree to sell the following products to Party B:"],
+  ["1/. Commodity", ":", "FROZEN OCTOPUS WHOLE ROUND SHORT ARM"],
+  ["Size", ":", "100/200"],
+  ["Quantity", ":", "25,000.00", "(KGS)"],
+  ["Unit Price", ":", "4.00", "(USD/KG CFR CAT LAI PORT, HO CHI MINH CITY, VIETNAM)"],
+  ["Packing", ":", "4Kgs Net WT Blocks x 5 per Carton."],
+  ["Total", ":", "100,000.00 USD"],
+  ["Total:", "USD 100,000.00 (25,000.00 KGS / 1,250 Ctns) (+/-10% in Amount & Quantity Allowed)"],
+  ["II/.ARTICLE II - SHIPMENT:"],
+  ["-", "Time of shipment", ": ON OR BEFORE 05 OCTOBER, 2026 (accept date of shipment before issue date of LC)"],
+  ["III/.ARTICLE III - PAYMENT: PAYMENT: Payment by LC at sight"],
+];
+
+// Tọa độ thật (pdf.js) phần bảng của "13-MAT-26.pdf" — PDF xuất từ Word, ô nhiều dòng bị tách thành dòng rời.
+const MAT13_PDF_ITEMS: PdfTextItem[] = [
+  { str: "I.", x: 83.2, y: 507.5, width: 6.3, height: 9.9 },
+  { str: "COMMODITY, QUANTITY, PRICE:", x: 117, y: 507.5, width: 162.9, height: 9.9 },
+  { str: "Mark", x: 67.2, y: 484.4, width: 21.4, height: 9.9 },
+  { str: "Commodities", x: 140.1, y: 484.4, width: 53.2, height: 9.9 },
+  { str: "Packing", x: 253.5, y: 484.4, width: 32, height: 9.9 },
+  { str: "Price", x: 322.8, y: 495.7, width: 20.3, height: 9.9 },
+  { str: "CNF main", x: 312.2, y: 484.4, width: 41.3, height: 9.9 },
+  { str: "port", x: 325.1, y: 473, width: 16, height: 9.9 },
+  { str: "Quantity", x: 403.6, y: 495.7, width: 34.7, height: 9.9 },
+  { str: "Amount", x: 494, y: 490.1, width: 32.5, height: 9.9 },
+  { str: "(usd)", x: 500, y: 478.7, width: 20.4, height: 9.9 },
+  { str: "Ctns", x: 381.4, y: 478.4, width: 18.1, height: 9.9 },
+  { str: "Kgs", x: 436.5, y: 478.4, width: 15.9, height: 9.9 },
+  { str: "1", x: 75.5, y: 449.9, width: 5, height: 9.9 },
+  { str: "Frozen iidako raw cut,", x: 122.5, y: 461.2, width: 88.8, height: 9.9 },
+  { str: "size 1.3 – 1.8 cm", x: 103, y: 449.9, width: 67.5, height: 9.9 },
+  { str: ", standard grade", x: 170.5, y: 449.9, width: 62.7, height: 9.9 },
+  { str: "(including paper skin)", x: 123.1, y: 438.5, width: 87.4, height: 9.9 },
+  { str: "2kg/Block x", x: 245.2, y: 455.5, width: 48.5, height: 9.9 },
+  { str: "6/PE/CTN", x: 248.6, y: 444.1, width: 41.7, height: 9.9 },
+  { str: "8.70", x: 324.4, y: 449.9, width: 17.4, height: 9.9 },
+  { str: "2,200", x: 379.2, y: 449.9, width: 22.3, height: 9.9 },
+  { str: "26,400.00", x: 424.7, y: 449.9, width: 39.6, height: 9.9 },
+  { str: "229,680.00", x: 487.8, y: 449.9, width: 44.6, height: 9.9 },
+  { str: "TOTAL", x: 149.5, y: 426.6, width: 34.7, height: 9.9 },
+  { str: "2,200", x: 379.2, y: 426.6, width: 22.4, height: 9.9 },
+  { str: "26,400.00", x: 424.8, y: 426.6, width: 39.6, height: 9.9 },
+  { str: "229,680.00", x: 487.9, y: 426.6, width: 44.6, height: 9.9 },
+  { str: "(10% more or less in quantity and amount are allowed )", x: 194.7, y: 414.8, width: 219.8, height: 9.9 },
 ];
 
 const read = (rows: string[][], role: "export" | "import" = "export"): ReadContract => {
@@ -205,8 +343,8 @@ describe("ba-spec 66 — đọc file hợp đồng", () => {
     expect(f.values.customerId).toBe("c1");
   });
 
-  it("AC-8 file không đọc được trả đúng lý do", () => {
-    expect(contractFileProblem("HD cu.doc")).toBe("old-word");
+  it("AC-8 file không đọc được trả đúng lý do (.doc đọc được từ 2026-11-03)", () => {
+    expect(contractFileProblem("HD cu.doc")).toBeNull();
     expect(contractFileProblem("scan.jpg")).toBe("unsupported");
     expect(contractFileProblem("HD.xlsx")).toBe("unsupported");
     expect(contractFileProblem("HD.docx")).toBeNull();
@@ -264,6 +402,88 @@ describe("ba-spec 66 — đọc file hợp đồng", () => {
   });
 });
 
+describe("ba-spec 66 — HĐ thật anh gửi 2026-11-03", () => {
+  it("13-MAT-26: THESELLER viết liền, tiêu đề 2 tầng Ctns / Kgs, size trong tên hàng, cảng ở mục SHIPMENT", () => {
+    const c = read(MAT13);
+    expect([c.contractNo, c.signedOn, c.partnerName]).toEqual(["13-MAT-26", "2026-10-16", "MATSUDA SANGYO CO.,LTD."]);
+    expect(c.lines).toHaveLength(1);
+    expect(c.lines[0]).toMatchObject({
+      description: "Frozen iidako raw cut, size 1.3 – 1.8 cm, standard grade (including paper skin)",
+      size: "1.3 – 1.8 cm",
+      packing: "2kg/Block x 6/PE/CTN",
+      netKgPerCarton: 12,
+      cartons: 2200,
+      kg: 26400,
+      unitPrice: 8.7,
+      amount: 229680,
+    });
+    expect([c.totalKg, c.totalAmount]).toEqual([26400, 229680]);
+    expect([c.incoterm, c.incotermRaw, c.portOfDischarge, c.currency]).toEqual(["CFR", "CNF", "Yokohama, Japan", "USD"]);
+    expect([c.tolerancePct, c.latestShipmentDate, c.latestShipmentInferred, c.containerCount, c.paymentMethod]).toEqual([10, "2027-03-31", true, 2, "ttr"]);
+    expect(c.lineIssues).toEqual([]);
+  });
+
+  it("17-26-NEWPOINT: cột Item không phải tên hàng, Quantity (CTN) là số thùng, LC không dấu /, dung sai không lấy trong tên hàng", () => {
+    const c = read(NEWPOINT17);
+    expect([c.contractNo, c.signedOn, c.partnerName]).toEqual(["17-26-NEWPOINT", "2026-11-03", "NEW POINT CO., LTD"]);
+    expect(c.lines.map((l) => [l.description, l.netKgPerCarton, l.cartons, l.kg, l.unitPrice, l.amount])).toEqual([
+      ["Dried seasoned Eihire A, old recipe", 10, 50, 500, 14, 7000],
+      ["Dried seasoned Octopus", 10, 100, 1000, 18, 18000],
+      ["Dried baby crab", 5, 350, 1750, 8.7, 15225],
+      ["Noshiika - Moisute: 30% +/-2% - Length: >=20cm", 10, 200, 2000, 19.8, 39600],
+    ]);
+    expect([c.totalKg, c.totalAmount]).toEqual([5250, 79825]);
+    expect([c.incoterm, c.currency, c.tolerancePct, c.containerCount, c.paymentMethod]).toEqual(["CFR", "USD", 10, 1, "lc"]);
+    expect([c.latestShipmentDate, c.latestShipmentInferred]).toEqual(["2026-11-10", false]);
+    expect(c.lineIssues).toEqual([]);
+    expect(c.priceWarnings).toEqual([]);
+  });
+
+  it("HĐ nhập MSA: dạng nhãn : giá trị, 3 size ⇒ 3 dòng, hạn giao bỏ chữ trong ngoặc", () => {
+    const c = read(MSA, "import");
+    expect([c.contractNo, c.signedOn, c.partnerName, c.partnerSide, c.currency]).toEqual(["001N.26-MSA", "2026-09-24", "MSA SEA FOODS", "seller", "USD"]);
+    expect(c.lines.map((l) => [l.description, l.size, l.kg, l.unitPrice, l.netKgPerCarton, l.cartons])).toEqual([
+      ["FROZEN OCTOPUS WHOLE ROUND SHORT ARM", "100/200", 18000, 4, 20, 900],
+      ["FROZEN OCTOPUS WHOLE ROUND SHORT ARM", "200/300", 5000, 4, 20, 250],
+      ["FROZEN OCTOPUS WHOLE ROUND SHORT ARM", "300/500", 1000, 4, 20, 50],
+    ]);
+    expect([c.totalKg, c.totalAmount]).toEqual([24000, 96000]);
+    expect([c.latestShipmentDate, c.latestShipmentInferred, c.paymentMethod, c.tolerancePct]).toEqual(["2026-10-25", false, "lc", 10]);
+    expect([...c.warnings, ...c.priceWarnings]).toEqual([]);
+    const f = fillImportContract(
+      { supplierId: "", contractNo: "", signedDate: "", currency: "USD", lines: [{ id: "x", productName: "", productId: "", goodsTypeId: "", kg: null, unitPrice: null }] },
+      c,
+      { mode: "create", baselineCurrency: "USD", suppliers: [{ id: "s9", code: "MSA", shortName: "MSA Sea Foods", fullName: "" }], newLineId: () => `m${++seq}` },
+    );
+    expect([f.values.supplierId, f.values.contractNo, f.values.signedDate]).toEqual(["s9", "001N.26-MSA", "2026-09-24"]);
+    expect(f.values.lines.map((l) => [l.productName, l.kg, l.unitPrice])).toEqual([
+      ["FROZEN OCTOPUS WHOLE ROUND SHORT ARM 100/200", 18000, 4],
+      ["FROZEN OCTOPUS WHOLE ROUND SHORT ARM 200/300", 5000, 4],
+      ["FROZEN OCTOPUS WHOLE ROUND SHORT ARM 300/500", 1000, 4],
+    ]);
+  });
+
+  it("13-MAT-26.pdf: ghép lại bảng theo tọa độ — ô nhiều dòng, tiêu đề 3 tầng", () => {
+    const rows = rowsFromPdfItems(MAT13_PDF_ITEMS);
+    expect(rows).toEqual([
+      ["I.", "COMMODITY, QUANTITY, PRICE:"],
+      ["Mark", "Commodities", "Packing", "Price CNF main port", "Ctns", "Quantity Kgs", "Amount (usd)"],
+      ["1", "Frozen iidako raw cut, size 1.3 – 1.8 cm, standard grade (including paper skin)", "2kg/Block x 6/PE/CTN", "8.70", "2,200", "26,400.00", "229,680.00"],
+      ["", "TOTAL", "", "", "2,200", "26,400.00", "229,680.00"],
+      ["(10% more or less in quantity and amount are allowed )"],
+    ]);
+    const c = read([...MAT13.slice(0, 7), ...rows, ...MAT13.slice(14)]);
+    expect(c.lines.map((l) => [l.size, l.netKgPerCarton, l.cartons, l.kg, l.unitPrice, l.amount])).toEqual([["1.3 – 1.8 cm", 12, 2200, 26400, 8.7, 229680]]);
+  });
+
+  it("HĐ nhập KORNISH: tên bên bán ở ô sau, 1 size", () => {
+    const c = read(KOR, "import");
+    expect([c.contractNo, c.partnerName]).toEqual(["001N.26-KOR", "KORNISH MARINE FOODS"]);
+    expect(c.lines.map((l) => [l.size, l.kg, l.unitPrice, l.cartons, l.amount])).toEqual([["100/200", 25000, 4, 1250, 100000]]);
+    expect([c.totalKg, c.totalAmount, c.latestShipmentDate]).toEqual([25000, 100000, "2026-10-05"]);
+  });
+});
+
 describe("ba-spec 66 — hàm phụ", () => {
   it("kg tịnh / thùng từ quy cách", () => {
     expect(packingNetKg("IQF, 1kg/PE x 12/ctn")).toBe(12);
@@ -277,6 +497,22 @@ describe("ba-spec 66 — hàm phụ", () => {
     expect(parseShipmentDeadline("Time of shipment: from November, 2026 to April, 2027")).toEqual({ date: "2027-04-30", inferred: true });
     expect(parseShipmentDeadline("Time of shipment: not later than 15/03/2027")).toEqual({ date: "2027-03-15", inferred: false });
     expect(parseShipmentDeadline("Shipment: February 2028")).toEqual({ date: "2028-02-29", inferred: true });
+    expect(parseShipmentDeadline("II. SHIPMENT: 2 container 20 feet to Yokohama, Japan within January and March, 2027")).toEqual({ date: "2027-03-31", inferred: true });
+    expect(parseShipmentDeadline("- Time of shipment : ON OR BEFORE 25 OCTOBER, 2026 (accept date of shipment before issue date of LC)")).toEqual({ date: "2026-10-25", inferred: false });
+  });
+
+  it("Word 97 (.doc): đoạn văn tách ô theo tab, trường EMBED Excel ⇒ dòng đánh dấu đúng chỗ, bảng Word giữ ô", () => {
+    // Chữ thô của thân 17-26-NEWPOINT.doc (rút gọn): bảng hàng là trường "EMBED Excel.Sheet.12".
+    const raw = "         No: 17-26-NEWPOINT\r\t         Date: November 03, 2026\rI.COMMODITY, QUANTITY, PRICE:\r\x13 EMBED Excel.Sheet.12  \x14\x01\x15More or less 10% in quantity\rA\x07B\x07\x07Size :\t100/200\t200/300\r";
+    expect(rowsFromWordBlocks(wordTextToBlocks(raw))).toEqual([
+      ["No: 17-26-NEWPOINT"],
+      ["Date: November 03, 2026"],
+      ["I.COMMODITY, QUANTITY, PRICE:"],
+      [EMBED_MARKER, "0"],
+      ["More or less 10% in quantity"],
+      ["A", "B"],
+      ["Size :", "100/200", "200/300"],
+    ]);
   });
 
   it("rowsFromDocxXml: đoạn văn, bảng, ô gộp ngang, ký tự đặc biệt", () => {
@@ -284,7 +520,9 @@ describe("ba-spec 66 — hàm phụ", () => {
       '<w:document><w:body><w:p><w:r><w:t>THE BUYER: A &amp; B CO.,LTD</w:t></w:r></w:p>' +
       "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Number</w:t></w:r><w:r><w:br/><w:t>pcs/kg</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Size</w:t></w:r></w:p></w:tc></w:tr>" +
       '<w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t xml:space="preserve">Total </w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>&lt; 5</w:t></w:r></w:p></w:tc></w:tr></w:tbl>' +
-      "<w:p/><w:p><w:r><w:t>Time of shipment</w:t></w:r></w:p></w:body></w:document>";
-    expect(rowsFromDocxXml(xml)).toEqual([["THE BUYER: A & B CO.,LTD"], ["Number pcs/kg", "Size"], ["Total", "", "< 5"], ["Time of shipment"]]);
+      "<w:p/><w:p><w:r><w:t>Time of shipment</w:t></w:r></w:p>" +
+      "<w:p><w:r><w:t>Size :</w:t><w:tab/><w:t>100/200</w:t><w:tab/><w:tab/><w:t>200/300</w:t></w:r></w:p>" +
+      '<w:p><w:r><w:object><o:OLEObject Type="Embed" ProgID="Excel.Sheet.12" ShapeID="_x0000_i1025" r:id="rId9"/></w:object></w:r></w:p></w:body></w:document>';
+    expect(rowsFromDocxXml(xml)).toEqual([["THE BUYER: A & B CO.,LTD"], ["Number pcs/kg", "Size"], ["Total", "", "< 5"], ["Time of shipment"], ["Size :", "100/200", "200/300"], [EMBED_MARKER, "rId9"]]);
   });
 });

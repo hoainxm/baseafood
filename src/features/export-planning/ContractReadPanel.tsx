@@ -1,7 +1,7 @@
 // ============================================================
 // Tên file: src/features/export-planning/ContractReadPanel.tsx
 // Tên tiếng Việt: Khối "Đọc file hợp đồng" trong hộp Lập / sửa / ghi bản sửa HĐ xuất và HĐ nhập
-// Description: Pick a contract / annex file (Word .docx or PDF with text — not scans), the dialog fills
+// Description: Pick a contract / annex file (Word .docx / .doc or PDF with text — not scans), the dialog fills
 //              the EMPTY fields from it (lib/contractReader.ts), this block reports what was filled,
 //              lists fields that differ (one-click "use the file value"), catalog misses and warnings.
 //              Chosen file can be attached to the contract or kept "read only". Never saves (ba-spec 66).
@@ -98,8 +98,8 @@ export function ContractReadPanel({
         <h3 className="font-semibold">Đọc file hợp đồng</h3>
       </div>
       <p className="text-sm text-muted-foreground">
-        Chọn file Word (.docx) hoặc PDF có chữ của hợp đồng / phụ lục: app điền sẵn các ô còn trống, ô đang có giá trị khác thì liệt kê để chọn. App không tự lưu,
-        không tự thêm khách hay mặt hàng vào danh mục. Bản scan (ảnh) và Word cũ (.doc) không đọc.
+        Chọn file Word (.docx, .doc) hoặc PDF có chữ của hợp đồng / phụ lục: app điền sẵn các ô còn trống, ô đang có giá trị khác thì liệt kê để chọn. App không tự
+        lưu, không tự thêm khách hay mặt hàng vào danh mục. Bản scan (ảnh) không đọc — đọc bản Word rồi đính bản scan đã ký ở mục File.
       </p>
       <div className="flex min-w-0 flex-wrap items-end gap-4">
         <FilePicker files={state ? [state.file] : []} onChange={(fs) => void pick(fs)} multiple={false} accept={ACCEPT} label={state ? "Chọn file khác để đọc" : "Chọn file để đọc"} />

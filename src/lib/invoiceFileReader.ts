@@ -22,8 +22,8 @@ async function rowsFromExcel(data: ArrayBuffer): Promise<InvoiceCell[][]> {
   return sheets.find((s) => has(s, /commercial\s+invoice/i)) ?? sheets.find((s) => has(s, /description/i)) ?? sheets[0] ?? [];
 }
 
-/** Chữ của PDF (≤ `maxPages` trang đầu, mặc định 5) gom theo dòng — dùng chung cho hóa đơn đại lý (lib/supplierInvoiceFiles.ts) và file hợp đồng (lib/contractFileReader.ts). */
-export async function rowsFromPdf(data: ArrayBuffer, maxPages = 5): Promise<InvoiceCell[][] | "scan"> {
+/** Mẩu chữ (kèm tọa độ) của PDF, ≤ `maxPages` trang đầu; quá ít chữ ⇒ "scan". Dùng riêng khi cần tọa độ (bảng hợp đồng). */
+export async function pdfTextItems(data: ArrayBuffer, maxPages = 5): Promise<(PdfTextItem & { page: number })[] | "scan"> {
   const [pdfjs, worker] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")]);
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
   const task = pdfjs.getDocument({ data: new Uint8Array(data) });
@@ -42,8 +42,13 @@ export async function rowsFromPdf(data: ArrayBuffer, maxPages = 5): Promise<Invo
   } finally {
     void task.destroy();
   }
-  if (items.reduce((n, i) => n + i.str.trim().length, 0) < MIN_PDF_TEXT) return "scan";
-  return rowsFromTextItems(items);
+  return items.reduce((n, i) => n + i.str.trim().length, 0) < MIN_PDF_TEXT ? "scan" : items;
+}
+
+/** Chữ của PDF (≤ `maxPages` trang đầu, mặc định 5) gom theo dòng — dùng chung cho hóa đơn đại lý (lib/supplierInvoiceFiles.ts). */
+export async function rowsFromPdf(data: ArrayBuffer, maxPages = 5): Promise<InvoiceCell[][] | "scan"> {
+  const items = await pdfTextItems(data, maxPages);
+  return items === "scan" ? "scan" : rowsFromTextItems(items);
 }
 
 /** Đọc một file invoice (vừa chọn, hoặc tải về từ kho file). Không ghi gì. */

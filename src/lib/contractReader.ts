@@ -15,28 +15,26 @@ import { nameKey } from "./customerProductNames";
 import { INCOTERMS } from "./exportPlanning";
 import { exportOptionListMeta, exportOptionsOf, optionKey } from "./exportOptions";
 import { formatDateVN, formatMoney, num } from "./format";
-import { parseInvoiceDate, parseInvoiceNumber, sizeKey } from "./invoiceReader";
+import { parseInvoiceDate, parseInvoiceNumber, rowsFromTextItems, sizeKey, type PdfTextItem } from "./invoiceReader";
 
 /* ---------- Kết quả đọc ---------- */
 
 /** Vai của form đang mở: Xuất khẩu ⇒ đối tác là bên mua; Nhập khẩu ⇒ bên bán (R3). */
 export type ContractRole = "export" | "import";
 
-export type ContractReadFailure = "scan" | "old-word" | "unsupported" | "empty" | "error";
+export type ContractReadFailure = "scan" | "unsupported" | "empty" | "error";
 
 export const CONTRACT_FAILURE_MESSAGES: Record<ContractReadFailure, string> = {
-  scan: "File là bản scan (ảnh), không có chữ để đọc. Vẫn đính được làm bằng chứng; muốn tự điền thì chọn file Word (.docx) hoặc PDF xuất từ Word.",
-  "old-word": "File Word cũ (.doc) không đọc được. Mở bằng Word, lưu lại thành .docx rồi chọn lại.",
-  unsupported: "Chỉ đọc được file Word (.docx) hoặc PDF có chữ. Ảnh, Excel, zip không đọc.",
+  scan: "File là bản scan (ảnh), không có chữ để đọc. Vẫn đính được làm bằng chứng; muốn tự điền thì chọn file Word (.docx, .doc) hoặc PDF xuất từ Word.",
+  unsupported: "Chỉ đọc được file Word (.docx, .doc) hoặc PDF có chữ. Ảnh, Excel, zip không đọc.",
   empty: "Không thấy thông tin hợp đồng nào trong file (số hợp đồng, hai bên, bảng dòng hàng).",
   error: "Không mở được file.",
 };
 
-export const isReadableContractFile = (name: string) => /\.(docx|pdf)$/i.test(name);
+export const isReadableContractFile = (name: string) => /\.(docx|doc|pdf)$/i.test(name);
 
 /** Loại file không đọc được ⇒ lý do (R1); đọc được ⇒ null. */
 export function contractFileProblem(name: string): ContractReadFailure | null {
-  if (/\.doc$/i.test(name)) return "old-word";
   return isReadableContractFile(name) ? null : "unsupported";
 }
 
@@ -120,25 +118,23 @@ const monthOf = (w: string) => MONTHS.findIndex((m) => m.startsWith(w.toLowerCas
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 
 /**
- * Hạn giao (R5): "not later than 30/04/2027" ⇒ ngày đó; "from November, 2026 to April, 2027" /
- * "until April 2027" ⇒ ngày cuối tháng cuối, đánh dấu suy ra.
+ * Hạn giao (R5): "not later than 30/04/2027" / "ON OR BEFORE 25 OCTOBER, 2026" ⇒ ngày đó;
+ * "from November, 2026 to April, 2027" / "within January and March, 2027" ⇒ ngày cuối tháng cuối,
+ * đánh dấu suy ra. Chữ trong ngoặc bỏ ("(accept date of shipment before issue date of LC)").
  */
 export function parseShipmentDeadline(text: string): { date: string; inferred: boolean } | null {
-  const body = text.replace(/^.*?(shipment|delivery)[^:：]*[:：]/i, "");
-  const last = body.split(/\bto\b|\buntil\b|\btill\b|\bbefore\b|\bnot later than\b|\blatest\b|\bby\b|–|—/i).pop() ?? body;
-  const exact = parseInvoiceDate(last);
-  if (exact) return { date: exact, inferred: false };
-  let m = last.match(/\b([a-z]{3,9})\.?,?\s*(\d{4})\b/i);
-  if (m && monthOf(m[1]) >= 0) {
-    const y = Number(m[2]);
-    const mo = monthOf(m[1]) + 1;
-    return { date: `${y}-${pad(mo)}-${pad(lastDay(y, mo))}`, inferred: true };
-  }
-  m = last.match(/\b(\d{1,2})[/.-](\d{4})\b/);
-  if (m && Number(m[1]) >= 1 && Number(m[1]) <= 12) {
-    const y = Number(m[2]);
-    const mo = Number(m[1]);
-    return { date: `${y}-${pad(mo)}-${pad(lastDay(y, mo))}`, inferred: true };
+  const body = text.replace(/^.*?(shipment|delivery)[^:：]*[:：]/i, "").replace(/\([^)]*\)/g, " ");
+  for (const seg of body.split(/\bto\b|\buntil\b|\btill\b|\band\b|–|—/i).reverse()) {
+    const exact = parseInvoiceDate(seg);
+    if (exact) return { date: exact, inferred: false };
+    const monthYear = [...seg.matchAll(/\b([a-z]{3,9})\.?,?\s*(\d{4})\b/gi)].filter((m) => monthOf(m[1]) >= 0).pop();
+    const numeric = seg.match(/\b(\d{1,2})[/.-](\d{4})\b/);
+    const [y, mo] = monthYear
+      ? [Number(monthYear[2]), monthOf(monthYear[1]) + 1]
+      : numeric && Number(numeric[1]) >= 1 && Number(numeric[1]) <= 12
+        ? [Number(numeric[2]), Number(numeric[1])]
+        : [0, 0];
+    if (y) return { date: `${y}-${pad(mo)}-${pad(lastDay(y, mo))}`, inferred: true };
   }
   return null;
 }
@@ -175,7 +171,7 @@ type Col =
 
 /** Thứ tự quan trọng: "Price (usd/kg)" có chữ kg ⇒ xét giá trước lượng; "pcs/kg" trước lượng. */
 const COLUMN_RULES: readonly [Col, RegExp][] = [
-  ["serial", /^(no\.?|stt|#|item no\.?)$/],
+  ["serial", /^(no\.?|stt|#|items?|itemno\.?|mark|marks|s\/n)$/],
   ["pcsPerKg", /pcs\/kg|pieces\/kg|pc\/kg|miếng\/kg/],
   ["extra", /average|avg|trungbình|daođộng|range|variation|assortment|cơcấu/],
   ["length", /length|chiềudài/],
@@ -183,11 +179,11 @@ const COLUMN_RULES: readonly [Col, RegExp][] = [
   ["packing", /packing|packaging|quycách|đónggói/],
   ["price", /price|đơngiá/],
   ["amount", /amount|value|thànhtiền|trịgiá/],
-  ["cartons", /^(ctns?|cartons?|sốthùng)/],
+  ["cartons", /^(?!.*kg).*(ctns?|cartons?|sốthùng)/],
   ["quantity", /quantity|q'?ty|weight|khốilượng|sốlượng|^kgs?$/],
   ["hs", /^hs|hscode|mãhs/],
   ["size", /size|^cỡ/],
-  ["description", /commodity|description|product|goods|^items?$|tênhàng|mặthàng|specification/],
+  ["description", /commodit|description|product|goods|tênhàng|mặthàng|specification/],
 ];
 
 const colOf = (header: string): Col | null => {
@@ -205,6 +201,8 @@ interface Table {
   warnings: string[];
   /** Chữ của dòng tiêu đề (tìm incoterm, tiền tệ trong "Price (usd/kg) CNF Hakata"). */
   headerText: string;
+  /** Dòng tổng của dạng nhãn : giá trị — có dung sai "(+/-10% in Amount & Quantity Allowed)". */
+  freeText?: string[];
 }
 
 const TOTAL_ROW = /^(total|grand total|tổng|cộng|says?\b)/i;
@@ -218,6 +216,20 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
     const known = kinds.size;
     if (known < 3 || !(kinds.has("size") || kinds.has("description")) || !(kinds.has("quantity") || kinds.has("price") || kinds.has("cartons"))) continue;
     const headers = rows[h].map(clean);
+    // Tiêu đề 2 tầng: dòng ngay dưới chỉ có nhãn ngắn, không số ("Ctns", "Kgs", "(usd/kg CFR)") ⇒ gộp vào cột
+    // trên; ô gộp ngang để trống thì lấy tên cột bên trái ("Quantity" | "" ⇒ "Quantity Ctns" | "Quantity Kgs").
+    let bodyStart = h + 1;
+    const sub = rows[h + 1]?.map(clean);
+    if (sub && sub.length === cols.length && sub.some(Boolean) && sub.every((c) => !c || (c.length <= 24 && parseInvoiceNumber(c) == null))) {
+      sub.forEach((c, at) => {
+        if (!c) return;
+        const parent = headers.slice(0, at + 1).reverse().find(Boolean) ?? "";
+        const own = colOf(c);
+        cols[at] = own && own !== "extra" ? own : colOf(`${parent} ${c}`);
+        headers[at] = `${parent} ${c}`.trim();
+      });
+      bodyStart = h + 2;
+    }
     const qtyHeader = headers[cols.indexOf("quantity")]?.toLowerCase() ?? "";
     const qtyFactor = /\bmt\b|tons?|tấn/.test(qtyHeader) ? 1000 : 1;
     const priceHeader = headers[cols.indexOf("price")]?.toLowerCase() ?? "";
@@ -227,7 +239,7 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
     const lines: ReadContractLine[] = [];
     let totalKg: number | null = null;
     let totalAmount: number | null = null;
-    let i = h + 1;
+    let i = bodyStart;
     let prev: ReadContractLine | null = null;
     for (; i < rows.length; i++) {
       const r = rows[i].map(clean);
@@ -273,6 +285,8 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
       if (kg == null && price == null && cartons == null && !size) continue;
       const ratio = cell("ratio") || prev?.partRatio || "";
       if (!description && prev && cols.includes("description")) description = prev.description;
+      // Không có cột Size: lấy "size 1.3 – 1.8 cm" trong tên hàng (tên giữ nguyên như trên HĐ).
+      if (!size && !cols.includes("size")) size = clean(description.match(/\bsize\s*:?\s*([^,;(]+)/i)?.[1]);
       const netKg = packingNetKg(packing);
       if (cartons == null && kg != null && netKg) {
         const q = kg / netKg;
@@ -298,9 +312,250 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
       prev = line;
     }
     if (!lines.length) continue;
-    return { start: h, end: i, lines, totalKg, totalAmount, warnings, headerText: rowText(rows[h]) };
+    return { start: h, end: i, lines, totalKg, totalAmount, warnings, headerText: headers.filter(Boolean).join(" ") };
   }
   return null;
+}
+
+/* ---------- Bảng của PDF xuất từ Word: ghép lại theo tọa độ ---------- */
+
+interface PdfCell {
+  text: string;
+  x0: number;
+  x1: number;
+}
+interface PdfLine {
+  page: number;
+  y: number;
+  h: number;
+  cells: PdfCell[];
+}
+
+/** Mẩu chữ ⇒ dòng (cùng đường chữ) ⇒ ô (cách ≤ `gap` điểm) — như rowsFromTextItems nhưng giữ tọa độ. */
+function pdfLines(items: readonly (PdfTextItem & { page?: number })[], gap = 3): PdfLine[] {
+  const xs = items.filter((i) => i.str.trim()).map((i) => ({ ...i, page: i.page ?? 1, h: i.height && i.height > 0 ? i.height : 10 }));
+  xs.sort((a, b) => a.page - b.page || b.y - a.y || a.x - b.x);
+  const groups: (typeof xs)[] = [];
+  for (const it of xs) {
+    const last = groups[groups.length - 1];
+    if (last && last[0].page === it.page && Math.abs(last[0].y - it.y) <= Math.max(2, last[0].h * 0.4)) last.push(it);
+    else groups.push([it]);
+  }
+  return groups.map((g) => {
+    g.sort((a, b) => a.x - b.x);
+    const cells: PdfCell[] = [];
+    for (const it of g) {
+      const prev = cells[cells.length - 1];
+      if (prev && it.x - prev.x1 <= gap) {
+        prev.text += it.x - prev.x1 > 0.5 && !prev.text.endsWith(" ") && !it.str.startsWith(" ") ? ` ${it.str}` : it.str;
+        prev.x1 = Math.max(prev.x1, it.x + it.width);
+      } else cells.push({ text: it.str, x0: it.x, x1: it.x + it.width });
+    }
+    return { page: g[0].page, y: g[0].y, h: g[0].h, cells: cells.map((c) => ({ ...c, text: clean(c.text) })).filter((c) => c.text) };
+  });
+}
+
+const knownHeader = (t: string) => {
+  const k = colOf(t);
+  return !!k && k !== "extra" && k !== "serial";
+};
+const numericCells = (l: PdfLine) => l.cells.filter((c) => parseInvoiceNumber(c.text) != null).length;
+const overlap = (a: { x0: number; x1: number }, b: { x0: number; x1: number }) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+
+/**
+ * PDF xuất từ Word tách mỗi ô bảng nhiều dòng thành nhiều dòng chữ rời (R6): "Frozen iidako raw cut," /
+ * "size 1.3 – 1.8 cm, standard grade" / "(including paper skin)", tiêu đề "Price" / "CNF main" / "port".
+ * Ghép lại: cột = cụm chữ chồng nhau theo chiều ngang của phần dữ liệu; dòng hàng = dòng có ≥ 2 số, các dòng
+ * chữ quanh nó (Word căn giữa theo chiều dọc) về dòng hàng gần nhất; dòng tiêu đề nằm trên. Không nhận ra
+ * bảng ⇒ trả đúng như rowsFromTextItems.
+ */
+export function rowsFromPdfItems(items: readonly (PdfTextItem & { page?: number })[]): string[][] {
+  const lines = pdfLines(items);
+  const plain = (ls: readonly PdfLine[]) => ls.map((l) => l.cells.map((c) => c.text));
+  for (let hs = 0; hs < lines.length; hs++) {
+    if (lines[hs].cells.filter((c) => knownHeader(c.text)).length < 2) continue;
+    const page = lines[hs].page;
+    const a0 = lines.findIndex((l, i) => i > hs && i <= hs + 8 && l.page === page && numericCells(l) >= 2 && !TOTAL_ROW.test(l.cells[0]?.text ?? ""));
+    if (a0 < 0) continue;
+    let top = hs;
+    while (top > 0) {
+      const up = lines[top - 1];
+      if (up.page !== page || up.y - lines[top].y > 1.3 * Math.max(up.h, lines[top].h) || up.cells.some((c) => c.text.length > 24 || /[:：]$/.test(c.text))) break;
+      top--;
+    }
+    // Phần thân: tới dòng TOTAL (gồm), hoặc tới dòng đầu tiên cách xa / là đoạn văn dài.
+    let end = a0 + 1;
+    let total = -1;
+    for (; end < lines.length; end++) {
+      const l = lines[end];
+      if (l.page !== page) break;
+      if (TOTAL_ROW.test(l.cells[0]?.text ?? "")) {
+        total = end;
+        end++;
+        break;
+      }
+      if (lines[end - 1].y - l.y > 2.2 * l.h || l.cells.some((c) => c.text.length > 60)) break;
+    }
+    const bodyEnd = total >= 0 ? total : end;
+    const anchors = lines.slice(a0, bodyEnd).flatMap((l, k) => (numericCells(l) >= 2 ? [a0 + k] : []));
+    const owner = new Map<number, number>();
+    for (let i = a0; i < bodyEnd; i++) {
+      const near = anchors.reduce((best, a) => (Math.abs(lines[a].y - lines[i].y) < Math.abs(lines[best].y - lines[i].y) ? a : best), anchors[0]);
+      owner.set(i, near);
+    }
+    // Dòng chữ nằm trên dòng hàng đầu: thuộc dòng hàng khi gần bằng phần chữ của nó ở dưới (căn giữa).
+    const below = [...owner].filter(([i, a]) => a === a0 && i > a0).map(([i]) => lines[a0].y - lines[i].y);
+    const ext = below.length ? Math.max(...below) : 0;
+    let dataTop = a0;
+    while (dataTop - 1 > hs && lines[dataTop - 1].y - lines[a0].y <= ext + 0.3 * lines[a0].h) {
+      dataTop--;
+      owner.set(dataTop, a0);
+    }
+    const head = lines.slice(top, dataTop);
+    const body = lines.slice(dataTop, total >= 0 ? total + 1 : bodyEnd);
+    // Cột = cụm các ô chồng nhau theo chiều ngang của phần thân.
+    const spans = body.flatMap((l) => l.cells.map((c) => ({ x0: c.x0, x1: c.x1 }))).sort((a, b) => a.x0 - b.x0);
+    const cols: { x0: number; x1: number }[] = [];
+    for (const sp of spans) {
+      const last = cols[cols.length - 1];
+      if (last && sp.x0 <= last.x1 + 1) last.x1 = Math.max(last.x1, sp.x1);
+      else cols.push({ ...sp });
+    }
+    if (cols.length < 3) continue;
+    const colFor = (c: PdfCell) => {
+      let best = 0;
+      cols.forEach((col, k) => {
+        const o = overlap(col, c);
+        const b = overlap(cols[best], c);
+        if (o > b || (o <= 0 && b <= 0 && Math.abs((col.x0 + col.x1) / 2 - (c.x0 + c.x1) / 2) < Math.abs((cols[best].x0 + cols[best].x1) / 2 - (c.x0 + c.x1) / 2))) best = k;
+      });
+      return best;
+    };
+    const headerTexts = cols.map(() => [] as string[]);
+    for (const l of head)
+      for (const c of l.cells) {
+        const hit = cols.flatMap((col, k) => (overlap(col, c) > 0 ? [k] : []));
+        for (const k of hit.length ? hit : [colFor(c)]) headerTexts[k].push(c.text);
+      }
+    const rowOf = (ls: readonly PdfLine[]) => {
+      const out = cols.map(() => [] as string[]);
+      for (const l of ls) for (const c of l.cells) out[colFor(c)].push(c.text);
+      return out.map((t) => t.join(" "));
+    };
+    const records = anchors.map((a) => rowOf(body.filter((l) => owner.get(lines.indexOf(l)) === a)));
+    const synth = [headerTexts.map((t) => t.join(" ")), ...records, ...(total >= 0 ? [rowOf([lines[total]])] : [])];
+    return [...plain(lines.slice(0, top)), ...synth, ...plain(lines.slice(total >= 0 ? total + 1 : bodyEnd))];
+  }
+  return rowsFromTextItems(items);
+}
+
+/* ---------- Dòng hàng dạng "nhãn : giá trị" (HĐ nhập của NCC Ấn Độ) ---------- */
+
+const KV_LABEL = /^\s*(?:-\s*)?(?:\d+\s*\/?\.\s*)?(commodity|commodities|product|description|size|quantity|q'?ty|unit price|price|packing|total)\s*[:：]/i;
+
+/** Giá trị sau dấu ":" của dòng — mỗi ô một giá trị (PDF tách ô theo khoảng trống; .docx tách theo tab). */
+function kvValues(cells: readonly string[]): string[] {
+  const at = cells.findIndex((c) => /[:：]/.test(c));
+  if (at < 0) return [];
+  const rest = clean(cells[at].slice(cells[at].search(/[:：]/) + 1));
+  return [rest, ...cells.slice(at + 1).map(clean)].filter(Boolean);
+}
+
+/**
+ * HĐ không có bảng mà ghi từng nhãn (R6): "1/. Commodity : FROZEN OCTOPUS…" · "Size : 100/200 200/300" ·
+ * "Quantity : 18,000.00 5,000 1,000 (KGS)" · "Unit Price : 4.00 (USD/KG CFR…)" · "Packing : 4Kgs … x 5 per
+ * Carton" · "Total : 96,000.00 USD", rồi dòng "Total: USD 96,000.00 (24,000.00 KGS / 1,200 Ctns)". Nhiều
+ * size ⇒ mỗi size một dòng hàng, lượng theo thứ tự.
+ */
+function findKeyValueLines(rows: readonly (readonly string[])[]): Table | null {
+  interface Block {
+    description: string;
+    sizes: string[];
+    qty: number[];
+    qtyUnit: string;
+    prices: number[];
+    priceText: string;
+    packing: string;
+    amount: number | null;
+  }
+  const blocks: Block[] = [];
+  let start = -1;
+  let end = -1;
+  let totalKg: number | null = null;
+  let totalAmount: number | null = null;
+  let headerText = "";
+  const freeText: string[] = [];
+  const numbersIn = (vals: readonly string[]) =>
+    vals.flatMap((v) => v.split(/\s+/)).map((t) => parseInvoiceNumber(t.replace(/[()]/g, ""))).filter((n): n is number => n != null);
+  rows.forEach((row, i) => {
+    const m = rowText(row).match(KV_LABEL);
+    if (!m) return;
+    const label = m[1].toLowerCase();
+    const vals = kvValues(row);
+    const block = blocks[blocks.length - 1];
+    if (/commodit|product|description/.test(label)) {
+      blocks.push({ description: vals.join(" "), sizes: [], qty: [], qtyUnit: "", prices: [], priceText: "", packing: "", amount: null });
+      if (start < 0) start = i;
+      end = i + 1;
+      return;
+    }
+    if (!block) return;
+    end = i + 1;
+    const joined = vals.join(" ");
+    if (label === "size") block.sizes = vals.flatMap((v) => (/\s{2,}/.test(v) ? v.split(/\s{2,}/) : [v])).map(clean).filter(Boolean);
+    else if (/quantity|q'?ty/.test(label)) {
+      block.qty = numbersIn(vals);
+      block.qtyUnit = joined.match(/\b(kgs?|mt|tons?|ctns?|cartons?)\b/i)?.[1].toLowerCase() ?? "kg";
+    } else if (/price/.test(label)) {
+      block.prices = numbersIn(vals);
+      block.priceText = joined;
+      headerText = headerText || joined;
+    } else if (label === "packing") block.packing = joined;
+    else if (label === "total") {
+      const kg = joined.match(/([\d.,]+)\s*kgs?\b/i);
+      if (kg) {
+        freeText.push(joined);
+        totalKg = parseInvoiceNumber(kg[1]);
+        totalAmount = parseInvoiceNumber(joined.match(/(?:USD|JPY|EUR)\s*([\d.,]+)|([\d.,]+)\s*(?:USD|JPY|EUR)/i)?.slice(1).find(Boolean) ?? "");
+      } else block.amount = numbersIn(vals)[0] ?? null;
+    }
+  });
+  if (!blocks.length) return null;
+  const warnings: string[] = [];
+  const lines = blocks.flatMap((b) => {
+    const n = Math.max(b.sizes.length, b.qty.length, 1);
+    const factor = /mt|ton/.test(b.qtyUnit) ? 1000 : 1;
+    const byCarton = /ctn|carton/.test(b.qtyUnit);
+    const perCarton = /\/\s*(ctn|carton)/i.test(b.priceText);
+    if (perCarton) warnings.push("Đơn giá trên file tính theo thùng — app ghi giá theo kg nên không điền đơn giá.");
+    const netKg = packingNetKg(b.packing);
+    return Array.from({ length: n }, (_, k): ReadContractLine => {
+      const q = b.qty[k] ?? null;
+      let cartons = byCarton ? q : null;
+      let kg = byCarton ? null : q == null ? null : round2(q * factor);
+      if (cartons == null && kg != null && netKg) {
+        const c = kg / netKg;
+        if (Math.abs(c - Math.round(c)) < 1e-6) cartons = Math.round(c);
+      }
+      if (kg == null && cartons != null && netKg) kg = round2(cartons * netKg);
+      return {
+        description: b.description,
+        size: b.sizes[k] ?? (b.sizes.length === 1 ? b.sizes[0] : ""),
+        packing: b.packing,
+        netKgPerCarton: netKg,
+        cartons,
+        kg,
+        unitPrice: perCarton ? null : (b.prices[k] ?? b.prices[0] ?? null),
+        amount: n === 1 ? b.amount : null,
+        piecesPerKg: "",
+        pieceLength: "",
+        partRatio: "",
+        hsCode: "",
+        note: "",
+      };
+    });
+  });
+  return { start, end, lines, totalKg, totalAmount, warnings, headerText, freeText };
 }
 
 /* ---------- Đầu HĐ, điều khoản ---------- */
@@ -318,8 +573,7 @@ function firstMatch(texts: readonly string[], re: RegExp): RegExpMatchArray | nu
 
 /** Đọc các dòng chữ của một file hợp đồng / phụ lục. Không ghi gì. */
 export function parseContractRows(rows: readonly (readonly string[])[], role: ContractRole): ContractReadResult {
-  const table = findTable(rows);
-  const texts = rows.map(rowText).filter(Boolean);
+  const table = findTable(rows) ?? findKeyValueLines(rows);
   const outside = rows
     .filter((_, i) => !table || i < table.start || i >= table.end)
     .map(rowText)
@@ -331,7 +585,7 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
   let sellerName = "";
   let buyerName = "";
   for (const t of outside) {
-    const m = t.match(/^(?:the\s+)?(seller|buyer|bên bán|bên mua)\b\s*(?:\([^)]*\))?\s*[:：]\s*(.+)$/i);
+    const m = t.match(/^(?:the\s*)?(seller|buyer|bên bán|bên mua)\b\s*(?:\([^)]*\))?\s*[:：]\s*(.+)$/i);
     if (!m) continue;
     const isSeller = /seller|bán/i.test(m[1]);
     if (isSeller && !sellerName) sellerName = clean(m[2]);
@@ -407,36 +661,40 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
     incotermRaw = inc[1].toUpperCase().replace(/\s+/g, "");
     incoterm = incotermRaw === "CNF" || incotermRaw === "C&F" ? "CFR" : incotermRaw;
     const port = clean(inc[2]);
-    if (port && !/^(incoterms?|price|usd|jpy|eur|terms?)\b/i.test(port)) {
+    if (port && !/^(incoterms?|price|usd|jpy|eur|terms?|main|any)\b/i.test(port)) {
       if (LOADING_TERMS.has(incoterm)) portOfLoading = port;
       else portOfDischarge = port;
     }
   }
   portOfLoading = portOfLoading || clean(firstMatch(outside, /port of loading\s*[:：]\s*([^,;]+)/i)?.[1]);
   portOfDischarge = portOfDischarge || clean(firstMatch(outside, /port of (?:discharge|destination)\s*[:：]\s*([^,;]+)/i)?.[1]);
+  portOfDischarge =
+    portOfDischarge ||
+    clean(firstMatch(outside.filter((t) => /shipment/i.test(t)), /\bto\s+([A-Z][A-Za-z .'-]+?(?:,\s*[A-Z][A-Za-z .'-]+?)?)\s+(?:within|before|in|on|by|not|during|from|latest)\b/)?.[1]);
   const cur = firstMatch(termTexts, /\b(USD|JPY|EUR|GBP|AUD|CNY)\b|US\$/i);
   const currency = cur ? (cur[1] ?? "USD").toUpperCase() : "";
+  const terms = [...outside, ...(table?.freeText ?? [])];
   const tol =
-    firstMatch(texts, /(\d+(?:[.,]\d+)?)\s*%\s*(?:more or less|\+\/-|±)/i) ??
-    firstMatch(texts, /(?:more or less|±|\+\/-)\s*(\d+(?:[.,]\d+)?)\s*%/i) ??
-    firstMatch(texts, /tolerance[^\d]{0,15}(\d+(?:[.,]\d+)?)\s*%/i);
+    firstMatch(terms, /(\d+(?:[.,]\d+)?)\s*%\s*(?:more or less|\+\/-|±)/i) ??
+    firstMatch(terms, /(?:more or less|±|\+\/-)\s*(\d+(?:[.,]\d+)?)\s*%/i) ??
+    firstMatch(terms, /tolerance[^\d]{0,15}(\d+(?:[.,]\d+)?)\s*%/i);
   const tolerancePct = tol ? parseInvoiceNumber(tol[1]) : null;
   let latestShipmentDate = "";
   let latestShipmentInferred = false;
-  const shipRow = outside.find((t) => /time of (?:shipment|delivery)|shipment (?:time|date|period)|date of shipment|latest (?:date of )?shipment|delivery time|^shipment\s*[:：]/i.test(t) && !/\bannex\b/i.test(t));
-  if (shipRow) {
-    const d = parseShipmentDeadline(shipRow);
-    if (d) {
-      latestShipmentDate = d.date;
-      latestShipmentInferred = d.inferred;
-    }
+  for (const t of outside) {
+    if (!/time of (?:shipment|delivery)|shipment (?:time|date|period)|date of shipment|latest (?:date of )?shipment|delivery time|\bshipment\s*[:：]/i.test(t) || /\bannex\b/i.test(t)) continue;
+    const d = parseShipmentDeadline(t);
+    if (!d) continue;
+    latestShipmentDate = d.date;
+    latestShipmentInferred = d.inferred;
+    break;
   }
-  const cont = firstMatch(texts, /(\d+)\s*(?:x\s*)?(?:(?:20|40)\s*['’]?\s*(?:ft|feet)?\s*(?:hc|rf|rh|reefers?|dc)?\s*)?(?:containers?|conts?)\b/i) ?? firstMatch(texts, /(\d+)\s*x\s*(?:20|40)\s*['’]/i);
+  const cont = firstMatch(outside, /(\d+)\s*(?:x\s*)?(?:(?:20|40)\s*['’]?\s*(?:ft|feet)?\s*(?:hc|rf|rh|reefers?|dc)?\s*)?(?:containers?|conts?)\b/i) ?? firstMatch(outside, /(\d+)\s*x\s*(?:20|40)\s*['’]/i);
   const containerCount = cont ? Number(cont[1]) : null;
-  const ctype = firstMatch(texts, /\b(20|40)\s*['’]?\s*(?:ft|feet)?\s*(hc)?\s*-?\s*(rf|rh|reefers?)\b/i);
+  const ctype = firstMatch(outside, /\b(20|40)\s*['’]?\s*(?:ft|feet)?\s*(hc)?\s*-?\s*(rf|rh|reefers?)\b/i);
   const containerType = ctype ? `${ctype[1]}${ctype[2] ? "HC-" : ""}RF` : "";
   const payTexts = outside.filter((t) => /payment|thanh toán/i.test(t));
-  const paymentMethod: ReadContract["paymentMethod"] = payTexts.some((t) => /\bL\s*\/\s*C\b|letter of credit/i.test(t))
+  const paymentMethod: ReadContract["paymentMethod"] = payTexts.some((t) => /\bL\s*\/\s*C\b|\bLC\b|letter of credit/i.test(t))
     ? "lc"
     : payTexts.some((t) => /\bT\s*\/\s*T\b|\bTTR\b|telegraphic|wire transfer|bank transfer/i.test(t))
       ? "ttr"
@@ -463,6 +721,9 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
   if (table?.totalKg != null && Math.abs(table.totalKg - sumKg) > 0.01) warnings.push(`Dòng Total ghi ${num(table.totalKg)} kg, cộng các dòng ra ${num(sumKg)} kg.`);
   if (table?.totalAmount != null && lines.some((l) => l.amount != null) && Math.abs(table.totalAmount - sumAmount) > 0.01)
     priceWarnings.push(`Dòng Total ghi ${formatMoney(table.totalAmount)}, cộng tiền các dòng ra ${formatMoney(sumAmount)}.`);
+  const sumPriced = round2(lines.reduce((s, l) => s + (l.kg ?? 0) * (l.unitPrice ?? 0), 0));
+  if (table?.totalAmount != null && !lines.some((l) => l.amount != null) && lines.every((l) => l.kg != null && l.unitPrice != null) && Math.abs(table.totalAmount - sumPriced) > 0.01)
+    priceWarnings.push(`Tổng tiền trên file ${formatMoney(table.totalAmount)}, kg × đơn giá các dòng ra ${formatMoney(sumPriced)}.`);
   lines.forEach((l, i) => {
     if (l.kg != null && l.netKgPerCarton && l.cartons == null)
       warnings.push(`Dòng ${i + 1}${l.size ? ` (${l.size})` : ""}: ${num(l.kg)} kg không chia hết ${num(l.netKgPerCarton)} kg/thùng — ghi kg tay, số thùng để trống.`);

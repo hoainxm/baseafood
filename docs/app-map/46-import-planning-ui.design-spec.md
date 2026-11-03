@@ -2,7 +2,8 @@
 
 > Load khi: chỉnh giao diện màn Nhập khẩu `/planning-import` (lô nhập theo tháng, danh sách hợp đồng nhập, hồ sơ HĐ, hộp lần nhập / chứng từ / thực nhập / đóng HĐ, phần thủ kho).
 covers: src/features/import-planning/**
-last_verified: 2026-11-02
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (đọc file HĐ, ba-spec 66) — hộp Lập / Sửa HĐ nhập có cùng khối **Đọc file hợp đồng** của Xuất khẩu (`ContractReadPanel`, mốc `import-contract-read`) đầu phiếu, trước mục 1. -->
 <!-- updated: 2026-11-02 (xem file) — hộp xem chứng từ dùng `FileViewer` chung (ba-spec 61): Word / Excel / văn bản xem ngay trong app; "Mở tab mới" mở trang `#/file-view`, không tải về. -->
 <!-- updated: 2026-11-02 — thanh tab chặn `max-w-full` + xuống dòng ở iPad dọc; hộp xem file như 40; "Mở tab mới" / "Tải về" mở tab trống trước khi chờ link (`lib/openInNewTab.ts`) — Safari iPhone / iPad từng chặn, bấm không thấy gì; file đính hiện "dd/mm/yyyy HH:mm". -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): Lô nhập thêm Trạng thái lần nhập (kèm số lô), ô Tra số chứng từ đổi sang SearchField; thẻ số vẫn của cả tháng. Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->

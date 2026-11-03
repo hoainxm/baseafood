@@ -26,6 +26,8 @@ import {
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { FilePicker } from "@/features/export-planning/parts";
+import { ContractReadPanel, type ContractFillReport } from "@/features/export-planning/ContractReadPanel";
+import { applyImportConflicts, fillImportContract, type ImportContractFillValues, type FillConflict, type ReadContract } from "@/lib/contractReader";
 import { LineProductLabel } from "./parts";
 import { useDialogDraft } from "@/lib/formDraft";
 import { useGoodsTypePicker } from "@/features/export-planning/goodsTypePicker";
@@ -163,6 +165,8 @@ export function ContractFormDialog({
 }) {
   const [form, setForm] = useState<ContractForm | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  /** File vừa đọc ở khối "Đọc file hợp đồng" mà U1 chọn đính vào HĐ (ba-spec 66 R13). */
+  const [readFile, setReadFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [busy, setBusy] = useState(false);
   const draft = useDialogDraft({ form: "import-contract", value: form, setValue: setForm, isEmpty: (f) => contractSnap(f) === f.initial });
@@ -192,6 +196,7 @@ export function ContractFormDialog({
     // Nháp lưu trước v3 không có mặt hàng của dòng ⇒ coi là chưa nối.
     setForm(kept && kept.key === fresh.key ? { ...kept, lines: kept.lines.map((l) => ({ ...l, productId: l.productId ?? "", goodsTypeId: l.goodsTypeId ?? "" })) } : fresh);
     setFiles([]);
+    setReadFile(null);
     setErrors([]);
     setSuggestedLines(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
@@ -242,8 +247,28 @@ export function ContractFormDialog({
     });
   };
 
+  /* Đọc file HĐ nhập (ba-spec 66 NV3): đối tác = bên bán; chỉ điền ô trống; loại hình vẫn chọn tay. */
+  const formRef = useRef(form);
+  formRef.current = form;
+  const fillValues = (f: ContractForm): ImportContractFillValues => ({ supplierId: f.supplierId, contractNo: f.contractNo, signedDate: f.signedDate, currency: f.currency, lines: f.lines });
+  const fillFromRead = (read: ReadContract): ContractFillReport | null => {
+    const f = formRef.current;
+    if (!f) return null;
+    const { values, ...report } = fillImportContract(fillValues(f), read, {
+      mode: f.mode,
+      baselineCurrency: "USD",
+      suppliers,
+      newLineId: newId,
+      suggestProduct: (name, supplierId) => (canLink && name.trim() ? (suggestImportProductId(data, name, supplierId, products, f.id) ?? "") : ""),
+    });
+    setForm((cur) => (cur ? { ...cur, ...values } : cur));
+    return report;
+  };
+  const applyFromRead = (picks: FillConflict[]) => setForm((cur) => (cur ? { ...cur, ...applyImportConflicts(fillValues(cur), picks) } : cur));
+
   const save = async () => {
     if (!form || busy) return;
+    const allFiles = readFile ? [readFile, ...files] : files;
     const prices: Record<string, number | null> = {};
     for (const l of form.lines) prices[l.id] = l.unitPrice;
     const lines: ImportContractLine[] = form.lines.map((l, i) => ({
@@ -259,7 +284,7 @@ export function ContractFormDialog({
     }));
     const head = { id: form.id, supplierId: form.supplierId, contractNo: form.contractNo.trim(), signedDate: form.signedDate, importType: form.importType };
     const errs = issuesToErrors(validateContract(head, lines, data.contracts, data), "Hợp đồng");
-    for (const f of files) {
+    for (const f of allFiles) {
       const fe = checkImportFile(f);
       if (fe) errs.push({ field: "File hợp đồng", message: fe });
     }
@@ -267,7 +292,7 @@ export function ContractFormDialog({
     if (errs.length) return;
     setBusy(true);
     try {
-      const up = await uploadAll(files, form.id, { contractId: form.id, receiptId: "", documentId: "", uploadedBy: recordedBy });
+      const up = await uploadAll(allFiles, form.id, { contractId: form.id, receiptId: "", documentId: "", uploadedBy: recordedBy });
       if ("error" in up) throw new Error(up.error);
       const old = data.contracts.find((c) => c.id === form.id);
       const supplier = suppliers.find((s) => s.id === form.supplierId);
@@ -332,6 +357,17 @@ export function ContractFormDialog({
       {form && (
         <div className="grid gap-5 py-2">
           <ErrorSummary errors={errors} />
+          <ContractReadPanel
+            key={form.key}
+            role="import"
+            canAttach={hasImportStorage}
+            canSeePrice
+            attach={!!readFile}
+            onAttachChange={setReadFile}
+            onFill={fillFromRead}
+            onApply={applyFromRead}
+            tourId="import-contract-read"
+          />
           <FormSection no={1} title="Hợp đồng">
             <div className="grid gap-4 sm:grid-cols-2">
               <Combobox

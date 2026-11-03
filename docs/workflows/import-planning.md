@@ -6,6 +6,7 @@ tours: src/features/import-planning/importTour.ts
 guides: src/features/shared/guides/importPlanningGuide.tsx
 last_verified: 2026-11-03
 ttl_days: 90
+<!-- re-verified: 2026-11-03 — khối Đọc file hợp đồng ở hộp Lập / Sửa HĐ nhập (`ImportDialogs.tsx`, `fillImportContract`) khớp đoạn "Đọc file hợp đồng" ở §1 (ba-spec 66); không đổi trạng thái, không đổi quyền. -->
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ).
 

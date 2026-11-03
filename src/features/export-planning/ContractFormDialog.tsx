@@ -53,9 +53,11 @@ import {
 import { formatMoney } from "@/lib/format";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import { findCustomerName, lineTextAfterPick } from "@/lib/customerProductNames";
+import { applyExportConflicts, fillExportContract, type ExportContractFillValues, type FillConflict, type ReadContract } from "@/lib/contractReader";
 import type { Customer, CustomerProductName, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, ExportFile, Product } from "@/types";
 import { Copy, Factory, FileSignature, Plus, Save, Trash2 } from "lucide-react";
 import { FilePicker } from "./parts";
+import { ContractReadPanel, type ContractFillReport } from "./ContractReadPanel";
 import { useGoodsTypePicker } from "./goodsTypePicker";
 import { useExportOptionPicker } from "./exportOptionPicker";
 import { uploadExtraContractFiles } from "./RecordDialogs";
@@ -222,6 +224,8 @@ export function ContractFormDialog({
   const today = todayIso();
   const [form, setForm] = useState<ContractForm | null>(null);
   const [file, setFile] = useState<File[]>([]);
+  /** File vừa đọc ở khối "Đọc file hợp đồng" mà U1 chọn đính vào HĐ (ba-spec 66 R13) — đứng đầu khi Lưu. */
+  const [readFile, setReadFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   /** Dòng đã mở phần "mã HS, vi sinh" (chỉ trình bày, không lưu). */
@@ -273,6 +277,7 @@ export function ContractFormDialog({
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
     setFile([]);
+    setReadFile(null);
     setErrors([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
@@ -330,9 +335,43 @@ export function ContractFormDialog({
   const customerGate = form && form.mode !== "create" ? customerChangeGate(data, form.contractId) : ({ ok: true } as const);
   const customerLocked = !customerGate.ok;
 
+  /* Đọc file hợp đồng (ba-spec 66): chỉ điền ô trống, ô khác file trả về để U1 chọn; không tự lưu. */
+  const formRef = useRef(form);
+  formRef.current = form;
+  const fillValues = (f: ContractForm): ExportContractFillValues => ({
+    customerId: f.customerId,
+    contractNo: f.contractNo,
+    signedOn: f.signedOn,
+    orderRef: f.orderRef,
+    revisedOn: f.revisedOn,
+    changeSummary: f.changeSummary,
+    terms: f.terms,
+    lines: f.lines,
+  });
+  const fillFromRead = (read: ReadContract, force: boolean): ContractFillReport | null => {
+    const f = formRef.current;
+    if (!f) return null;
+    const { values, ...report } = fillExportContract(fillValues(f), read, {
+      mode: f.mode,
+      baseline: { signedOn: today, revisedOn: today, paymentMethod: "ttr", currency: "USD" },
+      customers,
+      options: optionPicker.options,
+      canSeePrice,
+      customerLocked,
+      force,
+      newLineId: newId,
+      suggestProduct: (description, size, customerId) =>
+        description.trim() ? suggestProductId(data, description, customerId, products, { size, names: customerNames }) : "",
+    });
+    if (!report.blocked) setForm((cur) => (cur ? { ...cur, ...values } : cur));
+    return report;
+  };
+  const applyFromRead = (picks: FillConflict[]) => setForm((cur) => (cur ? { ...cur, ...applyExportConflicts(fillValues(cur), picks) } : cur));
+
   const save = async (thenCreateOrder = false) => {
     // Không đòi `target`: tải lại trang thì hộp mở lại từ NHÁP (target rỗng) — Lưu vẫn phải chạy.
     if (!form || isUploading) return;
+    const files = readFile ? [readFile, ...file] : file;
     const issues = validateContract(
       { id: form.contractId, customerId: form.customerId, contractNo: form.contractNo, signedOn: form.signedOn, terms: form.terms, lines: form.lines },
       contracts,
@@ -346,7 +385,7 @@ export function ContractFormDialog({
         field: "Mặt hàng (danh mục)",
         message: "Lập lệnh sản xuất cần ít nhất một dòng hàng đã chọn Mặt hàng (danh mục). Chọn ở dòng hàng, hoặc bấm Lưu hợp đồng để nối sau.",
       });
-    for (const f of file) {
+    for (const f of files) {
       const fileErr = checkExportFile(f);
       if (fileErr) errs.push({ field: f.name, message: fileErr });
     }
@@ -358,15 +397,15 @@ export function ContractFormDialog({
     try {
       let filePath = form.filePath;
       let fileName = form.fileName;
-      if (file[0] && hasExportStorage) {
-        const r = await uploadExportFile(exportFilePath(form.contractId, "contract", form.revisionId, file[0].name), file[0]);
+      if (files[0] && hasExportStorage) {
+        const r = await uploadExportFile(exportFilePath(form.contractId, "contract", form.revisionId, files[0].name), files[0]);
         if ("error" in r) throw new Error(r.error);
         done.push(r.path);
         filePath = r.path;
         fileName = r.fileName;
       }
       const attachments = await uploadExtraContractFiles(
-        file.slice(1),
+        files.slice(1),
         form.contractId,
         `Phụ lục / file kèm HĐ ${form.contractNo.trim()}${form.revisionNo ? ` bản sửa ${form.revisionNo}` : ""}`,
         recordedBy,
@@ -496,6 +535,18 @@ export function ContractFormDialog({
       {form && totals && (
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 py-2">
           <ErrorSummary errors={errors} />
+
+          <ContractReadPanel
+            key={form.key}
+            role="export"
+            canAttach={hasExportStorage}
+            canSeePrice={canSeePrice}
+            attach={!!readFile}
+            onAttachChange={setReadFile}
+            onFill={fillFromRead}
+            onApply={applyFromRead}
+            tourId="export-contract-read"
+          />
 
           <FormSection no={1} title="Hợp đồng" hint="VD số HĐ: 18.26/BSF-SCM.2026 · số PO của khách (dòng Order trên HĐ): #B182">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -668,7 +719,7 @@ export function ContractFormDialog({
                   <div key={l.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 rounded-lg border border-border bg-card p-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold">Dòng {i + 1}</span>
-                      <span className="tnum min-w-0 flex-1 text-sm text-muted-foreground">
+                      <span className="tnum min-w-0 flex-1 basis-40 text-sm text-muted-foreground">
                         {formatNumber(lineKg(l))} kg{canSeePrice ? ` · ${formatMoney(lineAmount(l))} ${currency}` : ""}
                       </span>
                       <Button

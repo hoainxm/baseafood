@@ -22,8 +22,8 @@ async function rowsFromExcel(data: ArrayBuffer): Promise<InvoiceCell[][]> {
   return sheets.find((s) => has(s, /commercial\s+invoice/i)) ?? sheets.find((s) => has(s, /description/i)) ?? sheets[0] ?? [];
 }
 
-/** Chữ của PDF (≤ 5 trang đầu) gom theo dòng — dùng chung cho hóa đơn đại lý (lib/supplierInvoiceFiles.ts). */
-export async function rowsFromPdf(data: ArrayBuffer): Promise<InvoiceCell[][] | "scan"> {
+/** Chữ của PDF (≤ `maxPages` trang đầu, mặc định 5) gom theo dòng — dùng chung cho hóa đơn đại lý (lib/supplierInvoiceFiles.ts) và file hợp đồng (lib/contractFileReader.ts). */
+export async function rowsFromPdf(data: ArrayBuffer, maxPages = 5): Promise<InvoiceCell[][] | "scan"> {
   const [pdfjs, worker] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")]);
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
   const task = pdfjs.getDocument({ data: new Uint8Array(data) });
@@ -31,7 +31,7 @@ export async function rowsFromPdf(data: ArrayBuffer): Promise<InvoiceCell[][] | 
   const items: (PdfTextItem & { page: number })[] = [];
   try {
     // Invoice 1–2 trang; đọc tối đa 5 trang đầu (file gộp cả bộ chứng từ thì invoice đứng đầu).
-    for (let p = 1; p <= Math.min(doc.numPages, 5); p++) {
+    for (let p = 1; p <= Math.min(doc.numPages, maxPages); p++) {
       const page = await doc.getPage(p);
       const content = await page.getTextContent();
       for (const it of content.items) {

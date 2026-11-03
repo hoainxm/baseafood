@@ -63,6 +63,7 @@ Mỗi quy tắc một dòng; mẫu + ngoại lệ + checklist ở link. *(máy c
 18. **Mọi trang nghiệp vụ có "Hướng dẫn thao tác" + hộp "?"**, cùng commit với trang: `features/<khu>/<trang>Tour.ts` (`tourSpec`, mốc `data-tour`) + hộp trong `PAGE_GUIDES`. Khu vực có trạng thái phải giải thích trạng thái, điều kiện xong, việc tiếp; tour không ghi — [`43-guided-tour`](docs/app-map/43-guided-tour.ba-spec.md) + [README § Hướng dẫn thao tác](src/design-system/README.md). *(máy chặn)*
 19. **Mọi bảng nghiệp vụ sắp được theo cột** (tăng → giảm → gốc; mỗi kiểu một cách xếp; ô trống cuối). Bảng chuẩn tự có — cột ô nhập/huy hiệu/trạng thái phải khai `sortValue` + `sortKind`; bảng tự dựng dùng `useTableSort` — [README § Sắp xếp cột](src/design-system/README.md#sắp-xếp-cột--bấm-tên-cột-mỗi-kiểu-dữ-liệu-một-cách-xếp-từ-2026-10-27). *(máy chặn)*
 20. **Lưới gọn (`EditableGrid compact`, bảng chính Cân đối): cột rộng VỪA giá trị dài nhất + đệm** — cột số tự đo, cột ô chọn khai `fitText`; tên cột tối đa 2 dòng (rút gọn + `title`, không giảm cỡ chữ); không giãn theo khung, không kéo cột; cột tên ăn phần dư — [README § Lưới GỌN](src/design-system/README.md). *(máy chặn)*
+21. **Module có sơ đồ workflow (`docs/workflows/`) ⇒ sửa code của module thì sửa sơ đồ CÙNG commit** (đổi luật ⇒ bảng / sơ đồ; chỉ đổi kỹ thuật ⇒ `last_verified:`); trang mới ⇒ gán module ở `WORKFLOW_MODULES` (`lib/workflowDocs.ts`); đổi quyền ⇒ `UPDATE_WORKFLOW_DOCS=1 npx vitest run src/lib/workflowDocs.test.ts` — [`docs/workflows/README.md`](docs/workflows/README.md). *(máy chặn)*
 
 ## Commit & deploy
 
@@ -118,6 +119,7 @@ Sửa doc xong ⇒ cập nhật `last_verified:` trong frontmatter. Hook pre-com
 | `App.tsx` (thêm màn / đổi nav) | [`02-pages-navigation`](docs/app-map/02-pages-navigation.md) |
 | Thêm thư mục / đổi ranh giới import | [`01-app-structure`](docs/app-map/01-app-structure.md) |
 | `index.html`, `package.json`, `vite.config.ts`, env | [`ops/deploy-vercel`](docs/ops/deploy-vercel.md) |
+| Code trong `covers:` của một sơ đồ `docs/workflows/*.md` (hiện: Xuất khẩu) | Sơ đồ đó — hook **chặn** nếu quên ([`docs/workflows/README.md`](docs/workflows/README.md), ba-spec [65](docs/app-map/65-workflow-docs.ba-spec.md)) |
 | `design-system/**`, `components/ui/**`, `tokens.css`, tô màu dòng | [`src/design-system/README.md`](src/design-system/README.md) — canonical, không nhân bản |
 
 ## Code đổi → cổng kiểm bắt buộc
@@ -159,6 +161,7 @@ Index đầy đủ + định tuyến theo task: [`docs/app-map/README.md`](docs/
 | [`40-documents`](docs/app-map/40-documents.md) | tài liệu công ty, lần ban hành, xem theo phòng ban |
 | [`41`](docs/app-map/41-export-planning.ba-spec.md) · [`42`](docs/app-map/42-export-planning-ui.design-spec.md) | Phòng Kế hoạch · Xuất khẩu |
 | [`45`](docs/app-map/45-import-planning.ba-spec.md) · [`46`](docs/app-map/46-import-planning-ui.design-spec.md) | Phòng Kế hoạch · Nhập khẩu (≠ Nhập hàng) |
+| [`docs/workflows/`](docs/workflows/README.md) | **review nhanh luật một module** (trạng thái · điều kiện · ai làm gì) — đọc TRƯỚC ba-spec dài |
 | [`43-guided-tour`](docs/app-map/43-guided-tour.ba-spec.md) | tour hướng dẫn + hộp "?" |
 | [`spec/qr-truy-xuat-lo`](docs/spec/qr-truy-xuat-lo.md) | truy xuất lô QR, gắn lô |
 | [`spec/che-do-demo`](docs/spec/che-do-demo.md) | chế độ demo, Tổng quan dòng chảy số liệu |

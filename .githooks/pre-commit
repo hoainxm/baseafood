@@ -9,6 +9,7 @@
 # CHẶN  : lộ khóa/URL Supabase · features import thẳng primitive · features gọi
 #         localStorage/supabase · chữ nhỏ & IN HOA trong màn nghiệp vụ ·
 #         tên tiếng Việt không dấu MỚI (scripts/check-naming.mjs --staged)
+#         sơ đồ docs/workflows/ có `covers:` trỏ tới file vừa sửa mà sơ đồ đứng yên
 # CẢNH BÁO: doc app-map có `covers:` trỏ tới file vừa sửa mà doc đứng yên ·
 #         nút chỉ-icon thêm mới chưa có aria-label/title (nhắc, không chặn —
 #         mẫu dò theo DÒNG nên JSX xuống dòng có thể báo nhầm)
@@ -117,6 +118,31 @@ for doc in docs/app-map/*.md; do
     done
   done
 done
+
+# ---------- 3b. Sơ đồ workflow lệch code (CHẶN — docs/workflows/README.md, ba-spec 65) ----------
+# Khác doc app-map (chỉ nhắc): sơ đồ workflow là bản review nhanh của module ⇒ code trong `covers:` đổi mà
+# file sơ đồ không đổi trong CÙNG commit ⇒ chặn. Thay đổi không đụng luật (đổi tên biến, sửa chữ): sửa
+# `last_verified:` của sơ đồ cũng tính là đã soát. Bỏ qua có chủ đích: WORKFLOW_DOC_SKIP=1 git commit …
+if [ "${WORKFLOW_DOC_SKIP:-0}" != 1 ]; then
+  for doc in docs/workflows/*.md; do
+    [ -f "$doc" ] || continue
+    case "$staged" in *"$doc"*) continue ;; esac
+    covers=$(sed -n 's/^covers:[[:space:]]*//p' "$doc" | head -1 | tr ',' ' ')
+    [ -z "$covers" ] && continue
+    for mau in $covers; do
+      mau=$(printf '%s' "$mau" | sed 's|\*\*|*|g')
+      hit=""
+      for f in $staged; do
+        # shellcheck disable=SC2254
+        case "$f" in $mau) hit="$f"; break ;; esac
+      done
+      if [ -n "$hit" ]; then
+        do_hong "$hit đổi nhưng sơ đồ $doc không — sửa sơ đồ (hoặc ít nhất last_verified:) trong cùng commit. Không đụng luật: WORKFLOW_DOC_SKIP=1 git commit"
+        break
+      fi
+    done
+  done
+fi
 
 # ---------- 4. Migration mở RLS cho anon (CẢNH BÁO) ----------
 # Bảng mới để lại policy `for all to anon, authenticated using(true)` = lỗ hổng:

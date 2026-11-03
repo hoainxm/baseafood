@@ -8,6 +8,7 @@ File này trả lời **một câu**: *doc nào ở đâu, và doc mới bỏ v�
 | Bucket | Đọc khi | Canonical cho |
 |---|---|---|
 | [`app-map/`](app-map/README.md) | **viết code** — cần ngữ cảnh 1 chủ đề | Kiến trúc, invariant nghiệp vụ, cạm bẫy — *cái không suy được từ code* |
+| [`workflows/`](workflows/README.md) | **review / kiểm lại** luật một module | Sơ đồ Mermaid + bảng trạng thái · điều kiện · ai làm gì — mỗi module một file, máy chặn khi lệch code |
 | [`ops/`](ops/README.md) | **đưa app lên chạy** — cài đặt, deploy, cấu hình | Cutover Supabase, deploy Vercel, env, vận hành |
 | [`spec/`](spec/) | **trước khi build** — chốt kiến trúc/đặc tả | ADR, đặc tả kỹ thuật (vd routing; **đặt tên: [`quy-uoc-dat-ten.md`](spec/quy-uoc-dat-ten.md)** — luật mọi lớp + từ điển thuật ngữ) |
 | [`trien-khai/`](trien-khai/README.md) | hiểu **vì sao nghiệp vụ vậy** | Phân tích gốc, 28 câu hỏi đã chốt, thiết kế flow, kế hoạch |
@@ -27,6 +28,7 @@ Hỏi *"doc này trả lời câu gì?"* rồi tra:
 | Doc trả lời… | Vào | Quy ước |
 |---|---|---|
 | "Sửa code chủ đề X thì đọc gì / invariant nào" | `app-map/` | 1 chủ đề/file · đánh số · frontmatter `covers:` trỏ source thật |
+| "Module X đang chạy luật gì, ai làm bước nào" | `workflows/` | 1 module/file · `covers:` · hook chặn khi code đổi mà sơ đồ không đổi |
 | "Cài / deploy / cấu hình / vận hành thế nào" | `ops/` | tên `<chủ-đề>.md`, không đánh số |
 | "Quyết định kiến trúc / đặc tả trước khi build" | `spec/` | tên `<chủ-đề>.md`, ghi trạng thái (dự thảo/chốt) |
 | "Vì sao nghiệp vụ vậy / phân tích / kế hoạch" | `trien-khai/` | đánh số theo thứ tự đọc |

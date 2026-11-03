@@ -2,7 +2,7 @@
 
 > Load khi: cần review / kiểm lại nhanh luật của một trang hoặc module; trước khi sửa code của module đã có sơ đồ; thêm module / trang mới. Oracle: ba-spec [65](../app-map/65-workflow-docs.ba-spec.md).
 
-**Xem trên app:** bấm "?" ở góc phải của bất kỳ trang nào → **Xem sơ đồ quy trình** (trang `#/workflows`, có tab từng khu). App hiện đúng các file này.
+**Xem trên app:** mục **Quy trình** ở thanh bên, hoặc nút **?** của bất kỳ trang nào → **Xem sơ đồ quy trình** (mở đúng khu). Trang có tab từng khu; ai có vai trò cũng xem. App hiện đúng các file này.
 
 Mỗi module MỘT file — đọc 5 phút là nắm: trạng thái, điều kiện chuyển, ai làm gì, nối sang đâu. Luật đầy đủ vẫn ở ba-spec của module; file ở đây là **bản đọc nhanh**, trỏ về R-id và tên hàm trong code, không chép lại spec.
 

@@ -111,6 +111,8 @@ sequenceDiagram
 - Quên mật khẩu: không gửi email được (email đăng nhập là email tổng hợp). Màn đăng nhập chỉ hướng dẫn báo admin; admin đặt mật khẩu tạm.
 - Tab NCC nhập khẩu do Phòng Kế hoạch giữ; thủ kho và xưởng không thấy (`catalog.import-suppliers` không nằm trong `CATALOG_TABS`).
 
+
+**Quyền tự cấp** (`resolvePermissions`): ai đã có quyền bất kỳ thì tự có quyền xem **Việc của tôi** (`my-tasks`), **Tài liệu công ty** (`documents`) và **Quy trình** (`workflows`, sơ đồ quy trình chỉ đọc). Ba tài nguyên này hiện ở Vai trò &amp; quyền nhưng không cần đặt ô; chặn riêng một người vẫn gỡ được.
 ## 5. Ai được làm gì
 
 Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể khác). Admin luôn đủ quyền. Bốn trang Quản trị (`admin`, `users`, `roles`, `audit`) chỉ admin dùng nên không có bảng.
@@ -267,4 +269,5 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 
 ## Lịch sử
 
+- 2026-11-03 — thêm tài nguyên tự cấp `workflows` (trang Quy trình).
 - 2026-11-03 — tạo.

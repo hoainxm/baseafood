@@ -53,7 +53,7 @@ import { emailToUsername } from "@/lib/username";
 
 // Việc của tôi — việc cần làm, hạn, giao việc
 /** Trang có route nhưng không nằm trong cây điều hướng — tiêu đề header riêng. */
-const EXTRA_PAGE_TITLES: Record<string, string> = { "file-view": "Xem file", workflows: "Quy trình" };
+const EXTRA_PAGE_TITLES: Record<string, string> = { "file-view": "Xem file" };
 
 const MyTasksScreen = lazy(() => import("@/features/my-tasks"));
 // Tài liệu công ty — quy trình, biểu mẫu, chứng nhận, hồ sơ năng lực (mig 0072)
@@ -380,7 +380,7 @@ export default function App() {
             <Route path="/my-tasks" element={<MyTasksScreen />} />
             <Route path="/documents" element={<DocumentsScreen />} />
             <Route path="/file-view" element={<FileViewScreen />} />
-            {/* Sơ đồ quy trình (docs/workflows/, ba-spec 65) — mở từ hộp "?" của mọi trang; ai có vai trò cũng xem. */}
+            {/* Sơ đồ quy trình (docs/workflows/, ba-spec 65) — mục nav "Quy trình" + hộp "?" mọi trang; ai có vai trò cũng xem. */}
             <Route path="/workflows" element={<WorkflowScreen />} />
             <Route path="/planning-export" element={<ExportPlanningScreen />} />
             <Route path="/planning-import" element={<ImportPlanningScreen />} />

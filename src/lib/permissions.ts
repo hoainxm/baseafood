@@ -127,6 +127,8 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   // Xóa = xóa tài liệu chưa từng hiệu lực · Duyệt = xem xét / phê duyệt (đợt 2). Ma trận
   // mặc định KHÔNG cấp ô ghi nào ⇒ trước mắt chỉ admin làm (chủ dự án 2026-10-19).
   { id: "documents", label: "Tài liệu công ty", group: "documents", navId: "documents", actions: [...CRUD, "approve", "export"] },
+  // Sơ đồ quy trình từng khu (ba-spec 65 R7) — chỉ đọc; ai có vai trò cũng tự có quyền xem (như Tài liệu công ty).
+  { id: "workflows", label: "Quy trình (sơ đồ workflow)", group: "documents", navId: "workflows", actions: ["view"] },
 
   // Phòng Kế hoạch · Xuất khẩu (mig 0075, ba-spec docs/app-map/41-export-planning.ba-spec.md R11).
   // `export-plans` = hợp đồng, bản sửa, duyệt giấy, gia hạn, chuyến, bước, file. `.loading` = người
@@ -592,6 +594,8 @@ function isGrantable(resource: string, action: PermissionAction): boolean {
 export const MY_TASKS_RESOURCE = "my-tasks";
 /** Tài nguyên "Tài liệu công ty" — mọi người có vai trò đều mở được màn; tài liệu nào thấy do phòng ban quyết. */
 export const DOCUMENTS_RESOURCE = "documents";
+/** Tài nguyên "Quy trình" — sơ đồ workflow chỉ đọc, ai có vai trò cũng xem (ba-spec 65 R7). */
+export const WORKFLOWS_RESOURCE = "workflows";
 
 export interface ResolveInput {
   roles: readonly Role[];
@@ -650,6 +654,7 @@ export function resolvePermissions({
   if (grants.size > 0) {
     add(MY_TASKS_RESOURCE, "view", "all");
     add(DOCUMENTS_RESOURCE, "view", "all");
+    add(WORKFLOWS_RESOURCE, "view", "all");
   }
 
   for (const o of overrides) if (o.effect === "deny") grants.delete(keyOf(o.resource, o.action));

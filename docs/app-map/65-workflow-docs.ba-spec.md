@@ -54,7 +54,7 @@ IN: khung, sổ đăng ký 10 module, sơ đồ cả 10 module, hook chặn, tes
 | R4 | Mọi nhãn trạng thái / bước khai ở `labels` có mặt nguyên văn trong sơ đồ |
 | R5 | Commit đụng file khớp `covers:` của sơ đồ mà sơ đồ không staged ⇒ chặn; `WORKFLOW_DOC_SKIP=1` bỏ qua có chủ đích |
 | R6 | (người dùng 2026-11-03) Code của khu đổi ⇒ cùng commit sửa ≥ 1 file hướng dẫn thao tác (`tours:`) + ≥ 1 file hộp "?" (`guides:`) của khu, theo sơ đồ; chỉ sửa chính file tour / hộp "?" không bắt sơ đồ đổi theo |
-| R7 | Xem trên app: trang `#/workflows` (tab từng khu, điện thoại ô chọn) hiện đúng file `docs/workflows/*.md` (Mermaid vẽ thành sơ đồ, bỏ dòng kỹ thuật); hộp "?" mọi trang có nút **Xem sơ đồ quy trình** mở đúng khu. Ai có vai trò cũng xem (tài liệu chỉ đọc) |
+| R7 | Xem trên app: trang `#/workflows` (tab từng khu, điện thoại ô chọn) hiện đúng file `docs/workflows/*.md` (Mermaid vẽ thành sơ đồ, bỏ dòng kỹ thuật); hộp "?" mọi trang có nút **Xem sơ đồ quy trình** mở đúng khu; mục nav **Quy trình** (nhóm riêng). Tài nguyên `workflows` (chỉ Xem) tự cấp cho mọi người có vai trò; trang có tour + hộp "?" như mọi trang |
 
 ## 10. Acceptance Criteria
 
@@ -92,6 +92,7 @@ IN: khung, sổ đăng ký 10 module, sơ đồ cả 10 module, hook chặn, tes
 - Sơ đồ 9 module sau (2026-11-03) đối chiếu với code; chỗ tài liệu cũ lệch code ghi ở `docs/.escaped-drift.log` (Kho dự trữ: duyệt nhập kho là Quản đốc / Phó quản đốc, không phải Thủ kho).
 
 ## History
+- 2026-11-03 — R7: Quy trình thành trang thật (nav, tài nguyên quyền tự cấp, tour + hộp "?") — người dùng: "phải cấu hình lên hệ thống".
 - 2026-11-03 — R6 (sửa khu ⇒ sửa tour + hộp "?"), R7 (xem trên app `#/workflows`, nút trong hộp "?"); thêm `marked` + `mermaid` (ghim bản).
 - 2026-11-03 — đủ sơ đồ 10 module; `labels` từ hằng số `src/lib` của từng module.
 - 2026-11-03 — v1 tạo + build (chủ dự án chốt 4 câu: module · Markdown + Mermaid · chặn commit + test · Xuất khẩu trước).

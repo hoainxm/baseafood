@@ -3,12 +3,14 @@
 // Tên tiếng Việt: Trang Quy trình — xem sơ đồ workflow của từng khu ngay trong app
 // Description: In-app viewer of docs/workflows/*.md (ba-spec 65) — same files the pre-commit hook keeps in sync with code
 // ============================================================
-// Mở từ hộp "?" của mọi trang ("Xem sơ đồ quy trình") hoặc thẳng `#/workflows?module=<id>`. Chỉ đọc; nội dung là
+// Mục "Quy trình" ở thanh bên (mọi người có vai trò), hộp "?" của mọi trang ("Xem sơ đồ quy trình") hoặc `#/workflows?module=<id>`. Chỉ đọc; nội dung là
 // đúng file trong repo (đóng gói lúc build) ⇒ sửa code mà quên sơ đồ thì commit bị chặn, app luôn hiện bản khớp code.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Combobox, EmptyState, MarkdownView, Tabs, TabsList, TabsTrigger, ThinkingDots } from "@/design-system";
 import { WORKFLOW_MODULES } from "@/lib/workflowDocs";
+import { usePageTour } from "@/features/shared/PageTourProvider";
+import { buildWorkflowsTour } from "./workflowsTour";
 import { Workflow } from "lucide-react";
 
 const DOCS = import.meta.glob<string>("../../../docs/workflows/*.md", { query: "?raw", import: "default" });
@@ -31,6 +33,9 @@ export default function WorkflowScreen() {
     };
   }, [current]);
 
+  const tour = useMemo(() => buildWorkflowsTour(), []);
+  usePageTour(tour);
+
   const select = useCallback((id: string) => setParams({ module: id }, { replace: true }), [setParams]);
   const linkFor = useCallback((id: string) => `#/workflows?module=${id === "README" ? MODULES[0].id : id}`, []);
 
@@ -39,6 +44,7 @@ export default function WorkflowScreen() {
     <div className="space-y-4">
       <h1 className="sr-only">Quy trình — sơ đồ workflow theo khu</h1>
       {/* Máy tính: hàng tab các khu; điện thoại: ô chọn. */}
+      <div data-tour="workflows-areas">
       <div className="max-lg:hidden">
         <Tabs value={current.id} onValueChange={select}>
           <TabsList className="h-auto flex-wrap justify-start">
@@ -60,7 +66,8 @@ export default function WorkflowScreen() {
           options={MODULES.map((m) => ({ value: m.id, label: m.title }))}
         />
       </div>
-      <div className="rounded-xl border-2 border-border bg-card p-4 sm:p-6">
+      </div>
+      <div data-tour="workflows-doc" className="rounded-xl border-2 border-border bg-card p-4 sm:p-6">
         {text?.id === current.id ? <MarkdownView markdown={text.md} linkFor={linkFor} /> : <ThinkingDots />}
       </div>
     </div>

@@ -118,8 +118,9 @@ export const WORKFLOW_MODULES: readonly WorkflowModule[] = [
   {
     id: "overview",
     title: "Việc của tôi · Tổng quan · Tài liệu",
-    pages: ["my-tasks", "dashboard", "documents"],
+    pages: ["my-tasks", "dashboard", "documents", "workflows"],
     doc: "docs/workflows/overview.md",
+    // "workflows" không vẽ bảng quyền: ai có vai trò cũng tự có quyền xem (resolvePermissions), không nằm trong ma trận.
     resources: ["dashboard", "my-tasks", "documents"],
     labels: [...values(DOCUMENT_STATE_LABELS), ...values(PLANNING_ATTENTION_LABELS), ...values(PLANNING_MODULE_LABELS)],
   },

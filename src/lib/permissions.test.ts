@@ -230,7 +230,6 @@ describe("sổ đăng ký tài nguyên khớp code", () => {
     );
     segs.delete("kit"); // trang bộ giao diện cho dev, không phải màn nghiệp vụ
     segs.delete("file-view"); // trang xem file ở tab mới (ba-spec 61) — quyền là quyền lấy link có hạn của nguồn file, không phải màn riêng
-    segs.delete("workflows"); // trang đọc sơ đồ quy trình (ba-spec 65) — tài liệu chỉ đọc, ai có vai trò cũng xem, không phải màn nghiệp vụ
     for (const seg of segs) expect(PERMISSION_NAV_IDS, seg).toContain(seg);
     expect(segs.size).toBeGreaterThan(10);
   });

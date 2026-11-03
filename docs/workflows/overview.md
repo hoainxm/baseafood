@@ -1,8 +1,8 @@
 # Việc của tôi · Tổng quan · Tài liệu — sơ đồ workflow
 
 > Load khi: review / kiểm lại ba trang `/my-tasks` (Việc của tôi), `/dashboard` (Tổng quan), `/documents` (Tài liệu công ty); trước khi sửa luật hạn việc, giao việc, cảnh báo chuỗi, lần ban hành, xem tài liệu theo phòng ban. Bản đọc nhanh — luật đầy đủ ở [39-my-tasks](../app-map/39-my-tasks.md) · [59](../app-map/59-my-tasks-by-role.ba-spec.md) · [40-documents](../app-map/40-documents.md) · [55](../app-map/55-dashboard-modules.ba-spec.md) · spec che-do-demo §5b.
-covers: src/features/my-tasks/*, src/features/dashboard/*, src/features/documents/*, src/lib/myTasks.ts, src/lib/dataFlow.ts, src/lib/dashboardAttention.ts, src/lib/documents.ts, src/lib/documentStorage.ts
-tours: src/features/my-tasks/myTasksTour.ts, src/features/dashboard/dashboardTour.ts, src/features/documents/documentsTour.ts
+covers: src/features/my-tasks/*, src/features/dashboard/*, src/features/documents/*, src/lib/myTasks.ts, src/lib/dataFlow.ts, src/lib/dashboardAttention.ts, src/lib/documents.ts, src/lib/documentStorage.ts, src/features/workflows/*
+tours: src/features/my-tasks/myTasksTour.ts, src/features/dashboard/dashboardTour.ts, src/features/documents/documentsTour.ts, src/features/workflows/workflowsTour.ts
 guides: src/features/shared/guideContent.tsx, src/features/shared/guides/dashboardGuide.tsx
 last_verified: 2026-11-03
 ttl_days: 90
@@ -134,6 +134,10 @@ sequenceDiagram
 - Xem tài liệu: admin, Ban giám đốc (`SEE_ALL_DEPARTMENT`) hoặc chạy không đăng nhập thấy hết; người khác thấy tài liệu "cả công ty", của phòng mình, hoặc phòng được chọn (`canViewDocument`). Phòng ban của người = hợp phòng các vai trò (`departmentsOfRoles`).
 - Ba lớp chặn đọc tài liệu: app, RLS, bucket `documents`. Đổi bảng phòng ban ở code ⇒ viết migration mới cho `current_user_departments()`.
 
+
+## Trang Quy trình (`/workflows`)
+
+Mục **Quy trình** ở thanh bên và nút **Xem sơ đồ quy trình** trong hộp **?** của mọi trang mở trang này. Tab từng khu (điện thoại: ô **Khu**) hiện đúng file sơ đồ `docs/workflows/` — chỉ đọc. Ai có vai trò cũng tự có quyền xem (`WORKFLOWS_RESOURCE` cấp ở `resolvePermissions`, như Tài liệu công ty), không cần đặt ở Vai trò &amp; quyền; chặn riêng một người vẫn được.
 ## 5. Ai được làm gì
 
 Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể khác). Admin luôn đủ quyền. `my-tasks` và `documents`: Xem do hệ thống tự cấp cho ai đã có quyền ở đâu đó (`resolvePermissions`).

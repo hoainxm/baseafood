@@ -21,7 +21,6 @@ const PAGE_TOUR_EXEMPT: Record<string, string> = {
   audit: "nhật ký thao tác — trang tra cứu của quản trị",
   kit: "trang mẫu giao diện cho người phát triển",
   "file-view": "trang xem một file ở tab mới (ba-spec 61) — không có thao tác nghiệp vụ, chỉ đọc + Tải về",
-  workflows: "trang đọc sơ đồ quy trình (ba-spec 65) — mở từ hộp \"?\", chỉ đọc tài liệu, không thao tác nghiệp vụ",
 };
 
 function listFiles(dir: string, ext: RegExp): string[] {

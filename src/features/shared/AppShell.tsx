@@ -57,8 +57,7 @@ import {
   Bell,
   ChevronDown,
   Search,
-  type LucideIcon,
-} from "lucide-react";
+  type LucideIcon, Workflow } from "lucide-react";
 
 /**
  * AppShell — khung MES: nav DỌC gom nhóm (sidebar trên desktop, drawer trượt
@@ -112,6 +111,7 @@ export const KIT_NAV: ShellNavItem[] = [
   { id: "planning-production", label: "Lệnh sản xuất", icon: ClipboardList, description: "Lệnh sản xuất của Phòng Kế hoạch: lập từ dòng hàng hợp đồng xuất, gắn nguyên liệu nhập khẩu dự kiến, phát hành tới Ban quản đốc phân xưởng và Thủ kho, gắn chuyến xuất, in mẫu QTI-KH-01-04." },
   { id: "planning-export", label: "Xuất khẩu", icon: Container, description: "Kế hoạch xuất khẩu theo tháng: từng khách, từng hợp đồng, từng chuyến container đang ở bước nào (hợp đồng → lệnh SX → bao bì → đóng cont → chứng từ) và còn thiếu gì." },
   { id: "documents", label: "Tài liệu công ty", icon: FolderOpen, description: "Quy trình, biểu mẫu, chứng nhận, hồ sơ năng lực của công ty: bản đang hiệu lực, các lần ban hành và file gốc. Chỉ thấy tài liệu của phòng mình." },
+  { id: "workflows", label: "Quy trình", icon: Workflow, description: "Sơ đồ quy trình từng khu: trạng thái, điều kiện xong của mỗi bước, bộ phận bàn giao, ai được làm gì. Luôn khớp phần mềm đang chạy." },
   { id: "catalog", label: "Danh mục", icon: Library , description: "Danh mục dùng chung: mặt hàng, khách hàng, đại lý, loại nguyên liệu, bột tẩm, kho lưu trữ, thành phẩm." },
   { id: "admin", label: "Tổng quan quản trị", icon: LayoutGrid , description: "Trang riêng của quản trị viên: tình trạng tài khoản, vai trò và lối vào các việc quản trị." },
   { id: "users", label: "Người dùng", icon: Users , description: "Quản lý tài khoản đăng nhập và vai trò của từng người." },
@@ -208,6 +208,7 @@ export const NAV_TREE: NavTreeGroup[] = [
   // Thứ tự theo dòng việc (chủ dự án 2026-10-30): Nhập khẩu (NL về) → Lệnh sản xuất → Xuất khẩu (chuyến).
   { name: "Kế hoạch", icon: Container, children: [{ ref: "planning-import" }, { ref: "planning-production" }, { ref: "planning-export" }, LOOKUP_CHILD("import-suppliers", "Tra NCC nhập khẩu")] },
   { name: "Tài liệu công ty", icon: FolderOpen, children: [{ ref: "documents" }] },
+  { name: "Quy trình", icon: Workflow, children: [{ ref: "workflows" }] },
   {
     name: "Hệ thống",
     icon: Library,

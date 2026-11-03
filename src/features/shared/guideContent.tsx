@@ -135,6 +135,33 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
       </>
     ),
   },
+  workflows: {
+    title: "Quy trình",
+    description: "Sơ đồ quy trình từng khu: trạng thái, điều kiện xong của mỗi bước, bộ phận bàn giao, ai được làm gì.",
+    content: (
+      <>
+        <Section title="Chọn khu">
+          <Y>
+            <li>Tab ở đầu trang (điện thoại: ô <b>Khu</b>): Xuất khẩu, Nhập hàng, Sản xuất, Kho, Kinh doanh, Báo cáo &amp; Cân đối, Nhập khẩu, Lệnh sản xuất, Việc của tôi · Tổng quan · Tài liệu, Danh mục · Quản trị.</li>
+            <li>Từ trang bất kỳ: nút <b>?</b> → <b>Xem sơ đồ quy trình</b> mở thẳng khu của trang đó.</li>
+          </Y>
+        </Section>
+        <Section title="Đọc một sơ đồ">
+          <Y>
+            <li><b>Trạng thái</b>: việc chính đi qua những trạng thái nào, sang bước sau khi nào, ai làm.</li>
+            <li><b>Các bước</b>: cột <b>Xong khi</b> là điều kiện để bước chuyển sang Xong.</li>
+            <li><b>Bàn giao</b>: bộ phận nào chuyển việc cho bộ phận nào.</li>
+            <li><b>Ai được làm gì</b>: theo phân quyền mặc định; vai đã chỉnh ở Vai trò &amp; quyền có thể khác.</li>
+          </Y>
+        </Section>
+        <Section title="Luôn khớp phần mềm">
+          <Y>
+            <li>Mỗi lần sửa phần mềm của một khu, sơ đồ của khu đó cùng hướng dẫn thao tác và hộp ? được sửa trong cùng một lần cập nhật. Trang chỉ để đọc.</li>
+          </Y>
+        </Section>
+      </>
+    ),
+  },
   documents: {
     title: "Tài liệu công ty",
     description: "Quy trình, biểu mẫu, chứng nhận và hồ sơ năng lực: bản đang hiệu lực, các lần ban hành, file gốc.",

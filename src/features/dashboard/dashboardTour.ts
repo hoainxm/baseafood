@@ -40,16 +40,13 @@ export function buildDashboardTour(ctx: DashboardTourContext): PageTour {
     {
       id: "kpis",
       target: "dashboard-kpis",
-      title: "Tám thẻ số của kỳ",
+      title: "Bốn thẻ số của kỳ",
       body:
-        "• Nguyên liệu nhập: kg nhập trong kỳ và số chuyến.\n" +
-        "• Bán thành phẩm sản xuất: kg sản xuất, và bằng bao nhiêu % kg nguyên liệu nhập.\n" +
         "• Định mức NL/TP bình quân: kg nguyên liệu cho 1 kg thành phẩm, tính từ mẻ đã gắn lô có cân kg; chưa có thì lấy kỳ cân đối gần nhất.\n" +
         "• Tồn BTP kho dự trữ cuối kỳ, kèm thành phẩm đóng gói còn.\n" +
-        "• Xuất + bán ra: xuất theo đơn · bán lẻ · bán nội địa.\n" +
         "• Lãi/lỗ kỳ cân đối gần nhất: xanh là lãi, đỏ là lỗ.\n" +
         "• Mẻ đã gắn lô NL: % kg bán thành phẩm đã gắn lô nguyên liệu, gồm mẻ đã ghi lý do chưa gắn.\n" +
-        "• Việc cần đốc: số việc phải làm, ghi thêm số chỗ sổ sai cần sửa.\n" +
+        "Kg nhập, sản xuất, xuất bán xem ở khối Năm khâu ngay dưới; việc phải làm xem ở khối Việc cần đốc.\n" +
         "Chọn một thẻ để mở màn liên quan.",
     },
     {

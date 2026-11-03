@@ -688,6 +688,8 @@ export default function SalesScreen() {
           <SearchField label="Tra khách, mặt hàng, quy cách, ghi chú" value={query} onChange={setQuery} />
       </FilterBar>
 
+      {/* Kỳ chưa có phiếu ⇒ không hiện ba thẻ "0" (rà UX 2026-11-03), khối trống bên dưới đã nói đủ. */}
+      {periodRows.length > 0 && (
       <div data-tour="sales-stats">
       <StatCardGrid
         cards={[
@@ -697,6 +699,7 @@ export default function SalesScreen() {
         ]}
       />
       </div>
+      )}
 
       {/* Sổ: mỗi phiếu một cụm */}
       {isLoading ? (

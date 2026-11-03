@@ -1,6 +1,7 @@
 > Load khi: làm chế độ DEMO (bật/tắt), sinh bộ dữ liệu demo, gỡ màn DEMO dữ liệu mẫu, thêm chức năng mới cần có mặt trong demo.
 > Trạng thái: **ĐÃ CHỐT hướng (2026-10-12)** — chủ dự án chọn **phương án B `site-demo` trong DB thật** · ẩn danh mặc định có công tắc · xóa hẳn `/production` + `/reports` · **chỉ admin** bật demo. Chưa build. Đọc §4b (rào chắn bắt buộc của B) trước khi code.
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — rà UX đợt 2 (§5b Tổng quan): 4 thẻ một màu (Định mức NL/TP bình quân · Tồn BTP kho dự trữ cuối kỳ · Lãi/lỗ kỳ cân đối gần nhất · Mẻ đã gắn lô NL) — bỏ 3 thẻ trùng số khối Năm khâu (NL nhập · BTP sản xuất · Xuất + bán ra) và thẻ Việc cần đốc (đã có danh sách); bỏ câu giải thích dài dưới tiêu đề Năm khâu · Nguyên liệu đi đâu · Việc cần đốc · Nhập và sản xuất theo ngày (đã ở tour / hộp "?"). Tính số không đổi. -->
 <!-- updated: 2026-11-03 — rà UX đợt 1 (§5b Tổng quan): thanh lọc = `FilterBar` + `PeriodPicker` + ô thả "Phân xưởng" (bỏ thanh nút kỳ và chip xưởng); tính số không đổi. -->
 <!-- updated: 2026-11-02 — bảng MỚI `export_shipment_lines` (mig 0096) vào `DemoBundle` (`exportShipmentLines` = `demoShipmentLines`: chép dòng HĐ bản mới nhất vào mỗi chuyến chưa hủy, chia đều số kiện; chuyến có số cont ⇒ thực đóng = kế hoạch) + `DemoPackLoader` (`useExportShipmentLines`); khóa ngoại mềm khai `refColumns`. -->
 <!-- updated: 2026-11-02 — bảng MỚI `export_options` (mig 0095) vào `DemoBundle` (`exportOptions` = `EXPORT_OPTION_SEED`, 19 mục) + `DemoPackLoader` (`useExportOptions`); không khóa ngoại (HĐ lưu chữ). -->

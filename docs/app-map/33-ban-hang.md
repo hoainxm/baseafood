@@ -1,6 +1,7 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
 covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts, src/lib/inventory.ts, src/lib/salesTotals.ts
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — rà UX đợt 2: kỳ chưa có phiếu ⇒ không hiện ba thẻ số "0" (khối trống đã nói đủ); bước tour "Ba chỉ số của kỳ" thành tùy chọn. -->
 <!-- updated: 2026-11-03 — rà UX đợt 1: ô chọn kỳ của Sổ bán hàng và Báo cáo = `PeriodPicker` chung (nhãn "Kỳ xem", nút ‹ › lùi / tới kỳ, "Đang xem: Tháng 11/2026"). -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): Sổ bán thêm Khách · Kênh bán · ô Tra; Báo cáo thêm Khách · Kênh (rowMarkKey ghép lọc). Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->
 <!-- re-verified: 2026-10-27 10:00 — handoff Đơn đặt ghi sourceWarehouse "Đơn đặt" (SalesOrderScreen.tsx:324); filterRetailSales chỉ giữ dòng đúng marker (Kho dự trữ / Kho thành phẩm). Chú thích trong inventory.ts còn ghi "Lưu trữ" — nợ code, ghi backlog -->

@@ -57,9 +57,8 @@ export function buildMyTasksTour(ctx: MyTasksTourContext): PageTour {
       body:
         "• Quá hạn: việc của tôi (được giao cho tôi và việc theo quyền của tôi) đã qua hạn. Còn việc quá hạn thì thẻ đỏ.\n" +
         "• Hạn hôm nay: việc phải xong trong hôm nay.\n" +
-        "• Được giao cho tôi: số việc người khác giao riêng cho bạn đang mở. Số trên chuông ở thanh tiêu đề và số đỏ cạnh mục Việc của tôi ở menu là số này.\n" +
-        "• Tôi đã giao: việc bạn giao cho người khác còn đang mở; dòng phụ cho biết bao nhiêu việc người nhận để quá hạn. Thẻ này chỉ hiện khi bạn được giao việc hoặc đã từng giao.\n" +
-        "Chọn thẻ Quá hạn hoặc Hạn hôm nay để lọc danh sách; chọn hai thẻ còn lại để tới đúng mục.",
+        "Số việc được giao cho tôi và việc tôi đã giao ghi ở tiêu đề hai mục bên dưới (mục Tôi đã giao ghi thêm số việc người nhận để quá hạn). Số trên chuông ở thanh tiêu đề và số đỏ cạnh mục Việc của tôi ở menu là số việc được giao cho tôi đang mở.\n" +
+        "Chọn thẻ Quá hạn hoặc Hạn hôm nay để lọc danh sách.",
     },
     {
       id: "assigned",

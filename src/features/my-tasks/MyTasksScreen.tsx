@@ -73,7 +73,7 @@ import { formatDateVN } from "@/lib/format";
 import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
 import { recordName } from "@/lib/personName";
 import type { TaskAssignment } from "@/types";
-import { AlarmClock, ArrowRight, CalendarCheck, CheckCircle2, ClipboardList, Eye, LogOut, Pencil, Send, UserPlus, Users, XCircle } from "lucide-react";
+import { AlarmClock, ArrowRight, CalendarCheck, CheckCircle2, Eye, LogOut, Pencil, Send, UserPlus, XCircle } from "lucide-react";
 import { AssignTaskDialog, type AssignTarget } from "./AssignTaskDialog";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildMyTasksTour } from "./myTasksTour";
@@ -97,6 +97,9 @@ const FILTERS: { value: UrgencyFilter; label: string }[] = [
 const matchesFilter = (x: MyTaskItem, f: UrgencyFilter) =>
   f === "all" ||
   (f === "todo" ? x.urgency !== "info" || (x.bucket === "delegated" && x.assignment?.status === "open" && !x.isResolved) : x.urgency === f);
+
+/** Quá số việc này ⇒ nhóm trang thu gọn, chọn từng nhóm để xem (rà UX đợt 2 — trang dài 9.000px khi 80 việc mở hết). */
+const COLLAPSE_AFTER = 10;
 
 function Section({ id, title, description, tour, children }: { id: string; title: string; description?: ReactNode; tour?: string; children: ReactNode }) {
   return (
@@ -364,7 +367,7 @@ export default function MyTasksScreen() {
   const openDelegated = tasks.delegated.filter((x) => x.assignment?.status === "open" && !x.isResolved);
   const showDelegated = canAssign.create || tasks.delegated.length > 0;
 
-  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Rà UX đợt 2 (2026-11-03): bỏ thẻ "Được giao cho tôi" / "Tôi đã giao" — số đã ở tiêu đề hai mục bên dưới.
   const cards: StatCardData[] = [
     {
       label: "Quá hạn",
@@ -386,30 +389,6 @@ export default function MyTasksScreen() {
       onSelect: () => setFilter("today"),
       selectHint: "Chỉ hiện các việc có hạn hôm nay.",
     },
-    {
-      label: "Được giao cho tôi",
-      value: tasks.assigned.length,
-      subtext: "đang mở",
-      numeric: true,
-      icon: ClipboardList,
-      color: "brand",
-      onSelect: () => scrollTo("assigned"),
-      selectHint: "Tới mục việc được giao cho tôi.",
-    },
-    ...(showDelegated
-      ? [
-          {
-            label: "Tôi đã giao",
-            value: openDelegated.length,
-            subtext: `${openDelegated.filter((x) => x.urgency === "overdue").length} việc người nhận để quá hạn`,
-            numeric: true,
-            icon: Users,
-            color: "neutral" as const,
-            onSelect: () => scrollTo("delegated"),
-            selectHint: "Tới mục việc tôi đã giao để đốc.",
-          },
-        ]
-      : []),
   ];
 
   // ---- Nhóm trang (ba-spec 59 NV2, NV3) ----
@@ -541,7 +520,9 @@ export default function MyTasksScreen() {
         description={
           adminSummary
             ? "Mọi việc máy phát hiện của hệ thống, gom theo nhóm trang. Chọn một nhóm để xem việc; chọn Xem như để thấy đúng việc của một vai hoặc một người."
-            : "Việc máy phát hiện thuộc các nhóm trang được phân cho bạn (theo quyền và xưởng của bạn) mà chưa giao riêng cho ai. Bấm Mở việc để tới đúng ngày cần sửa."
+            : mine.length > COLLAPSE_AFTER
+              ? `Nhiều hơn ${COLLAPSE_AFTER} việc ⇒ gom theo nhóm trang: chọn một nhóm để xem việc của nhóm đó. Bấm Mở việc để tới đúng ngày cần sửa.`
+              : "Việc máy phát hiện thuộc các nhóm trang được phân cho bạn (theo quyền và xưởng của bạn) mà chưa giao riêng cho ai. Bấm Mở việc để tới đúng ngày cần sửa."
         }
       >
         {tasks.mine.length === 0 && tasks.assigned.length === 0 ? (
@@ -549,7 +530,7 @@ export default function MyTasksScreen() {
         ) : (
           mine.length === 0 ? (
             <p className="text-sm text-muted-foreground">Không có việc nào khớp bộ lọc.</p>
-          ) : adminSummary ? (
+          ) : adminSummary || mine.length > COLLAPSE_AFTER ? (
             adminGroups(mineGroups)
           ) : (
             groupBlocks(mineGroups)
@@ -558,7 +539,7 @@ export default function MyTasksScreen() {
       </Section>
 
       {showDelegated && viewAs?.kind !== "role" && (
-        <Section id="delegated" tour="my-tasks-delegated" title={`Tôi đã giao (${delegated.length})`} description="Việc bạn đã giao cho người khác — để đốc. Việc đã xong hiện thêm 7 ngày.">
+        <Section id="delegated" tour="my-tasks-delegated" title={`Tôi đã giao (${delegated.length})${openDelegated.some((x) => x.urgency === "overdue") ? ` · ${openDelegated.filter((x) => x.urgency === "overdue").length} việc người nhận để quá hạn` : ""}`} description="Việc bạn đã giao cho người khác — để đốc. Việc đã xong hiện thêm 7 ngày.">
           {table("delegated", delegated, "Chưa giao việc nào cho người khác.")}
         </Section>
       )}

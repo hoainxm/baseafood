@@ -79,10 +79,12 @@ export function buildSalesTour(ctx: SalesTourContext): PageTour {
     {
       id: "stats",
       target: "sales-stats",
+      optional: true,
       title: "Ba chỉ số của kỳ",
       body:
         "• Số phiếu và Số dòng: số phiếu bán và số dòng mặt hàng trong kỳ.\n" +
-        "• Tổng bán: tổng kg đã bán trong kỳ.",
+        "• Tổng bán: tổng kg đã bán trong kỳ.\n" +
+        "Kỳ chưa có phiếu nào thì ba thẻ không hiện, trang ghi \"Chưa có phiếu bán nào trong …\".",
     },
     {
       id: "invoice",

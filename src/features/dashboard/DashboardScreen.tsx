@@ -90,7 +90,6 @@ import {
   QrCode,
   Scale,
   Ship,
-  ShoppingCart,
   Truck,
   Warehouse,
 } from "lucide-react";
@@ -303,14 +302,8 @@ export default function DashboardScreen() {
   }, [warnings, invoiceRows, planningReports, access]);
   const hasPlanning = planningSummary.import != null || planningSummary.productionOrder != null || planningSummary.export != null;
 
-  const stageKg = (k: TraceStageKey) => stages.find((x) => x.key === k)?.kg ?? 0;
-  const inKg = stageKg("imports");
-  const productionKg = stageKg("production");
-  const outKg = stageKg("outbound");
   const last = byDate[byDate.length - 1];
   const latestPeriod = periodResults.find((x) => x.hasFinishedGoods);
-  const taskCount = allWarnings.filter((c) => c.level !== "info").length;
-  const errorCount = allWarnings.filter((c) => c.level === "error").length;
 
   // % kg BTP trong khoảng đã có lô NL (hoặc lý do chưa gắn).
   const lotCoverageRatio = useMemo(() => {
@@ -324,27 +317,9 @@ export default function DashboardScreen() {
     return mes.filter((w) => lottedWipIds.has(w.id)).reduce((s, w) => s + (w.quantityKg || 0), 0) / total;
   }, [d, fromDate, toDate, workshop]);
 
+  // Rà UX đợt 2 (2026-11-03): 4 thẻ một màu, KHÔNG lặp số của khối Năm khâu (NL nhập · BTP · xuất bán) và
+  // không lặp danh sách Việc cần đốc. Màu riêng chỉ còn ở lãi / lỗ (xanh lãi, đỏ lỗ).
   const cards: StatCardData[] = [
-    {
-      label: "Nguyên liệu nhập",
-      value: `${num(inKg)} kg`,
-      subtext: `${new Set(d.imports.filter((r) => r.deliveryDate >= fromDate && r.deliveryDate <= toDate && (!workshop || r.workshop === workshop)).map((r) => r.shipmentId)).size} chuyến`,
-      numeric: true,
-      icon: Truck,
-      tone: KIND_TONES.imports,
-      onSelect: () => navigate("/imports"),
-      selectHint: "Mở màn Nhập hàng để xem từng chuyến.",
-    },
-    {
-      label: "Bán thành phẩm sản xuất",
-      value: `${num(productionKg)} kg`,
-      subtext: inKg > 0 ? `= ${num((productionKg / inKg) * 100)}% kg NL nhập` : undefined,
-      numeric: true,
-      icon: Factory,
-      tone: KIND_TONES.production,
-      onSelect: () => navigate("/wip"),
-      selectHint: "Mở màn Sản xuất thành phẩm.",
-    },
     {
       label: "Định mức NL/TP bình quân",
       value: yieldRatio.binhQuan != null ? num(yieldRatio.binhQuan) : latestPeriod ? num(latestPeriod.result.norm) : "—",
@@ -356,7 +331,7 @@ export default function DashboardScreen() {
             : "chưa có mẻ gắn lô cân kg",
       numeric: true,
       icon: Gauge,
-      tone: KIND_TONES.yieldRatio,
+      color: "brand",
     },
     {
       label: "Tồn BTP kho dự trữ cuối kỳ",
@@ -364,19 +339,9 @@ export default function DashboardScreen() {
       subtext: `TP đóng gói còn ${num(last?.finishedStockKg ?? 0)} kg`,
       numeric: true,
       icon: Warehouse,
-      tone: KIND_TONES.warehouse,
+      color: "brand",
       onSelect: () => navigate("/warehouse"),
       selectHint: "Mở màn Kho dự trữ để xem tồn theo lô.",
-    },
-    {
-      label: "Xuất + bán ra",
-      value: `${num(outKg)} kg`,
-      subtext: "xuất theo đơn · bán lẻ · bán nội địa",
-      numeric: true,
-      icon: ShoppingCart,
-      tone: KIND_TONES.sales,
-      onSelect: () => navigate("/orders"),
-      selectHint: "Mở màn Đơn đặt để xem lệnh xuất.",
     },
     {
       label: "Lãi/lỗ kỳ cân đối gần nhất",
@@ -394,19 +359,9 @@ export default function DashboardScreen() {
       subtext: "tính theo kg BTP (gồm mẻ đã ghi lý do)",
       numeric: true,
       icon: QrCode,
-      tone: KIND_TONES.lots,
+      color: "brand",
       onSelect: () => navigate("/qr?tab=stages"),
       selectHint: "Mở Mã lô QR — tab Theo giai đoạn để gắn lô còn thiếu.",
-    },
-    {
-      label: "Việc cần đốc",
-      value: `${num(taskCount)} việc`,
-      subtext: errorCount > 0 ? `${errorCount} chỗ sổ sai cần sửa` : "không có sổ sai",
-      numeric: true,
-      icon: AlertTriangle,
-      color: errorCount > 0 ? "danger" : taskCount > 0 ? "warning" : "success",
-      onSelect: () => warningsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      selectHint: "Cuộn tới danh sách việc cần đốc.",
     },
   ];
 
@@ -661,7 +616,6 @@ export default function DashboardScreen() {
       <Section
         tourTarget="dashboard-stages"
         title="Năm khâu của chuỗi"
-        description="kg đã qua từng khâu trong kỳ và số lô / dòng còn thiếu việc (tem, gắn lô, duyệt, quét kiểm). Phần trăm trên mũi tên so với khâu nguồn: SX so với NL nhập, nhập kho so với SX, đóng gói và xuất/bán so với nhập kho. Bấm một khâu để mở màn của khâu đó."
       >
         <PipelineStages stages={coloredStages} onSelect={(k) => navigate(stagePaths[k] ?? "/dashboard")} />
       </Section>
@@ -679,7 +633,6 @@ export default function DashboardScreen() {
       <Section
         tourTarget="dashboard-outflow"
         title="Nguyên liệu đi đâu"
-        description="Mỗi thanh là 100% một khối hàng, chia theo nơi nó đi tới. Bấm một phần để mở màn liên quan."
       >
         {materialOutflow.length === 0 && outOfWarehouse.length === 0 ? (
           <EmptyState icon={Truck} title="Kỳ này chưa có số" description="Chưa ghi nhập hàng hay sản xuất nào trong kỳ đang xem." />
@@ -724,7 +677,6 @@ export default function DashboardScreen() {
       <div ref={warningsRef} data-tour="dashboard-warnings" className="scroll-mt-header">
         <Section
           title={`Việc cần đốc (${allWarnings.length})`}
-          description="Gồm việc của chuỗi xưởng và việc của Phòng Kế hoạch, hóa đơn đại lý mà bạn được xem. Sổ sai đứng trước, rồi việc chưa làm, cuối cùng là các mục để biết. Bấm Mở để tới đúng chỗ sửa."
         >
           {allWarnings.length === 0 ? (
             <EmptyState icon={AlertTriangle} title="Không có việc tồn đọng" description="Các ngày đã chốt, lô đã gắn, không có bán vượt tồn, không có việc kế hoạch treo trong kỳ này." />
@@ -735,7 +687,7 @@ export default function DashboardScreen() {
       </div>
 
       <div data-tour="dashboard-daily" className="grid grid-cols-[minmax(0,1fr)] gap-6 2xl:grid-cols-2">
-        <Section title="Nhập và sản xuất theo ngày" description="Cột: kg nguyên liệu nhập và kg bán thành phẩm sản xuất mỗi ngày.">
+        <Section title="Nhập và sản xuất theo ngày">
           {hasDailyFigures ? (
             <TimeSeriesChart
               labels={dayLabels}

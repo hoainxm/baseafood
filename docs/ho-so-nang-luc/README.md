@@ -14,6 +14,10 @@ Khác với các thư mục khác:
 | [`spec/`](../spec/) | Phần mềm sẽ làm ra sao (trước khi build) |
 | [`app-map/`](../app-map/README.md) | Code đang chạy thế nào (khi sửa code) |
 
+## Hồ sơ pháp nhân & nhận diện
+
+[`company-profile.md`](company-profile.md) — tên, MST, địa chỉ, điện thoại / fax, 3 tài khoản ngân hàng, người ký chứng từ, logo, chứng nhận còn thiếu (kiểm kê 2026-11-03, [ba-spec 64](../app-map/64-company-profile.ba-spec.md)).
+
 ## Danh mục quy trình
 
 | Mã | Tên | Phòng | Hiệu lực | Chuẩn | Trạng thái số hóa | File |

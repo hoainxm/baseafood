@@ -5,6 +5,7 @@ covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/expor
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-03
+<!-- re-verified: 2026-11-03 (ba-spec 69) — thêm Hạn hợp đồng (ô điều khoản, hồ sơ HĐ, bộ đọc file); không đổi trạng thái HĐ / chuyến, không đổi quyền. -->
 <!-- re-verified: 2026-11-03 (ba-spec 66 v1.2) — khối Đọc file hợp đồng (`ContractReadPanel.tsx`, tour) — đọc thêm .doc + bảng Excel nhúng + bảng PDF theo tọa độ; không đổi trạng thái, không đổi quyền. -->
 ttl_days: 90
 

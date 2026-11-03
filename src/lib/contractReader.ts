@@ -86,6 +86,8 @@ export interface ReadContract {
   latestShipmentDate: string;
   /** Hạn giao suy ra từ tháng ("to April, 2027" ⇒ 30/04/2027) — cần soát lại. */
   latestShipmentInferred: boolean;
+  /** Hạn hợp đồng — "binding on from date of signing to May 31, 2027" (ba-spec 69 R5). */
+  contractValidUntil: string;
   containerCount: number | null;
   containerType: string;
   paymentMethod: "ttr" | "lc" | "";
@@ -689,6 +691,9 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
     latestShipmentInferred = d.inferred;
     break;
   }
+  // Hạn HĐ (69 R5): binding / valid / validity / effective / hiệu lực … to / until / till / through <ngày>.
+  const validity = firstMatch([outside.join(" ")], /\b(?:binding|valid|validity|effective|hiệu lực)\b[^.;]*?\b(?:to|until|till|through|đến)\s+(?:late|latest|the end of)?\s*([^.;]{6,40})/i);
+  const contractValidUntil = validity ? parseInvoiceDate(validity[1]) : "";
   const cont = firstMatch(outside, /(\d+)\s*(?:x\s*)?(?:(?:20|40)\s*['’]?\s*(?:ft|feet)?\s*(?:hc|rf|rh|reefers?|dc)?\s*)?(?:containers?|conts?)\b/i) ?? firstMatch(outside, /(\d+)\s*x\s*(?:20|40)\s*['’]/i);
   const containerCount = cont ? Number(cont[1]) : null;
   const ctype = firstMatch(outside, /\b(20|40)\s*['’]?\s*(?:ft|feet)?\s*(hc)?\s*-?\s*(rf|rh|reefers?)\b/i);
@@ -753,6 +758,7 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
       tolerancePct,
       latestShipmentDate,
       latestShipmentInferred,
+      contractValidUntil,
       containerCount,
       containerType,
       paymentMethod,
@@ -968,6 +974,7 @@ export function fillExportContract(values: ExportContractFillValues, read: ReadC
   t.currency = a.put("terms.currency", "Tiền tệ", t.currency, optionFor(read.currency, "currency"), { baseline: ctx.mode === "create" ? ctx.baseline.currency : undefined });
   t.tolerancePct = a.put("terms.tolerancePct", "Dung sai ±", t.tolerancePct, read.tolerancePct, { show: showNumber });
   t.latestShipmentDate = a.put("terms.latestShipmentDate", "Hạn giao muộn nhất", t.latestShipmentDate, read.latestShipmentDate, { show: showDate });
+  t.contractValidUntil = a.put("terms.contractValidUntil", "Hạn hợp đồng", t.contractValidUntil ?? "", read.contractValidUntil, { show: showDate });
   t.containerCount = a.put("terms.containerCount", "Số container", t.containerCount, read.containerCount, { show: showNumber });
   t.containerType = a.put("terms.containerType", "Loại container", t.containerType, optionFor(read.containerType, "container-type"));
   if (read.paymentMethod)

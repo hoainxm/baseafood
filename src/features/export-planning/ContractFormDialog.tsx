@@ -54,6 +54,7 @@ import { formatMoney } from "@/lib/format";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import { findCustomerName, lineTextAfterPick } from "@/lib/customerProductNames";
 import { applyExportConflicts, fillExportContract, type ExportContractFillValues, type FillConflict, type ReadContract } from "@/lib/contractReader";
+import { validityError, validityWarning } from "@/lib/contractValidity";
 import type { Customer, CustomerProductName, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, ExportFile, Product } from "@/types";
 import { Copy, Factory, FileSignature, Plus, Save, Trash2 } from "lucide-react";
 import { FilePicker } from "./parts";
@@ -380,6 +381,9 @@ export function ContractFormDialog({
     );
     const errs: FieldError[] = issues.map((i) => ({ field: i.label, message: i.message }));
     if (form.mode === "revise" && !form.changeSummary.trim()) errs.push({ field: "Nội dung sửa", message: "Ghi bản sửa đổi gì (VD: giảm dòng 1 còn 180 thùng)" });
+    // Hạn hợp đồng (ba-spec 69 R2): không bắt buộc, có thì không trước ngày ký.
+    const validity = validityError(form.signedOn, form.terms.contractValidUntil);
+    if (validity) errs.push({ field: "Hạn hợp đồng", message: validity });
     if (scheduleState?.enabled) errs.push(...validateScheduleRows(scheduleRows).map((i) => ({ field: i.label, message: i.message })));
     // Lệnh sản xuất chỉ chọn được dòng đã nối mặt hàng (ba-spec 48 R1) — chặn sớm, khỏi lưu HĐ rồi mở hộp lệnh trống.
     if (thenCreateOrder && !form.lines.some((l) => l.description.trim() && l.productId))
@@ -622,6 +626,12 @@ export function ContractFormDialog({
                 onChange={(v) => setTerm("portOfDischarge", v)}
               />
               <DateField label="Hạn giao muộn nhất" required value={form.terms.latestShipmentDate} onChange={(v) => setTerm("latestShipmentDate", v)} />
+              <DateField
+                label="Hạn hợp đồng"
+                hint={validityWarning(form.terms.latestShipmentDate, form.terms.contractValidUntil) || "Ngày hợp đồng hết hiệu lực (\"binding … to …\"), khác hạn giao. Không bắt buộc."}
+                value={form.terms.contractValidUntil ?? ""}
+                onChange={(v) => setTerm("contractValidUntil", v)}
+              />
               <NumberField label="Dung sai ±" unit="%" value={form.terms.tolerancePct} onChange={(v) => setTerm("tolerancePct", v)} />
               <Combobox
                 label="Tiền tệ"

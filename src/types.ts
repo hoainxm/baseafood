@@ -1320,6 +1320,11 @@ export interface ExportContractTerms {
   currency: string;
   tolerancePct: number | null;
   latestShipmentDate: string;
+  /**
+   * Hạn hợp đồng — ngày HĐ hết hiệu lực ("binding on from date of signing to …"), KHÁC hạn giao (ba-spec 69).
+   * Không bắt buộc; nằm trong JSON terms nên không cần cột. Bản cũ không có ⇒ chưa ghi.
+   */
+  contractValidUntil?: string;
   containerCount: number | null;
   containerType: string;
   requiredDocuments: ExportRequiredDocument[];

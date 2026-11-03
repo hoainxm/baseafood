@@ -421,6 +421,10 @@ describe("ba-spec 66 — HĐ thật anh gửi 2026-11-03", () => {
     expect([c.incoterm, c.incotermRaw, c.portOfDischarge, c.currency]).toEqual(["CFR", "CNF", "Yokohama, Japan", "USD"]);
     expect([c.tolerancePct, c.latestShipmentDate, c.latestShipmentInferred, c.containerCount, c.paymentMethod]).toEqual([10, "2027-03-31", true, 2, "ttr"]);
     expect(c.lineIssues).toEqual([]);
+    // ba-spec 69 AC-5: hạn hợp đồng từ mục OTHERS.
+    expect(c.contractValidUntil).toBe("2027-05-31");
+    const f = fillExportContract(createForm(), c, ctx());
+    expect(f.values.terms.contractValidUntil).toBe("2027-05-31");
   });
 
   it("17-26-NEWPOINT: cột Item không phải tên hàng, Quantity (CTN) là số thùng, LC không dấu /, dung sai không lấy trong tên hàng", () => {
@@ -435,6 +439,7 @@ describe("ba-spec 66 — HĐ thật anh gửi 2026-11-03", () => {
     expect([c.totalKg, c.totalAmount]).toEqual([5250, 79825]);
     expect([c.incoterm, c.currency, c.tolerancePct, c.containerCount, c.paymentMethod]).toEqual(["CFR", "USD", 10, 1, "lc"]);
     expect([c.latestShipmentDate, c.latestShipmentInferred]).toEqual(["2026-11-10", false]);
+    expect(c.contractValidUntil).toBe("2026-12-31");
     expect(c.lineIssues).toEqual([]);
     expect(c.priceWarnings).toEqual([]);
   });
@@ -449,6 +454,7 @@ describe("ba-spec 66 — HĐ thật anh gửi 2026-11-03", () => {
     ]);
     expect([c.totalKg, c.totalAmount]).toEqual([24000, 96000]);
     expect([c.latestShipmentDate, c.latestShipmentInferred, c.paymentMethod, c.tolerancePct]).toEqual(["2026-10-25", false, "lc", 10]);
+    expect(c.contractValidUntil).toBe("2026-12-31");
     expect([...c.warnings, ...c.priceWarnings]).toEqual([]);
     const f = fillImportContract(
       { supplierId: "", contractNo: "", signedDate: "", currency: "USD", lines: [{ id: "x", productName: "", productId: "", goodsTypeId: "", kg: null, unitPrice: null }] },

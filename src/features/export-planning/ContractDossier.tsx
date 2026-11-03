@@ -56,7 +56,8 @@ import {
   workingRevision,
   type ExportData,
 } from "@/lib/exportPlanning";
-import { formatDateVN, formatMoney, formatDateTimeVN } from "@/lib/format";
+import { formatDateVN, formatMoney, formatDateTimeVN, todayISO } from "@/lib/format";
+import { validityLabel, validityState } from "@/lib/contractValidity";
 import { useGoodsTypeStore } from "@/lib/catalogRepo";
 import { goodsTypeName } from "@/lib/goodsTypes";
 import { useNavigate } from "react-router-dom";
@@ -183,6 +184,10 @@ export function ContractDossier({
   const terms = working?.terms;
   const totals = working ? contractTotals(working.lines) : null;
   const state = contractState(data, contract.id, opts);
+  // Hạn hợp đồng (ba-spec 69 R4): "31/05/2027 · Còn 7 ngày" / "· Đã hết hạn"; chưa ghi ⇒ "Chưa ghi".
+  const validUntil = working?.terms.contractValidUntil;
+  const validityNote = validityLabel(validityState(validUntil, todayISO(), state !== "closed" && state !== "cancelled"));
+  const validityText = validUntil ? [formatDateVN(validUntil), validityNote].filter(Boolean).join(" · ") : "Chưa ghi";
   const closure = contractClosure(data, contract.id, opts);
   const coverage = contractCoverage(data, contract.id);
   const deadline = effectiveDeadline(data, contract.id);
@@ -497,6 +502,7 @@ export function ContractDossier({
       {terms && totals && (
         <dl data-tour="dossier-summary" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm">
           <Info label="Hạn giao" value={`${formatDateVN(deadline)}${extensions.length ? " (đã gia hạn)" : ""}`} />
+          <Info label="Hạn hợp đồng" value={validityText} />
           <Info label="Tổng hợp đồng" value={`${formatNumber(totals.kg)} kg${can.viewPrice ? ` · ${formatMoney(totals.amount)} ${currency}` : ""}`} />
           <Info label="Dung sai" value={`±${formatNumber(terms.tolerancePct ?? 0)}% lượng và tiền`} />
           <Info label="Chuyến" value={shipmentCountText(openShipments, terms.containerCount)} />
@@ -658,6 +664,7 @@ export function ContractDossier({
                 .join(" · ")}
             />
             <Info label="Hạn giao" value={`${formatDateVN(deadline)}${extensions.length ? ` (gia hạn từ ${formatDateVN(terms.latestShipmentDate)})` : ""}`} />
+            <Info label="Hạn hợp đồng" value={validityText} />
             <Info label="Container" value={[terms.containerCount != null && `${terms.containerCount} cont`, terms.containerType].filter(Boolean).join(" ")} />
             <Info
               label="Tổng"

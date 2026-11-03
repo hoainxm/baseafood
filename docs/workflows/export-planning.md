@@ -41,6 +41,18 @@ Hồ sơ đính kèm **Bổ sung sau** (ba-spec 58): cho chạy tiếp nhưng v�
 
 **Đọc file hợp đồng** (ba-spec [66](../app-map/66-contract-file-autofill.ba-spec.md)): ở hộp Lập HĐ / Sửa / Ghi bản sửa, chọn file Word (.docx) hoặc PDF có chữ ⇒ app điền sẵn ô **còn trống** (khách, số, ngày ký, điều khoản, dòng hàng); ô khác file chỉ liệt kê để chọn; phụ lục của HĐ khác thì không điền gì tới khi xác nhận; bản sửa nối dòng theo size, không tự xóa dòng. Không tự lưu, không tự thêm danh mục, không đổi trạng thái HĐ (`fillExportContract`, `lib/contractReader.ts`).
 
+
+### Sửa hợp đồng: sửa được gì, khóa khi nào (ba-spec [68](../app-map/68-export-contract-edit.ba-spec.md))
+
+| Việc | Được khi | Khóa khi | Code |
+|---|---|---|---|
+| Sửa hợp đồng (sửa thẳng bản đang dùng, không thêm bản) | HĐ còn mở **và** chưa chuyến nào có mã lô, booking, ngày, số cont hay file | có chuyến đã ghi thông tin ⇒ dùng Ghi bản sửa | `canEditContractDirectly` |
+| Ghi bản sửa (bản mới có hiệu lực ngay, bản cũ giữ để tra) | HĐ còn mở, có bản hiệu lực (kể cả đang Chờ duyệt cuối) | Đã đóng HĐ · Đã hủy | `ContractDossier` menu |
+| Số hợp đồng | mọi lần Sửa / Ghi bản sửa; không trùng số HĐ khác của cùng khách | Đã đóng HĐ · Đã hủy | `validateContract` |
+| Khách | tới khi một chuyến xong bước 4 Đóng cont | có chuyến xong bước 4 | `customerChangeGate` |
+| Mở lại HĐ đã đóng | Trưởng / Phó phòng KH | — | |
+
+Mỗi lần lưu, nhật ký Xuất khẩu ghi từng ô đổi **cũ → mới**: Số HĐ, Khách, Ngày ký, Số PO, điều khoản (cảng, thanh toán, hạn giao, dung sai, cont…), dòng hàng thêm / bớt / sửa (`contractChangeSummary`). Bản sửa không lưu riêng số HĐ ⇒ số cũ chỉ còn ở nhật ký.
 ## 2. Một chuyến (container) đi qua 6 bước
 
 ```mermaid
@@ -145,5 +157,6 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 
 ## Lịch sử
 
+- 2026-11-03 — bảng sửa / khóa hợp đồng; Số HĐ đổi được ở Ghi bản sửa (ba-spec 68).
 - 2026-11-03 — tạo (mẫu đầu tiên của bộ sơ đồ workflow, ba-spec 65).
 - 2026-11-03 — thêm đọc file hợp đồng / phụ lục để điền sẵn form (ba-spec 66).

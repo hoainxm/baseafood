@@ -3,6 +3,7 @@
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (ba-spec 68) — tour + hộp "?" Xuất khẩu: thêm bảng "Sửa hợp đồng: sửa được gì, khóa khi nào" (ba-spec 68). -->
 <!-- updated: 2026-11-03 (ba-spec 66 v1.2) — tour + hộp "?" Lập hợp đồng (Xuất, Nhập): Word .docx và .doc đều đọc được; bản scan không đọc ⇒ đọc bản Word, đính bản scan ở mục File. -->
 <!-- updated: 2026-11-03 (d) — trang Quy trình có tour (`features/workflows/workflowsTour.ts`, 5 bước: giới thiệu · chọn khu · đọc sơ đồ · luôn khớp phần mềm · hoàn tất) + hộp "?" (`PAGE_GUIDES.workflows`); bỏ khỏi `PAGE_TOUR_EXEMPT`. -->
 <!-- updated: 2026-11-03 (ba-spec 66) — bước Lập hợp đồng (tour + hộp "?") của Xuất khẩu và Nhập khẩu thêm đoạn Đọc file hợp đồng: loại file đọc được, chỉ điền ô còn trống, không tự lưu, bản scan / .doc không đọc. Test `guides/contractReadGuide.test.ts`. -->

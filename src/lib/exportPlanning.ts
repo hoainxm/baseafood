@@ -1742,3 +1742,82 @@ export function buildMonthExcel(plan: MonthPlan, d: ExportData, goodsTypes: read
   }
   return { header: [...MONTH_EXCEL_HEADER], rows };
 }
+
+/* ---------- Nhật ký sửa hợp đồng (ba-spec 68) ---------- */
+
+const CONTRACT_FIELD_LABELS: readonly [keyof ExportContract, string][] = [
+  ["contractNo", "Số HĐ"],
+  ["customerId", "Khách"],
+  ["signedOn", "Ngày ký"],
+  ["orderRef", "Số đơn / PO"],
+  ["note", "Ghi chú"],
+];
+const TERM_FIELD_LABELS: readonly [keyof ExportContractTerms, string][] = [
+  ["incoterm", "Điều kiện giao"],
+  ["portOfLoading", "Cảng xếp"],
+  ["portOfDischarge", "Cảng đích"],
+  ["paymentMethod", "Thanh toán"],
+  ["paymentOther", "Hình thức thanh toán khác"],
+  ["depositPct", "Đặt cọc %"],
+  ["lcNo", "Số L/C"],
+  ["lcExpiry", "Hạn L/C"],
+  ["lcLatestShipment", "Hạn giao theo L/C"],
+  ["currency", "Tiền tệ"],
+  ["tolerancePct", "Dung sai %"],
+  ["latestShipmentDate", "Hạn giao muộn nhất"],
+  ["containerCount", "Số cont"],
+  ["containerType", "Loại container"],
+];
+const isIsoDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+const shown = (v: unknown) => (v == null || v === "" ? "(trống)" : isIsoDate(v) ? formatDateVN(v) : String(v));
+const lineLabel = (l: ExportContractLine) => [l.description, l.size].filter((x) => x.trim()).join(" ") || "(chưa tên)";
+const LINE_KEYS: readonly (keyof ExportContractLine)[] = ["description", "size", "packing", "unitKind", "cartonsPerUnit", "netKgPerCarton", "quantity", "kg", "unitPrice", "productId"];
+
+/**
+ * Các thay đổi của một lần lưu hợp đồng (Sửa / Ghi bản sửa) — ghi vào nhật ký Xuất khẩu để tra lại (ba-spec 68 R3).
+ * Bản sửa không lưu riêng Số HĐ ⇒ nhật ký là nơi duy nhất giữ số cũ khi đổi số.
+ */
+export function contractChangeSummary(
+  before: { contract: ExportContract; revision?: ExportContractRevision } | undefined,
+  after: { contract: ExportContract; revision: ExportContractRevision },
+  customerName: (id: string) => string,
+): string[] {
+  if (!before) return [];
+  const out: string[] = [];
+  for (const [k, label] of CONTRACT_FIELD_LABELS) {
+    const a = before.contract[k];
+    const b = after.contract[k];
+    if (String(a ?? "").trim() === String(b ?? "").trim()) continue;
+    out.push(k === "customerId" ? `${label}: ${customerName(String(a)) || "(trống)"} → ${customerName(String(b)) || "(trống)"}` : `${label}: ${shown(a)} → ${shown(b)}`);
+  }
+  const ta = before.revision?.terms;
+  const tb = after.revision.terms;
+  if (ta) {
+    for (const [k, label] of TERM_FIELD_LABELS) {
+      if (String(ta[k] ?? "") === String(tb[k] ?? "")) continue;
+      const pm = (v: unknown) => PAYMENT_METHODS.find((m) => m.value === v)?.label ?? shown(v);
+      out.push(k === "paymentMethod" ? `${label}: ${pm(ta[k])} → ${pm(tb[k])}` : `${label}: ${shown(ta[k])} → ${shown(tb[k])}`);
+    }
+    if (JSON.stringify(ta.requiredDocuments ?? []) !== JSON.stringify(tb.requiredDocuments ?? [])) out.push("Chứng từ khách yêu cầu: đổi");
+  }
+  const la = before.revision?.lines ?? [];
+  const lb = after.revision.lines;
+  // Ghi bản sửa chép dòng sang id MỚI ⇒ ghép dòng cũ ↔ mới theo id, không có thì theo tên + size (không phân hoa thường).
+  const keyOf = (l: ExportContractLine) => `${l.description.trim().toLowerCase()}|${l.size.trim().toLowerCase()}`;
+  const unused = [...la];
+  const pairs = lb.map((l) => {
+    const i = unused.findIndex((x) => x.id === l.id);
+    const j = i >= 0 ? i : unused.findIndex((x) => keyOf(x) === keyOf(l));
+    return { line: l, old: j >= 0 ? unused.splice(j, 1)[0] : undefined };
+  });
+  const added = pairs.filter((p) => !p.old).map((p) => p.line);
+  const removed = unused;
+  const changed = pairs
+    .filter((p) => p.old && LINE_KEYS.some((k) => String(p.old?.[k] ?? "") !== String(p.line[k] ?? "")))
+    .map((p) => p.line);
+  if (before.revision && (added.length || removed.length || changed.length)) {
+    const names = [...added.map((l) => `+${lineLabel(l)}`), ...removed.map((l) => `−${lineLabel(l)}`), ...changed.map((l) => `sửa ${lineLabel(l)}`)];
+    out.push(`Dòng hàng: ${names.slice(0, 4).join(", ")}${names.length > 4 ? ` … (${names.length} dòng)` : ""}`);
+  }
+  return out;
+}

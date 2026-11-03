@@ -330,7 +330,9 @@ export function ContractFormDialog({
     );
   };
 
-  const identityLocked = form?.mode === "revise" || (form?.mode === "edit" && form.revisionNo > 0);
+  // Số HĐ sửa được ở MỌI lần Sửa / Ghi bản sửa khi HĐ còn mở (ba-spec 68 R1 — trước khóa ở bản sửa ⇒ gõ nhầm số không
+  // còn đường sửa). Đổi số ⇒ nhật ký ghi số cũ → mới (bản sửa không lưu riêng số); chứng từ đã tải giữ số cũ.
+  const numberChanged = !!form && form.mode !== "create" && form.contractNo.trim() !== (contracts.find((c) => c.id === form.contractId)?.contractNo ?? "").trim();
   // Khách: đổi được (cả ở bản sửa) tới khi một chuyến của HĐ xong bước 4 Đóng cont (R44, 2026-11-03).
   const customerGate = form && form.mode !== "create" ? customerChangeGate(data, form.contractId) : ({ ok: true } as const);
   const customerLocked = !customerGate.ok;
@@ -576,8 +578,12 @@ export function ContractFormDialog({
                   editLabel={customerEditor.editLabel}
                 />
               )}
-              <Field label="Số hợp đồng" required>
-                <Input value={form.contractNo} readOnly={identityLocked} onChange={(e) => set("contractNo", e.target.value)} aria-required />
+              <Field
+                label="Số hợp đồng"
+                required
+                hint={numberChanged ? "Đổi số hợp đồng: nhật ký ghi số cũ → mới; chứng từ đã tải giữ số cũ." : undefined}
+              >
+                <Input value={form.contractNo} onChange={(e) => set("contractNo", e.target.value)} aria-required />
               </Field>
               <DateField label="Ngày ký" required value={form.signedOn} onChange={(v) => set("signedOn", v)} />
               <Field label="Số PO của khách">

@@ -58,6 +58,7 @@ import {
   shipmentMonth,
   termsOf,
   workingRevision,
+  contractChangeSummary,
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
 import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportShipmentLine, type ExportStepItem } from "@/types";
@@ -295,7 +296,17 @@ export default function ExportPlanningScreen() {
         : p.mode === "revise"
           ? `Ghi bản sửa ${p.revision.revisionNo} của HĐ ${p.contract.contractNo} — có hiệu lực ngay`
           : `Sửa bản ${p.revision.revisionNo} của HĐ ${p.contract.contractNo}`;
-    track(p.contract.id, "", p.mode === "create" ? "create" : "update", what);
+    // Nhật ký ghi ĐỦ trường đổi, cũ → mới (ba-spec 68 R3) — Số HĐ cũ chỉ còn ở đây khi đổi số.
+    const before =
+      p.mode === "create"
+        ? undefined
+        : {
+            contract: prevC.find((c) => c.id === p.contract.id) ?? p.contract,
+            revision: p.mode === "edit" ? prevR.find((r) => r.id === p.revision.id) : (workingRevision(d, p.contract.id) ?? undefined),
+          };
+    const changes = contractChangeSummary(before, { contract: p.contract, revision: p.revision }, (id) => customers.find((x) => x.id === id)?.name ?? "");
+    const logged = changes.length ? `${what}: ${changes.join("; ")}`.slice(0, 1000) : what;
+    track(p.contract.id, "", p.mode === "create" ? "create" : "update", logged);
     notify.saved(
       (p.mode === "create"
         ? `Đã lập HĐ ${p.contract.contractNo}${scheduleText ? ` + ${scheduleText}` : ""} — ${p.thenCreateOrder ? "đang mở Lập lệnh sản xuất; đính kèm hợp đồng đã ký sau ở hồ sơ HĐ" : "việc tiếp: đính kèm hợp đồng đã ký"}`

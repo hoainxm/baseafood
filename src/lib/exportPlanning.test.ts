@@ -1158,3 +1158,23 @@ describe("Ảnh thêm của bước Đóng cont (mig 0097) — không làm bư�
   });
 });
 
+
+describe("ba-spec 68 — nhật ký sửa hợp đồng", () => {
+  it("AC-2: đổi số HĐ, hạn giao, thanh toán và dòng hàng ⇒ ghi đủ cũ → mới", async () => {
+    const { contractChangeSummary, emptyTerms } = await import("./exportPlanning");
+    const contract = { id: "c1", customerId: "k1", contractNo: "02.26/BSF", signedOn: "2026-10-01", orderRef: "", status: "open", cancelReason: "", closeReason: "", note: "", createdAt: "", attachments: [] } as unknown as Parameters<typeof contractChangeSummary>[1]["contract"];
+    const line = { id: "l1", description: "Tako tip raw", size: "", packing: "", unitKind: "carton", cartonsPerUnit: 1, netKgPerCarton: 10, quantity: 180, kg: 1800, unitPrice: 5, hsCode: "", microSpec: "" };
+    const terms = { ...emptyTerms(), latestShipmentDate: "2026-11-30" };
+    const rev0 = { id: "r0", contractId: "c1", revisionNo: 0, revisedOn: "2026-10-01", changeSummary: "", terms, lines: [line] } as unknown as Parameters<typeof contractChangeSummary>[1]["revision"];
+    const rev1 = { ...rev0, id: "r1", revisionNo: 1, terms: { ...terms, latestShipmentDate: "2026-12-15", paymentMethod: "lc" }, lines: [{ ...line, quantity: 200 }, { ...line, id: "l2", description: "Iwadako" }] } as typeof rev0;
+    const out = contractChangeSummary({ contract, revision: rev0 }, { contract: { ...contract, contractNo: "02.26/BSF-RVS1" }, revision: rev1 }, () => "");
+    expect(out).toContain("Số HĐ: 02.26/BSF → 02.26/BSF-RVS1");
+    expect(out).toContain("Hạn giao muộn nhất: 30/11/2026 → 15/12/2026");
+    expect(out.some((x) => x.startsWith("Thanh toán: TTR"))).toBe(true);
+    expect(out.find((x) => x.startsWith("Dòng hàng:"))).toBe("Dòng hàng: +Iwadako, sửa Tako tip raw");
+    expect(contractChangeSummary({ contract, revision: rev0 }, { contract, revision: rev0 }, () => "")).toHaveLength(0);
+    // Ghi bản sửa chép dòng sang id mới, không đổi gì ⇒ không báo dòng hàng.
+    const copied = { ...rev0, id: "r2", lines: [{ ...line, id: "l9" }] } as typeof rev0;
+    expect(contractChangeSummary({ contract, revision: rev0 }, { contract, revision: copied }, () => "")).toHaveLength(0);
+  });
+});

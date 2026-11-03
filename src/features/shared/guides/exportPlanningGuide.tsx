@@ -185,6 +185,14 @@ export const exportPlanningGuide: PageGuide = {
           <li>Chuyến mới có tháng kế hoạch nằm ở mục <b>Chưa có ngày</b> cuối cột trái; ghi ngày đóng cont hoặc ETD thì chuyến tự vào lịch.</li>
         </GuideList>
       </GuideSection>
+      <GuideSection title="Sửa hợp đồng: sửa được gì, khóa khi nào">
+        <GuideList>
+          <li><b>Sửa hợp đồng</b> (sửa thẳng bản đang dùng): khi chưa chuyến nào có mã lô, booking, ngày, số cont hay file.</li>
+          <li><b>Ghi bản sửa</b> (rvs / phụ kiện / tu chỉnh L/C): khi hợp đồng còn mở — bản mới có hiệu lực ngay, bản cũ giữ để tra.</li>
+          <li><b>Số hợp đồng</b> đổi được ở cả hai cách, không trùng số với hợp đồng khác của cùng khách. <b>Khách</b> đổi được tới khi một chuyến xong bước 4 Đóng cont.</li>
+          <li>Khóa khi hợp đồng <b>Đã đóng HĐ</b> hoặc <b>Đã hủy</b> — Trưởng / Phó phòng Kế hoạch mở lại. Mỗi lần lưu, nhật ký ghi từng ô đổi: cũ → mới (kể cả số hợp đồng cũ).</li>
+        </GuideList>
+      </GuideSection>
       <GuideSection title="Danh mục: danh sách chọn của Xuất khẩu">
         <GuideList>
           <li>Tab <b>Danh mục</b> giữ 6 danh sách: <b>Cảng xếp</b>, <b>Cảng đích</b>, <b>Loại container</b>, <b>Tiền tệ</b>, <b>Loại chứng từ</b>, <b>Loại hàng</b>. Tài khoản ngân hàng và tên, địa chỉ, logo in trên invoice: <b>Tài liệu công ty → Thông tin công ty</b>. Người chỉ có quyền xem thì xem được, không thêm / sửa / xóa.</li>

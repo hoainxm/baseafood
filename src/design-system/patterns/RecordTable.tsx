@@ -67,6 +67,9 @@ export interface RecordTableColumn<T> {
  * Không bao giờ bắt người dùng cuộn ngang để đọc số — cuộn ngang là chỗ hay
  * đọc nhầm dòng nhất.
  */
+/** Số thẻ mỗi đợt ở dạng thẻ (vùng hẹp). */
+const CARD_STEP = 20;
+
 export function RecordTable<T>({
   columns,
   rows,
@@ -140,6 +143,10 @@ export function RecordTable<T>({
     }))
   );
   const daSap = tableSort.rows;
+  // Dạng THẺ (vùng hẹp): hiện từng đợt CARD_STEP thẻ, nút "Xem thêm" — rà UX đợt 3 (2026-11-03): Kho dự trữ 78 lô
+  // thành 78 thẻ, trang cao ~30 màn hình ở 375px. Bảng rộng giữ nguyên (cuộn trong khung).
+  const [cardLimit, setCardLimit] = React.useState(CARD_STEP);
+  const cardRows = daSap.slice(0, cardLimit);
   const sapTheo = tableSort.sort?.key ?? null;
   const toggleSort = tableSort.toggle;
   // Chế độ thẻ: chỉ đưa nút sắp theo cột ĐANG HIỆN trên thẻ — nút cho mọi
@@ -435,7 +442,7 @@ export function RecordTable<T>({
 
           {/* Vùng chứa hẹp (điện thoại, laptop có thanh bên, lưới 2 cột) */}
           <ul className="space-y-3 @3xl:hidden">
-            {daSap.map((r) => {
+            {cardRows.map((r) => {
               const k = getKey(r);
               return (
               <li
@@ -482,6 +489,18 @@ export function RecordTable<T>({
               );
             })}
           </ul>
+          {daSap.length > cardLimit && (
+            <div className="@3xl:hidden">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setCardLimit((n) => n + CARD_STEP)}
+                title="Hiện thêm các dòng tiếp theo của bảng."
+              >
+                Xem thêm {Math.min(CARD_STEP, daSap.length - cardLimit)} dòng (còn {daSap.length - cardLimit})
+              </Button>
+            </div>
+          )}
           <RowMarkToolbar marker={to} selectedKeys={daTick} onClearSelection={rowSelection.clearSelection} />
         </>
       )}

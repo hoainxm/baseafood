@@ -929,6 +929,14 @@ không) ⇒ người dùng phải học lại ở mỗi trang. Luật:
 Chưa theo (để đợt sau, ghi rõ để khỏi tưởng là mẫu): Xuất khẩu (`MonthView` — 3 nút Tháng/Tuần/Ngày + ‹ Tháng ›),
 Nhập khẩu (`MonthNav` — chỉ tháng), Nhập xuất tồn kho (kỳ = danh sách kỳ đã nạp của kho, không phải lịch).
 
+## Điện thoại: lọc gập · nút phụ vào "Thêm" · thẻ theo đợt (từ 2026-11-03, rà UX đợt 3)
+
+| Việc | Cách |
+|---|---|
+| `FilterBar` có > 2 ô lọc | Dưới 640px chỉ hiện 2 ô đầu (đặt kỳ xem / đối tượng chính trước); các ô sau gập vào "Thêm bộ lọc (n ô)". Đang có điều kiện bật lúc mở trang ⇒ mở sẵn. Nút trang (`actions`) luôn hiện |
+| Nhiều nút của trang | `OverflowActions primary={nút chính} more={nút phụ}`: máy tính một hàng đủ nút; điện thoại nút chính + "Thêm" (popover). Bước tour trỏ nút phụ ⇒ `optional: true` |
+| `RecordTable` dạng thẻ | Vùng hẹp hiện 20 thẻ / đợt + "Xem thêm 20 dòng (còn N)"; bảng rộng không đổi |
+
 ## Animation & Loading → "Thinking"
 
 Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn ào*.

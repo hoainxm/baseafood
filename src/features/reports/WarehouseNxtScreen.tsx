@@ -51,6 +51,7 @@ import {
   type StatCardData,
   RowMarkActions,
   useRowMarkTools,
+  OverflowActions,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
@@ -611,27 +612,64 @@ export default function WarehouseNxtScreen() {
   const hasData = snapshots.length > 0;
 
   // Nút của trang: có số ⇒ đứng cuối hàng lọc; chưa có số ⇒ một hàng riêng (README § Đầu trang gọn).
+  // Rà UX đợt 3 (2026-11-03): điện thoại chỉ hiện nút chính (Ghi nhập/xuất), nút phụ gom vào "Thêm".
+  const canEditPeriod = periodRows.length > 0 && canWrite;
   const pageActions = (
-    <>
-      {canWrite && (
-        <Button data-tour="nxt-warehouse-import" variant="outline" onClick={pickFile} title="Đọc file Excel báo cáo Xuất–Nhập–Tồn xuất từ hệ thống xí nghiệp (mẫu 10 cột). Nạp lại cùng kho + cùng kỳ chỉ cập nhật, không nhân đôi dòng.">
-          <Upload className="mr-2 h-4 w-4" />
-          Nhập Excel báo cáo
-        </Button>
-      )}
-      {allowed.export && (
+    <OverflowActions
+      primary={
+        canEditPeriod && (
+          <Button
+            data-tour="nxt-warehouse-edit"
+            variant={isEditMode ? "default" : "edit"}
+            onClick={() => setIsEditMode((v) => !v)}
+            title={
+              isEditMode
+                ? "Thoát chế độ ghi, quay về bảng xem."
+                : "Bật lưới gõ tồn đầu / nhập / xuất từng mã. Tồn cuối tự tính, dán được cả khối từ Excel."
+            }
+          >
+            {isEditMode ? <Eye className="mr-2 h-4 w-4" /> : <Pencil className="mr-2 h-4 w-4" />}
+            {isEditMode ? "Xong · xem lại" : "Ghi nhập/xuất"}
+          </Button>
+        )
+      }
+      more={
         <>
-          <Button data-tour="nxt-warehouse-export" variant="outline" onClick={exportExcel} disabled={!rows.length} title="Tải kỳ đang xem ra file Excel đúng mẫu báo cáo của xí nghiệp, để gửi kế toán hoặc lưu hồ sơ.">
-            <Download className="mr-2 h-4 w-4" />
-            Xuất Excel
-          </Button>
-          <Button onClick={() => setMoIn(true)} disabled={!rows.length} title="Xem trước bản in A4 của kỳ đang xem, rồi in giấy hoặc lưu PDF.">
-            <Printer className="mr-2 h-4 w-4" />
-            In A4
-          </Button>
+          {canEditPeriod && (
+            <Button
+              data-tour="nxt-warehouse-next-period"
+              variant="outline"
+              title="Mở một kỳ báo cáo mới và lấy tồn cuối kỳ này làm tồn đầu kỳ đó (kèm cả kho lưu) — khỏi gõ lại từ đầu."
+              onClick={() => {
+                setPeriodForm({ from: nextDay(toDate), to: "" });
+                setPeriodErrors([]);
+              }}
+            >
+              <CalendarPlus className="mr-2 h-4 w-4" />
+              Tạo kỳ kế tiếp
+            </Button>
+          )}
+          {canWrite && (
+            <Button data-tour="nxt-warehouse-import" variant="outline" onClick={pickFile} title="Đọc file Excel báo cáo Xuất–Nhập–Tồn xuất từ hệ thống xí nghiệp (mẫu 10 cột). Nạp lại cùng kho + cùng kỳ chỉ cập nhật, không nhân đôi dòng.">
+              <Upload className="mr-2 h-4 w-4" />
+              Nhập Excel báo cáo
+            </Button>
+          )}
+          {allowed.export && (
+            <>
+              <Button data-tour="nxt-warehouse-export" variant="outline" onClick={exportExcel} disabled={!rows.length} title="Tải kỳ đang xem ra file Excel đúng mẫu báo cáo của xí nghiệp, để gửi kế toán hoặc lưu hồ sơ.">
+                <Download className="mr-2 h-4 w-4" />
+                Xuất Excel
+              </Button>
+              <Button onClick={() => setMoIn(true)} disabled={!rows.length} title="Xem trước bản in A4 của kỳ đang xem, rồi in giấy hoặc lưu PDF.">
+                <Printer className="mr-2 h-4 w-4" />
+                In A4
+              </Button>
+            </>
+          )}
         </>
-      )}
-    </>
+      }
+    />
   );
 
   return (
@@ -707,35 +745,6 @@ export default function WarehouseNxtScreen() {
             clearable={false}
             className="min-w-[14rem] flex-1"
           />
-          {periodRows.length > 0 && canWrite && (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                data-tour="nxt-warehouse-edit"
-                variant={isEditMode ? "default" : "edit"}
-                onClick={() => setIsEditMode((v) => !v)}
-                title={
-                  isEditMode
-                    ? "Thoát chế độ ghi, quay về bảng xem."
-                    : "Bật lưới gõ tồn đầu / nhập / xuất từng mã. Tồn cuối tự tính, dán được cả khối từ Excel."
-                }
-              >
-                {isEditMode ? <Eye className="mr-2 h-4 w-4" /> : <Pencil className="mr-2 h-4 w-4" />}
-                {isEditMode ? "Xong · xem lại" : "Ghi nhập/xuất"}
-              </Button>
-              <Button
-                data-tour="nxt-warehouse-next-period"
-                variant="outline"
-                title="Mở một kỳ báo cáo mới và lấy tồn cuối kỳ này làm tồn đầu kỳ đó (kèm cả kho lưu) — khỏi gõ lại từ đầu."
-                onClick={() => {
-                  setPeriodForm({ from: nextDay(toDate), to: "" });
-                  setPeriodErrors([]);
-                }}
-              >
-                <CalendarPlus className="mr-2 h-4 w-4" />
-                Tạo kỳ kế tiếp
-              </Button>
-            </div>
-          )}
         </FilterBar>
       )}
 

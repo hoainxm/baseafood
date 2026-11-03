@@ -2,6 +2,8 @@
 
 > Load khi: review / kiểm lại trang Bán hàng (`/sales`) và Đơn đặt (`/orders`), trước khi sửa luật phiếu bán, ghi bù, trừ tồn, lệnh xuất. Bản đọc nhanh — luật đầy đủ ở [33-ban-hang](../app-map/33-ban-hang.md) · ba-spec [34](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [53](../app-map/53-filters.ba-spec.md).
 covers: src/features/sales/*, src/features/orders/*, src/lib/salesTotals.ts, src/lib/inventory.ts
+tours: src/features/sales/salesTour.ts, src/features/orders/ordersTour.ts
+guides: src/features/shared/guideContent.tsx
 last_verified: 2026-11-03
 ttl_days: 90
 

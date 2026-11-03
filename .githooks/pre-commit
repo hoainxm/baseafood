@@ -119,28 +119,37 @@ for doc in docs/app-map/*.md; do
   done
 done
 
-# ---------- 3b. Sơ đồ workflow lệch code (CHẶN — docs/workflows/README.md, ba-spec 65) ----------
-# Khác doc app-map (chỉ nhắc): sơ đồ workflow là bản review nhanh của module ⇒ code trong `covers:` đổi mà
-# file sơ đồ không đổi trong CÙNG commit ⇒ chặn. Thay đổi không đụng luật (đổi tên biến, sửa chữ): sửa
-# `last_verified:` của sơ đồ cũng tính là đã soát. Bỏ qua có chủ đích: WORKFLOW_DOC_SKIP=1 git commit …
+# ---------- 3b. Sơ đồ workflow + 2 hướng dẫn lệch code (CHẶN — docs/workflows/README.md, ba-spec 65) ----------
+# Code trong `covers:` của một sơ đồ đổi (KHÔNG tính chính file tour / hộp "?") ⇒ trong CÙNG commit phải có:
+#   1. file sơ đồ đó (đổi luật ⇒ bảng / sơ đồ; chỉ đổi kỹ thuật ⇒ ít nhất `last_verified:`),
+#   2. ≥ 1 file hướng dẫn thao tác (`tours:`) và ≥ 1 file hộp "?" (`guides:`) của khu đó (người dùng 2026-11-03:
+#      "bất kì thay đổi nào cũng cập nhật 2 HDSD").
+# Bỏ qua có chủ đích (đổi kỹ thuật không đụng chữ người dùng đọc): WORKFLOW_DOC_SKIP=1 git commit …
 if [ "${WORKFLOW_DOC_SKIP:-0}" != 1 ]; then
   for doc in docs/workflows/*.md; do
     [ -f "$doc" ] || continue
-    case "$staged" in *"$doc"*) continue ;; esac
     covers=$(sed -n 's/^covers:[[:space:]]*//p' "$doc" | head -1 | tr ',' ' ')
     [ -z "$covers" ] && continue
-    for mau in $covers; do
-      mau=$(printf '%s' "$mau" | sed 's|\*\*|*|g')
-      hit=""
-      for f in $staged; do
+    tours=$(sed -n 's/^tours:[[:space:]]*//p' "$doc" | head -1 | tr ',' ' ')
+    guides=$(sed -n 's/^guides:[[:space:]]*//p' "$doc" | head -1 | tr ',' ' ')
+    hit=""
+    for f in $staged; do
+      case " $tours $guides " in *" $f "*) continue ;; esac
+      for mau in $covers; do
+        mau=$(printf '%s' "$mau" | sed 's|\*\*|*|g')
         # shellcheck disable=SC2254
         case "$f" in $mau) hit="$f"; break ;; esac
       done
-      if [ -n "$hit" ]; then
-        do_hong "$hit đổi nhưng sơ đồ $doc không — sửa sơ đồ (hoặc ít nhất last_verified:) trong cùng commit. Không đụng luật: WORKFLOW_DOC_SKIP=1 git commit"
-        break
-      fi
+      [ -n "$hit" ] && break
     done
+    [ -z "$hit" ] && continue
+    case "$staged" in *"$doc"*) ;; *)
+      do_hong "$hit đổi nhưng sơ đồ $doc không — sửa sơ đồ (hoặc ít nhất last_verified:) trong cùng commit. Không đụng luật: WORKFLOW_DOC_SKIP=1 git commit" ;;
+    esac
+    co_tour=""; for t in $tours; do case "$staged" in *"$t"*) co_tour=1 ;; esac; done
+    co_guide=""; for g in $guides; do case "$staged" in *"$g"*) co_guide=1 ;; esac; done
+    [ -n "$tours" ] && [ -z "$co_tour" ] && do_hong "$hit đổi nhưng chưa sửa hướng dẫn thao tác của khu ($tours) — cập nhật bước tour theo sơ đồ $doc"
+    [ -n "$guides" ] && [ -z "$co_guide" ] && do_hong "$hit đổi nhưng chưa sửa hộp \"?\" của khu ($guides) — cập nhật hướng dẫn theo sơ đồ $doc"
   done
 fi
 

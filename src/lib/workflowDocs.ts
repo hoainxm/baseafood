@@ -199,3 +199,7 @@ export function writeGenerated(doc: string, key: string, body: string): string {
   if (a < 0 || b < a) return doc;
   return `${doc.slice(0, a + start.length)}\n${body}\n${doc.slice(b)}`;
 }
+
+/** Module chứa một trang (navId) — hộp "?" mở đúng sơ đồ của trang đang xem. */
+export const workflowModuleOfPage = (navId: string): WorkflowModule | undefined =>
+  WORKFLOW_MODULES.find((m) => m.doc && m.pages.includes(navId));

@@ -2,6 +2,8 @@
 
 > Load khi: review / kiểm lại các trang Cân đối kỳ (`/balancing`), Báo cáo thành phẩm (`/production-report`), Báo cáo đơn xuất (`/export-report`), Tồn kho thành phẩm (`/nxt`), Đối soát hóa đơn điện tử (`/reconciliation`); trước khi sửa công thức định mức, lãi / lỗ, chốt kỳ, tồn thành phẩm. Bản đọc nhanh — luật đầy đủ ở [31-can-doi-ky](../app-map/31-can-doi-ky.md) · [37-doi-soat-hddt](../app-map/37-doi-soat-hddt.md) · ba-spec [34](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [53](../app-map/53-filters.ba-spec.md).
 covers: src/features/balancing/*, src/features/reports/*, src/features/reconciliation/*, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/lib/balancingStockLines.ts, src/lib/inventoryFinished.ts, src/lib/einvoiceReconciliation.ts, src/lib/twoVersionReconciliation.ts, src/lib/reconciliation*.ts
+tours: src/features/balancing/balancingTour.ts, src/features/reports/productionReportTour.ts, src/features/reports/exportReportTour.ts, src/features/reports/finishedGoodStockTour.ts, src/features/reconciliation/reconciliationTour.ts
+guides: src/features/shared/guideContent.tsx, src/features/shared/guides/reconciliationGuide.tsx
 last_verified: 2026-11-03
 ttl_days: 90
 

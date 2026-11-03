@@ -2,6 +2,8 @@
 
 > Load khi: review / kiểm lại trang Nhập hàng (`/imports`) và Tồn kho nguyên liệu (`/nxt-material`), trước khi sửa luật chuyến, ghi bù, chốt ngày, phế liệu, hóa đơn đại lý. Bản đọc nhanh — luật đầy đủ ở [30-nhap-hang](../app-map/30-nhap-hang.md) · ba-spec [51](../app-map/51-supplier-invoice-matching.ba-spec.md) · [36](../app-map/36-so-kho-thang.md) (tồn theo tháng).
 covers: src/features/imports/*, src/features/reports/MaterialNxtScreen.tsx, src/lib/supplierInvoice*.ts, src/lib/inventoryMaterial.ts, src/lib/periodUtils.ts
+tours: src/features/imports/importsTour.ts, src/features/reports/materialStockTour.ts
+guides: src/features/shared/guideContent.tsx, src/features/shared/guides/materialStockGuide.tsx
 last_verified: 2026-11-03
 ttl_days: 90
 
@@ -86,7 +88,7 @@ sequenceDiagram
   participant TK as Thủ kho nhập hàng
   participant KT as Kế toán
   participant KTT as Kế toán trưởng
-  TK->>TK: Ghi chuyến, phế liệu; để trống giá nếu chờ hóa đơn
+  TK->>TK: Ghi chuyến, phế liệu, để trống giá nếu chờ hóa đơn
   TK->>KT: Chốt ngày (tổng kg lúc chốt)
   KT->>KT: Nạp sổ chi tiết NL và PDF, ghép vào chuyến
   KT-->>TK: Nhãn Chờ HĐ · Lệch HĐ hiện trên chuyến

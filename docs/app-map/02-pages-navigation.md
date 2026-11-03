@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/my-tasks/MyTasksScreen.tsx, src/features/shared/AccountMenu.tsx, src/features/admin/AdminHomeScreen.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts, src/lib/permissions.ts, src/features/shared/PermissionProvider.tsx
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (c) — route `/workflows` "Quy trình" (không có trong nav): xem sơ đồ quy trình từng khu, mở từ hộp "?" của mọi trang (nút Xem sơ đồ quy trình, AppShell `workflowModuleOfPage`). Miễn tài nguyên quyền + tour như `/file-view` (ba-spec 65 R7). -->
 <!-- updated: 2026-11-03 — thanh bên: mục tra cứu ghi rõ tra gì ("Tra đại lý" · "Tra mặt hàng" · "Tra kho lưu" · "Tra khách hàng" · "Tra NCC nhập khẩu") thay 6 mục cùng chữ "Tra cứu" (`LOOKUP_CHILD(tab, nhãn)` ở AppShell). Rà UX đợt 1. -->
 <!-- updated: 2026-11-02 — `/planning-export` thêm `?view=catalog` (tab Danh mục) + `?list=` (`loading-port` mặc định · `discharge-port` · `container-type` · `currency` · `document-kinds` · `goods-types`). `/catalog?tab=document-kinds` · `goods-types` chuyển hướng sang đó (ba-spec 62). -->
 <!-- updated: 2026-11-02 (xem file) — THÊM route `/file-view` "Xem file" (ngoài nav, tiêu đề header qua `EXTRA_PAGE_TITLES` trong App.tsx) — ba-spec 61. -->

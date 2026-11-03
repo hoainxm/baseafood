@@ -2,6 +2,8 @@
 
 > Load khi: review / kiểm lại trang Xuất khẩu (`/planning-export`), trước khi sửa luật hợp đồng, chuyến, đóng cont, chứng từ. Bản đọc nhanh — luật đầy đủ ở ba-spec [41](../app-map/41-export-planning.ba-spec.md) · [62](../app-map/62-export-option-lists.ba-spec.md) · [63](../app-map/63-export-invoice-from-app.ba-spec.md) · [58](../app-map/58-contract-attachment-deferral.ba-spec.md).
 covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/exportInvoice*.ts, src/lib/exportOptions.ts, src/lib/exportFiles*.ts
+tours: src/features/export-planning/exportTour.ts
+guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-03
 ttl_days: 90
 
@@ -35,6 +37,7 @@ stateDiagram-v2
 | Đã hủy | HĐ bỏ, chuyến không còn tính | — | Nhân viên Kế hoạch | |
 
 Hồ sơ đính kèm **Bổ sung sau** (ba-spec 58): cho chạy tiếp nhưng vẫn nhắc ở Việc của tôi tới khi có file.
+
 
 ## 2. Một chuyến (container) đi qua 6 bước
 
@@ -137,3 +140,4 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 ## Lịch sử
 
 - 2026-11-03 — tạo (mẫu đầu tiên của bộ sơ đồ workflow, ba-spec 65).
+- 2026-11-03 — thêm đọc file hợp đồng / phụ lục để điền sẵn form (ba-spec 66).

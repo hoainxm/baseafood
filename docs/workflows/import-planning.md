@@ -2,6 +2,8 @@
 
 > Load khi: review / kiểm lại trang Nhập khẩu (`/planning-import`), trước khi sửa luật hợp đồng nhập, lần nhập, bộ chứng từ, thực nhập, đóng hợp đồng. Bản đọc nhanh — luật đầy đủ ở ba-spec [45](../app-map/45-import-planning.ba-spec.md) · design-spec [46](../app-map/46-import-planning-ui.design-spec.md). "Nhập khẩu" khác "Nhập hàng" (`/imports`, mua nguyên liệu trong nước).
 covers: src/features/import-planning/*, src/lib/importPlanning.ts, src/lib/importPlanningDemo.ts, src/lib/importReports.ts, src/lib/importSample*.ts, src/lib/importFileStorage.ts
+tours: src/features/import-planning/importTour.ts
+guides: src/features/shared/guides/importPlanningGuide.tsx
 last_verified: 2026-11-03
 ttl_days: 90
 
@@ -57,6 +59,7 @@ stateDiagram-v2
 - Xóa lần nhập chỉ khi chưa có file, chưa có kiểm mẫu, chưa có thực nhập kg > 0 (`canDeleteReceipt`).
 - Kiểm mẫu của kho (nạp báo cáo Excel / ảnh) chỉ lưu số, **không** đổi trạng thái lần nhập.
 - Báo cáo và Việc của tôi chỉ báo hai loại lần nhập cần chú ý: Thiếu chứng từ, Chờ thực nhập (`IMPORT_ATTENTION_LABELS`).
+- **Đọc file hợp đồng** (ba-spec [66](../app-map/66-contract-file-autofill.ba-spec.md)): lập / sửa HĐ nhập chọn file Word (.docx) hoặc PDF có chữ ⇒ điền sẵn ô còn trống (đối tác = bên bán, số, ngày ký, tiền tệ, dòng hàng tên · kg · đơn giá); loại hình vẫn chọn tay; không tự lưu, không đổi trạng thái (`fillImportContract`).
 
 ## 2. Các bước của luồng
 
@@ -139,3 +142,4 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 ## Lịch sử
 
 - 2026-11-03 — tạo.
+- 2026-11-03 — thêm đọc file hợp đồng nhập để điền sẵn form (ba-spec 66).

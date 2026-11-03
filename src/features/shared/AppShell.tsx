@@ -4,6 +4,7 @@
 // Description: Main MES Layout App Shell with Navigation Sidebar
 // ============================================================
 // src/features/shared/AppShell.tsx
+import { workflowModuleOfPage } from "@/lib/workflowDocs";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Tag,
@@ -561,6 +562,8 @@ export default function AppShell({
 }: AppShellProps) {
   // Trang đang mở có khai "hướng dẫn từng bước" ⇒ nút "?" có lối bắt đầu (ba-spec 43).
   const pageTour = usePageTourControl();
+  // Hộp "?" mở sơ đồ quy trình của khu chứa trang này (ba-spec 65).
+  const workflowModule = workflowModuleOfPage(active);
   // Thanh bên thu về dải icon: TỰ ĐỘNG ở màn hẹp (iPhone ngang, iPad dọc) để
   // nhường chỗ cho tiêu đề + bảng; người dùng bấm nút thu/mở thì theo ý họ —
   // nhưng chỉ trong cùng một cỡ màn: xoay máy sang cỡ khác là về lại mặc định.
@@ -765,6 +768,7 @@ export default function AppShell({
                 title={guide?.title ?? title}
                 description={guide?.description}
                 onStartTour={pageTour.available ? pageTour.start : undefined}
+                onOpenWorkflow={workflowModule ? () => onSelect(`workflows?module=${workflowModule.id}`) : undefined}
               >
                 {guide?.content}
               </GuideButton>

@@ -2,6 +2,8 @@
 
 > Load khi: review / kiểm lại các trang `/catalog` (Danh mục), `/admin` (Quản trị), `/users` (Người dùng), `/roles` (Vai trò & quyền), `/audit` (Nhật ký thao tác); trước khi sửa luật tài khoản, ma trận quyền, danh mục dùng chung. Bản đọc nhanh — luật đầy đủ ở [32-danh-muc](../app-map/32-danh-muc.md) · [05-bao-mat-phan-quyen](../app-map/05-bao-mat-phan-quyen.md) · [56](../app-map/56-activity-log-groups.ba-spec.md).
 covers: src/features/catalog/*, src/features/users/*, src/features/admin/*, src/features/audit/*, src/lib/permissions.ts, src/lib/audit.ts, src/lib/userDirectory.ts, src/lib/catalogRepo.ts, src/lib/productUsage.ts
+tours: src/features/catalog/catalogTour.ts
+guides: src/features/shared/guideContent.tsx
 last_verified: 2026-11-03
 ttl_days: 90
 

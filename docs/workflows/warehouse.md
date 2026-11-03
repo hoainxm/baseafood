@@ -2,6 +2,8 @@
 
 > Load khi: review / kiểm lại các trang Kho dự trữ (`/warehouse`), Sổ kho theo tháng (`/monthly-stock`), Mã lô QR (`/qr`), Nhập xuất tồn kho (`/nxt-warehouse`). Trước khi sửa luật duyệt nhập kho, tồn theo lô, dồn tồn tháng, tem QR. Bản đọc nhanh — luật đầy đủ ở ba-spec [34](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [36](../app-map/36-so-kho-thang.md) · [spec qr-truy-xuat-lo](../spec/qr-truy-xuat-lo.md).
 covers: src/features/warehouse/*, src/features/monthly-stock/*, src/features/qr/*, src/features/reports/WarehouseNxtScreen.tsx, src/lib/inventory.ts, src/lib/lotTraceability.ts, src/lib/monthlyStock*.ts, src/lib/frozenStockLines.ts, src/lib/nxtExcel.ts
+tours: src/features/warehouse/warehouseTour.ts, src/features/monthly-stock/monthlyStockTour.ts, src/features/qr/qrTour.ts, src/features/reports/warehouseNxtTour.ts
+guides: src/features/shared/guideContent.tsx, src/features/shared/guides/warehouseNxtGuide.tsx
 last_verified: 2026-11-03
 ttl_days: 90
 
@@ -74,7 +76,7 @@ sequenceDiagram
   participant KT as Kế toán
   XU->>TK: Mẻ BTP ở trạng thái Chờ nhập kho, kèm tem QR
   TK->>TK: Quản đốc quét tem, đối chiếu kg và block thực, Duyệt nhập kho
-  TK-->>KT: Tồn dự trữ theo lô; hàng đông lạnh vào nhóm Hàng tạm
+  TK-->>KT: Tồn dự trữ theo lô, hàng đông lạnh vào nhóm Hàng tạm
   KT->>KT: Cuối tháng Dồn sang tháng sau, nạp Excel bảng kê, đối chiếu lệch
   KT->>KT: Nhập xuất tồn kho: Tạo kỳ kế tiếp
 ```

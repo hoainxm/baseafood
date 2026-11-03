@@ -2,6 +2,8 @@
 
 > Load khi: review / kiểm lại trang Lệnh sản xuất (`/planning-production`), trước khi sửa luật lập lệnh, phát hành, gắn chuyến, NL nhập khẩu dự kiến, file Word / PDF. Bản đọc nhanh — luật đầy đủ ở ba-spec [48](../app-map/48-production-order.ba-spec.md) · [54](../app-map/54-document-composer.ba-spec.md) · design-spec [49](../app-map/49-production-order-ui.design-spec.md).
 covers: src/features/production-orders/*, src/lib/productionOrder.ts, src/lib/productionOrderReports.ts, src/lib/documentComposer.ts, src/lib/documentTypes/productionOrder*.ts
+tours: src/features/production-orders/productionOrderTour.ts
+guides: src/features/shared/guides/productionOrderGuide.tsx
 last_verified: 2026-11-03
 ttl_days: 90
 

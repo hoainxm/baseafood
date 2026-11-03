@@ -36,6 +36,33 @@ describe("ba-spec 65 — sơ đồ workflow theo module", () => {
     }
   });
 
+  it("AC-6: sơ đồ Mermaid không có dấu ; trong lời (Mermaid hiểu ; là ngắt lệnh ⇒ sơ đồ vẽ hỏng trên app và GitHub)", () => {
+    for (const m of withDoc) {
+      const blocks = read(m.doc as string).match(/```mermaid\n[\s\S]*?```/g) ?? [];
+      expect(blocks.filter((b) => b.includes(";")).length, m.id).toBe(0);
+    }
+  });
+
+  it("AC-7: mỗi sơ đồ khai tours: + guides: có thật; mọi file tour của app thuộc ít nhất một khu", () => {
+    const listed = (doc: string, key: string) => (doc.match(new RegExp(`^${key}: (.+)$`, "m"))?.[1] ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    const allTours = new Set<string>();
+    for (const m of withDoc) {
+      const doc = read(m.doc as string);
+      const tours = listed(doc, "tours");
+      const guides = listed(doc, "guides");
+      expect(tours.length, `${m.id} tours`).toBeGreaterThan(0);
+      expect(guides.length, `${m.id} guides`).toBeGreaterThan(0);
+      for (const f of [...tours, ...guides]) expect(fs.existsSync(path.join(root, f)), f).toBe(true);
+      tours.forEach((t) => allTours.add(t));
+    }
+    const featureTours = fs
+      .readdirSync(path.join(root, "src/features"), { recursive: true })
+      .map(String)
+      .filter((f) => /Tour\.ts$/.test(f))
+      .map((f) => `src/features/${f.replace(/\\/g, "/")}`);
+    expect(featureTours.filter((t) => !allTours.has(t))).toEqual([]);
+  });
+
   it("AC-4: mọi nhãn trạng thái / bước trong code có mặt trong sơ đồ", () => {
     for (const m of withDoc) {
       const doc = read(m.doc as string);

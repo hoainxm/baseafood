@@ -2,6 +2,8 @@
 
 > Load khi: review / kiểm lại 3 trang Sản xuất thành phẩm (`/wip`), Đóng gói (`/packaging`), Kiểm tra QC (`/qc`); trước khi sửa luật chốt ngày, ghi bù, nhập kho, đóng gói. Bản đọc nhanh — luật đầy đủ ở ba-spec [34](../app-map/34-btp-san-xuat-kho.ba-spec.md) · design-spec [35](../app-map/35-btp-ui.design-spec.md).
 covers: src/features/production/*, src/features/packaging/*, src/features/quality-check/*, src/lib/inventory.ts
+tours: src/features/production/wipTour.ts, src/features/packaging/packagingTour.ts, src/features/quality-check/qcTour.ts
+guides: src/features/shared/guides/wipGuide.tsx, src/features/shared/guides/packagingGuide.tsx, src/features/shared/guides/qcGuide.tsx
 last_verified: 2026-11-03
 ttl_days: 90
 

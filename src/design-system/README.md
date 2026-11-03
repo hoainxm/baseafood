@@ -937,6 +937,10 @@ Nhập khẩu (`MonthNav` — chỉ tháng), Nhập xuất tồn kho (kỳ = dan
 | Nhiều nút của trang | `OverflowActions primary={nút chính} more={nút phụ}`: máy tính một hàng đủ nút; điện thoại nút chính + "Thêm" (popover). Bước tour trỏ nút phụ ⇒ `optional: true` |
 | `RecordTable` dạng thẻ | Vùng hẹp hiện 20 thẻ / đợt + "Xem thêm 20 dòng (còn N)"; bảng rộng không đổi |
 
+## Tài liệu trong app — `MarkdownView` (từ 2026-11-03, ba-spec 65)
+
+Hiện file Markdown của repo (sơ đồ `docs/workflows/`): khối ```mermaid vẽ thành sơ đồ (`mermaid` tải lười), bỏ dòng kỹ thuật frontmatter, link `<id>.md` ⇒ `linkFor(id)`. Bảng trong tài liệu cuộn ngang trong khung riêng (`.md-table`) — **ngoại lệ luật 14** vì là tài liệu đọc, không phải bảng nghiệp vụ. Chỉ dùng cho nội dung đóng gói lúc build, không cho chữ người dùng gõ.
+
 ## Animation & Loading → "Thinking"
 
 Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn ào*.

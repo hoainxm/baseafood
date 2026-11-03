@@ -1,6 +1,7 @@
 > Load khi: deploy app lên Vercel, đổi env production, nối repo cá nhân, hoặc người mới tiếp nhận cần dựng bản chạy thật.
 covers: index.html, package.json, vite.config.ts, src/lib/supabase.ts
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (c) — package.json thêm `marked@18.1.1` + `mermaid@12.2.0` (ghim bản) cho trang Quy trình `#/workflows`; mermaid tách chunk riêng, chỉ tải khi mở trang có sơ đồ — các trang khác không nặng thêm. -->
 ttl_days: 90
 
 # Deploy Vercel — Baseafood MES

@@ -5,7 +5,7 @@
 // ============================================================
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { HelpCircle, Route } from "lucide-react";
+import { HelpCircle, Route, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormDialog, CloseButton } from "./FormDialog";
 
@@ -24,6 +24,7 @@ export function GuideButton({
   children,
   className,
   onStartTour,
+  onOpenWorkflow,
 }: {
   title: string;
   description?: string;
@@ -31,6 +32,8 @@ export function GuideButton({
   className?: string;
   /** Trang có hướng dẫn thao tác (GuidedTour) ⇒ đầu hộp có lối bắt đầu. */
   onStartTour?: () => void;
+  /** Module của trang có sơ đồ quy trình (`docs/workflows/`, ba-spec 65) ⇒ đầu hộp có lối mở trang Quy trình. */
+  onOpenWorkflow?: () => void;
 }) {
   const [open, setOpen] = React.useState(false);
   return (
@@ -74,6 +77,23 @@ export function GuideButton({
             >
               <Route aria-hidden />
               Bắt đầu hướng dẫn thao tác
+            </Button>
+          </div>
+        )}
+        {onOpenWorkflow && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border px-4 py-3">
+            <p className="min-w-0 flex-1 basis-56 text-sm text-muted-foreground">Sơ đồ quy trình của khu này: trạng thái, điều kiện xong của từng bước, ai làm gì.</p>
+            <Button
+              variant="outline"
+              className="h-auto min-h-10 max-w-full whitespace-normal py-2 text-left"
+              onClick={() => {
+                setOpen(false);
+                onOpenWorkflow();
+              }}
+              title="Mở trang Quy trình ở đúng khu của trang này."
+            >
+              <Workflow aria-hidden />
+              Xem sơ đồ quy trình
             </Button>
           </div>
         )}

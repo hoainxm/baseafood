@@ -102,8 +102,7 @@ import type {
   RowMark,
   AppRole,
   RolePermission,
-  UserPermission,
-} from "@/types";
+  UserPermission, CompanyProfile } from "@/types";
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { getProductBatterIds, sanitizeBatterKg } from "@/lib/batter";
 import { appendAuditEntries, type NewAuditEntry } from "@/lib/audit";
@@ -2778,6 +2777,49 @@ export const EXPORT_OPTION_TABLE: TableMapping<ExportOption> = {
   }),
 };
 
+/** Thông tin công ty (mig 0099, ba-spec 67) — mỗi site một dòng, id `company`. */
+export const COMPANY_PROFILE_TABLE: TableMapping<CompanyProfile> = {
+  table: "company_profile",
+  localKey: "bsf.company-profile.v1",
+  getKey: theoId,
+  toRow: (x) => ({
+    id: x.id,
+    name_vietnamese: x.nameVietnamese,
+    name_en: x.nameEn,
+    short_name_en: x.shortNameEn,
+    tax_code: x.taxCode,
+    address_vietnamese: x.addressVietnamese,
+    address_en: x.addressEn,
+    issue_place: x.issuePlace,
+    phone: x.phone,
+    fax: x.fax,
+    email: x.email,
+    website: x.website,
+    signer_name: x.signerName,
+    signer_title: x.signerTitle,
+    logo_path: x.logoPath,
+    note: x.note ?? "",
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    nameVietnamese: s(r.name_vietnamese),
+    nameEn: s(r.name_en),
+    shortNameEn: s(r.short_name_en),
+    taxCode: s(r.tax_code),
+    addressVietnamese: s(r.address_vietnamese),
+    addressEn: s(r.address_en),
+    issuePlace: s(r.issue_place),
+    phone: s(r.phone),
+    fax: s(r.fax),
+    email: s(r.email),
+    website: s(r.website),
+    signerName: s(r.signer_name),
+    signerTitle: s(r.signer_title),
+    logoPath: s(r.logo_path),
+    note: s(r.note),
+  }),
+};
+
 /* ---------- Nhật ký thao tác (audit) ---------- */
 
 /* ---------- Phòng Kế hoạch · Nhập khẩu (mig 0082, ba-spec 45) ---------- */
@@ -3529,6 +3571,7 @@ export const TABLE_LABELS: Readonly<Record<string, string>> = {
   customer_product_names: "Tên hàng theo khách",
   export_document_kinds: "Loại chứng từ xuất khẩu",
   export_options: "Danh sách chọn xuất khẩu",
+  company_profile: "Thông tin công ty",
   import_suppliers: "NCC nhập khẩu",
   goods_types: "Loại hàng",
   import_contracts: "Hợp đồng nhập khẩu",

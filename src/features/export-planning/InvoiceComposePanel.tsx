@@ -21,6 +21,8 @@ import {
   lineUnits,
   shipmentLinesOf,
 } from "@/lib/exportInvoice";
+import { companySellerOf } from "@/lib/companyProfile";
+import { useCompanyProfileStore } from "@/lib/catalogRepo";
 import { termsOf, workingRevision, type ExportData } from "@/lib/exportPlanning";
 import type { Customer, ExportContract, ExportShipment, ExportStepItem, InvoiceComposition } from "@/types";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
@@ -52,7 +54,10 @@ export function InvoiceComposePanel({
   const lines = shipmentLinesOf(data.shipmentLines ?? [], shipment.id);
   const banks = bankAccountsOf(picker.options);
   const bank = banks.find((b) => b.id === comp.bankOptionId) ?? banks[0];
-  const doc = useMemo(() => invoiceDocumentFor(data, shipment, contract, customer, item, picker.options), [data, shipment, contract, customer, item, picker.options]);
+  // Người bán + logo từ Thông tin công ty (ba-spec 67).
+  const company = useCompanyProfileStore();
+  const seller = useMemo(() => companySellerOf(company.profile), [company.profile]);
+  const doc = useMemo(() => invoiceDocumentFor(data, shipment, contract, customer, item, picker.options, seller), [data, shipment, contract, customer, item, picker.options, seller]);
   const totalsDiffer =
     item.cartons !== doc.totals.units || item.netKg !== doc.totals.netKg || item.amount !== doc.totals.amount;
   const pod = shipment.portOfDischarge || terms.portOfDischarge;
@@ -77,7 +82,7 @@ export function InvoiceComposePanel({
     if (item.netKg == null) patch.netKg = doc.totals.netKg;
     if (item.amount == null) patch.amount = doc.totals.amount;
     if (Object.keys(patch).length) onPatchItem(patch);
-    await downloadInvoiceDocument(doc, format);
+    await downloadInvoiceDocument(doc, format, company.profile.logoPath);
     setBusy(false);
   };
 

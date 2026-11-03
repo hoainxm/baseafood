@@ -1,6 +1,7 @@
 > Load khi: sửa màn `/documents` "Tài liệu công ty", luật xem theo phòng ban, lần ban hành, file trên bucket `documents`, hạn chứng nhận ở Việc của tôi, cột `app_roles.department`.
 covers: src/features/documents/DocumentsScreen.tsx, src/features/documents/DocumentDetailDialog.tsx, src/features/documents/FilePreviewDialog.tsx, src/features/documents/openDocumentFile.ts, src/features/documents/DocumentFormDialog.tsx, src/features/documents/VersionFormDialog.tsx, src/features/documents/index.ts, src/lib/documents.ts, src/lib/documentStorage.ts, supabase/migrations/0072_company_documents.sql
-last_verified: 2026-11-02
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (ba-spec 67) — trang có 2 tab: Tài liệu · Thông tin công ty (`?tab=company`, `CompanyProfileView`, ba-spec 67) — logo, pháp nhân, người ký, tài khoản ngân hàng; quyền `company-profile`. -->
 <!-- updated: 2026-11-02 (b) — xem file Word / Excel ngay trong app + trang xem ở tab mới (ba-spec 61); nút "Xem file gốc" ở hộp chi tiết. -->
 <!-- updated: 2026-11-02 — hộp xem file: khung PDF cao `min(75dvh, 100dvh−16rem)` (không vượt hộp ở điện thoại / iPad ngang) + dòng nhắc "Trên iPhone / iPad khung có thể chỉ hiện trang đầu — chọn Mở tab mới"; `filePreviewKind` xem trước thêm ảnh .webp / .gif. -->
 <!-- re-verified: 2026-10-29 09:00 — DEPARTMENTS (10 phòng) + SYSTEM_ROLE_DEPARTMENTS (planner / planning-head / planning-deputy → planning) + departmentsOfRoles (app_roles.department trước, rồi mặc định) khớp lib/documents.ts. Màn Người dùng (lib/userDirectory.ts) giờ cũng gom theo đúng nguồn này. -->

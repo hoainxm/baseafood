@@ -85,9 +85,9 @@ import type {
   ExportOption,
   ExportShipmentLine,
   ExportShipment,
-  ExportStepItem,
-} from "@/types";
+  ExportStepItem, CompanyProfile } from "@/types";
 import { EXPORT_OPTION_SEED } from "./exportOptions";
+import { COMPANY_DEFAULTS } from "./companyProfile";
 import { shipmentLineFromContract } from "./exportInvoice";
 import { calculateBalancing } from "@/lib/balancingCalc";
 import { RETAIL_WAREHOUSE, FG_WAREHOUSE } from "@/lib/inventory";
@@ -166,6 +166,8 @@ export interface DemoBundle {
   goodsTypes: GoodsType[];
   /** Danh sách chọn Xuất khẩu (mig 0095) — đúng danh sách khởi tạo, để thử thêm / sửa / xóa tại ô. */
   exportOptions: ExportOption[];
+  /** Thông tin công ty (mig 0099) — giá trị mặc định, để thử sửa / đổi logo trong demo. */
+  companyProfiles: CompanyProfile[];
   /** Hàng của chuyến (mig 0096, ba-spec 63) — chép dòng HĐ của bản mới nhất vào mỗi chuyến chưa hủy, chia
    *  đều số kiện theo số chuyến; chuyến đã có số cont ⇒ kho đã điền số thực đóng (bằng kế hoạch). */
   exportShipmentLines: ExportShipmentLine[];
@@ -786,6 +788,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
       { id: "frozen-fish", name: "Cá đông", sortOrder: 70, note: "" },
     ],
     exportOptions: EXPORT_OPTION_SEED.map((o) => ({ ...o })),
+    companyProfiles: [{ ...COMPANY_DEFAULTS }],
     exportShipmentLines: demoShipmentLines(exportDemo),
     importSuppliers: importDemo.suppliers,
     importContracts: importDemo.contracts,

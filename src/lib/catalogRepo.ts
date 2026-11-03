@@ -77,6 +77,7 @@ import {
   CUSTOMER_PRODUCT_NAME_TABLE,
   EXPORT_DOCUMENT_KIND_TABLE,
   EXPORT_OPTION_TABLE,
+  COMPANY_PROFILE_TABLE,
   EXPORT_SHIPMENT_LINE_TABLE,
   GOODS_TYPE_TABLE,
   BATTER_TYPE_TABLE,
@@ -94,11 +95,11 @@ import type {
   Product,
   FinishedGood,
   NxtSnapshotLine,
-  StorageLocation,
-} from "@/types";
+  StorageLocation, CompanyProfile } from "@/types";
 import { DEFAULT_STORAGE_LOCATION } from "@/types";
 import { BATTER_TYPE_SEED, inferBattersFromName } from "@/lib/batter";
 import { effectiveExportOptions } from "@/lib/exportOptions";
+import { effectiveCompanyProfile } from "@/lib/companyProfile";
 import fgSeed from "@/data/finished-goods.json";
 import octopusNxtSnapshot from "@/data/nxt-bachtuoc-2026-07.json";
 
@@ -480,6 +481,20 @@ export function useExportOptionStore() {
   const { isAvailable: banksAvailable } = useExportShipmentLineStore();
   const options = useMemo(() => effectiveExportOptions(rows, isAvailable, banksAvailable), [rows, isAvailable, banksAvailable]);
   return { options, setOptions: setRows, isAvailable, isLoading: meta.status === "loading" && rows.length === 0 };
+}
+/** Thông tin công ty (mig 0099, ba-spec 67) — dùng qua `useCompanyProfileStore`. */
+export const useCompanyProfiles = () => useTable(COMPANY_PROFILE_TABLE);
+
+/**
+ * Thông tin công ty đang dùng + cờ `isAvailable`: có máy chủ mà chưa chạy 0099 ⇒ không ghi (dùng giá trị mặc định,
+ * chỉ xem) — khỏi kẹt hàng chờ. `saveProfile` thay bản ghi duy nhất của site.
+ */
+export function useCompanyProfileStore() {
+  const [rows, setRows, meta] = useCompanyProfiles();
+  const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
+  const profile = useMemo(() => effectiveCompanyProfile(rows), [rows]);
+  const saveProfile = (next: CompanyProfile) => setRows([...rows.filter((r) => r.id !== next.id), next]);
+  return { profile, hasRecord: rows.length > 0, saveProfile, isAvailable, isLoading: meta.status === "loading" && rows.length === 0 };
 }
 /** Danh mục Loại hàng (mig 0089) — dùng qua `useGoodsTypeStore`. */
 export const useGoodsTypes = () => useTable(GOODS_TYPE_TABLE);

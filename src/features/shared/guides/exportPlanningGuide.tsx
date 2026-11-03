@@ -187,7 +187,7 @@ export const exportPlanningGuide: PageGuide = {
       </GuideSection>
       <GuideSection title="Danh mục: danh sách chọn của Xuất khẩu">
         <GuideList>
-          <li>Tab <b>Danh mục</b> giữ 6 danh sách: <b>Cảng xếp</b>, <b>Cảng đích</b>, <b>Loại container</b>, <b>Tiền tệ</b>, <b>Loại chứng từ</b>, <b>Loại hàng</b>. Người chỉ có quyền xem thì xem được, không thêm / sửa / xóa.</li>
+          <li>Tab <b>Danh mục</b> giữ 6 danh sách: <b>Cảng xếp</b>, <b>Cảng đích</b>, <b>Loại container</b>, <b>Tiền tệ</b>, <b>Loại chứng từ</b>, <b>Loại hàng</b>. Tài khoản ngân hàng và tên, địa chỉ, logo in trên invoice: <b>Tài liệu công ty → Thông tin công ty</b>. Người chỉ có quyền xem thì xem được, không thêm / sửa / xóa.</li>
           <li>Ô Cảng xếp, Cảng đích, Loại container, Tiền tệ của hợp đồng và ô Cảng đến của chuyến chọn theo danh sách. Chưa có thì gõ tên rồi chọn <b>Thêm mới</b>; bút chì để sửa tên; thùng rác để xóa mục khỏi danh sách (có hỏi xác nhận, có Hoàn tác).</li>
           <li>Hợp đồng và chuyến <b>giữ đúng chữ lúc ghi</b>: đổi tên hay xóa một mục không làm đổi hợp đồng, chuyến đã ghi.</li>
           <li>Hợp đồng cũ gõ tay khác danh sách (VD "Việt Nam", "TOKYO") hiện ở đầu ô với dòng <b>Ngoài danh sách</b>. Khi sửa hợp đồng đó, chọn lại mục trong danh sách cho thống nhất.</li>

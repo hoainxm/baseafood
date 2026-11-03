@@ -10,8 +10,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
-import { useCustomerProductNameStore, useCustomers, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportLoadingExtraPhotosAvailable, useExportOptionStore, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
+import { useCustomerProductNameStore, useCustomers, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportLoadingExtraPhotosAvailable, useExportOptionStore,
+  useCompanyProfileStore, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { lineUnits, shipmentLinesOf } from "@/lib/exportInvoice";
+import { companySellerOf } from "@/lib/companyProfile";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNamesDialog";
 import { useAuth } from "@/lib/auth";
@@ -189,6 +191,8 @@ export default function ExportPlanningScreen() {
   const [linesTarget, setLinesTarget] = useState<ShipmentLinesTarget | null>(null);
   const [countTarget, setCountTarget] = useState<LoadingCountTarget | null>(null);
   const exportOptions = useExportOptionStore().options;
+  // Người bán + logo trên chứng từ lấy từ Thông tin công ty (ba-spec 67).
+  const company = useCompanyProfileStore();
   /** Mig 0097 — ảnh kèm số lượng thực đóng + ảnh bao bì / cân gross. */
   const extraPhotosAvailable = useExportLoadingExtraPhotosAvailable();
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null);
@@ -497,7 +501,7 @@ export default function ExportPlanningScreen() {
     const c = d.contracts.find((x) => x.id === s.contractId);
     if (!c) return;
     const ci = documentItems(d, s.id).find((x) => x.docKind === "commercial-invoice");
-    void downloadInvoiceDocument(invoiceDocumentFor(d, s, c, customers.find((x) => x.id === c.customerId), ci, exportOptions), format);
+    void downloadInvoiceDocument(invoiceDocumentFor(d, s, c, customers.find((x) => x.id === c.customerId), ci, exportOptions, companySellerOf(company.profile)), format, company.profile.logoPath);
   };
 
   const saveLoadingFiles = (rows: ExportFile[]): boolean => {

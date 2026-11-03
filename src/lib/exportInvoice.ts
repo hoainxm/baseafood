@@ -17,8 +17,12 @@ import type {
   InvoiceComposition,
 } from "@/types";
 import type { InvoiceCell } from "./invoiceReader";
+import type { CompanySeller } from "./companyProfile";
 
-/** Người bán in ở đầu mọi chứng từ (mẫu INV 236/26). */
+/**
+ * Người bán MẶC ĐỊNH (mẫu INV 236/26) — khi chưa có Thông tin công ty (ba-spec 67 R1). Chứng từ dùng `input.seller`
+ * (`companySellerOf(profile)`), hằng này chỉ còn làm giá trị dự phòng.
+ */
 export const SELLER = {
   name: "BASEAFOOD 1 COMPANY LIMITED",
   address: "321 TRAN XUAN DO STREET, QUARTER 2, BA RIA WARD, HO CHI MINH CITY, VIETNAM",
@@ -272,6 +276,8 @@ export interface InvoiceDocInput {
   unitPrice: (line: ExportShipmentLine) => number | null;
   bankLines: readonly string[];
   specialNotes: string;
+  /** Người bán từ Thông tin công ty (ba-spec 67); không có ⇒ `SELLER` mặc định. */
+  seller?: CompanySeller;
 }
 
 export interface InvoiceTotals {
@@ -363,9 +369,9 @@ const text = (t: string, col = 0): InvoiceSheetRow => {
   cells[col] = t;
   return { role: "text", cells };
 };
-const company = (): InvoiceSheetRow[] => [
-  { role: "company", cells: [null, SELLER.name] },
-  { role: "company", cells: [null, SELLER.address] },
+const company = (seller: CompanySeller): InvoiceSheetRow[] => [
+  { role: "company", cells: [null, seller.name] },
+  { role: "company", cells: [null, seller.address] },
   blank(),
 ];
 
@@ -402,7 +408,7 @@ function headRows(input: InvoiceDocInput, title: string): InvoiceSheetRow[] {
   ];
   const left = [`Applicant: ${input.customer.name}`, ...addr];
   const rows: InvoiceSheetRow[] = [
-    { role: "head", cells: [null, null, null, `${SELLER.place},`, englishDate(input.issuedOn)] },
+    { role: "head", cells: [null, null, null, `${sellerOf(input).place},`, englishDate(input.issuedOn)] },
     { role: "title", cells: [title, null, null, null, input.invoiceNo] },
     blank(),
   ];
@@ -417,7 +423,10 @@ function headRows(input: InvoiceDocInput, title: string): InvoiceSheetRow[] {
 export const invoiceFileName = (invoiceNo: string) => `INVOICE ${invoiceNo.trim().replace(/[\\/:*?"<>|]+/g, ".")}`.trim() + ".xlsx";
 
 /** Dựng Invoice + Packing list (+ Expiry date list khi có dòng ghi hạn dùng) cho một chuyến. */
+const sellerOf = (input: InvoiceDocInput): CompanySeller => input.seller ?? SELLER;
+
 export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
+  const seller = sellerOf(input);
   const cur = (input.currency || "USD").toUpperCase();
   const printed: PrintedLine[] = input.lines.map((line) => {
     const units = lineUnits(line);
@@ -435,7 +444,7 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
   const groups = groupLines(printed);
 
   // Invoice
-  const inv: InvoiceSheetRow[] = [...company(), ...headRows(input, "COMMERCIAL INVOICE")];
+  const inv: InvoiceSheetRow[] = [...company(seller), ...headRows(input, "COMMERCIAL INVOICE")];
   inv.push(
     { role: "table-head", cells: ["ITEMS", "DESCRIPTION OF GOODS", "NUMBER OF", "NET", cur === "USD" ? "IN US. DOLLARS" : `IN ${cur}`] },
     { role: "table-head", cells: [null, null, "PACKAGES", "WEIGHT", "UNIT PRICE", "AMOUNT"] },
@@ -450,14 +459,14 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
     inv.push(blank());
     for (const r of notes) inv.push({ role: "text", cells: r });
   }
-  inv.push(blank(), { role: "signature", cells: [null, null, null, SELLER.signature] }, blank(), blank(), blank());
+  inv.push(blank(), { role: "signature", cells: [null, null, null, seller.signature] }, blank(), blank(), blank());
   if (input.bankLines.length) {
     inv.push(text("Please make TT to:"));
     for (const l of input.bankLines) inv.push(text(l));
   }
 
   // Packing list
-  const pl: InvoiceSheetRow[] = [...company(), ...headRows(input, "PACKING LIST")];
+  const pl: InvoiceSheetRow[] = [...company(seller), ...headRows(input, "PACKING LIST")];
   pl.push(
     { role: "table-head", cells: ["ITEMS", "DESCRIPTION", "KIND OF PACKAGES", "NUMBER OF", "TOTAL WEIGHT"] },
     { role: "table-head", cells: [null, null, "N.W / G.W", "PACKAGES", "NET", "GROSS"] },
@@ -472,7 +481,7 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
   groups.forEach((g, i) => pl.push(...groupRows(g, i + 1, (p) => [nwgw(p), p.units, p.netKg, p.grossKg])));
   pl.push({ role: "total", cells: [null, "TOTAL", null, totals.units, totals.netKg, totals.grossKg || null] }, blank());
   pl.push(text(`Say: ${capitalize(integerToWords(totals.units))} ${pkg.word} only.`));
-  pl.push(blank(), { role: "signature", cells: [null, null, null, SELLER.signature] });
+  pl.push(blank(), { role: "signature", cells: [null, null, null, seller.signature] });
 
   const sheets: InvoiceSheet[] = [
     { name: "INVOICE", widths: [7, 52, 13, 13, 14, 16], numFmts: [null, null, "#,##0", "#,##0.00", "#,##0.00####", "#,##0.00"], rows: inv },
@@ -481,7 +490,7 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
 
   // Expiry date list — chỉ khi có dòng ghi hạn dùng.
   if (input.lines.some((l) => l.expiry.trim())) {
-    const ex: InvoiceSheetRow[] = [...company()];
+    const ex: InvoiceSheetRow[] = [...company(seller)];
     ex.push(
       { role: "title", cells: ["EXPIRY DATE LIST"] },
       blank(),
@@ -498,8 +507,8 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
     );
     groups.forEach((g, i) => ex.push(...groupRows(g, i + 1, (p) => [nwgw(p), p.line.expiry || null, p.units, p.netKg, p.grossKg])));
     ex.push({ role: "total", cells: [null, "TOTAL", null, null, totals.units, totals.netKg, totals.grossKg || null] }, blank());
-    ex.push({ role: "head", cells: [null, null, null, null, `${SELLER.place.toUpperCase()},`, englishDate(input.issuedOn)] });
-    ex.push({ role: "signature", cells: [null, null, null, SELLER.signature] });
+    ex.push({ role: "head", cells: [null, null, null, null, `${seller.place.toUpperCase()},`, englishDate(input.issuedOn)] });
+    ex.push({ role: "signature", cells: [null, null, null, seller.signature] });
     sheets.push({ name: "EXPIRY DATE", widths: [7, 48, 16, 13, 14, 12, 12], numFmts: [null, null, null, null, "#,##0", "#,##0.00", "#,##0.00"], rows: ex });
   }
 

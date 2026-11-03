@@ -1,7 +1,7 @@
 # Việc của tôi · Tổng quan · Tài liệu — sơ đồ workflow
 
 > Load khi: review / kiểm lại ba trang `/my-tasks` (Việc của tôi), `/dashboard` (Tổng quan), `/documents` (Tài liệu công ty); trước khi sửa luật hạn việc, giao việc, cảnh báo chuỗi, lần ban hành, xem tài liệu theo phòng ban. Bản đọc nhanh — luật đầy đủ ở [39-my-tasks](../app-map/39-my-tasks.md) · [59](../app-map/59-my-tasks-by-role.ba-spec.md) · [40-documents](../app-map/40-documents.md) · [55](../app-map/55-dashboard-modules.ba-spec.md) · spec che-do-demo §5b.
-covers: src/features/my-tasks/*, src/features/dashboard/*, src/features/documents/*, src/lib/myTasks.ts, src/lib/dataFlow.ts, src/lib/dashboardAttention.ts, src/lib/documents.ts, src/lib/documentStorage.ts, src/features/workflows/*
+covers: src/features/my-tasks/*, src/features/dashboard/*, src/features/documents/*, src/lib/myTasks.ts, src/lib/dataFlow.ts, src/lib/dashboardAttention.ts, src/lib/documents.ts, src/lib/documentStorage.ts, src/features/workflows/*, src/lib/companyProfile.ts, src/lib/companyAssets.ts
 tours: src/features/my-tasks/myTasksTour.ts, src/features/dashboard/dashboardTour.ts, src/features/documents/documentsTour.ts, src/features/workflows/workflowsTour.ts
 guides: src/features/shared/guideContent.tsx, src/features/shared/guides/dashboardGuide.tsx
 last_verified: 2026-11-03
@@ -138,6 +138,10 @@ sequenceDiagram
 ## Trang Quy trình (`/workflows`)
 
 Mục **Quy trình** ở thanh bên và nút **Xem sơ đồ quy trình** trong hộp **?** của mọi trang mở trang này. Tab từng khu (điện thoại: ô **Khu**) hiện đúng file sơ đồ `docs/workflows/` — chỉ đọc. Ai có vai trò cũng tự có quyền xem (`WORKFLOWS_RESOURCE` cấp ở `resolvePermissions`, như Tài liệu công ty), không cần đặt ở Vai trò &amp; quyền; chặn riêng một người vẫn được.
+
+## Tab Thông tin công ty (`/documents?tab=company`, ba-spec 67)
+
+Logo (chỉ chọn một ảnh), thông tin pháp nhân (tên VN / EN, viết tắt, MST, địa chỉ, nơi lập chứng từ, liên hệ, người ký), tài khoản ngân hàng thụ hưởng. Xem: mọi người có vai trò; Sửa: quyền `company-profile` (Kế toán trưởng, Trưởng / Phó phòng KH, admin). Chứng từ lập SAU khi lưu dùng thông tin mới (`companySellerOf`), chứng từ đã tải không đổi; mọi lần sửa có nhật ký.
 ## 5. Ai được làm gì
 
 Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể khác). Admin luôn đủ quyền. `my-tasks` và `documents`: Xem do hệ thống tự cấp cho ai đã có quyền ở đâu đó (`resolvePermissions`).
@@ -175,6 +179,14 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 | Vai | Xem | Thêm | Sửa | Xóa | Duyệt | Xuất / In |
 |---|---|---|---|---|---|---|
 | Kế toán trưởng | ✓ | ✓ | ✓ | ✓ |  | ✓ |
+
+**Thông tin công ty** (`company-profile`)
+
+| Vai | Xem | Sửa |
+|---|---|---|
+| Kế toán trưởng | ✓ | ✓ |
+| Trưởng phòng Kế hoạch | ✓ | ✓ |
+| Phó phòng Kế hoạch | ✓ | ✓ |
 <!-- /gen:roles -->
 
 ## 6. Nối với module khác

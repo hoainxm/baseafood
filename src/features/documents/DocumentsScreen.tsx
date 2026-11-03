@@ -9,6 +9,7 @@
 // chỉ để giao diện khớp (chạy không đăng nhập thì thấy hết như các màn khác).
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { CompanyProfileView } from "./CompanyProfileView";
 import {
   Button,
   ChoiceGroup,
@@ -26,6 +27,7 @@ import {
   type RecordTableColumn,
   type StatCardData,
   type TagVariant,
+  Tabs, TabsList, TabsTrigger,
 } from "@/design-system";
 import { useAppRoles, useCompanyDocuments, useDocumentVersions } from "@/lib/catalogRepo";
 import { useAuth } from "@/lib/auth";
@@ -64,7 +66,7 @@ import { DocumentFormDialog, type DocumentFormTarget } from "./DocumentFormDialo
 import { FilePreviewDialog, type PreviewFile } from "./FilePreviewDialog";
 import { VersionFormDialog } from "./VersionFormDialog";
 import { usePageTour } from "@/features/shared/PageTourProvider";
-import { buildDocumentsTour } from "./documentsTour";
+import { buildCompanyProfileTour, buildDocumentsTour } from "./documentsTour";
 import { recordName } from "@/lib/personName";
 
 const STATE_TAGS: Record<DocumentState, TagVariant> = {
@@ -90,6 +92,19 @@ export default function DocumentsScreen() {
   const can = useCan("documents");
   const canWrite = can.create || can.update;
   const [searchParams, setSearchParams] = useSearchParams();
+  type PageTab = "documents" | "company";
+  const pageTab: PageTab = searchParams.get("tab") === "company" ? "company" : "documents";
+  const canCompanyEdit = useCan("company-profile").update;
+  const setPageTab = (t: PageTab) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (t === "company") next.set("tab", "company");
+        else next.delete("tab");
+        return next;
+      },
+      { replace: true },
+    );
 
   const [documents, saveDocuments, { status }] = useCompanyDocuments();
   const [versions, saveVersions] = useDocumentVersions();
@@ -310,146 +325,166 @@ export default function DocumentsScreen() {
     () => buildDocumentsTour({ can: { create: can.create, write: canWrite, delete: can.delete } }),
     [can.create, canWrite, can.delete],
   );
-  usePageTour(isLoading ? null : tour);
+  // Tab Thông tin công ty có tour riêng (ba-spec 67).
+  const companyTour = useMemo(() => buildCompanyProfileTour({ canEdit: canCompanyEdit }), [canCompanyEdit]);
+  usePageTour(isLoading ? null : pageTab === "company" ? companyTour : tour);
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <h1 className="sr-only">Tài liệu công ty</h1>
-      {/* Một hàng: bộ lọc trái, nút Thêm phải — để bảng tài liệu hiện ngay màn đầu. */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div data-tour="documents-filters" className="flex min-w-0 flex-1 flex-wrap items-end gap-3 [&>*]:h-auto [&>*]:max-w-full max-sm:[&>*]:w-full">
-          <div className="min-w-0 flex-1 basis-36 sm:max-w-64">
-            <Combobox label="Loại" hideRequiredMark value={kindFilter} onChange={setKindFilter} options={KIND_FILTERS} clearable={false} />
-          </div>
-          <div className="min-w-0 flex-1 basis-36 sm:max-w-64">
-            <Combobox label="Phòng" hideRequiredMark value={departmentFilter} onChange={setDepartmentFilter} options={DEPARTMENT_FILTERS} clearable={false} />
-          </div>
-          <ChoiceGroup
-            className="min-w-0 sm:w-[26rem] sm:shrink-0"
-            label="Trạng thái"
-            hideRequiredMark
-            value={statusFilter}
-            onChange={(v) => setStatusFilter(v as StatusFilter)}
-            options={STATUS_FILTERS}
-            columns={3}
-          />
-        </div>
-        {can.create && (
-          <Button data-tour="documents-add" title="Thêm một tài liệu mới: mã, tên, loại, phòng sở hữu và ai được xem." onClick={() => setFormTarget({ kind: "create" })}>
-            <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
-            Thêm tài liệu
-          </Button>
-        )}
-      </div>
-
-      {!hasDocumentStorage && (
-        <p role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
-          Đang chạy không nối máy chủ: xem và ghi được thông tin tài liệu trên máy này, chưa mở / tải được file.
-        </p>
-      )}
-
-      <div data-tour="documents-stats">
-        <StatCardGrid cards={cards} />
-      </div>
-
-      {onlyMissingFile && (
-        <div role="status" className="flex flex-wrap items-center gap-3 rounded-lg bg-warning-surface px-4 py-2 text-sm">
-          <span className="min-w-0 flex-1">Đang lọc: chỉ tài liệu đang hiệu lực mà chưa có PDF đã ký. Mở từng tài liệu để đính file.</span>
-          <Button size="sm" variant="outline" onClick={() => setOnlyMissingFile(false)} title="Bỏ lọc, hiện lại mọi tài liệu.">
-            Bỏ lọc
-          </Button>
-        </div>
-      )}
-
-      {isLoading ? (
-        <TableSkeleton />
-      ) : visibleDocs.length === 0 ? (
-        <EmptyState
-          icon={FolderOpen}
-          title="Chưa có tài liệu nào bạn xem được"
-          description={
-            can.create
-              ? "Bấm Thêm tài liệu để đưa quy trình, biểu mẫu hay chứng nhận đầu tiên lên."
-              : "Phòng của bạn chưa có tài liệu nào. Hỏi quản trị viên nếu bạn cần xem tài liệu của phòng khác."
-          }
-        />
+      {/* Hai tab (ba-spec 67): tài liệu (quy trình, biểu mẫu, chứng nhận…) tách khỏi thông tin công ty (logo, pháp
+          nhân, tài khoản ngân hàng — một nguồn cho chứng từ). */}
+      <Tabs value={pageTab} onValueChange={(v) => setPageTab(v as PageTab)}>
+        <TabsList data-tour="documents-tabs">
+          <TabsTrigger value="documents" title="Quy trình, hướng dẫn, biểu mẫu, chứng nhận, hồ sơ năng lực và các lần ban hành.">
+            Tài liệu
+          </TabsTrigger>
+          <TabsTrigger value="company" title="Logo, tên, mã số thuế, địa chỉ, người ký, tài khoản ngân hàng — chứng từ lấy từ đây.">
+            Thông tin công ty
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {pageTab === "company" ? (
+        <CompanyProfileView />
       ) : (
-        <div data-tour="documents-table" className="min-w-0">
-          <RecordTable
-            columns={columns}
-            rows={rows}
-            getKey={(d) => d.id}
-            rowMarkKey="documents"
-            getSearchText={(d) => `${d.code} ${d.title} ${d.note}`}
-            searchLabel="Tìm theo mã hoặc tên tài liệu…"
-            emptyText="Không có tài liệu nào khớp bộ lọc."
-            actions={(d) => (
-              <Button size="sm" variant="outline" onClick={() => openDetail(d.id)} title="Xem chi tiết, các lần ban hành và mở file của tài liệu này.">
-                <Eye className="mr-1 h-4 w-4" aria-hidden />
-                Xem
+        <>
+          {/* Một hàng: bộ lọc trái, nút Thêm phải — để bảng tài liệu hiện ngay màn đầu. */}
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div data-tour="documents-filters" className="flex min-w-0 flex-1 flex-wrap items-end gap-3 [&>*]:h-auto [&>*]:max-w-full max-sm:[&>*]:w-full">
+              <div className="min-w-0 flex-1 basis-36 sm:max-w-64">
+                <Combobox label="Loại" hideRequiredMark value={kindFilter} onChange={setKindFilter} options={KIND_FILTERS} clearable={false} />
+              </div>
+              <div className="min-w-0 flex-1 basis-36 sm:max-w-64">
+                <Combobox label="Phòng" hideRequiredMark value={departmentFilter} onChange={setDepartmentFilter} options={DEPARTMENT_FILTERS} clearable={false} />
+              </div>
+              <ChoiceGroup
+                className="min-w-0 sm:w-[26rem] sm:shrink-0"
+                label="Trạng thái"
+                hideRequiredMark
+                value={statusFilter}
+                onChange={(v) => setStatusFilter(v as StatusFilter)}
+                options={STATUS_FILTERS}
+                columns={3}
+              />
+            </div>
+            {can.create && (
+              <Button data-tour="documents-add" title="Thêm một tài liệu mới: mã, tên, loại, phòng sở hữu và ai được xem." onClick={() => setFormTarget({ kind: "create" })}>
+                <FilePlus2 className="mr-2 h-4 w-4" aria-hidden />
+                Thêm tài liệu
               </Button>
             )}
+          </div>
+
+          {!hasDocumentStorage && (
+            <p role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
+              Đang chạy không nối máy chủ: xem và ghi được thông tin tài liệu trên máy này, chưa mở / tải được file.
+            </p>
+          )}
+
+          <div data-tour="documents-stats">
+            <StatCardGrid cards={cards} />
+          </div>
+
+          {onlyMissingFile && (
+            <div role="status" className="flex flex-wrap items-center gap-3 rounded-lg bg-warning-surface px-4 py-2 text-sm">
+              <span className="min-w-0 flex-1">Đang lọc: chỉ tài liệu đang hiệu lực mà chưa có PDF đã ký. Mở từng tài liệu để đính file.</span>
+              <Button size="sm" variant="outline" onClick={() => setOnlyMissingFile(false)} title="Bỏ lọc, hiện lại mọi tài liệu.">
+                Bỏ lọc
+              </Button>
+            </div>
+          )}
+
+          {isLoading ? (
+            <TableSkeleton />
+          ) : visibleDocs.length === 0 ? (
+            <EmptyState
+              icon={FolderOpen}
+              title="Chưa có tài liệu nào bạn xem được"
+              description={
+                can.create
+                  ? "Bấm Thêm tài liệu để đưa quy trình, biểu mẫu hay chứng nhận đầu tiên lên."
+                  : "Phòng của bạn chưa có tài liệu nào. Hỏi quản trị viên nếu bạn cần xem tài liệu của phòng khác."
+              }
+            />
+          ) : (
+            <div data-tour="documents-table" className="min-w-0">
+              <RecordTable
+                columns={columns}
+                rows={rows}
+                getKey={(d) => d.id}
+                rowMarkKey="documents"
+                getSearchText={(d) => `${d.code} ${d.title} ${d.note}`}
+                searchLabel="Tìm theo mã hoặc tên tài liệu…"
+                emptyText="Không có tài liệu nào khớp bộ lọc."
+                actions={(d) => (
+                  <Button size="sm" variant="outline" onClick={() => openDetail(d.id)} title="Xem chi tiết, các lần ban hành và mở file của tài liệu này.">
+                    <Eye className="mr-1 h-4 w-4" aria-hidden />
+                    Xem
+                  </Button>
+                )}
+              />
+            </div>
+          )}
+
+          <DocumentDetailDialog
+            document={detail ?? null}
+            isMissing={!!detailId && !detail && status !== "loading"}
+            documents={visibleDocs}
+            versions={versions}
+            today={today}
+            can={{ write: canWrite, update: can.update, delete: can.delete, create: can.create }}
+            onClose={() => openDetail("")}
+            onOpen={openDetail}
+            onPreview={setPreview}
+            onEdit={(d) => setFormTarget({ kind: "edit", document: d })}
+            onAddChild={(d) => setFormTarget({ kind: "create", parentId: d.id })}
+            onRecordVersion={(d) => setVersionDoc(d)}
+            onAttach={attachFile}
+            onWithdraw={(d) => setWithdrawing(d)}
+            onRestore={(d) => setWithdrawn(d, false)}
+            onDelete={(d) => setDeleting(d)}
           />
-        </div>
+
+          <FilePreviewDialog file={preview} onClose={() => setPreview(null)} />
+
+          <DocumentFormDialog target={formTarget} documents={documents} onClose={() => setFormTarget(null)} onSave={saveDocument} />
+
+          <VersionFormDialog
+            document={versionDoc}
+            versions={versions}
+            recordedByName={recordName(profile, "Máy này")}
+            onClose={() => setVersionDoc(null)}
+            onSave={saveVersion}
+          />
+
+          <ConfirmAction
+            open={!!withdrawing}
+            onOpenChange={(o) => !o && setWithdrawing(null)}
+            title={`Thu hồi ${withdrawing?.code ?? ""}?`}
+            description="Tài liệu chuyển Hết hiệu lực, không còn ở danh sách Đang dùng. Mọi lần ban hành và file vẫn giữ nguyên, mở lại được."
+            detail={withdrawing?.title}
+            confirmLabel="Thu hồi tài liệu"
+            destructive
+            icon={Archive}
+            onConfirm={() => {
+              if (withdrawing) setWithdrawn(withdrawing, true);
+              setWithdrawing(null);
+            }}
+          />
+
+          <ConfirmDelete
+            open={!!deleting}
+            onOpenChange={(o) => !o && setDeleting(null)}
+            title="Xóa tài liệu này?"
+            confirmLabel="Xóa tài liệu"
+            recordDescription={deleting ? `${deleting.code} — ${deleting.title}` : ""}
+            onConfirm={() => {
+              if (deleting) removeDocument(deleting);
+              setDeleting(null);
+            }}
+          />
+        </>
       )}
-
-      <DocumentDetailDialog
-        document={detail ?? null}
-        isMissing={!!detailId && !detail && status !== "loading"}
-        documents={visibleDocs}
-        versions={versions}
-        today={today}
-        can={{ write: canWrite, update: can.update, delete: can.delete, create: can.create }}
-        onClose={() => openDetail("")}
-        onOpen={openDetail}
-        onPreview={setPreview}
-        onEdit={(d) => setFormTarget({ kind: "edit", document: d })}
-        onAddChild={(d) => setFormTarget({ kind: "create", parentId: d.id })}
-        onRecordVersion={(d) => setVersionDoc(d)}
-        onAttach={attachFile}
-        onWithdraw={(d) => setWithdrawing(d)}
-        onRestore={(d) => setWithdrawn(d, false)}
-        onDelete={(d) => setDeleting(d)}
-      />
-
-      <FilePreviewDialog file={preview} onClose={() => setPreview(null)} />
-
-      <DocumentFormDialog target={formTarget} documents={documents} onClose={() => setFormTarget(null)} onSave={saveDocument} />
-
-      <VersionFormDialog
-        document={versionDoc}
-        versions={versions}
-        recordedByName={recordName(profile, "Máy này")}
-        onClose={() => setVersionDoc(null)}
-        onSave={saveVersion}
-      />
-
-      <ConfirmAction
-        open={!!withdrawing}
-        onOpenChange={(o) => !o && setWithdrawing(null)}
-        title={`Thu hồi ${withdrawing?.code ?? ""}?`}
-        description="Tài liệu chuyển Hết hiệu lực, không còn ở danh sách Đang dùng. Mọi lần ban hành và file vẫn giữ nguyên, mở lại được."
-        detail={withdrawing?.title}
-        confirmLabel="Thu hồi tài liệu"
-        destructive
-        icon={Archive}
-        onConfirm={() => {
-          if (withdrawing) setWithdrawn(withdrawing, true);
-          setWithdrawing(null);
-        }}
-      />
-
-      <ConfirmDelete
-        open={!!deleting}
-        onOpenChange={(o) => !o && setDeleting(null)}
-        title="Xóa tài liệu này?"
-        confirmLabel="Xóa tài liệu"
-        recordDescription={deleting ? `${deleting.code} — ${deleting.title}` : ""}
-        onConfirm={() => {
-          if (deleting) removeDocument(deleting);
-          setDeleting(null);
-        }}
-      />
     </div>
   );
 }

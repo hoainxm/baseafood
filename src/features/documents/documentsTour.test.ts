@@ -56,7 +56,7 @@ describe("buildDocumentsTour", () => {
 
   it("thứ tự công việc; mở đầu + kết thúc giữa trang; không bước nào đổi chỗ xem", () => {
     const steps = buildDocumentsTour(full).steps;
-    expect(steps.map((s) => s.id)).toEqual(["intro", "visibility", "stats", "filters", "table", "status", "file", "detail", "detail-actions", "add-document", "outro"]);
+    expect(steps.map((s) => s.id)).toEqual(["intro", "tabs", "visibility", "stats", "filters", "table", "status", "file", "detail", "detail-actions", "add-document", "outro"]);
     expect(steps[0].target ?? "").toBe("");
     expect(steps[steps.length - 1].target ?? "").toBe("");
     expect(steps.filter((s) => s.prepare)).toEqual([]);
@@ -67,5 +67,16 @@ describe("buildDocumentsTour", () => {
     expect(steps.filter((s) => s.title.trim().endsWith(".")).map((s) => s.id)).toEqual([]);
     expect(steps.filter((s) => !s.body.trim().endsWith(".")).map((s) => s.id)).toEqual([]);
     expect(steps.filter((s) => /(^|[^\p{L}])(bấm|nhấn|click)(?!\p{L})/iu.test(`${s.title} ${s.body}`)).map((s) => s.id)).toEqual([]);
+  });
+});
+
+describe("buildCompanyProfileTour (ba-spec 67)", () => {
+  it("mở đầu + logo + thông tin + ngân hàng + kết thúc; lời nói rõ chứng từ lấy từ đây", async () => {
+    const { buildCompanyProfileTour } = await import("./documentsTour");
+    const steps = buildCompanyProfileTour({ canEdit: true }).steps;
+    expect(steps.map((s) => s.id)).toEqual(["intro", "logo", "info", "banks", "outro"]);
+    expect(steps.filter((s) => s.title.trim().endsWith("."))).toHaveLength(0);
+    expect(steps.filter((s) => !s.body.trim().endsWith("."))).toHaveLength(0);
+    expect(steps.map((s) => s.body).join(" ")).toContain("không cần điền gì thêm");
   });
 });

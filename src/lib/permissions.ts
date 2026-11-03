@@ -129,6 +129,9 @@ export const PERMISSION_RESOURCES: readonly PermissionResource[] = [
   { id: "documents", label: "Tài liệu công ty", group: "documents", navId: "documents", actions: [...CRUD, "approve", "export"] },
   // Sơ đồ quy trình từng khu (ba-spec 65 R7) — chỉ đọc; ai có vai trò cũng tự có quyền xem (như Tài liệu công ty).
   { id: "workflows", label: "Quy trình (sơ đồ workflow)", group: "documents", navId: "workflows", actions: ["view"] },
+  // Thông tin công ty (ba-spec 67): logo, pháp nhân, người ký, tài khoản ngân hàng — tab ở Tài liệu công ty, một
+  // nguồn cho chứng từ. Xem tự cấp cho mọi người có vai trò; Sửa theo ma trận (Kế toán trưởng, Trưởng / Phó phòng KH).
+  { id: "company-profile", label: "Thông tin công ty", group: "documents", navId: "documents", actions: ["view", "update"] },
 
   // Phòng Kế hoạch · Xuất khẩu (mig 0075, ba-spec docs/app-map/41-export-planning.ba-spec.md R11).
   // `export-plans` = hợp đồng, bản sửa, duyệt giấy, gia hạn, chuyến, bước, file. `.loading` = người
@@ -388,6 +391,7 @@ const CHIEF_ACCOUNTANT: RoleSpec = {
   // Tài liệu công ty: thêm / sửa / ghi lần ban hành / đính file / xóa tài liệu chưa ban hành
   // (chủ dự án cấp 2026-10-20, mig 0073). Duyệt (approve, đợt 2) để Ban giám đốc.
   documents: ["view", "create", "update", "delete", "export"],
+  "company-profile": ["view", "update"],
   // Xuất khẩu: xem hợp đồng + giá; ghi bước 6 (gửi bộ chứng từ, tiền về — Q5).
   "export-plans": ["view", "export", "view-price"],
   "export-plans.loading": VIEW,
@@ -531,6 +535,8 @@ const PLANNER: RoleSpec = {
 const PLANNING_HEAD: RoleSpec = {
   ...PLANNER,
   "export-plans": [...(PLANNER["export-plans"] ?? []), "approve"],
+  // Thông tin công ty (ba-spec 67): Trưởng / Phó phòng KH sửa — chứng từ xuất khẩu dùng.
+  "company-profile": ["view", "update"],
 };
 
 /**
@@ -596,6 +602,8 @@ export const MY_TASKS_RESOURCE = "my-tasks";
 export const DOCUMENTS_RESOURCE = "documents";
 /** Tài nguyên "Quy trình" — sơ đồ workflow chỉ đọc, ai có vai trò cũng xem (ba-spec 65 R7). */
 export const WORKFLOWS_RESOURCE = "workflows";
+/** Tài nguyên "Thông tin công ty" — ai có vai trò cũng xem (ba-spec 67 R2); Sửa theo ma trận. */
+export const COMPANY_PROFILE_RESOURCE = "company-profile";
 
 export interface ResolveInput {
   roles: readonly Role[];
@@ -655,6 +663,7 @@ export function resolvePermissions({
     add(MY_TASKS_RESOURCE, "view", "all");
     add(DOCUMENTS_RESOURCE, "view", "all");
     add(WORKFLOWS_RESOURCE, "view", "all");
+    add(COMPANY_PROFILE_RESOURCE, "view", "all");
   }
 
   for (const o of overrides) if (o.effect === "deny") grants.delete(keyOf(o.resource, o.action));

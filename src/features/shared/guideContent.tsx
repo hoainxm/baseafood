@@ -167,6 +167,14 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
     description: "Quy trình, biểu mẫu, chứng nhận và hồ sơ năng lực: bản đang hiệu lực, các lần ban hành, file gốc.",
     content: (
       <>
+        <Section title="Hai tab: Tài liệu · Thông tin công ty">
+          <Y>
+            <li><b>Tài liệu</b>: quy trình, hướng dẫn, biểu mẫu, chứng nhận, hồ sơ năng lực và các lần ban hành (các mục dưới đây).</li>
+            <li><b>Thông tin công ty</b>: logo, tên, mã số thuế, địa chỉ, người ký, <b>tài khoản ngân hàng</b>. Invoice, Packing list của Xuất khẩu lấy thông tin từ đây.</li>
+            <li>Đổi logo: chọn một ảnh (PNG / JPG / WEBP, tối đa 5 MB), không điền gì thêm. Sửa thông tin: <b>Sửa thông tin</b> → Lưu. Chứng từ lập sau khi lưu dùng thông tin mới; chứng từ đã tải không đổi.</li>
+            <li>Ai có vai trò cũng xem; Kế toán trưởng, Trưởng / Phó phòng Kế hoạch và quản trị sửa được (đổi ở Vai trò &amp; quyền).</li>
+          </Y>
+        </Section>
         <Section title="Bạn thấy tài liệu nào">
           <Y>
             <li>Tài liệu của <b>phòng mình</b>, tài liệu mở cho <b>cả công ty</b>, và tài liệu phòng khác chọn cho phòng mình xem.</li>

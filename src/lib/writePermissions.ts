@@ -154,7 +154,8 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   // Tên hàng theo khách (mig 0077) — RLS riêng: danh mục khách HOẶC Xuất khẩu (trích xuất khi lưu HĐ).
   customer_product_names: null,
   export_document_kinds: null,
-  export_options: null, // danh sách chọn Xuất khẩu (0095) — RLS export-plans, như loại chứng từ
+  export_options: null, // danh sách chọn Xuất khẩu (0095) — RLS export-plans, như loại chứng từ; dòng bank-account thêm company-profile (0099)
+  company_profile: null, // thông tin công ty (0099) — RLS company-profile:update; app kiểm bằng useCan("company-profile")
   // Hàng của chuyến (0096, ba-spec 63) — RLS export-plans; người đóng hàng (.loading) chỉ điền số thực đóng (trigger chặn cột khác).
   export_shipment_lines: null,
   goods_types: null, // danh mục Loại hàng (0089) — RLS Phòng Kế hoạch, không qua ma trận app

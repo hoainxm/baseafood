@@ -14,7 +14,8 @@ import type { ExportOptionListKind } from "@/types";
 export type ExportCatalogList = ExportOptionListKind | "document-kinds" | "goods-types";
 
 export const EXPORT_CATALOG_LISTS: readonly { value: ExportCatalogList; label: string; hint: string }[] = [
-  ...EXPORT_OPTION_LISTS.map((l) => ({ value: l.kind, label: l.title, hint: l.description })),
+  // Tài khoản ngân hàng quản lý ở Tài liệu công ty → Thông tin công ty (ba-spec 67) — invoice vẫn chọn từ đó.
+  ...EXPORT_OPTION_LISTS.filter((l) => l.kind !== "bank-account").map((l) => ({ value: l.kind, label: l.title, hint: l.description })),
   { value: "document-kinds", label: "Loại chứng từ", hint: "Loại chứng từ xuất khẩu (Commercial Invoice, B/L, H/C, C/O…) — thêm loại khách mới yêu cầu, đổi tên loại có sẵn." },
   { value: "goods-types", label: "Loại hàng", hint: "Loại hàng của dòng hàng hợp đồng xuất / nhập (1 da, 2 da, mada, cá khô…) — để lọc khi xuất Excel." },
 ];
@@ -33,7 +34,7 @@ export function ExportCatalogView({ list, onListChange }: { list: ExportCatalogL
           </TabsTrigger>
         ))}
       </TabsList>
-      {EXPORT_OPTION_LISTS.map((l) => (
+      {EXPORT_OPTION_LISTS.filter((l) => l.kind !== "bank-account").map((l) => (
         <TabsContent key={l.kind} value={l.kind} data-tour={`export-catalog-${l.kind}`} className="pt-4">
           <CatalogCrudFor cfg={exportOptionListConfig(c.exportOption, l.kind)} rowMarkKey={`export-options-${l.kind}`} resource="export-plans" />
         </TabsContent>

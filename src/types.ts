@@ -1245,6 +1245,28 @@ export interface ExportOption {
   note: string;
 }
 
+/** Thông tin công ty (mig 0099, ba-spec 67) — mỗi site một bản ghi (id `company`), một nguồn cho chứng từ. */
+export interface CompanyProfile {
+  id: string;
+  nameVietnamese: string;
+  nameEn: string;
+  shortNameEn: string;
+  taxCode: string;
+  addressVietnamese: string;
+  addressEn: string;
+  /** Nơi lập chứng từ — "Ba Ria," trên invoice. */
+  issuePlace: string;
+  phone: string;
+  fax: string;
+  email: string;
+  website: string;
+  signerName: string;
+  signerTitle: string;
+  /** Đường dẫn ảnh logo trong bucket `company-assets`; "" = dùng logo đóng gói sẵn. */
+  logoPath: string;
+  note: string;
+}
+
 /** Chứng từ khách yêu cầu trên hợp đồng — giữ form (C/O form VJ…) và người cấp (H/C tự cấp…). */
 export interface ExportRequiredDocument {
   kind: ExportDocumentKind;

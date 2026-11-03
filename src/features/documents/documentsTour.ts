@@ -37,6 +37,14 @@ export function buildDocumentsTour(ctx: DocumentsTourContext): PageTour {
         "Trong lúc xem hướng dẫn, các nút trên trang tạm khóa và dữ liệu không thay đổi. Chọn Tiếp theo (phím →) để sang bước sau, Quay lại (phím ←) để xem lại, Esc để thoát.",
     },
     {
+      id: "tabs",
+      target: "documents-tabs",
+      title: "Tài liệu và Thông tin công ty",
+      body:
+        "Tài liệu: quy trình, hướng dẫn, biểu mẫu, chứng nhận, hồ sơ năng lực và các lần ban hành — các bước dưới đây.\n" +
+        "Thông tin công ty: logo, tên, mã số thuế, địa chỉ, người ký, tài khoản ngân hàng. Invoice, Packing list của Xuất khẩu lấy thông tin từ đây; đổi logo chỉ cần chọn một ảnh, không điền gì thêm.",
+    },
+    {
       id: "visibility",
       title: "Bạn thấy tài liệu nào",
       body:
@@ -159,3 +167,48 @@ export const tourSpec: PageTourSpec = {
   pageId: "documents",
   build: () => buildDocumentsTour({ can: { create: true, write: true, delete: true } }),
 };
+
+/** Tour khi đang ở tab Thông tin công ty (ba-spec 67) — trang đăng ký tour này thay cho tour Tài liệu. */
+export function buildCompanyProfileTour(ctx: { canEdit: boolean }): PageTour {
+  const steps: TourStep[] = [
+    {
+      id: "intro",
+      title: "Giới thiệu tab Thông tin công ty",
+      body:
+        "Tab này giữ MỘT bản thông tin công ty cho mọi chứng từ phần mềm lập: Invoice, Packing list, Expiry date list của Xuất khẩu (về sau cả Nhập khẩu, Lệnh sản xuất). Ai có vai trò cũng xem được; Kế toán trưởng, Trưởng / Phó phòng Kế hoạch và quản trị sửa được.\n" +
+        "Trong lúc xem hướng dẫn, các nút trên trang tạm khóa và dữ liệu không thay đổi. Chọn Tiếp theo (phím →) để sang bước sau, Quay lại (phím ←) để xem lại, Esc để thoát.",
+    },
+    {
+      id: "logo",
+      target: "company-logo",
+      title: "Logo",
+      body:
+        "Logo in trên Invoice, Packing list bản PDF và Word. Chưa lưu logo riêng thì chứng từ dùng logo có sẵn của phần mềm.\n" +
+        (ctx.canEdit ? "Đổi logo: chọn một ảnh PNG, JPG hoặc WEBP tối đa 5 MB — không cần điền gì thêm. Ảnh cũ được thay." : "Bạn đang chỉ xem; người có quyền sửa đổi logo ở đây."),
+    },
+    {
+      id: "info",
+      target: "company-info",
+      title: "Thông tin pháp nhân",
+      body:
+        "Tên tiếng Việt, tiếng Anh, tên viết tắt, mã số thuế, địa chỉ, nơi lập chứng từ, điện thoại, fax, email, website, người ký.\n" +
+        "Chứng từ in tên và địa chỉ tiếng Anh (viết hoa tự động), nơi lập trước ngày, tên viết tắt ở chỗ ký. Ô nào để trống thì chứng từ dùng giá trị đang in trên invoice 236/26.\n" +
+        "Sửa xong, chứng từ lập SAU đó dùng thông tin mới; chứng từ đã tải trước đó là file, không đổi. Mọi lần sửa có ghi nhật ký.",
+    },
+    {
+      id: "banks",
+      target: "company-banks",
+      title: "Tài khoản ngân hàng thụ hưởng",
+      body:
+        "Danh sách tài khoản in dưới \"Please make TT to:\" trên invoice. Invoice Xuất khẩu chọn một tài khoản trong danh sách này. Ghi chú của mỗi tài khoản là khối in (Bank name, Account number, SWIFT CODE, Beneficiary, địa chỉ — mỗi dòng một dòng).",
+    },
+    {
+      id: "outro",
+      title: "Hoàn tất hướng dẫn",
+      body:
+        "Chọn Hoàn tất để trở về đúng màn hình đang xem trước khi bắt đầu.\n" +
+        "Để xem lại, chọn nút ? trên thanh tiêu đề rồi chọn Bắt đầu hướng dẫn thao tác.",
+    },
+  ];
+  return { title: "Thông tin công ty", steps };
+}

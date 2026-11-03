@@ -257,3 +257,15 @@ describe("đóng cont tự điền số thực đóng (feedback 2026-11-03, mig 
     expect(s).toMatchObject({ filledCount: 2, loadedUnits: 138, diffUnits: -2, unplannedCount: 1, complete: true });
   });
 });
+
+describe("ba-spec 67 AC-2 — người bán lấy từ Thông tin công ty", () => {
+  it("đổi địa chỉ EN ⇒ mọi chứng từ in địa chỉ mới, viết hoa; không còn địa chỉ cũ", async () => {
+    const { COMPANY_DEFAULTS, companySellerOf } = await import("./companyProfile");
+    const seller = companySellerOf({ ...COMPANY_DEFAULTS, addressEn: "1 New Street, Ba Ria", issuePlace: "Vung Tau" });
+    const doc = buildInvoiceDocument(kaiseiInput({ seller }));
+    const texts = doc.sheets.flatMap((sh) => sh.rows.flatMap((r) => r.cells.map((c) => String(c ?? ""))));
+    expect(texts.filter((t) => t.includes("1 NEW STREET, BA RIA")).length).toBeGreaterThanOrEqual(1);
+    expect(texts.filter((t) => t.includes("321 TRAN XUAN DO")).length).toBe(0);
+    expect(texts.filter((t) => t.startsWith("Vung Tau,")).length).toBeGreaterThanOrEqual(1);
+  });
+});

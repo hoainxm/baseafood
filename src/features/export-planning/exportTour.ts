@@ -84,7 +84,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         "Lịch xuất hàng: các chuyến trong kỳ đang xem, nhóm theo khách hàng. Dùng hằng ngày để biết chuyến nào còn thiếu việc.\n" +
         "Hợp đồng: toàn bộ hợp đồng ở mọi tháng, lọc theo trạng thái. Dùng khi cần tìm một hợp đồng cụ thể.\n" +
         "Báo cáo: số theo tháng, quý hoặc năm — chuyến, kg thực xuất, giá trị, tiền về, tỉ lệ đúng hạn, hồ sơ còn kẹt ở bước nào và hợp đồng cần chú ý (quá hạn, lệch dung sai, còn tiền chưa về). Chỉ xem, không sửa số.\n" +
-        "Danh mục: 6 danh sách chọn của Xuất khẩu (Cảng xếp, Cảng đích, Loại container, Tiền tệ, Loại chứng từ, Loại hàng) — thêm, sửa tên, xóa mục ở đây hoặc ngay trong ô chọn của phiếu. Hợp đồng, chuyến đã ghi giữ đúng chữ lúc ghi: đổi tên hay xóa mục không đổi hợp đồng cũ; hợp đồng cũ gõ khác danh sách hiện dòng Ngoài danh sách ở ô chọn.",
+        "Danh mục: 6 danh sách chọn của Xuất khẩu (Cảng xếp, Cảng đích, Loại container, Tiền tệ, Loại chứng từ, Loại hàng; tài khoản ngân hàng in trên invoice quản lý ở Tài liệu công ty → Thông tin công ty) — thêm, sửa tên, xóa mục ở đây hoặc ngay trong ô chọn của phiếu. Hợp đồng, chuyến đã ghi giữ đúng chữ lúc ghi: đổi tên hay xóa mục không đổi hợp đồng cũ; hợp đồng cũ gõ khác danh sách hiện dòng Ngoài danh sách ở ô chọn.",
     }),
   ];
   if (can.create) {

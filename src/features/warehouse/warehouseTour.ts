@@ -28,16 +28,6 @@ export function buildWarehouseTour(ctx: WarehouseTourContext): PageTour {
         "Trong lúc xem hướng dẫn, các nút trên trang tạm khóa và dữ liệu không thay đổi. Chọn Tiếp theo (phím →) để sang bước sau, Quay lại (phím ←) để xem lại, Esc để thoát.",
     },
     {
-      id: "stats",
-      target: "warehouse-stats",
-      title: "Ba chỉ số của kho",
-      body:
-        "Số tính tới lúc mở trang (tồn hiện tại), không theo kỳ.\n" +
-        "• Chờ nhập: số lô sản xuất đã ghi mà chưa duyệt nhập kho. Lô chờ nhập chưa tính vào tồn.\n" +
-        "• Số lô hàng: số lô còn hàng trong kho đang lọc.\n" +
-        "• Tổng tồn: tổng kg còn lại của các lô đó. Mỗi lô còn = kg thực khi duyệt nhập − kg đã xuất theo lệnh xuất của Đơn đặt − kg bán lẻ block thô − kg đem đóng gói. Dòng đã gắn lô thì trừ đúng lô đó, phần còn lại trừ lô sản xuất sớm trước.",
-    },
-    {
       id: "oversold",
       target: "warehouse-oversold",
       optional: true,
@@ -83,8 +73,19 @@ export function buildWarehouseTour(ctx: WarehouseTourContext): PageTour {
     {
       id: "filter",
       target: "warehouse-filter",
-      title: "Lọc theo kho",
-      body: "Chọn một kho để chỉ xem tồn của kho đó; bỏ chọn để xem mọi kho. Bộ lọc đổi theo Số lô hàng, Tổng tồn, thanh Hàng nằm kho bao lâu và bảng tồn bên dưới.",
+      title: "Lọc theo kho và ô tra",
+      body:
+        "Kho: chọn một kho để chỉ xem tồn của kho đó; bỏ chọn để xem mọi kho. Tra mặt hàng, quy cách, kho: gõ vài chữ, không cần dấu.\n" +
+        "Đang lọc thì thanh lọc ghi số lô đang hiện / tổng số lô và có nút Bỏ hết bộ lọc. Thẻ số, bảng tồn đổi theo cả hai ô; thanh Hàng nằm kho bao lâu và dung tích đổi theo ô Kho.",
+    },
+    {
+      id: "stats",
+      target: "warehouse-stats",
+      title: "Hai chỉ số của kho",
+      body:
+        "Số tính tới lúc mở trang (tồn hiện tại), không theo kỳ. Số lô chờ nhập đã ghi ở đầu khối duyệt bên trên.\n" +
+        "• Số lô hàng: số lô còn hàng đang hiện (đang lọc thì ghi \"theo bộ lọc\").\n" +
+        "• Tổng tồn: tổng kg còn lại của các lô đó. Mỗi lô còn = kg thực khi duyệt nhập − kg đã xuất theo lệnh xuất của Đơn đặt − kg bán lẻ block thô − kg đem đóng gói. Dòng đã gắn lô thì trừ đúng lô đó, phần còn lại trừ lô sản xuất sớm trước.",
     },
     {
       id: "stock",
@@ -92,8 +93,8 @@ export function buildWarehouseTour(ctx: WarehouseTourContext): PageTour {
       title: "Bảng tồn theo lô",
       body:
         "Mỗi dòng là một lô còn hàng: Mặt hàng · Kho · Lô (ngày SX) · Còn (kg) · Block · Nhập / xuất (kg nhập khi duyệt / kg đã ra). Lô đã hết hàng không hiện.\n" +
-        "Ô tìm lọc theo mặt hàng, quy cách hoặc kho; chọn tên cột để sắp xếp. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu, đánh dấu những dòng đã kiểm. Dòng Tổng tồn ở cuối bảng.\n" +
-        "Chưa có lô nào thì trang ghi \"Chưa có tồn trong kho\": duyệt các lô chờ nhập ở trên, hoặc ghi sản lượng ở Sản xuất thành phẩm trước.",
+        "Chọn tên cột để sắp xếp. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu, đánh dấu những dòng đã kiểm. Dòng Tổng tồn ở cuối bảng.\n" +
+        "Chưa có lô nào thì trang ghi \"Chưa có tồn trong kho\": duyệt các lô chờ nhập ở trên, hoặc ghi sản lượng ở Sản xuất thành phẩm trước. Ô tra không khớp lô nào thì trang ghi \"Không có dòng nào khớp bộ lọc\".",
     },
     {
       id: "age",

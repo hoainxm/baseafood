@@ -1,6 +1,7 @@
 > Load khi: sửa màn `/my-tasks` "Việc của tôi", luật hạn / quá hạn, giao việc (`task_assignments`), chuông header, link mở thẳng ngày (`?date=&workshop=`).
 covers: src/features/my-tasks/MyTasksScreen.tsx, src/features/my-tasks/AssignTaskDialog.tsx, src/features/my-tasks/index.ts, src/lib/myTasks.ts, supabase/migrations/0070_task_assignments.sql
-last_verified: 2026-11-02
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — rà UX đợt 1: bỏ đoạn giới thiệu đầu trang (đã ở hộp "?" + tour); `FilterBar` lên trước thẻ số, nút "Giao việc mới" ở cuối hàng lọc (`actions`); tour đổi thứ tự lọc → thẻ số. -->
 <!-- updated: 2026-11-02 — ba-spec [59](59-my-tasks-by-role.ba-spec.md) ĐÃ BUILD: việc Kế hoạch (Nhập khẩu · Lệnh SX · Xuất khẩu) + HĐ đại lý vào Việc của tôi theo quyền từng mục; gom theo nhóm trang (`RESOURCE_GROUP_LABELS`); admin mặc định tổng hợp theo nhóm; admin "xem như" vai trò / người dùng (chỉ xem, không ghi). Hạn việc Kế hoạch: 59 R3; quyền: 59 R2. -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): thêm ô Tra việc, người giao, người nhận. Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->
 ttl_days: 90

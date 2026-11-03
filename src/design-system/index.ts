@@ -44,6 +44,7 @@ export { ContextBar, type ContextBarItem } from "./patterns/ContextBar";
 export { ErrorSummary, type FieldError } from "./patterns/ErrorSummary";
 export { EmptyState } from "./patterns/EmptyState";
 export { FilterBar, SearchField, NoMatchState } from "./patterns/FilterBar";
+export { PeriodPicker } from "./patterns/PeriodPicker";
 export { ReadOnlyBadge } from "./patterns/ReadOnlyBadge";
 export { InfoTip } from "./patterns/InfoTip";
 export { Abbr, AbbrHint } from "./patterns/AbbrHint";

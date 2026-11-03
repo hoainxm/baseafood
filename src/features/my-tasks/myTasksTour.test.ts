@@ -55,11 +55,11 @@ describe("buildMyTasksTour", () => {
     expect(textOf({ can: { assign: true, editAssigned: false } })).not.toContain("Sửa: đổi người nhận");
   });
 
-  it("thứ tự công việc: thẻ số → lọc → ba mục → giao việc mới; mở đầu + kết thúc giữa trang", () => {
+  it("thứ tự công việc: lọc → thẻ số → ba mục → giao việc mới; mở đầu + kết thúc giữa trang", () => {
     const steps = buildMyTasksTour(full).steps;
     const ids = steps.map((s) => s.id);
     // view-as: chỉ quản trị viên, ngay sau lời chào (ba-spec 59).
-    const order = ["intro", "view-as", "stats", "filter", "assigned", "mine", "task-row", "delegate", "delegated", "assign-new", "outro"];
+    const order = ["intro", "view-as", "filter", "stats", "assigned", "mine", "task-row", "delegate", "delegated", "assign-new", "outro"];
     expect(ids).toEqual(order);
     expect(steps[0].target ?? "").toBe("");
     expect(steps[steps.length - 1].target ?? "").toBe("");

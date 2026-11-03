@@ -37,7 +37,11 @@ import {
   type ComboboxOption,
   ProportionBar,
   todayIso,
+  FilterBar,
+  NoMatchState,
+  SearchField,
 } from "@/design-system";
+import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
 import { kg, num, formatDateVN } from "@/lib/format";
 import { AlertTriangle, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
 import { QrScanner } from "@/features/shared";
@@ -81,6 +85,7 @@ export default function ReserveWarehouseScreen() {
   );
 
   const [warehouseFilter, setWarehouseFilter] = useState("");
+  const [query, setQuery] = useState("");
   const [approval, setApproval] = useState<ApprovalForm | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [isScanning, setIsScanning] = useState(false);
@@ -118,6 +123,10 @@ export default function ReserveWarehouseScreen() {
     [lotStock, warehouseFilter]
   );
   const totalStock = filteredStock.reduce((s, t) => s + t.remainingKg, 0);
+  // Ô tra ở thanh lọc (ba-spec 53): thẻ số + bảng tính theo dòng đang hiện; tuổi tồn / dung tích theo kho đang chọn.
+  const shownStock = filteredStock.filter((r) => matchesSearch(query, productNameOf(r.productId), r.spec, r.warehouse));
+  const shownTotal = shownStock.reduce((s, t) => s + t.remainingKg, 0);
+  const filterCount = activeFilterCount([warehouseFilter, query]);
   const ageBuckets = useMemo(() => bucketStockByAge(filteredStock, todayIso()), [filteredStock]);
 
   const openApprove = (s: WipProductionItem) => {
@@ -248,16 +257,6 @@ export default function ReserveWarehouseScreen() {
       <h1 className="sr-only">Kho dự trữ đông</h1>
       {isReadOnly && <ReadOnlyBadge />}
 
-      <div data-tour="warehouse-stats">
-      <StatCardGrid
-        cards={[
-          { label: "Chờ nhập", value: pendingIntake.length, numeric: true, icon: Warehouse, color: "neutral" },
-          { label: "Số lô hàng", value: filteredStock.length, numeric: true, icon: ClipboardList, color: "brand" },
-          { label: "Tổng tồn", value: kg(totalStock), numeric: true, icon: Scale, color: "success" },
-        ]}
-      />
-      </div>
-
       {totalOversold > 0 && (
         <div data-tour="warehouse-oversold" role="status" className="flex items-start gap-3 rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
@@ -333,21 +332,42 @@ export default function ReserveWarehouseScreen() {
         </div>
       )}
 
-      <div data-tour="warehouse-filter" className="flex flex-wrap items-end gap-3">
+      {/* Thứ tự chung (README § Đầu trang gọn): lọc → thẻ số → bảng. Số lô chờ nhập đã ở đầu khối duyệt bên trên. */}
+      <FilterBar
+        data-tour="warehouse-filter"
+        activeCount={filterCount}
+        onClearAll={() => {
+          setWarehouseFilter("");
+          setQuery("");
+        }}
+        resultText={filterCount > 0 ? `Đang hiện ${shownStock.length.toLocaleString("vi-VN")} / ${lotStock.filter((t) => t.remainingKg > 0).length.toLocaleString("vi-VN")} lô` : undefined}
+      >
         <Combobox
-          label="Lọc theo kho"
+          label="Kho"
           hideRequiredMark
           value={warehouseFilter}
           onChange={setWarehouseFilter}
           options={warehouseOptions}
           placeholder="Tất cả kho"
-          className="min-w-[220px]"
+          className="min-w-[14rem]"
+        />
+        <SearchField label="Tra mặt hàng, quy cách, kho" value={query} onChange={setQuery} />
+      </FilterBar>
+
+      <div data-tour="warehouse-stats">
+        <StatCardGrid
+          cards={[
+            { label: filterCount > 0 ? "Số lô theo bộ lọc" : "Số lô hàng", value: shownStock.length, numeric: true, icon: ClipboardList, color: "brand" },
+            { label: filterCount > 0 ? "Tồn theo bộ lọc" : "Tổng tồn", value: kg(shownTotal), numeric: true, icon: Scale, color: "success" },
+          ]}
         />
       </div>
 
       <div data-tour="warehouse-stock" className="space-y-6">
       {isLoading ? (
         <TableSkeleton />
+      ) : filteredStock.length > 0 && shownStock.length === 0 ? (
+        <NoMatchState onClearAll={() => setQuery("")} />
       ) : filteredStock.length === 0 ? (
         <EmptyState
           icon={Snowflake}
@@ -362,16 +382,14 @@ export default function ReserveWarehouseScreen() {
         <>
           <RecordTable
             columns={stockColumns}
-            rows={filteredStock}
+            rows={shownStock}
             getKey={(r) => r.wipId}
             rowMarkKey="kho-du-tru"
-            getSearchText={(r) => `${productNameOf(r.productId)} ${r.spec} ${r.warehouse}`}
-            searchLabel="Tìm theo mặt hàng / quy cách / kho…"
           />
           <div className="flex justify-end rounded-xl bg-muted px-5 py-4">
             <div className="flex items-baseline gap-3">
               <span className="text-base text-muted-foreground">Tổng tồn</span>
-              <span className="tnum text-xl font-semibold">{kg(totalStock)}</span>
+              <span className="tnum text-xl font-semibold">{kg(shownTotal)}</span>
             </div>
           </div>
         </>

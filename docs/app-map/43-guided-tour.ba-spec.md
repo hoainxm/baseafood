@@ -2,7 +2,8 @@
 
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
-last_verified: 2026-11-02
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — rà UX đợt 1: tour Kho dự trữ (chờ nhập → duyệt → lọc → thẻ số → bảng, bỏ nhãn thẻ "Chờ nhập"), Việc của tôi (lọc → thẻ số), Tổng quan + các sổ có kỳ (nhãn "Kỳ xem", nút ‹ ›), Nhập hàng / Sản xuất (tên tab không emoji). Test thứ tự sửa theo. -->
 ttl_days: 90
 <!-- updated: 2026-11-02 (h) — tour Xuất khẩu bước `create-contract` + hộp "?": phiếu Lập HĐ 6 phần, phần 6 Lịch xuất hàng (mặc định Có, tự chia tới khi sửa tay, 4 ô booking / ngày tàu, hệ quả R41); bỏ câu "sau khi lưu app hỏi tạo lịch". -->
 <!-- updated: 2026-11-02 — Xuất khẩu: bước "tabs" kể thêm tab Danh mục (6 danh sách, giữ chữ lúc ghi, "Ngoài danh sách"); bước Lập hợp đồng kể 4 ô chọn theo danh sách. Không thêm bước riêng (tour ở trần 22 bước). Hộp "?" Xuất khẩu thêm mục "Danh mục: danh sách chọn của Xuất khẩu". Tour Danh mục bỏ 2 bước Loại chứng từ, Loại hàng (đã chuyển trang). -->

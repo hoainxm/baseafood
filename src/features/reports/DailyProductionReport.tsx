@@ -11,8 +11,6 @@ import {
   VerticalBarChart,
   Button,
   Combobox,
-  DateField,
-  DateRangeField,
   EmptyState,
   PrintSheet,
   TableSkeleton,
@@ -35,8 +33,9 @@ import {
   useRowMarkTools,
   useTableSort,
   type SortColumnSpec,
+  PeriodPicker,
 } from "@/design-system";
-import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { exportAoaToXlsx, type OExcel } from "@/lib/reportXlsx";
 import { useCan } from "@/features/shared/PermissionProvider";
@@ -238,39 +237,19 @@ export default function DailyProductionReport() {
       <h1 className="sr-only">Báo cáo thành phẩm hàng ngày</h1>
 
       <div data-tour="production-report-filters" className="flex flex-wrap items-end gap-3 rounded-xl border-2 border-border p-3">
-        <div className="min-w-[12rem]">
-          <Combobox
-            label="Kỳ báo cáo"
-            hideRequiredMark
-            clearable={false}
-            value={period}
-            onChange={(v) => setPeriod(v as ViewPeriod)}
-            options={PERIOD_OPTIONS}
-          />
-        </div>
-        <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {period === "custom" ? (
-            <DateRangeField
-              label="Khoảng ngày sản xuất"
-              hideRequiredMark
-              presets={false}
-              startDate={customFrom}
-              endDate={customTo}
-              onChange={(a, b) => {
-                setCustomFrom(a);
-                setCustomTo(b);
-              }}
-            />
-          ) : (
-            <DateField
-              label={period === "day" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
-              hideRequiredMark
-              hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
-              value={anchor}
-              onChange={setAnchor}
-            />
-          )}
-        </div>
+        <PeriodPicker
+          rangeLabel="Khoảng ngày sản xuất"
+          period={period}
+          onPeriodChange={setPeriod}
+          anchor={anchor}
+          onAnchorChange={setAnchor}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomChange={(a, b) => {
+            setCustomFrom(a);
+            setCustomTo(b);
+          }}
+        />
         <div className="min-w-[10rem]">
           <Combobox
             label="Phân xưởng"

@@ -28,7 +28,6 @@ import {
   Combobox,
   ConfirmDelete,
   DateField,
-  DateRangeField,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -51,10 +50,11 @@ import {
   type FieldError,
   type ComboboxOption,
   type StatCardData,
+  PeriodPicker,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { PERIOD_OPTIONS, getViewPeriodRange, startOfMonth, type ViewPeriod } from "@/lib/periodUtils";
+import { getViewPeriodRange, startOfMonth, type ViewPeriod } from "@/lib/periodUtils";
 import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
 import { num, formatDateVN } from "@/lib/format";
 import { uid } from "@/lib/db";
@@ -359,39 +359,18 @@ export default function NxtReportScreen() {
         onClearAll={() => setQuery("")}
         resultText={`Đang hiện ${rows.length.toLocaleString("vi-VN")} / ${allRows.length.toLocaleString("vi-VN")} mặt hàng`}
       >
-        <div className="min-w-[12rem]">
-          <Combobox
-            label="Kỳ báo cáo"
-            hideRequiredMark
-            clearable={false}
-            value={period}
-            onChange={(v) => setPeriod(v as ViewPeriod)}
-            options={PERIOD_OPTIONS}
-          />
-        </div>
-        <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {period === "custom" ? (
-            <DateRangeField
-              label="Khoảng ngày"
-              hideRequiredMark
-              presets={false}
-              startDate={customFrom}
-              endDate={customTo}
-              onChange={(a, b) => {
-                setCustomFrom(a);
-                setCustomTo(b);
-              }}
-            />
-          ) : (
-            <DateField
-              label={period === "day" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
-              hideRequiredMark
-              hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
-              value={anchor}
-              onChange={setAnchor}
-            />
-          )}
-        </div>
+        <PeriodPicker
+          period={period}
+          onPeriodChange={setPeriod}
+          anchor={anchor}
+          onAnchorChange={setAnchor}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomChange={(a, b) => {
+            setCustomFrom(a);
+            setCustomTo(b);
+          }}
+        />
         <SearchField label="Tra mã, tên hàng, quy cách" value={query} onChange={setQuery} />
       </FilterBar>
 

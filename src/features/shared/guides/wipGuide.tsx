@@ -18,7 +18,7 @@ export const wipGuide: PageGuide = {
       <GuideSection title="Ghi sản lượng trong ngày">
         <GuideSteps>
           <li>
-            Ở chế độ <b>📝 Ghi nhập</b>, phiếu trống mở sẵn. Soát <b>Ngày ghi sổ</b>, <b>Ngày sản xuất</b> (ngày làm ra
+            Ở chế độ <b>Ghi nhập</b>, phiếu trống mở sẵn. Soát <b>Ngày ghi sổ</b>, <b>Ngày sản xuất</b> (ngày làm ra
             thật) và <b>Phân xưởng</b>.
           </li>
           <li>
@@ -56,7 +56,7 @@ export const wipGuide: PageGuide = {
       <GuideSection title="Sổ ngày và trạng thái">
         <GuideList>
           <li>
-            Chế độ <b>📖 Sổ ngày &amp; báo cáo</b>: chọn <b>Kỳ xem sổ</b>, ngày và phân xưởng để xem số đã lưu.
+            Chế độ <b>Sổ ngày &amp; báo cáo</b>: chọn <b>Kỳ xem</b>, ngày và phân xưởng để xem số đã lưu.
           </li>
           <li>
             <b>Chờ nhập kho</b>: mẻ mới ghi, thủ kho chưa duyệt ở <b>Kho dự trữ</b> — chưa tính vào tồn kho.

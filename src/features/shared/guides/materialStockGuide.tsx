@@ -16,7 +16,7 @@ export const materialStockGuide: PageGuide = {
       <GuideSection title="Cách xem">
         <GuideSteps>
           <li>
-            Chọn <b>Kỳ báo cáo</b> (ngày / tuần / tháng / năm / khoảng tự chọn), rồi chọn một ngày bất kỳ trong kỳ.
+            Chọn <b>Kỳ xem</b> (ngày / tuần / tháng / năm / khoảng tự chọn), rồi chọn một ngày bất kỳ trong kỳ.
           </li>
           <li>
             Chọn <b>Phân xưởng</b>: tất cả xưởng hoặc Đông, Cá, Khô.

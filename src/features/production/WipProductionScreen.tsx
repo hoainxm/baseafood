@@ -53,7 +53,6 @@ import {
   ConfirmDelete,
   Combobox,
   DateField,
-  DateRangeField,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -73,16 +72,19 @@ import {
   NumberField,
   RecordTable,
   StatCardGrid,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   notify,
   type RecordTableColumn,
   type FieldError,
   type ComboboxOption,
+  PeriodPicker,
 } from "@/design-system";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { appendAuditEntries } from "@/lib/audit";
-import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { ALL, activeFilterCount, countedLabel, filterRows, matchesSearch, matchesValue, statusOptions } from "@/lib/recordFilters";
 import { DailyTaskReminder, LotInputPicker, LotDispatchPicker, BlankDailyWipSlip, LotQrLabels } from "@/features/shared";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
@@ -1575,39 +1577,22 @@ export default function WipProductionScreen() {
   return (
     <div className="space-y-4">
       <h1 className="sr-only">Sản xuất thành phẩm</h1>
-      <div className="flex flex-col gap-3 empty:hidden sm:flex-row sm:items-center sm:justify-between">
-        {isReadOnly && <ReadOnlyBadge />}
-        {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
+      {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. Tab trái, nhãn "Chỉ xem" phải — cùng kiểu tab của
+          Bán hàng / Xuất khẩu (rà UX 2026-11-03: trước là khối nút tự vẽ có emoji). */}
+      <div className="flex flex-wrap items-center justify-between gap-3 empty:hidden">
         {canEnter && (
-        <div data-tour="wip-mode-switch" className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
-          <button
-            title="Sang chế độ Ghi nhập để gõ sản lượng thành phẩm."
-            type="button"
-            onClick={() => setMode("entry")}
-            className={cn(
-              "flex-1 px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              mode === "entry"
-                ? "bg-primary text-primary-foreground"
-                : "bg-card text-muted-foreground hover:bg-muted"
-            )}
-          >
-            📝 Ghi nhập
-          </button>
-          <button
-            title="Xem sổ sản lượng đã ghi trong ngày và báo cáo theo xưởng, chốt ngày tại đây."
-            type="button"
-            onClick={() => setMode("ledger")}
-            className={cn(
-              "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              mode === "ledger"
-                ? "bg-primary text-primary-foreground"
-                : "bg-card text-muted-foreground hover:bg-muted"
-            )}
-          >
-            📖 Sổ ngày & báo cáo
-          </button>
-        </div>
+          <Tabs value={mode} className="min-w-0 max-sm:w-full" onValueChange={(v) => setMode(v as typeof mode)}>
+            <TabsList data-tour="wip-mode-switch" className="max-sm:w-full">
+              <TabsTrigger className="min-w-0 max-sm:px-2" value="entry" title="Sang chế độ Ghi nhập để gõ sản lượng thành phẩm.">
+                Ghi nhập
+              </TabsTrigger>
+              <TabsTrigger className="min-w-0 max-sm:px-2" value="ledger" title="Xem sổ sản lượng đã ghi trong ngày và báo cáo theo xưởng, chốt ngày tại đây.">
+                Sổ ngày & báo cáo
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         )}
+        {isReadOnly && <ReadOnlyBadge />}
       </div>
 
       <div data-tour="wip-daily-reminder">
@@ -1682,42 +1667,20 @@ export default function WipProductionScreen() {
         onClearAll={clearFilters}
         resultText={`Đang hiện ${view.length.toLocaleString("vi-VN")} / ${periodView.length.toLocaleString("vi-VN")} dòng của kỳ`}
       >
-        <Combobox
-          label="Kỳ xem sổ"
-          hideRequiredMark
-          clearable={false}
-          value={period}
-          onChange={(v) => setPeriod(v as ViewPeriod)}
-          options={PERIOD_OPTIONS}
-          className="min-w-[13rem]"
+        <PeriodPicker
+          dayLabel="Ngày sản xuất"
+          rangeLabel="Khoảng ngày sản xuất"
+          period={period}
+          onPeriodChange={setPeriod}
+          anchor={date}
+          onAnchorChange={setDate}
+          customFrom={fromDate}
+          customTo={toDate}
+          onCustomChange={(fromDate, toDate) => {
+            setFromDate(fromDate);
+            setToDate(toDate);
+          }}
         />
-        <div className="min-w-[220px] flex-1">
-          {period === "custom" ? (
-            <DateRangeField
-              label="Khoảng ngày sản xuất"
-              hideRequiredMark
-              presets={false}
-              startDate={fromDate}
-              endDate={toDate}
-              onChange={(fromDate, toDate) => {
-                setFromDate(fromDate);
-                setToDate(toDate);
-              }}
-            />
-          ) : (
-            <DateField
-              label="Ngày sản xuất"
-              hideRequiredMark
-              hint={
-                period === "day"
-                  ? undefined
-                  : `Kỳ: ${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`
-              }
-              value={date}
-              onChange={setDate}
-            />
-          )}
-        </div>
         <Combobox
           label="Phân xưởng"
           hideRequiredMark

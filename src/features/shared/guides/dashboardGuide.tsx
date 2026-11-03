@@ -16,8 +16,8 @@ export const dashboardGuide: PageGuide = {
       <GuideSection title="Cách xem">
         <GuideSteps>
           <li>
-            Chọn kỳ <b>Ngày · Tuần · Tháng · Năm</b> (mặc định tháng này) hoặc <b>Tự chọn</b> khoảng ngày; dùng <b>‹ ›</b> để
-            sang kỳ khác. Chọn <b>Cả 3 xưởng</b> hoặc một xưởng.
+            Ở ô <b>Kỳ xem</b> chọn <b>Ngày · Tuần · Tháng · Năm</b> (mặc định tháng này) hoặc <b>Khoảng tự chọn</b>; bấm{" "}
+            <b>‹ ›</b> cạnh ô ngày để sang kỳ khác. Ô <b>Phân xưởng</b>: <b>Cả 3 xưởng</b> hoặc một xưởng.
           </li>
           <li>
             Đọc <b>8 thẻ số</b> ở đầu trang. Chọn một thẻ để mở màn liên quan.

@@ -71,7 +71,7 @@ import {
 } from "@/lib/myTasks";
 import { formatDateVN } from "@/lib/format";
 import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
-import { callName, recordName } from "@/lib/personName";
+import { recordName } from "@/lib/personName";
 import type { TaskAssignment } from "@/types";
 import { AlarmClock, ArrowRight, CalendarCheck, CheckCircle2, ClipboardList, Eye, LogOut, Pencil, Send, UserPlus, Users, XCircle } from "lucide-react";
 import { AssignTaskDialog, type AssignTarget } from "./AssignTaskDialog";
@@ -128,7 +128,6 @@ export default function MyTasksScreen() {
   const viewAs = parseViewAs(params.get("viewAs"), ownPermissions.isAdmin);
   // Người giao việc ghi sổ bằng họ tên (ba-spec 47 R1); lời chào gọi bằng tên gọi (R2).
   const userName = recordName(profile, "Máy này");
-  const ownGreet = callName(profile, "Máy này");
 
   // ---- Nạp sổ (giống Tổng quan — cùng bộ tính cảnh báo) ----
   const { traceData, isReady: isTraceReady } = useTraceData();
@@ -154,7 +153,6 @@ export default function MyTasksScreen() {
   const userId = viewAs ? (viewCtx?.userId || "__view-as-role__") : ownUserId;
   const viewedProfile = viewAs?.kind === "user" ? profiles.find((p) => p.id === viewAs.userId) : undefined;
   const viewRoles = viewAs?.kind === "role" ? [viewAs.roleId] : viewedProfile ? viewedProfile.roles : (profile?.roles ?? []);
-  const greetName = viewAs?.kind === "role" ? `vai ${listRoleOptions(appRoles).find((r) => r.value === viewAs.roleId)?.label ?? viewAs.roleId}` : viewedProfile ? callName(viewedProfile, viewedProfile.fullName) : ownGreet;
   const canAssign = { create: !readOnly && ownCanAssign.create, update: !readOnly && ownCanAssign.update, delete: !readOnly && ownCanAssign.delete };
   const setViewAs = (value: string) => {
     const next = new URLSearchParams(params);
@@ -484,21 +482,8 @@ export default function MyTasksScreen() {
     );
 
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="max-w-3xl text-base text-muted-foreground">
-          Việc cần làm của <b className="text-foreground">{greetName}</b>: việc được giao, và việc máy tự phát hiện thuộc các nhóm trang được
-          phân (ngày chưa chốt, BTP chờ duyệt, chưa gắn lô, kỳ chưa chốt, việc Nhập khẩu · Lệnh sản xuất · Xuất khẩu…), gom theo nhóm. Sổ
-          sửa xong thì việc tự hết. Tính từ {formatDateVN(TASKS_START_DATE)}.
-        </p>
-        {canAssign.create && (
-          <Button data-tour="my-tasks-assign-new" title="Giao một việc tay cho một người: tiêu đề, hạn và màn cần mở." onClick={() => setAssignTarget({ kind: "manual" })}>
-            <Send className="mr-2 h-4 w-4" aria-hidden />
-            Giao việc mới
-          </Button>
-        )}
-      </div>
-
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
+      <h1 className="sr-only">Việc của tôi</h1>
       {ownPermissions.isAdmin && (
         <div data-tour="my-tasks-view-as" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 rounded-xl border-2 border-border p-4">
           <div className="max-w-xl">
@@ -520,14 +505,28 @@ export default function MyTasksScreen() {
         </div>
       )}
 
-      <div data-tour="my-tasks-stats">
-        <StatCardGrid cards={cards} />
-      </div>
-
-      <FilterBar data-tour="my-tasks-filter" activeCount={activeFilterCount([query])} onClearAll={() => setQuery("")}>
+      {/* Đầu trang chung (README § Đầu trang gọn, rà UX 2026-11-03): không đoạn giới thiệu (đã ở hộp "?"), nút của trang
+          ở cuối hàng lọc, lọc trước thẻ số. */}
+      <FilterBar
+        data-tour="my-tasks-filter"
+        activeCount={activeFilterCount([query])}
+        onClearAll={() => setQuery("")}
+        actions={
+          canAssign.create && (
+            <Button data-tour="my-tasks-assign-new" title="Giao một việc tay cho một người: tiêu đề, hạn và màn cần mở." onClick={() => setAssignTarget({ kind: "manual" })}>
+              <Send className="mr-2 h-4 w-4" aria-hidden />
+              Giao việc mới
+            </Button>
+          )
+        }
+      >
         <Combobox label="Lọc theo hạn" hideRequiredMark value={filter} onChange={(v) => setFilter(v as UrgencyFilter)} options={FILTERS} clearable={false} className="min-w-[14rem] flex-1" />
         <SearchField label="Tra việc, người giao, người nhận" value={query} onChange={setQuery} />
       </FilterBar>
+
+      <div data-tour="my-tasks-stats">
+        <StatCardGrid cards={cards} />
+      </div>
 
       {viewAs?.kind !== "role" && (
       <Section id="assigned" tour="my-tasks-assigned" title={`Được giao cho tôi (${assigned.length})`} description="Việc người khác giao riêng cho bạn — làm theo hạn người giao đặt.">

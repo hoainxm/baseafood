@@ -716,7 +716,7 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             </li>
             <li>
               In lại sau: <b>Nhập hàng</b> → nút <b>Tem</b> ở cột "Đã ghi ngày", hoặc{" "}
-              <b>📊 Báo cáo → Sổ chi tiết các chuyến</b> → <b>In tem QR</b>.{" "}
+              <b>Báo cáo → Sổ chi tiết các chuyến</b> → <b>In tem QR</b>.{" "}
               <b>Sản xuất thành phẩm</b> và <b>Đóng gói</b>: nút <b>Tem</b> ở từng dòng.
             </li>
           </Y>

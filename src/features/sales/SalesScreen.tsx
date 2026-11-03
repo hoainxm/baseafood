@@ -37,7 +37,6 @@ import {
   Combobox,
   ConfirmDelete,
   DateField,
-  DateRangeField,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -62,6 +61,7 @@ import {
   type RecordTableColumn,
   type FieldError,
   type ComboboxOption,
+  PeriodPicker,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { LotDispatchPicker } from "@/features/shared";
@@ -71,7 +71,7 @@ import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { sumSalesAmountByChannel } from "@/lib/salesTotals";
-import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { ALL, activeFilterCount, filterRows, matchesSearch, matchesValue } from "@/lib/recordFilters";
 import {
   CircleCheck,
@@ -640,51 +640,20 @@ export default function SalesScreen() {
         onClearAll={clearFilters}
         resultText={`Đang hiện ${groupedView.length.toLocaleString("vi-VN")} phiếu · ${view.length.toLocaleString("vi-VN")} / ${periodRows.length.toLocaleString("vi-VN")} dòng của kỳ`}
       >
-          <Combobox
-            label="Kỳ xem sổ"
-            hideRequiredMark
-            clearable={false}
-            value={period}
-            onChange={(v) => setPeriod(v as ViewPeriod)}
-            options={PERIOD_OPTIONS}
-            className="min-w-[10rem]"
+          <PeriodPicker
+            dayLabel="Ngày xuất bán"
+            rangeLabel="Khoảng ngày xuất bán"
+            period={period}
+            onPeriodChange={setPeriod}
+            anchor={date}
+            onAnchorChange={setDate}
+            customFrom={fromDate}
+            customTo={toDate}
+            onCustomChange={(fromDate, toDate) => {
+              setFromDate(fromDate);
+              setToDate(toDate);
+            }}
           />
-
-          <div className="min-w-[13rem] flex-1">
-            {period === "custom" ? (
-              <DateRangeField
-                label="Khoảng ngày xuất bán"
-                hideRequiredMark
-                presets={false}
-                startDate={fromDate}
-                endDate={toDate}
-                onChange={(fromDate, toDate) => {
-                  setFromDate(fromDate);
-                  setToDate(toDate);
-                }}
-              />
-            ) : (
-              <DateField
-                label={
-                  period === "day"
-                    ? "Ngày xuất bán"
-                    : period === "week"
-                      ? "Ngày bất kỳ trong tuần"
-                      : period === "month"
-                        ? "Ngày bất kỳ trong tháng"
-                        : "Ngày bất kỳ trong năm"
-                }
-                hideRequiredMark
-                hint={
-                  period === "day"
-                    ? undefined
-                    : `Kỳ đang xem: ${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`
-                }
-                value={date}
-                onChange={setDate}
-              />
-            )}
-          </div>
 
           <Combobox
             label="Phân xưởng"

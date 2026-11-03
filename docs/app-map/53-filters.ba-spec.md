@@ -2,7 +2,8 @@
 
 > Load khi: thêm hoặc sửa bộ lọc / ô tra của một sổ, bảng nghiệp vụ; làm khung `FilterBar` · `SearchField` của design-system; rà màn nào còn thiếu lọc.
 covers: src/design-system/patterns/FilterBar.tsx, src/lib/recordFilters.ts, src/features/shared/filterCoverage.test.ts, src/design-system/patterns/CatalogCrudModal.tsx
-last_verified: 2026-11-02
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — rà UX đợt 1: kỳ xem trong `FilterBar` = `PeriodPicker` (12 trang, kể cả Tổng quan — Tổng quan bỏ thanh nút kỳ + chip xưởng, dùng `FilterBar`). `CatalogCrud` đặt ô tra (`SearchField`, `matchesSearch`) TRONG thanh lọc ở mọi danh mục, không còn ô tìm riêng của `RecordTable`; đếm vào "Bỏ hết bộ lọc". Kho dự trữ thêm `FilterBar` (Kho + ô tra). Luật ở README design-system § Một kiểu cho cùng một việc. -->
 <!-- updated: 2026-11-02 — chủ dự án: "Lọc các chỗ nên đổi thành dropdown list". Mọi ô lọc một giá trị trong `FilterBar` (Lọc theo hạn ở Việc của tôi; Kênh bán ở Bán hàng + báo cáo bán; Trạng thái tài khoản ở Người dùng; Nhập kho ở Sản xuất; Trạng thái ở Đơn đặt + báo cáo đơn xuất; Dòng ở NXT kho) đổi từ hàng nút `ChoiceGroup` sang `Combobox` thả xuống. Hành vi lọc, nhãn, số đếm giữ nguyên. Luật ở README design-system § Bộ lọc. -->
 <!-- re-verified: 2026-10-31 — AC-1…3 test recordFilters (4); AC-7 filterCoverage (17); preview demo: Đơn đặt lọc Đang gom ⇒ 1 / 5 đơn, thẻ số "theo bộ lọc", "Bỏ hết bộ lọc (1)"; tra "xyzkhongco" ⇒ "Không có dòng nào khớp bộ lọc", bỏ lọc ⇒ 5 đơn; 360 px × 130 % 10 trang `scrollWidth == clientWidth` (sau khi FilterBar chặn bề rộng); bsf.* trước == sau. -->
 ttl_days: 90

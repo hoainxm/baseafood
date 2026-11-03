@@ -69,9 +69,9 @@ export function buildSalesTour(ctx: SalesTourContext): PageTour {
     {
       id: "filter",
       target: "sales-filter",
-      title: "Kỳ xem sổ, phân xưởng và bộ lọc",
+      title: "Kỳ xem, phân xưởng và bộ lọc",
       body:
-        "Kỳ xem sổ: Ngày · Tuần · Tháng · Năm · Khoảng tự chọn. Với Tuần, Tháng, Năm, chọn một ngày bất kỳ trong kỳ; ô ngày ghi rõ kỳ đang xem.\n" +
+        "Kỳ xem: Ngày · Tuần · Tháng · Năm · Khoảng tự chọn (nút ‹ › lùi / tới một kỳ). Với Tuần, Tháng, Năm, chọn một ngày bất kỳ trong kỳ; ô ngày ghi rõ kỳ đang xem.\n" +
         "Phân xưởng: Đông · Cá · Khô hoặc Tất cả. Sổ lọc theo ngày xuất bán của phiếu.\n" +
         "Khách hàng · Kênh bán · ô Tra khách, mặt hàng, quy cách, ghi chú (không cần dấu) để chỉ xem phiếu cần. Đang lọc thì thẻ số và tổng tính theo dòng đang hiện (ghi \"theo bộ lọc\"); Bỏ hết bộ lọc để về sổ đầy đủ của kỳ. Lọc ra không dòng nào thì trang báo Không có dòng nào khớp bộ lọc.\n" +
         "Ghi xong một phiếu nằm ngoài kỳ đang xem, sổ tự chuyển về ngày của phiếu đó.",
@@ -159,9 +159,9 @@ export function buildSalesTour(ctx: SalesTourContext): PageTour {
     {
       id: "report-filters",
       target: "sales-report-filters",
-      title: "Kỳ báo cáo",
+      title: "Kỳ xem",
       prepare: toReport,
-      body: "Ở tab Báo cáo, chọn Kỳ báo cáo (Ngày · Tuần · Tháng · Năm · Khoảng tự chọn) rồi chọn một ngày bất kỳ trong kỳ. Phiếu vào kỳ theo ngày xuất bán, giống sổ bán. Lọc thêm theo Khách hàng và Kênh bán: thẻ số, biểu đồ và bảng tính theo phần đang lọc (ghi \"theo bộ lọc\"); Bỏ hết bộ lọc để về cả kỳ.",
+      body: "Ở tab Báo cáo, chọn Kỳ xem (Ngày · Tuần · Tháng · Năm · Khoảng tự chọn) rồi chọn một ngày bất kỳ trong kỳ. Phiếu vào kỳ theo ngày xuất bán, giống sổ bán. Lọc thêm theo Khách hàng và Kênh bán: thẻ số, biểu đồ và bảng tính theo phần đang lọc (ghi \"theo bộ lọc\"); Bỏ hết bộ lọc để về cả kỳ.",
     },
     {
       id: "report-stats",

@@ -24,7 +24,8 @@ import { ReadOnlyBadge } from "./ReadOnlyBadge";
 import { notify } from "./notify";
 import { Pencil, Plus } from "lucide-react";
 import { Combobox } from "./Combobox";
-import { FilterBar, NoMatchState } from "./FilterBar";
+import { FilterBar, NoMatchState, SearchField } from "./FilterBar";
+import { matchesSearch } from "@/lib/recordFilters";
 
 /** Ô lọc theo nhóm của một danh mục (ba-spec 53 đợt 3) — VD nhóm hàng, thị trường, loài. */
 export interface CatalogFilter<T> {
@@ -147,8 +148,15 @@ export function CatalogCrud<T extends { id: string }>({
     })
     .filter((x) => x.count >= 2);
   const activeFilters = shownFilters.filter((x) => filterValues[x.f.key]);
-  const shownRows = activeFilters.length ? rows.filter((r) => activeFilters.every((x) => groupOf(x.f, r) === filterValues[x.f.key])) : rows;
-  const clearFilters = () => setFilterValues({});
+  // Ô tra nằm CÙNG thanh lọc (rà UX 2026-11-03: trước ở hàng riêng dưới khung lọc, mỗi danh mục một kiểu).
+  const [query, setQuery] = React.useState("");
+  const shownRows = rows.filter(
+    (r) => activeFilters.every((x) => groupOf(x.f, r) === filterValues[x.f.key]) && matchesSearch(query, getSearchText(r))
+  );
+  const clearFilters = () => {
+    setFilterValues({});
+    setQuery("");
+  };
   const [isAdding, setIsAdding] = React.useState(false);
   const [errors, setErrors] = React.useState<FieldError[]>([]);
 
@@ -224,7 +232,7 @@ export function CatalogCrud<T extends { id: string }>({
   ) : (
     !canUpdate && !canDelete && <ReadOnlyBadge />
   );
-  const addInFilterBar = !loading && rows.length > 0 && shownFilters.length > 0;
+  const addInFilterBar = !loading && rows.length > 0;
 
   return (
     <div className="space-y-4">
@@ -253,27 +261,26 @@ export function CatalogCrud<T extends { id: string }>({
         />
       ) : (
         <>
-        {shownFilters.length > 0 && (
-          <FilterBar
-            actions={addButton}
-            activeCount={activeFilters.length}
-            onClearAll={clearFilters}
-            resultText={`Đang hiện ${shownRows.length.toLocaleString("vi-VN")} / ${rows.length.toLocaleString("vi-VN")} ${entityName}`}
-          >
-            {shownFilters.map(({ f, options }) => (
-              <div key={f.key} className="min-w-[12rem] flex-1 sm:max-w-80">
-                <Combobox
-                  label={f.label}
-                  hideRequiredMark
-                  clearable={false}
-                  value={filterValues[f.key] ?? ""}
-                  onChange={(v) => setFilterValues((m) => ({ ...m, [f.key]: v }))}
-                  options={options}
-                />
-              </div>
-            ))}
-          </FilterBar>
-        )}
+        <FilterBar
+          actions={addButton}
+          activeCount={activeFilters.length + (query.trim() ? 1 : 0)}
+          onClearAll={clearFilters}
+          resultText={`Đang hiện ${shownRows.length.toLocaleString("vi-VN")} / ${rows.length.toLocaleString("vi-VN")} ${entityName}`}
+        >
+          {shownFilters.map(({ f, options }) => (
+            <div key={f.key} className="min-w-[12rem] flex-1 sm:max-w-80">
+              <Combobox
+                label={f.label}
+                hideRequiredMark
+                clearable={false}
+                value={filterValues[f.key] ?? ""}
+                onChange={(v) => setFilterValues((m) => ({ ...m, [f.key]: v }))}
+                options={options}
+              />
+            </div>
+          ))}
+          <SearchField label={`Tra ${entityName}`} value={query} onChange={setQuery} />
+        </FilterBar>
         {shownRows.length === 0 ? (
           <NoMatchState onClearAll={clearFilters} />
         ) : (
@@ -281,8 +288,6 @@ export function CatalogCrud<T extends { id: string }>({
           columns={cols}
           rows={shownRows}
           getKey={(r) => r.id}
-          getSearchText={getSearchText}
-          searchLabel={`Tìm ${entityName}…`}
           rowMarkKey={rowMarkKey}
           actions={
             canUpdate || canDelete || rowActions

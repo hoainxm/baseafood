@@ -9,17 +9,16 @@ import {
   BarChart,
   Combobox,
   FilterBar,
-  DateField,
-  DateRangeField,
   StatCardGrid,
   todayIso,
   type BarChartItem,
   type SummaryTableColumn,
   type StatCardData,
+  PeriodPicker,
 } from "@/design-system";
 import { useSalesItems, useSalesInvoices, useCustomers } from "@/lib/catalogRepo";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { num, formatDateVN } from "@/lib/format";
 import { SALES_CHANNELS, calculateSalesAmount, type SalesChannel } from "@/types";
 import { ALL, activeFilterCount, matchesValue } from "@/lib/recordFilters";
@@ -158,39 +157,18 @@ export default function SalesReport() {
           setChannelFilter(ALL);
         }}
       >
-        <div className="min-w-[12rem]">
-          <Combobox
-            label="Kỳ báo cáo"
-            hideRequiredMark
-            clearable={false}
-            value={period}
-            onChange={(v) => setPeriod(v as ViewPeriod)}
-            options={PERIOD_OPTIONS}
-          />
-        </div>
-        <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {period === "custom" ? (
-            <DateRangeField
-              label="Khoảng ngày"
-              hideRequiredMark
-              presets={false}
-              startDate={customFrom}
-              endDate={customTo}
-              onChange={(a, b) => {
-                setCustomFrom(a);
-                setCustomTo(b);
-              }}
-            />
-          ) : (
-            <DateField
-              label={period === "day" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
-              hideRequiredMark
-              hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
-              value={anchor}
-              onChange={setAnchor}
-            />
-          )}
-        </div>
+        <PeriodPicker
+          period={period}
+          onPeriodChange={setPeriod}
+          anchor={anchor}
+          onAnchorChange={setAnchor}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomChange={(a, b) => {
+            setCustomFrom(a);
+            setCustomTo(b);
+          }}
+        />
         <div className="min-w-[14rem] flex-1">
           <Combobox label="Khách hàng" hideRequiredMark clearable={false} value={customerFilter} onChange={(v) => setCustomerFilter(v || ALL)} options={customerChoices} />
         </div>

@@ -7,13 +7,11 @@ import { useState, type ReactNode } from "react";
 import type { MaterialImportItem, ScrapItem, Workshop } from "@/types";
 import {
   Button,
-  Combobox,
-  DateField,
-  DateRangeField,
   getDatesInRange,
+  PeriodPicker,
 } from "@/design-system";
-import { num, formatDateVN } from "@/lib/format";
-import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { num } from "@/lib/format";
+import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Printer, X } from "lucide-react";
 
 /** "2026-07-31" → "31 THÁNG 07 NĂM 2026" (đúng giọng phiếu giấy). */
@@ -112,52 +110,18 @@ export default function DailyImportInvoice({
           <X className="size-4" /> Đóng
         </Button>
 
-        <div className="min-w-[12rem]">
-          <Combobox
-            label="Kỳ báo cáo"
-            hideRequiredMark
-            clearable={false}
-            value={period}
-            onChange={(v) => setPeriod(v as ViewPeriod)}
-            options={PERIOD_OPTIONS}
-          />
-        </div>
-
-        <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {period === "custom" ? (
-            <DateRangeField
-              label="Khoảng ngày"
-              hideRequiredMark
-              presets={false}
-              startDate={customFrom}
-              endDate={customTo}
-              onChange={(a, b) => {
-                setCustomFrom(a);
-                setCustomTo(b);
-              }}
-            />
-          ) : (
-            <DateField
-              label={
-                period === "day"
-                  ? "Ngày"
-                  : period === "week"
-                    ? "Ngày bất kỳ trong tuần"
-                    : period === "month"
-                      ? "Ngày bất kỳ trong tháng"
-                      : "Ngày bất kỳ trong năm"
-              }
-              hideRequiredMark
-              hint={
-                period === "day"
-                  ? undefined
-                  : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`
-              }
-              value={anchor}
-              onChange={setAnchor}
-            />
-          )}
-        </div>
+        <PeriodPicker
+          period={period}
+          onPeriodChange={setPeriod}
+          anchor={anchor}
+          onAnchorChange={setAnchor}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomChange={(a, b) => {
+            setCustomFrom(a);
+            setCustomTo(b);
+          }}
+        />
 
         <Button
           title="Mở hộp in của trình duyệt cho phiếu này. Chọn máy in để in giấy, hoặc 'Lưu thành PDF' để ra file." onClick={() => window.print()}>

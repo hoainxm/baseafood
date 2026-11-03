@@ -32,7 +32,6 @@ import {
   Combobox,
   ConfirmDelete,
   DateField,
-  DateRangeField,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -50,11 +49,15 @@ import {
   RecordTable,
   ReadOnlyBadge,
   StatCardGrid,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   notify,
   toneByName,
   type RecordTableColumn,
   type FieldError,
   type ComboboxOption,
+  PeriodPicker,
 } from "@/design-system";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
 import { formatMaterialLotLabel } from "@/lib/lotTraceability";
@@ -69,7 +72,7 @@ import { buildImportsTour } from "./importsTour";
 import { ImportSlipOcr } from "./ImportSlipOcr";
 import { hasOcr, type OcrCatalog, type OcrResult } from "@/lib/ocr";
 import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
-import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { matchesSearch } from "@/lib/recordFilters";
 import {
   CalendarRange,
@@ -1719,80 +1722,50 @@ export default function MaterialImportScreen() {
   return (
     <div className="space-y-4">
       <h1 className="sr-only">Nhập hàng về xưởng</h1>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {isReadOnly ? <ReadOnlyBadge /> : <span aria-hidden className="max-sm:hidden" />}
-        {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. */}
-        <div data-tour="imports-mode-tabs" className="flex w-full overflow-hidden rounded-xl border-2 border-border sm:w-auto">
-          <button
-            title="Sang chế độ Ghi nhập để gõ chuyến nguyên liệu mới."
-            type="button"
-            onClick={() => setMode("entry")}
-            className={cn(
-              "flex-1 px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              mode === "entry"
-                ? "bg-primary text-primary-foreground"
-                : "bg-card text-muted-foreground hover:bg-muted"
-            )}
-          >
-            📝 Ghi nhập
-          </button>
-          <button
-            title="Tổng hợp nhập hàng theo kỳ (xuất Excel / in) và tra cứu sổ chi tiết các chuyến theo ngày, đại lý, loại, thiếu giá."
-            type="button"
-            onClick={() => setMode("report")}
-            className={cn(
-              "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-              mode === "report" || mode === "ledger"
-                ? "bg-primary text-primary-foreground"
-                : "bg-card text-muted-foreground hover:bg-muted"
-            )}
-          >
-            📊 Báo cáo
-          </button>
-          {invoiceAllowed.view && (
-            <button
-              title="Gắn hóa đơn đại lý vào chuyến: nạp sổ chi tiết NL của kế toán + PDF hóa đơn, xử chỗ lệch."
-              type="button"
-              data-tour="imports-invoice-tab"
-              onClick={() => setMode("invoices")}
-              className={cn(
-                "flex-1 border-l-2 border-border px-4 py-2.5 text-base font-semibold transition-colors sm:flex-none",
-                mode === "invoices"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-muted"
-              )}
+      {/* Tách rõ NHẬP với TRA CỨU: một màn làm một việc. Tab trái, nhãn "Chỉ xem" phải — cùng kiểu tab của
+          Bán hàng / Xuất khẩu (rà UX 2026-11-03: trước là khối nút tự vẽ có emoji, nằm bên phải). */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={mode === "ledger" ? "report" : mode} className="min-w-0 max-sm:w-full" onValueChange={(v) => setMode(v as typeof mode)}>
+          <TabsList data-tour="imports-mode-tabs" className="max-sm:w-full">
+            <TabsTrigger className="min-w-0 max-sm:px-2" value="entry" title="Sang chế độ Ghi nhập để gõ chuyến nguyên liệu mới.">
+              Ghi nhập
+            </TabsTrigger>
+            <TabsTrigger
+              value="report"
+              title="Tổng hợp nhập hàng theo kỳ (xuất Excel / in) và tra cứu sổ chi tiết các chuyến theo ngày, đại lý, loại, thiếu giá."
             >
-              🧾 Hóa đơn
-            </button>
-          )}
-        </div>
+              Báo cáo
+            </TabsTrigger>
+            {invoiceAllowed.view && (
+              <TabsTrigger
+                value="invoices"
+                data-tour="imports-invoice-tab"
+                title="Gắn hóa đơn đại lý vào chuyến: nạp sổ chi tiết NL của kế toán + PDF hóa đơn, xử chỗ lệch."
+              >
+                Hóa đơn
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </Tabs>
+        {isReadOnly && <ReadOnlyBadge />}
       </div>
 
       {/* Trong "Báo cáo": tổng hợp theo kỳ ⇄ sổ chi tiết các chuyến (tab "Sổ ngày" cũ —
-          việc xem/sửa chuyến TRONG NGÀY đã nằm ở cột phải của "Ghi nhập"). */}
+          việc xem/sửa chuyến TRONG NGÀY đã nằm ở cột phải của "Ghi nhập"). Tab cấp hai = kiểu gạch chân. */}
       {(mode === "report" || mode === "ledger") && (
-        <div className="flex w-full overflow-hidden rounded-lg border-2 border-border sm:w-fit">
-          {(
-            [
-              ["report", "Tổng hợp theo kỳ", "Tổng nhập theo kỳ, gom theo đại lý × loại nguyên liệu; xuất Excel hoặc in."],
-              ["ledger", "Sổ chi tiết các chuyến", "Tra cứu từng chuyến theo ngày / tuần / tháng, lọc đại lý · loại · chưa có giá; in tem QR, đổi loại hàng loạt."],
-            ] as const
-          ).map(([id, label, description], i) => (
-            <button
-              key={id}
-              title={description}
-              type="button"
-              onClick={() => setMode(id)}
-              className={cn(
-                "flex-1 px-4 py-2 font-semibold transition-colors sm:flex-none",
-                i > 0 && "border-l-2 border-border",
-                mode === id ? "bg-accent text-foreground" : "bg-card text-muted-foreground hover:bg-muted"
-              )}
+        <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
+          <TabsList variant="line">
+            <TabsTrigger value="report" title="Tổng nhập theo kỳ, gom theo đại lý × loại nguyên liệu; xuất Excel hoặc in.">
+              Tổng hợp theo kỳ
+            </TabsTrigger>
+            <TabsTrigger
+              value="ledger"
+              title="Tra cứu từng chuyến theo ngày / tuần / tháng, lọc đại lý · loại · chưa có giá; in tem QR, đổi loại hàng loạt."
             >
-              {label}
-            </button>
-          ))}
-        </div>
+              Sổ chi tiết các chuyến
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       )}
 
       {mode === "report" && <ImportReport canExport={allowed.export} showPrice={canViewPrice} />}
@@ -1899,51 +1872,20 @@ export default function MaterialImportScreen() {
           hiện ngay, không phải cuộn qua cả khối lọc */}
       <div data-tour="imports-ledger-filters" className="space-y-4 rounded-xl border-2 border-border p-4">
         <div className="flex flex-wrap items-end gap-4">
-          <Combobox
-            label="Kỳ xem sổ"
-            hideRequiredMark
-            clearable={false}
-            value={period}
-            onChange={(v) => setPeriod(v as ViewPeriod)}
-            options={PERIOD_OPTIONS}
-            className="min-w-[13rem]"
+          <PeriodPicker
+            dayLabel="Ngày hàng về xưởng"
+            rangeLabel="Khoảng ngày hàng về xưởng"
+            period={period}
+            onPeriodChange={setPeriod}
+            anchor={date}
+            onAnchorChange={setDate}
+            customFrom={fromDate}
+            customTo={toDate}
+            onCustomChange={(fromDate, toDate) => {
+              setFromDate(fromDate);
+              setToDate(toDate);
+            }}
           />
-
-          <div className="min-w-[220px] flex-1">
-            {period === "custom" ? (
-              <DateRangeField
-                label="Khoảng ngày hàng về xưởng"
-                hideRequiredMark
-                presets={false}
-                startDate={fromDate}
-                endDate={toDate}
-                onChange={(fromDate, toDate) => {
-                  setFromDate(fromDate);
-                  setToDate(toDate);
-                }}
-              />
-            ) : (
-              <DateField
-                label={
-                  period === "day"
-                    ? "Ngày hàng về xưởng"
-                    : period === "week"
-                      ? "Ngày bất kỳ trong tuần"
-                      : period === "month"
-                        ? "Ngày bất kỳ trong tháng"
-                        : "Ngày bất kỳ trong năm"
-                }
-                hideRequiredMark
-                hint={
-                  period === "day"
-                    ? undefined
-                    : `Kỳ đang xem: ${formatDateVN(effectiveFrom)} – ${formatDateVN(effectiveTo)}`
-                }
-                value={date}
-                onChange={setDate}
-              />
-            )}
-          </div>
 
           <Combobox
             label="Phân xưởng"

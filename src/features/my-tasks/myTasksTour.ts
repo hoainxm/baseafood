@@ -40,17 +40,6 @@ export function buildMyTasksTour(ctx: MyTasksTourContext): PageTour {
         "Trong lúc xem hướng dẫn, các nút trên trang tạm khóa và dữ liệu không thay đổi. Chọn Tiếp theo (phím →) để sang bước sau, Quay lại (phím ←) để xem lại, Esc để thoát.",
     },
     {
-      id: "stats",
-      target: "my-tasks-stats",
-      title: "Các thẻ số",
-      body:
-        "• Quá hạn: việc của tôi (được giao cho tôi và việc theo quyền của tôi) đã qua hạn. Còn việc quá hạn thì thẻ đỏ.\n" +
-        "• Hạn hôm nay: việc phải xong trong hôm nay.\n" +
-        "• Được giao cho tôi: số việc người khác giao riêng cho bạn đang mở. Số trên chuông ở thanh tiêu đề và số đỏ cạnh mục Việc của tôi ở menu là số này.\n" +
-        "• Tôi đã giao: việc bạn giao cho người khác còn đang mở; dòng phụ cho biết bao nhiêu việc người nhận để quá hạn. Thẻ này chỉ hiện khi bạn được giao việc hoặc đã từng giao.\n" +
-        "Chọn thẻ Quá hạn hoặc Hạn hôm nay để lọc danh sách; chọn hai thẻ còn lại để tới đúng mục.",
-    },
-    {
       id: "filter",
       target: "my-tasks-filter",
       title: "Lọc theo hạn",
@@ -60,6 +49,17 @@ export function buildMyTasksTour(ctx: MyTasksTourContext): PageTour {
         "• Quá hạn · Hôm nay · Để biết: chỉ hiện việc đúng mức đó.\n" +
         "• Tất cả: hiện mọi việc, kể cả việc đã xong hoặc đã thu hồi ở mục Tôi đã giao.\n" +
         "Ô Tra việc, người giao, người nhận: gõ một phần tên việc hoặc tên người (không cần dấu); Bỏ hết bộ lọc để xóa ô tra.",
+    },
+    {
+      id: "stats",
+      target: "my-tasks-stats",
+      title: "Các thẻ số",
+      body:
+        "• Quá hạn: việc của tôi (được giao cho tôi và việc theo quyền của tôi) đã qua hạn. Còn việc quá hạn thì thẻ đỏ.\n" +
+        "• Hạn hôm nay: việc phải xong trong hôm nay.\n" +
+        "• Được giao cho tôi: số việc người khác giao riêng cho bạn đang mở. Số trên chuông ở thanh tiêu đề và số đỏ cạnh mục Việc của tôi ở menu là số này.\n" +
+        "• Tôi đã giao: việc bạn giao cho người khác còn đang mở; dòng phụ cho biết bao nhiêu việc người nhận để quá hạn. Thẻ này chỉ hiện khi bạn được giao việc hoặc đã từng giao.\n" +
+        "Chọn thẻ Quá hạn hoặc Hạn hôm nay để lọc danh sách; chọn hai thẻ còn lại để tới đúng mục.",
     },
     {
       id: "assigned",

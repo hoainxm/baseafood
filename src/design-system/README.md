@@ -913,6 +913,22 @@ Oracle hành vi: [ba-spec 53](../../docs/app-map/53-filters.ba-spec.md). Logic s
 
 Màn cũ đã đủ lọc (Nhật ký thao tác, Tài liệu, Sổ chuyến Nhập hàng…) giữ nguyên; màn THÊM lọc từ 2026-10-31 dùng khung này.
 
+## Một kiểu cho cùng một việc — kỳ xem · xưởng · tab trang (từ 2026-11-03)
+
+Rà UX 2026-11-03: cùng một việc mà mỗi trang một kiểu (4 kiểu chọn kỳ, 3 kiểu chọn xưởng, tab trái / phải, có emoji /
+không) ⇒ người dùng phải học lại ở mỗi trang. Luật:
+
+| Việc | Dùng | Không dùng |
+|---|---|---|
+| Chọn **kỳ xem** của sổ / báo cáo | `PeriodPicker` đặt thẳng trong `FilterBar`: ô "Kỳ xem" (Ngày · Tuần · Tháng · Năm · Khoảng tự chọn) + ô ngày neo có nút ‹ › lùi / tới một kỳ, dưới nhãn ghi "Đang xem: Tháng 11/2026". `dayLabel` = tên ngày của sổ ("Ngày xuất bán"); bớt kiểu kỳ bằng `options`. Toán ngày: `stepViewPeriod` · `viewPeriodLabel` (`lib/periodUtils.ts`, có test) | Tự ghép `Combobox` + `DateField` + hint; hàng nút / thanh tab chọn kỳ |
+| Lọc **phân xưởng** | `Combobox` "Phân xưởng" trong `FilterBar` (có "Tất cả" / "Cả 3 xưởng") | Thanh chip / hàng nút trong thanh lọc. Ngoại lệ: xưởng là ô NHẬP của phiếu (Kiểm tra QC, form Ghi nhập) ⇒ `ChoiceGroup` như mọi ô nhập |
+| **Tab của trang** (chế độ Ghi nhập ⇄ Sổ / Báo cáo) | `Tabs` + `TabsList` + `TabsTrigger` (có `title`), đặt TRÁI; tab cấp hai `TabsList variant="line"`. Nhãn chữ, không emoji | Khối nút tự vẽ `bg-primary`; tab đặt phải |
+| **Ô tra** của bảng có bộ lọc | `SearchField` trong `FilterBar`, lọc bằng `matchesSearch`; thẻ số + bảng tính theo dòng đang hiện | Ô tìm riêng của `RecordTable` (`getSearchText`) nằm hàng dưới khung lọc. `CatalogCrud` đã tự đặt ô tra trong thanh lọc |
+| **Mục tra cứu** ở thanh bên | Nhãn nói rõ tra gì: "Tra đại lý", "Tra mặt hàng"… (`LOOKUP_CHILD(tab, nhãn)`) | Nhiều mục cùng chữ "Tra cứu" |
+
+Chưa theo (để đợt sau, ghi rõ để khỏi tưởng là mẫu): Xuất khẩu (`MonthView` — 3 nút Tháng/Tuần/Ngày + ‹ Tháng ›),
+Nhập khẩu (`MonthNav` — chỉ tháng), Nhập xuất tồn kho (kỳ = danh sách kỳ đã nạp của kho, không phải lịch).
+
 ## Animation & Loading → "Thinking"
 
 Mục tiêu: tinh tế, không phô — giao diện *mượt* chứ không *ồn ào*.

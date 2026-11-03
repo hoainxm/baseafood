@@ -1,6 +1,7 @@
 > Load khi: thêm/bớt màn hình, đổi điều hướng, header, hay tìm xem một màn được gắn vào đâu.
 covers: src/App.tsx, src/features/shared/AppShell.tsx, src/features/my-tasks/MyTasksScreen.tsx, src/features/shared/AccountMenu.tsx, src/features/admin/AdminHomeScreen.tsx, src/features/shared/NotFound.tsx, src/features/shared/guideContent.tsx, src/lib/nav-access.ts, src/lib/permissions.ts, src/features/shared/PermissionProvider.tsx
-last_verified: 2026-11-02
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — thanh bên: mục tra cứu ghi rõ tra gì ("Tra đại lý" · "Tra mặt hàng" · "Tra kho lưu" · "Tra khách hàng" · "Tra NCC nhập khẩu") thay 6 mục cùng chữ "Tra cứu" (`LOOKUP_CHILD(tab, nhãn)` ở AppShell). Rà UX đợt 1. -->
 <!-- updated: 2026-11-02 — `/planning-export` thêm `?view=catalog` (tab Danh mục) + `?list=` (`loading-port` mặc định · `discharge-port` · `container-type` · `currency` · `document-kinds` · `goods-types`). `/catalog?tab=document-kinds` · `goods-types` chuyển hướng sang đó (ba-spec 62). -->
 <!-- updated: 2026-11-02 (xem file) — THÊM route `/file-view` "Xem file" (ngoài nav, tiêu đề header qua `EXTRA_PAGE_TITLES` trong App.tsx) — ba-spec 61. -->
 <!-- updated: 2026-10-30 (thứ tự) — nhóm nav "Kế hoạch" xếp theo dòng việc: Nhập khẩu → Lệnh sản xuất → Xuất khẩu (+ Tra cứu NCC nhập khẩu); danh sách phẳng của AppShell cùng thứ tự. Trang chủ của planner vẫn là Xuất khẩu. -->
@@ -85,7 +86,7 @@ Cả hai dùng CHUNG một cây nav (`CayNav`) dựng từ `KIT_NAV` (danh sách
 | Hệ thống | `catalog` (danh mục đầy đủ) · `users` (chỉ admin) · `audit` (chỉ admin) |
 
 - **Gập/mở**: mỗi nhóm là nút gập/mở (chevron), nhớ trạng thái theo máy (`localStorage bsf1:nav-nhom`, mặc định MỞ). Nhóm chỉ 1 màn (Tổng quan) hiện thẳng, không có tiêu đề gập.
-- **Tra cứu (deep-link danh mục)**: mỗi module có MỘT mục "Tra cứu" mở đúng tab liên quan của `/catalog` qua `?tab=` (helper `TRACUU`, icon `Search`) — **MỘT nguồn danh mục duy nhất** (không nhân bản, không tách 1-mục-mỗi-tab), `CatalogScreen` đọc tab bằng `useSearchParams`. Kiểm quyền theo `gateId="catalog"`, nên gate 2 bộ phận (`nav-access.ts`) không vỡ. `gomCay` bỏ nhánh Tra cứu **mồ côi** khi module không có màn thật nào người dùng thấy.
+- **Tra cứu (deep-link danh mục)**: mỗi module có MỘT mục tra cứu — nhãn nói rõ tra gì ("Tra đại lý", "Tra mặt hàng"…, từ 2026-11-03) — mở đúng tab liên quan của `/catalog` qua `?tab=` (helper `TRACUU`, icon `Search`) — **MỘT nguồn danh mục duy nhất** (không nhân bản, không tách 1-mục-mỗi-tab), `CatalogScreen` đọc tab bằng `useSearchParams`. Kiểm quyền theo `gateId="catalog"`, nên gate 2 bộ phận (`nav-access.ts`) không vỡ. `gomCay` bỏ nhánh Tra cứu **mồ côi** khi module không có màn thật nào người dùng thấy.
 - Mục có trong `KIT_NAV` (đã lọc quyền) nhưng thiếu trong `CAY_NAV` rơi vào nhóm **"Khác"** — không mất, nhưng là dấu hiệu quên xếp nhánh.
 - Thu gọn sidebar (`thuGon`, chỉ desktop) = icon-only: bỏ deep-link danh mục (còn nút Danh mục đầy đủ), bỏ qua trạng thái gập.
 

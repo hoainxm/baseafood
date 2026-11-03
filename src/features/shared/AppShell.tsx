@@ -144,14 +144,15 @@ export interface NavTreeGroup {
 }
 
 /**
- * MỘT mục "Tra cứu" cho mỗi module — mở đúng danh mục liên quan (deep-link `?tab=`).
+ * MỘT mục tra cứu cho mỗi module — mở đúng danh mục liên quan (deep-link `?tab=`).
  * Gom về 1 mục thay vì 1-mục-mỗi-tab: danh mục vốn là MỘT trang nhiều tab, không
  * cần tách sidebar theo từng tab. Danh mục ĐẦY ĐỦ vẫn ở nhóm Hệ thống ("Danh mục").
+ * Nhãn ghi rõ tra gì (2026-11-03, rà UX): 6 mục cùng chữ "Tra cứu" không biết mục nào mở gì.
  */
-const LOOKUP_CHILD = (tab: string): NavTreeChild => ({
+const LOOKUP_CHILD = (tab: string, label: string): NavTreeChild => ({
   to: `catalog?tab=${tab}`,
   gateId: "catalog",
-  label: "Tra cứu",
+  label,
   icon: Search,
 });
 
@@ -162,7 +163,7 @@ export const NAV_TREE: NavTreeGroup[] = [
   {
     name: "Nhập hàng",
     icon: Truck,
-    children: [{ ref: "imports" }, { ref: "nxt-material" }, LOOKUP_CHILD("suppliers")],
+    children: [{ ref: "imports" }, { ref: "nxt-material" }, LOOKUP_CHILD("suppliers", "Tra đại lý")],
   },
   {
     name: "Sản xuất",
@@ -171,7 +172,7 @@ export const NAV_TREE: NavTreeGroup[] = [
       { ref: "wip" },
       { ref: "packaging" },
       { ref: "qc" },
-      LOOKUP_CHILD("products"),
+      LOOKUP_CHILD("products", "Tra mặt hàng"),
     ],
   },
   {
@@ -182,13 +183,13 @@ export const NAV_TREE: NavTreeGroup[] = [
       { ref: "monthly-stock" },
       { ref: "qr" },
       { ref: "nxt-warehouse" },
-      LOOKUP_CHILD("storage-locations"),
+      LOOKUP_CHILD("storage-locations", "Tra kho lưu"),
     ],
   },
   {
     name: "Kinh doanh",
     icon: ShoppingCart,
-    children: [{ ref: "sales" }, { ref: "orders" }, LOOKUP_CHILD("customers")],
+    children: [{ ref: "sales" }, { ref: "orders" }, LOOKUP_CHILD("customers", "Tra khách hàng")],
   },
   {
     name: "Báo cáo & Cân đối",
@@ -204,7 +205,7 @@ export const NAV_TREE: NavTreeGroup[] = [
   // Phòng Kế hoạch: Xuất khẩu · Nhập khẩu (ba-spec 45); "Khác" thêm vào nhánh này về sau. MỘT mục Tra cứu
   // (ba-spec 45 v2 R19, chủ dự án chọn): mở danh mục NCC nhập khẩu. Tra cứu Khách hàng ở nhóm Bán hàng.
   // Thứ tự theo dòng việc (chủ dự án 2026-10-30): Nhập khẩu (NL về) → Lệnh sản xuất → Xuất khẩu (chuyến).
-  { name: "Kế hoạch", icon: Container, children: [{ ref: "planning-import" }, { ref: "planning-production" }, { ref: "planning-export" }, LOOKUP_CHILD("import-suppliers")] },
+  { name: "Kế hoạch", icon: Container, children: [{ ref: "planning-import" }, { ref: "planning-production" }, { ref: "planning-export" }, LOOKUP_CHILD("import-suppliers", "Tra NCC nhập khẩu")] },
   { name: "Tài liệu công ty", icon: FolderOpen, children: [{ ref: "documents" }] },
   {
     name: "Hệ thống",

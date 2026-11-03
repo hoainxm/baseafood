@@ -29,9 +29,9 @@ export function buildFinishedGoodStockTour(ctx: FinishedGoodStockTourContext): P
     {
       id: "period",
       target: "nxt-period",
-      title: "Kỳ báo cáo và ô tra",
+      title: "Kỳ xem và ô tra",
       body:
-        "Chọn Kỳ báo cáo: Ngày · Tuần · Tháng · Năm · Khoảng tự chọn. Sau đó chọn Ngày bất kỳ trong kỳ (dòng nhỏ bên dưới ghi rõ Kỳ: từ ngày – đến ngày); Khoảng tự chọn thì chọn Khoảng ngày.\n" +
+        "Chọn Kỳ xem: Ngày · Tuần · Tháng · Năm · Khoảng tự chọn (nút ‹ › lùi / tới một kỳ). Sau đó chọn Ngày bất kỳ trong kỳ (dòng nhỏ bên dưới ghi rõ Kỳ: từ ngày – đến ngày); Khoảng tự chọn thì chọn Khoảng ngày.\n" +
         "Mọi số trên trang tính trong khoảng đó. Kỳ không có phát sinh thì trang hiện Chưa có số liệu thành phẩm trong khoảng ngày này. Ô Tra mã, tên hàng, quy cách thu hẹp bảng và bốn chỉ số (Xuất Excel vẫn xuất đủ mọi mặt hàng của kỳ); Bỏ hết bộ lọc để về đủ.",
     },
     {

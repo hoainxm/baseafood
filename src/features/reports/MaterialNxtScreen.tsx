@@ -12,7 +12,6 @@ import {
   Combobox,
   ConfirmDelete,
   DateField,
-  DateRangeField,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -32,6 +31,7 @@ import {
   type FieldError,
   type ComboboxOption,
   type StatCardData,
+  PeriodPicker,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
@@ -44,7 +44,7 @@ import {
   useMaterialTypes,
   useProductionLocks,
 } from "@/lib/catalogRepo";
-import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import {
   computeMaterialTotalStock,
   sumUnmatchedLeftover,
@@ -339,39 +339,18 @@ export default function MaterialNxtScreen() {
       {isReadOnly && <ReadOnlyBadge />}
       {/* Bộ chọn kỳ + phân xưởng; nút Tồn đầu dạt phải cùng hàng (README § Đầu trang gọn) */}
       <div data-tour="nxt-material-filters" className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[12rem]">
-          <Combobox
-            label="Kỳ báo cáo"
-            hideRequiredMark
-            clearable={false}
-            value={period}
-            onChange={(v) => setPeriod(v as ViewPeriod)}
-            options={PERIOD_OPTIONS}
-          />
-        </div>
-        <div className="min-w-[min(12rem,100%)] flex-1 sm:min-w-[16rem]">
-          {period === "custom" ? (
-            <DateRangeField
-              label="Khoảng ngày"
-              hideRequiredMark
-              presets={false}
-              startDate={customFrom}
-              endDate={customTo}
-              onChange={(a, b) => {
-                setCustomFrom(a);
-                setCustomTo(b);
-              }}
-            />
-          ) : (
-            <DateField
-              label={period === "day" ? "Ngày" : "Ngày bất kỳ trong kỳ"}
-              hideRequiredMark
-              hint={period === "day" ? undefined : `Kỳ: ${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`}
-              value={anchor}
-              onChange={setAnchor}
-            />
-          )}
-        </div>
+        <PeriodPicker
+          period={period}
+          onPeriodChange={setPeriod}
+          anchor={anchor}
+          onAnchorChange={setAnchor}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomChange={(a, b) => {
+            setCustomFrom(a);
+            setCustomTo(b);
+          }}
+        />
         <div className="min-w-[10rem]">
           <Combobox
             label="Phân xưởng"

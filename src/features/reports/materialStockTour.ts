@@ -28,9 +28,9 @@ export function buildMaterialStockTour(ctx: MaterialStockTourContext): PageTour 
     {
       id: "filters",
       target: "nxt-material-filters",
-      title: "Kỳ báo cáo và phân xưởng",
+      title: "Kỳ xem và phân xưởng",
       body:
-        "Kỳ báo cáo: Ngày · Tuần · Tháng · Năm · Khoảng tự chọn. Sau đó chọn Ngày bất kỳ trong kỳ (dòng nhỏ bên dưới ghi rõ Kỳ: từ ngày – đến ngày); Khoảng tự chọn thì chọn Khoảng ngày.\n" +
+        "Kỳ xem: Ngày · Tuần · Tháng · Năm · Khoảng tự chọn (nút ‹ › lùi / tới một kỳ). Sau đó chọn Ngày bất kỳ trong kỳ (dòng nhỏ bên dưới ghi rõ Kỳ: từ ngày – đến ngày); Khoảng tự chọn thì chọn Khoảng ngày.\n" +
         "Phân xưởng: Tất cả xưởng hoặc một xưởng Đông, Cá, Khô. Mọi số và cả danh sách Tồn đầu đều theo xưởng đã chọn.\n" +
         "Kỳ không có nhập hàng thì trang hiện Chưa có nhập hàng nào trong khoảng ngày này.",
     },

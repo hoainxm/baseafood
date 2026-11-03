@@ -1,6 +1,7 @@
 > Load khi: làm chế độ DEMO (bật/tắt), sinh bộ dữ liệu demo, gỡ màn DEMO dữ liệu mẫu, thêm chức năng mới cần có mặt trong demo.
 > Trạng thái: **ĐÃ CHỐT hướng (2026-10-12)** — chủ dự án chọn **phương án B `site-demo` trong DB thật** · ẩn danh mặc định có công tắc · xóa hẳn `/production` + `/reports` · **chỉ admin** bật demo. Chưa build. Đọc §4b (rào chắn bắt buộc của B) trước khi code.
-last_verified: 2026-11-02
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — rà UX đợt 1 (§5b Tổng quan): thanh lọc = `FilterBar` + `PeriodPicker` + ô thả "Phân xưởng" (bỏ thanh nút kỳ và chip xưởng); tính số không đổi. -->
 <!-- updated: 2026-11-02 — bảng MỚI `export_shipment_lines` (mig 0096) vào `DemoBundle` (`exportShipmentLines` = `demoShipmentLines`: chép dòng HĐ bản mới nhất vào mỗi chuyến chưa hủy, chia đều số kiện; chuyến có số cont ⇒ thực đóng = kế hoạch) + `DemoPackLoader` (`useExportShipmentLines`); khóa ngoại mềm khai `refColumns`. -->
 <!-- updated: 2026-11-02 — bảng MỚI `export_options` (mig 0095) vào `DemoBundle` (`exportOptions` = `EXPORT_OPTION_SEED`, 19 mục) + `DemoPackLoader` (`useExportOptions`); không khóa ngoại (HĐ lưu chữ). -->
 <!-- updated: 2026-11-02 (nhật ký 56) — 2 bảng MỚI mig 0092 vào `DemoBundle` (`importsActivities` · `productionActivities`, để TRỐNG — thao tác trong demo tự sinh dòng) + `DemoPackLoader`. Khóa ngoại mềm `record_id` · `parent_id` (refColumns). `export_activity_log` thêm `record_id` · `parent_id` vào refColumns. Xóa chỉ dòng `site-demo` (RLS 0092). -->

@@ -73,3 +73,24 @@ export function getViewPeriodRange(
       return [startDate, endDate];
   }
 }
+
+/** Lùi / tiến mốc kỳ một bước: ngày ±1, tuần ±7, tháng / năm ±1 (về ngày đầu). Khoảng tự chọn không bước. */
+export function stepViewPeriod(period: ViewPeriod, anchor: string, step: 1 | -1): string {
+  const d = toDate(anchor);
+  if (period === "day") d.setDate(d.getDate() + step);
+  else if (period === "week") d.setDate(d.getDate() + 7 * step);
+  else if (period === "month") return toIso(new Date(d.getFullYear(), d.getMonth() + step, 1));
+  else if (period === "year") return toIso(new Date(d.getFullYear() + step, 0, 1));
+  return toIso(d);
+}
+
+const dmy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+/** Nhãn ngắn của kỳ đang xem: "03/11/2026" · "Tháng 11/2026" · "Năm 2026" · "02/11/2026 – 08/11/2026". */
+export function viewPeriodLabel(period: ViewPeriod, fromDate: string, toDate: string): string {
+  if (!fromDate) return "";
+  if (period === "day") return dmy(fromDate);
+  if (period === "month") return `Tháng ${fromDate.slice(5, 7)}/${fromDate.slice(0, 4)}`;
+  if (period === "year") return `Năm ${fromDate.slice(0, 4)}`;
+  return toDate ? `${dmy(fromDate)} – ${dmy(toDate)}` : dmy(fromDate);
+}

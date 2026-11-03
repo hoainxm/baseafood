@@ -203,6 +203,8 @@ export function DateField({
   clearable = false,
   hideRequiredMark = false,
   className,
+  adornStart,
+  adornEnd,
 }: {
   label: string;
   /** ISO yyyy-mm-dd */
@@ -217,6 +219,9 @@ export function DateField({
   /** Ẩn nhãn "Bắt buộc / (không bắt buộc)" — dùng khi đây là BỘ LỌC, không phải ô nhập. */
   hideRequiredMark?: boolean;
   className?: string;
+  /** Nút đặt TRÁI / PHẢI ô ngày, cùng hàng (vd ‹ › lùi / tới kỳ của `PeriodPicker`). */
+  adornStart?: React.ReactNode;
+  adornEnd?: React.ReactNode;
 }) {
   const id = React.useId();
   return (
@@ -234,6 +239,7 @@ export function DateField({
         hideRequiredMark={hideRequiredMark}
       />
       <div className="mt-auto flex items-center gap-2">
+        {adornStart}
         <div className="min-w-0 flex-1">
           <CalendarButton
             id={id}
@@ -253,6 +259,7 @@ export function DateField({
             <X />
           </Button>
         )}
+        {adornEnd}
       </div>
     </div>
   );

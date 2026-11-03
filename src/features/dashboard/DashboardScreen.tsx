@@ -12,12 +12,11 @@ import {
   BarChart,
   TimeSeriesChart,
   Button,
-  DateRangeField,
+  Combobox,
   EmptyState,
+  FilterBar,
+  PeriodPicker,
   Tag,
-  Tabs,
-  TabsList,
-  TabsTrigger,
   ProportionBar,
   StatCardGrid,
   todayIso,
@@ -83,8 +82,6 @@ import type { TraceStageKey } from "@/lib/lotTraceability";
 import {
   AlertTriangle,
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
   ClipboardList,
   Factory,
   FileSpreadsheet,
@@ -115,15 +112,9 @@ interface WarehouseRow {
   productCount: number;
 }
 
-const QUICK_PERIODS: { value: ViewPeriod; label: string }[] = [
-  { value: "day", label: "Ngày" },
-  { value: "week", label: "Tuần" },
-  { value: "month", label: "Tháng" },
-  { value: "year", label: "Năm" },
-  { value: "custom", label: "Tự chọn" },
-];
-const WORKSHOP_QUICK = [
-  { value: "tat-ca", label: "Cả 3 xưởng" },
+const ALL_WORKSHOPS = "all";
+const WORKSHOP_CHOICES = [
+  { value: ALL_WORKSHOPS, label: "Cả 3 xưởng" },
   { value: "Đông", label: "Đông" },
   { value: "Cá", label: "Cá" },
   { value: "Khô", label: "Khô" },
@@ -164,24 +155,6 @@ const WAREHOUSE_PARTS: Record<string, { label: string; tone: CategoryTone; descr
   "block-sale": { label: "Bán block thô", tone: "pink" },
   "wip-stock": { label: "Còn trong kho", tone: KIND_TONES.warehouse },
 };
-
-/** Lùi / tiến mốc kỳ một bước (ngày · tuần · tháng · năm). */
-function stepPeriod(period: ViewPeriod, anchor: string, step: 1 | -1): string {
-  const d = new Date(`${anchor}T00:00:00Z`);
-  if (period === "day") d.setUTCDate(d.getUTCDate() + step);
-  else if (period === "week") d.setUTCDate(d.getUTCDate() + 7 * step);
-  else if (period === "month") d.setUTCMonth(d.getUTCMonth() + step, 1);
-  else if (period === "year") d.setUTCFullYear(d.getUTCFullYear() + step, 0, 1);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Nhãn kỳ đang xem, ngắn: "Tháng 10/2026" · "Năm 2026" · "06/10 – 12/10/2026". */
-function periodLabel(period: ViewPeriod, fromDate: string, toDate: string): string {
-  if (period === "day") return formatDateVN(fromDate);
-  if (period === "month") return `Tháng ${fromDate.slice(5, 7)}/${fromDate.slice(0, 4)}`;
-  if (period === "year") return `Năm ${fromDate.slice(0, 4)}`;
-  return `${formatDateVN(fromDate)} – ${formatDateVN(toDate)}`;
-}
 
 /** Một dòng "Việc cần đốc": việc chuỗi (lib/dataFlow) hoặc việc module mới (lib/dashboardAttention, ba-spec 55). */
 type WarningRow = Omit<FlowWarning, "kind"> & { kindLabel: string };
@@ -656,55 +629,30 @@ export default function DashboardScreen() {
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <h1 className="sr-only">Tổng quan — dòng chảy số liệu</h1>
 
-      {/* Thanh lọc GỌN một hàng: kỳ (bấm nhanh) · lùi/tiến · xưởng. Tự chọn mới hiện ô ngày. */}
-      <div data-tour="dashboard-filters" className="grid gap-3 rounded-xl border bg-muted/30 p-3">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Tabs value={period} onValueChange={(v) => setPeriod(v as ViewPeriod)}>
-            <TabsList aria-label="Kỳ xem" className="flex-wrap group-data-horizontal/tabs:h-auto">
-              {QUICK_PERIODS.map((k) => (
-                <TabsTrigger key={k.value} value={k.value} title={`Xem số theo ${k.label.toLowerCase()}.`}>
-                  {k.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-          {period !== "custom" && (
-            <div className="flex items-center gap-1">
-              <Button title="Lùi về kỳ trước." variant="ghost" size="icon" aria-label="Kỳ trước" onClick={() => setAnchor(stepPeriod(period, anchor, -1))}>
-                <ChevronLeft />
-              </Button>
-              <span className="tnum min-w-[9rem] text-center text-base font-semibold text-foreground">{periodLabel(period, fromDate, toDate)}</span>
-              <Button title="Tới kỳ sau." variant="ghost" size="icon" aria-label="Kỳ sau" onClick={() => setAnchor(stepPeriod(period, anchor, 1))}>
-                <ChevronRight />
-              </Button>
-            </div>
-          )}
-          <Tabs value={workshop || "tat-ca"} onValueChange={(v) => setWorkshop(v === "tat-ca" ? "" : (v as Workshop))} className="ml-auto">
-            <TabsList aria-label="Phân xưởng" className="flex-wrap group-data-horizontal/tabs:h-auto">
-              {WORKSHOP_QUICK.map((x) => (
-                <TabsTrigger key={x.value} value={x.value} title={x.value === "tat-ca" ? "Gộp số cả 3 xưởng." : `Chỉ xem số xưởng ${x.label}.`}>
-                  {x.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </div>
-        {period === "custom" && (
-          <div className="max-w-md">
-            <DateRangeField
-              label="Khoảng ngày"
-              hideRequiredMark
-              presets={false}
-              startDate={customFrom}
-              endDate={customTo}
-              onChange={(a2, b2) => {
-                setCustomFrom(a2);
-                setCustomTo(b2);
-              }}
-            />
-          </div>
-        )}
-      </div>
+      {/* Thanh lọc chung (rà UX 2026-11-03): kỳ = `PeriodPicker` như mọi sổ, xưởng = ô thả như mọi trang. */}
+      <FilterBar data-tour="dashboard-filters">
+        <PeriodPicker
+          period={period}
+          onPeriodChange={setPeriod}
+          anchor={anchor}
+          onAnchorChange={setAnchor}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomChange={(a, b) => {
+            setCustomFrom(a);
+            setCustomTo(b);
+          }}
+        />
+        <Combobox
+          label="Phân xưởng"
+          hideRequiredMark
+          clearable={false}
+          value={workshop || ALL_WORKSHOPS}
+          onChange={(v) => setWorkshop(v === ALL_WORKSHOPS ? "" : (v as Workshop))}
+          options={WORKSHOP_CHOICES}
+          className="min-w-[10rem]"
+        />
+      </FilterBar>
 
       <div data-tour="dashboard-kpis">
         <StatCardGrid cards={cards} />

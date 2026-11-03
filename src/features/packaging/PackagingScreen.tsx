@@ -40,7 +40,6 @@ import {
   RequiredLegend,
   Combobox,
   DateField,
-  DateRangeField,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -64,13 +63,14 @@ import {
   type RecordTableColumn,
   type FieldError,
   type ComboboxOption,
+  PeriodPicker,
 } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildPackagingTour } from "./packagingTour";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
-import { PERIOD_OPTIONS, getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
+import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { ALL, activeFilterCount, filterRows, matchesSearch, matchesValue } from "@/lib/recordFilters";
 import { Boxes, Link2, Package, PackageCheck, Plus, QrCode, Scale } from "lucide-react";
 
@@ -427,32 +427,18 @@ export default function PackagingScreen() {
         onClearAll={clearFilters}
         resultText={`Đang hiện ${view.length.toLocaleString("vi-VN")} / ${periodView.length.toLocaleString("vi-VN")} phiếu của kỳ`}
       >
-        <Combobox
-          label="Kỳ xem"
-          hideRequiredMark
-          clearable={false}
-          value={period}
-          onChange={(v) => setPeriod(v as ViewPeriod)}
-          options={PERIOD_OPTIONS}
-          className="min-w-[13rem]"
+        <PeriodPicker
+          period={period}
+          onPeriodChange={setPeriod}
+          anchor={date}
+          onAnchorChange={setDate}
+          customFrom={fromDate}
+          customTo={toDate}
+          onCustomChange={(fromDate, toDate) => {
+            setFromDate(fromDate);
+            setToDate(toDate);
+          }}
         />
-        <div className="min-w-[220px] flex-1">
-          {period === "custom" ? (
-            <DateRangeField
-              label="Khoảng ngày"
-              hideRequiredMark
-              presets={false}
-              startDate={fromDate}
-              endDate={toDate}
-              onChange={(fromDate, toDate) => {
-                setFromDate(fromDate);
-                setToDate(toDate);
-              }}
-            />
-          ) : (
-            <DateField label="Ngày" hideRequiredMark value={date} onChange={setDate} />
-          )}
-        </div>
         <Combobox
           label="Phân xưởng"
           clearable={false}

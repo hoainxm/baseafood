@@ -2,7 +2,8 @@
 
 > Load khi: task chạm hành vi / nghiệp vụ / flow / acceptance của tồn kho NGUYÊN LIỆU theo thời gian thực (sổ sự kiện kho, lô NL, lấy NL ra sàn sản xuất, tiêu hao, cấp đông dự trữ, xả đông, tồn theo ngày, đối chiếu XNT), hoặc khi định thay/nối các sổ tồn đang có (`/nxt-material`, `/nxt-warehouse`, `/monthly-stock`).
 covers: src/lib/inventoryMaterial.ts, src/lib/lotTraceability.ts, src/features/reports/MaterialNxtScreen.tsx, src/features/reports/WarehouseNxtScreen.tsx, src/features/production/WipProductionScreen.tsx
-last_verified: 2026-10-12
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — rà UX đợt 1: kỳ xem ở Tồn kho nguyên liệu và Sản xuất = `PeriodPicker` (nhãn "Kỳ xem", nút ‹ ›); cách tính tồn không đổi. -->
 <!-- updated: 2026-10-12 — `computeMaterialTotalStock` (/nxt-material): tồn đầu khai tay có mốc GIỮA khoảng xem nay vẫn áp (trước: xem "Năm"/01-06…31-07 với baseline 01/07 mất khai tay); quy tắc mốc chung với sổ BTP — xem 31 §Tồn kho NL. `lotTraceability`: `buildLotStockIndex` (tồn W/P dựng một lần), `lui` theo UTC. Không đổi AC sổ liên tục. -->
 <!-- updated: 2026-10-08 (c) — ĐỊNH NGHĨA LÔ NL ĐỔI ở lotTraceability.ts (chủ dự án chốt, ../spec/qr-truy-xuat-lo.md §6e): `S:<id DÒNG nhập>` = một loại NL của chuyến (trước: `S:<id chuyến>`). Khớp ý "sự kiện theo dòng loại NL" của doc này ở mục Lô; khi build sổ tồn liên tục, khóa lô tươi `S:` dùng id dòng nhập. `S:<id chuyến>` cũ vẫn đọc được (nút cả chuyến). Không đổi AC sổ tồn NL. -->
 <!-- re-verified: 2026-10-08 11:10 — lotTraceability.ts thêm `groupByTraceStage` (tab /qr "Theo giai đoạn", thay `doPhuTruyXuat`): chỉ ĐỌC lô S/W/P + lot_inputs / lot_dispatches / lot_waivers / label_prints để xếp theo khâu; không đổi `computeLotMassBalance` / `listSelectableMaterialLots` / định nghĩa lô — hành vi và AC sổ tồn NL của doc này giữ nguyên. -->

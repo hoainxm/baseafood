@@ -1,6 +1,7 @@
 > Load khi: thiết kế/build 3 màn module WIP — Sản xuất BTP, Kho dự trữ, Đơn đặt.
 covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/features/orders/ExportLotCheck.tsx, src/features/production/wipHelpers.ts, src/features/production/ProductionLinesTable.tsx, src/features/production/FrozenStockSection.tsx, src/features/production/BatterSection.tsx, src/features/production/DomesticSaleSection.tsx
-last_verified: 2026-10-31
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — rà UX đợt 1–3: Sản xuất thành phẩm — tab Ghi nhập / Sổ ngày & báo cáo dùng `Tabs` chung (trái, bỏ emoji), kỳ xem = `PeriodPicker`. Kho dự trữ — khối duyệt → `FilterBar` (Kho + ô tra) → thẻ Số lô · Tổng tồn → bảng; điện thoại 20 thẻ / đợt + "Xem thêm". -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): Sổ SX TP thêm Nhập kho (thẻ Chờ nhập kho bấm được) · Khách · ô Tra; Đóng gói thêm Kho TP · ô Tra; Đơn đặt thêm Trạng thái · Khách · ô Tra. Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->
 <!-- re-verified: 2026-10-27 10:00 — /wip ghi bằng form inline (không dialog Ghi sản lượng), lưu là status "pending" = "Chờ nhập kho" ngay (WipProductionScreen.tsx), nav "Sản xuất thành phẩm" (AppShell) -->
 <!-- updated: 2026-10-15 (d) — bảng thành phẩm BỎ chặn `max-w-[64rem]`: màn rộng (~1900px) bảng chỉ chiếm ~60% bề ngang, người dùng thấy như bị cắt đôi ⇒ `w-full` (cột tên ăn phần còn lại), thẳng mép với khối lô / bán nội địa. Câu hướng dẫn nằm NGAY DƯỚI tiêu đề (trước dạt sang mép phải). -->

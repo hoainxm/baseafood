@@ -2,7 +2,8 @@
 
 > Load khi: sửa luật đính kèm hồ sơ cấp HĐ của Xuất khẩu (hợp đồng đã ký, L/C), cổng ghi chuyến (`shipmentGate`), trạng thái "Chờ đính kèm", bước 1 "Hợp đồng" của chuyến, điều kiện duyệt cuối.
 covers: src/lib/exportPlanning.ts, src/features/export-planning/ContractDossier.tsx, src/features/export-planning/ExportPlanningScreen.tsx, src/features/export-planning/progress.ts
-last_verified: 2026-11-02
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — soát: `ExportPlanningScreen.tsx` đổi ở lưu số thực đóng (thêm dòng từ HĐ) — luật "Bổ sung sau" không đổi. -->
 ttl_days: 90
 status: v1 ĐÃ BUILD 2026-11-02 — mig `0093` (CHƯA chạy DB thật; app tự ẩn nút khi máy chủ chưa có cột — `useExportDeferralsAvailable`), luật ở `lib/exportPlanning.ts` (`attachmentStatus`, `blockingAttachmentKinds`, `deferredAttachmentKinds`, `withDeferral`, `validateDeferral`, `finalReviewGate.missingAttachments`), việc cần đốc kind `deferred-attachment` (`exportReports.ts`, Tổng quan qua `dashboardAttention.ts`). Test AC-1…AC-8, AC-10. AC-9 (nhật ký) + giao diện CHƯA thử tay: sandbox không bắt file (AC-59 của 41), DB thật chưa có cột. Sửa đổi [41](41-export-planning.ba-spec.md): bảng chặng HĐ dòng "Đính kèm", R30, AC-56 và luật `shipmentGate`. Cần migration chỉ-thêm-cột (🟡).
 

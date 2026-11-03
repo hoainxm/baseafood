@@ -2,7 +2,8 @@
 
 > Load khi: người dùng muốn được gọi bằng tên khác họ tên (biệt danh, tên tiếng Anh…); thêm chỗ nào hiện tên người; thêm cột "người ghi / người lập / người ký"; đụng `scopeContextFor` / phạm vi `own`; làm chữ ký về sau.
 covers: src/lib/personName.ts, src/types.ts, src/lib/auth.ts, src/lib/repo.ts, src/lib/permissions.ts, src/App.tsx, src/features/shared/AccountMenu.tsx, src/features/users/**, src/features/my-tasks/**, src/features/admin/**, supabase/migrations/0086_user_display_name.sql
-last_verified: 2026-10-29
+last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — rà UX đợt 1: Việc của tôi bỏ đoạn giới thiệu đầu trang "Việc cần làm của <tên gọi>" ⇒ tên gọi không còn hiện ở đó (vẫn dùng ở menu tài khoản, Xem như, giao việc). -->
 ttl_days: 180
 
 > **Mục đích**: oracle HÀNH VI cho "tên gọi" — ai đặt, hiện ở đâu, và **chỗ nào TUYỆT ĐỐI dùng họ tên thật**. KHÔNG mô tả giao diện (design-spec làm sau nếu cần).

@@ -3,6 +3,7 @@
 > Load khi: nạp logo / thông tin pháp nhân / chứng nhận vào Tài liệu công ty, hoặc đổi chỗ chứng từ (Invoice, Packing list, Sale contract) lấy tên, địa chỉ, MST, ngân hàng của công ty.
 covers: docs/ho-so-nang-luc/company-profile.md, docs/brand/README.md, src/lib/exportInvoice.ts
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 — soát: `exportInvoice.ts` thêm `loadingCountRows` / `applyLoadingCounts`, `loadingCountSummary` thêm `unplannedCount` — phần thông tin công ty trên invoice không đổi. -->
 ttl_days: 90
 status: v1 ĐẶC TẢ 2026-11-03 — kiểm kê xong (`ho-so-nang-luc/company-profile.md`); NV1 chờ chủ dự án đồng ý nạp lên hệ thống thật; NV3 hoãn (§7).
 

@@ -28,6 +28,7 @@ import {
   IMPORTS_ACTIVITY_TABLE,
   PRODUCTION_ACTIVITY_TABLE,
   serverHasColumn,
+  serverHasValue,
   SUPPLIER_INVOICE_TABLE,
   SUPPLIER_INVOICE_LINE_TABLE,
   ACCOUNTING_CODE_MAP_TABLE,
@@ -397,6 +398,18 @@ export function useExportBookingFilesAvailable(): boolean {
   useEffect(() => {
     let alive = true;
     void serverHasColumn("export_file_steps", "step").then((v) => alive && setOk(v));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return ok;
+}
+/** Mig 0097 đã chạy ⇒ đính được ảnh kèm số lượng thực đóng + ảnh bao bì / cân gross (view có loại mới). */
+export function useExportLoadingExtraPhotosAvailable(): boolean {
+  const [ok, setOk] = useState<boolean>(!isServerConnected);
+  useEffect(() => {
+    let alive = true;
+    void serverHasValue("export_file_steps", "step", "package-weight-photos").then((v) => alive && setOk(v));
     return () => {
       alive = false;
     };

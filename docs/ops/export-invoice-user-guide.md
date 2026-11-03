@@ -66,7 +66,7 @@ Người đóng hàng không thấy đơn giá, tiền. Họ chỉ sửa đượ
    - **Dòng dưới tiêu đề bảng:** mặc định "Produced in Vietnam". Packing list in "Manufactured in Vietnam".
    - **Thông tin riêng khách yêu cầu:** xem mục 4.
 4. Khung tổng ghi: số kiện, kg tịnh, tiền của invoice. Có dòng thiếu số kiện, kg/thùng hoặc đơn giá thì app báo. Dòng đó in trống tiền và không cộng vào tổng.
-5. Chọn **Tải file Invoice (PDF)** để có bản in sẵn giống file PDF đang gửi khách: mỗi chứng từ một trang A4, có logo, chừa chỗ đóng dấu và ký bên phải khối ngân hàng. Cần sửa tiếp thì chọn **Tải file Excel**. Hai bản cùng số. File tên `INVOICE 275.26.pdf` / `.xlsx`, gồm:
+5. Chọn **Tải file Invoice (PDF)** để có bản in sẵn giống file PDF đang gửi khách: mỗi chứng từ một trang A4, có logo, chừa chỗ đóng dấu và ký bên phải khối ngân hàng. Cần sửa tiếp thì chọn **Tải file Word** (cùng bố cục, giữ chữ có dấu) hoặc **Tải file Excel**. Ba bản cùng số. File tên `INVOICE 275.26.pdf` / `.xlsx`, gồm:
    - **INVOICE:** bảng hàng gom theo tên hàng, từng size, dòng Packing, TOTAL, "Says" bằng chữ, khối ngân hàng.
    - **PACKING LIST:** N.W / G.W, số kiện, NET, GROSS.
    - **EXPIRY DATE:** chỉ có khi có dòng ghi hạn dùng.
@@ -76,7 +76,11 @@ Ba ô **Tổng thùng · Tổng kg tịnh · Tổng tiền** là số thực xu�
 - Ô đang trống thì tự điền theo invoice lập khi tải file.
 - Ô đã có số khác thì app báo lệch. Chọn **Dùng số của invoice lập** nếu muốn lấy số mới.
 
-Tải lại nhanh không cần mở hộp: bước 5 → nút **Tải PDF** hoặc **Tải Excel** (dùng phần lập đã lưu).
+Tải lại nhanh không cần mở hộp: bước 5 → nút **Tải PDF**, **Tải Word** hoặc **Tải Excel** (dùng phần lập đã lưu).
+
+**Số container** phải đúng 11 ký tự: 4 chữ cái + 7 chữ số (VD `SZLU2030326`). Gõ có khoảng trắng / gạch / chữ thường thì app tự chuẩn hóa; sai số ký tự thì không lưu được. Xe tải ghi biển số như cũ.
+
+**Bước Đóng cont** xếp theo trình tự làm thật: file booking → lệnh xuất → số cont + seal → số lượng thực đóng (đính kèm ảnh tờ đếm) → hình ảnh bao bì + cân gross → sơ đồ container → hình ảnh đóng cont → tờ khai. Kho đính hai loại ảnh mới ngay ở màn đóng hàng (nút "Ảnh số lượng thực đóng", "Ảnh bao bì + cân gross"); hai loại này không bắt buộc để bước Đóng cont xong.
 
 Bản PDF dùng font Times như mẫu, chữ tiếng Việt có dấu (nếu lỡ gõ vào ghi chú) in thành không dấu. Chuyến quá nhiều dòng thì app tự thu nhỏ chữ cho vừa một trang; vẫn không vừa thì sang trang 2.
 

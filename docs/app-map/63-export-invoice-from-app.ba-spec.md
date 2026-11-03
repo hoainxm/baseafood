@@ -1,7 +1,7 @@
 # 63 — ba-spec: Hàng của chuyến xuất · số thực đóng của kho · lập Invoice / Packing list từ app
 
 > Load khi: sửa khối Hàng của chuyến, hàng Số lượng thực đóng (bước 4), phần Lập invoice từ app ở mục Commercial Invoice, file Excel Invoice · Packing list · Expiry date list, danh sách Tài khoản ngân hàng.
-covers: src/lib/exportInvoice.ts, src/lib/exportInvoiceExcel.ts, src/lib/exportInvoicePdf.ts, src/features/export-planning/ShipmentGoods.tsx, src/features/export-planning/shipmentGoodsLogic.ts, src/features/export-planning/InvoiceComposePanel.tsx, src/features/export-planning/invoiceDocument.ts, supabase/migrations/0096_export_shipment_lines.sql
+covers: src/lib/exportInvoice.ts, src/lib/exportInvoiceExcel.ts, src/lib/exportInvoicePdf.ts, src/lib/exportInvoiceDocx.ts, src/features/export-planning/ShipmentGoods.tsx, src/features/export-planning/shipmentGoodsLogic.ts, src/features/export-planning/InvoiceComposePanel.tsx, src/features/export-planning/invoiceDocument.ts, supabase/migrations/0096_export_shipment_lines.sql
 last_verified: 2026-11-03
 ttl_days: 90
 status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`, cột `export_step_items.invoice_composition`, danh sách `bank-account` + 3 tài khoản; ✅ **đã chạy DB thật** (kiểm chỉ-đọc 2026-11-03); kiểm PGlite chuỗi 0001→0096 + chạy lại 2 lần + RLS theo vai đạt — AC-8 phần máy chủ đã thử trên PGlite). Hàm thuần + test `exportInvoice.test.ts` (AC-1…AC-7, vòng tròn dựng ⇄ `parseInvoiceRows`, đọc lại .xlsx bằng exceljs). Thử sandbox 2026-11-02: nhập 2 dòng → điền thực đóng 197 + 150 → lập invoice → file đọc lại ra 347 thùng · 3.470 kg · 36.060 USD; 360px × 130% không tràn. Bổ sung [41](41-export-planning.ba-spec.md) NV7–NV9 + bước 5.
@@ -85,6 +85,7 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 | R6 | Máy chủ chưa chạy 0096 ⇒ ẩn khối Hàng của chuyến / Số thực đóng / Lập invoice; danh sách chọn không đưa tài khoản ngân hàng vào bảng (khỏi kẹt hàng chờ) |
 | R7 | Đơn giá sửa ở invoice chỉ lưu trong mục CI; không đổi đơn giá HĐ |
 | R9 | **PDF** (`exportInvoicePdf.ts`, `pdf-lib`): vẽ từ CÙNG bảng của file Excel ⇒ hai bản cùng số. Bố cục đo từ PDF mẫu 275/26: logo (`public/invoice-logo.jpg` — 480 px, thu từ logo gốc rõ nét `docs/brand/baseafood-logo-original.jpg`) + tên công ty, kẻ ngang, "Ba Ria, <ngày>" nghiêng canh phải, tiêu đề 22pt + số đóng khung, bảng kẻ lưới (ô cuối dòng tiêu đề phủ các cột con: "IN US. DOLLARS", "TOTAL WEIGHT"; "Trade Terms: CFR" / cảng phủ 2 cột tiền; dòng đơn vị gạch chân; TOTAL đóng khung), "Says" đậm nghiêng, chữ ký công ty bên phải, khối ngân hàng 9pt đóng khung góc trái (chừa chỗ dấu + chữ ký tay). Mỗi chứng từ cố vừa MỘT trang: tràn thì vẽ lại ở 90 % · 82 % · 75 %; vẫn tràn ⇒ sang trang, không mất dòng. Font chuẩn PDF không có chữ Việt ⇒ bỏ dấu khi in. Dấu + chữ ký giám đốc KHÔNG in (ký tay / đóng dấu trên bản in) |
+| R10 | **Word** (`exportInvoiceDocx.ts`, dựng WordprocessingML bằng `pizzip`, không khuôn): cùng bảng + cùng bố cục bản PDF (R9); mỗi chứng từ một trang (ngắt trang là đoạn riêng — đặt trong ô bảng Word bỏ qua); GIỮ dấu tiếng Việt (khác PDF). Để phòng KH sửa chữ / thêm dòng khách yêu cầu rồi in (chủ dự án 2026-11-03) |
 | R8 | Địa chỉ bên mua: có xuống dòng ⇒ theo đó; một dòng dài (ô Địa chỉ của danh mục khách là ô một dòng) ⇒ ngắt theo từ, ≤ 40 ký tự / dòng (`addressLines`) — cột C đã có chữ nên dòng dài bị che. Hướng dẫn người dùng: [ops/export-invoice-user-guide](../ops/export-invoice-user-guide.md) |
 
 ## 10. Acceptance Criteria
@@ -123,6 +124,10 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 - **Given** chuyến 275/26 **When** tải PDF **Then** mỗi chứng từ một trang, đủ chữ và số của mẫu; 15 size vẫn vừa một trang / chứng từ; 60 size thì sang trang mà không mất dòng.
 - **Assert:** số trang `== 2` (275/26), `== 3` (15 size + hạn dùng); trang 1 chứa "42,442.00", "6,570.00", "Please make TT to:"; 60 size ⇒ có "ITEM 59" và "3,000.00". Thủ công 2026-11-03: vẽ PDF ra ảnh so cạnh PDF mẫu; nút trong app ra file `%PDF` ~14 KB có logo.
 
+### AC-10 — Bản Word · Maps to: NV3, R10 · Test: unit + manual
+- **Given** chuyến 275/26 có hạn dùng **When** tải Word **Then** file .docx mở được, đủ chữ + số, giữ dấu, mỗi chứng từ một trang, có logo.
+- **Assert:** zip có `word/document.xml` + `word/media/logo.jpg`; chữ chứa "42,442.00", "7,238.00", "Việt Nam"; số lần ngắt trang `== 2` (3 chứng từ). Thủ công 2026-11-03: `docx-preview` vẽ 3 trang, bảng rộng 698 px (đúng vùng in A4 lề 0,5"); nút trong app ra file 37 KB.
+
 ## 11. Assumptions / Open
 
 - A1. Bên mua in theo danh mục khách (tên + địa chỉ, mỗi dòng địa chỉ một dòng in) — khách chưa ghi địa chỉ thì in trống.
@@ -135,3 +140,4 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 - 2026-11-02 — v1 tạo + build (Zalo chị Vi).
 - 2026-11-03 — 0095 + 0096 đã chạy DB thật (kiểm chỉ-đọc); R8 ngắt địa chỉ; viết hướng dẫn thao tác.
 - 2026-11-03 — R9 + AC-9: tải bản PDF theo mẫu 275/26 (chủ dự án).
+- 2026-11-03 — R10 + AC-10: tải bản Word (chủ dự án).

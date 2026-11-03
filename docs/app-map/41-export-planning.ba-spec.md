@@ -35,6 +35,25 @@ status: ba-spec v9.1 (2026-10-29: danh mục Loại chứng từ — §0b) · v9
 > **Nguồn đã chốt:** kế hoạch [`spec/xuat-khau-phong-ke-hoach.md`](../spec/xuat-khau-phong-ke-hoach.md) (§9 chốt 11 câu 2026-10-20) · quy trình [`QTI-KH-01`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (luật KH-R1…R16) · phân quyền [`spec/role-permissions.md`](../spec/role-permissions.md) · tài liệu công ty [`40-documents.md`](40-documents.md) (khuôn file + RLS).
 
 
+## 0g. v9.7 (2026-11-03, ĐÃ BUILD) — số container chuẩn, trình tự bước Đóng cont
+
+- **Nguồn:** chị Vi (ảnh chú thích 2026-11-03): "Định dạng số container gồm 11 ký tự: 4 chữ cái đầu + 7 chữ số sau"; "Sắp xếp lại thứ tự đóng cont: Booking · Lệnh xuất hàng · Số container / số seal · Số lượng thực đóng (cho đính kèm hình ảnh) · Hình ảnh bao bì + cân gross · Sơ đồ container · Hình ảnh đóng container · Tờ khai hải quan".
+- **R45 — số container** (ISO 6346): cont lạnh (20RF · 40RF · 40HC-RF) có ghi số ⇒ sau khi bỏ khoảng trắng / gạch / chấm và viết hoa phải đúng `4 chữ cái + 7 chữ số`; sai ⇒ chặn lưu chuyến, báo "11 ký tự: 4 chữ cái đầu + 7 chữ số". Xe tải (biển số), đóng ghép, ô trống không kiểm. Lưu ở dạng đã chuẩn hóa.
+- **R46 — trình tự bước 4** = file booking → lệnh xuất (4d) → số cont + seal → số lượng thực đóng (ba-spec 63) → sơ đồ (4a) → hình ảnh (4b) → tờ khai (4c). Dòng "Còn thiếu" của bước 4 cùng trình tự. Chỉ đổi thứ tự hiển thị — điều kiện xong của từng mục (NV8) giữ nguyên.
+- **R47 — ảnh thêm của bước 4** (mig 0097, chủ dự án đồng ý đổi RLS 2026-11-03): "Số lượng thực đóng" đính được ảnh (tờ đếm, lớp hàng) · hàng MỚI "Hình ảnh bao bì + cân gross" (có ảnh ⇒ Xong). Cả hai là file của chuyến (không mục bước), người đóng hàng đính được ở màn của mình, **không** chặn bước 4 / đủ hồ sơ; người đóng hàng vẫn không xem file booking, không xóa file. Máy chủ chưa chạy 0097 ⇒ ẩn nút.
+
+### AC-85 — Người đóng hàng đính 2 loại ảnh mới, không hơn · Maps to: 0g, R47 · Test: unit + manual (PGlite / DB thật sau khi chạy 0097)
+- **Given** tài khoản thủ kho **When** đính ảnh bao bì + cân gross và ảnh số lượng thực đóng **Then** lưu được; đính file booking hoặc xóa file ⇒ bị chặn; bước 4 không tự xong vì các ảnh này.
+- **Assert:** PGlite: insert 2 loại mới `OK 1` mỗi loại; insert booking ⇒ lỗi RLS; delete ⇒ 0 dòng; `stepState(…, 4) == "not-started"` khi chỉ có ảnh thêm; đọc lại `fromRow` giữ đúng 2 loại.
+
+### AC-83 — Số container 4 chữ + 7 số · Maps to: 0g, R45 · Test: unit
+- **Given** chuyến 20RF số cont "SZLU203032" (10 ký tự) **When** lưu **Then** chặn với lỗi số container; "szlu 2030326" lưu thành "SZLU2030326"; xe tải "72C-123.45" không kiểm.
+- **Assert:** `validateShipment(...).map(key) == ["containerNo"]`; `normalizeContainerNo(" szlu 203032-6 ") == "SZLU2030326"`; 5 mẫu sai `isValidContainerNo == false`.
+
+### AC-84 — Trình tự bước Đóng cont · Maps to: 0g, R46 · Test: unit + manual
+- **Given** chuyến chưa làm bước 4 **When** xem bước 4 **Then** các mục theo R46; "Còn thiếu" liệt kê lệnh xuất → số cont + seal → sơ đồ → hình ảnh → tờ khai.
+- **Assert:** `LOADING_STEPS == ["export-order", "loading-plan", "loading-photos", "customs-declaration"]`; test tour / tiến độ của khu Xuất khẩu xanh (108 test).
+
 ## 0f. v9.6 (2026-11-03, ĐÃ BUILD) — đổi khách của HĐ tới khi đóng cont
 
 - **Nguồn:** chủ dự án 2026-11-03: "Đổi tên KH sau khi tạo xong HĐ và kế hoạch xuất hàng: cần cho phép đổi…", bổ sung "xong bước thứ 4 là đóng cont thì không cho đổi nữa". Trước đây ô khách khóa ngay khi HĐ có bản duyệt (ghi bản sửa) ⇒ lập nhầm khách thì phải xóa HĐ làm lại, mất lịch xuất hàng.

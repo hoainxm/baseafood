@@ -37,8 +37,21 @@ export function invoiceDocumentFor(data: ExportData, shipment: ExportShipment, c
 }
 
 /** Tải bộ chứng từ (exceljs nạp động — không kéo vào bundle chính). Lỗi ⇒ báo (luật 13: lỗi luôn báo). */
-export async function downloadInvoiceDocument(doc: ReturnType<typeof buildInvoiceDocument>, format: "xlsx" | "pdf" = "xlsx"): Promise<void> {
+export type InvoiceFileFormat = "xlsx" | "pdf" | "docx";
+
+export async function downloadInvoiceDocument(doc: ReturnType<typeof buildInvoiceDocument>, format: InvoiceFileFormat = "xlsx"): Promise<void> {
   try {
+    if (format === "docx") {
+      const { invoiceDocxBytes, invoiceDocxFileName } = await import("@/lib/exportInvoiceDocx");
+      const logo = await fetch(`${import.meta.env.BASE_URL}invoice-logo.jpg`)
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .catch(() => null);
+      saveBlob(
+        new Blob([invoiceDocxBytes(doc, logo) as BlobPart], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
+        invoiceDocxFileName(doc),
+      );
+      return;
+    }
     if (format === "pdf") {
       const { invoicePdfBytes, invoicePdfFileName } = await import("@/lib/exportInvoicePdf");
       // Logo cho PDF (public/invoice-logo.jpg, từ logo gốc docs/brand) — không tải được thì in chữ, vẫn ra PDF.
@@ -51,7 +64,7 @@ export async function downloadInvoiceDocument(doc: ReturnType<typeof buildInvoic
     const { downloadInvoiceWorkbook } = await import("@/lib/exportInvoiceExcel");
     await downloadInvoiceWorkbook(doc);
   } catch (e) {
-    const what = format === "pdf" ? "PDF" : "Excel";
+    const what = format === "pdf" ? "PDF" : format === "docx" ? "Word" : "Excel";
     notify.error(e instanceof Error ? `Không tạo được file ${what}: ${e.message}` : `Không tạo được file ${what}`);
   }
 }

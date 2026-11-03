@@ -1492,6 +1492,12 @@ export interface ExportStepItem {
   createdAt: string;
 }
 
+/**
+ * Ảnh thêm của bước Đóng cont (mig 0097, ba-spec 41 §0g) — file của chuyến, không có mục bước, KHÔNG làm
+ * bước 4 tự xong: ảnh kèm số lượng thực đóng · ảnh bao bì + cân gross. Người đóng hàng đính được.
+ */
+export type ExportLoadingExtraStep = "loading-count-photos" | "package-weight-photos";
+
 /** Loại hồ sơ đính kèm cấp HĐ (bước Đính kèm, mig 0079). */
 export type ExportContractAttachmentKind = "signed-contract" | "lc" | "proforma" | "other";
 
@@ -1505,7 +1511,7 @@ export interface ExportFile {
   shipmentId: string;
   stepItemId: string;
   /** "contract" = hồ sơ cấp HĐ (0079); "booking" = file booking của chuyến (0094, ba-spec 60) — không gắn mục bước. */
-  step: ExportStep | "contract" | "booking";
+  step: ExportStep | "contract" | "booking" | ExportLoadingExtraStep;
   attachmentKind?: ExportContractAttachmentKind | "";
   path: string;
   fileName: string;

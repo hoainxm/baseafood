@@ -166,7 +166,8 @@ export const SUB_STEP_LABELS: Record<ExportStep, string> = {
   document: "Chứng từ",
 };
 /** Mục con của bước 4 (đóng cont), theo thứ tự 4a → 4d. */
-export const LOADING_STEPS: ExportStep[] = ["loading-plan", "loading-photos", "customs-declaration", "export-order"];
+/** Mục của bước 4 theo trình tự đóng cont thật (chị Vi 2026-11-03): lệnh xuất → sơ đồ → hình ảnh → tờ khai. */
+export const LOADING_STEPS: ExportStep[] = ["export-order", "loading-plan", "loading-photos", "customs-declaration"];
 /** Hai mục người đóng hàng (U4) đính được — trạng thái tự suy từ file (R10). */
 export const LOADING_UPLOAD_STEPS: ExportStep[] = ["loading-plan", "loading-photos"];
 
@@ -477,8 +478,20 @@ export function shipmentMonth(s: Pick<ExportShipment, "loadingDate" | "etd" | "p
   return (s.loadingDate || s.etd || "").slice(0, 7) || s.planMonth;
 }
 
-export function validateShipment(s: Pick<ExportShipment, "planMonth" | "loadingDate" | "etd" | "eta" | "plannedKg">): ValidationIssue[] {
+/**
+ * Số container chuẩn ISO 6346 (chị Vi 2026-11-03): 11 ký tự = 4 chữ cái (mã chủ + loại) + 7 chữ số (6 số
+ * seri + 1 số kiểm), VD SZLU2030326. Gõ có khoảng trắng / gạch / chữ thường ⇒ chuẩn hóa trước khi kiểm.
+ */
+export const normalizeContainerNo = (v: string) => v.replace(/[\s\-./]/g, "").toUpperCase();
+export const isValidContainerNo = (v: string) => /^[A-Z]{4}\d{7}$/.test(normalizeContainerNo(v));
+
+export function validateShipment(
+  s: Pick<ExportShipment, "planMonth" | "loadingDate" | "etd" | "eta" | "plannedKg"> & Partial<Pick<ExportShipment, "kind" | "containerNo">>,
+): ValidationIssue[] {
   const out: ValidationIssue[] = [];
+  // Xe tải ghi biển số, đóng ghép không có cont riêng ⇒ chỉ kiểm cont lạnh (20RF · 40RF · 40HC-RF).
+  if (s.kind && isContainerKind(s.kind) && s.containerNo?.trim() && !isValidContainerNo(s.containerNo))
+    out.push({ key: "containerNo", label: "Số container", message: "Số container gồm 11 ký tự: 4 chữ cái đầu + 7 chữ số (VD SZLU2030326)" });
   if (!s.planMonth && !s.loadingDate && !s.etd)
     out.push({ key: "planMonth", label: "Tháng kế hoạch", message: "Chọn tháng kế hoạch (hoặc ngày đóng / ETD)" });
   if (s.loadingDate && s.etd && s.loadingDate > s.etd)
@@ -569,6 +582,13 @@ export function filesOfItem(d: Pick<ExportData, "files">, itemId: string): Expor
  * File booking của MỘT chuyến (ba-spec 60 R1, R2): mới nhất trước. Chuyến "dùng chung" KHÔNG mượn file của chuyến
  * nguồn (R5). Không gắn mục bước ⇒ không làm bước nào tự xong (R3).
  */
+/** File chỉ-của-chuyến (không mục bước) theo loại: booking (0094), ảnh thực đóng / bao bì + cân gross (0097). Mới nhất đầu. */
+export function shipmentFilesOf(d: Pick<ExportData, "files">, shipmentId: string, step: ExportFile["step"]): ExportFile[] {
+  return d.files
+    .filter((f) => f.shipmentId === shipmentId && f.step === step)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.fileName.localeCompare(b.fileName, "vi"));
+}
+
 export function bookingFilesOf(d: Pick<ExportData, "files">, shipmentId: string): ExportFile[] {
   return d.files
     .filter((f) => f.shipmentId === shipmentId && f.step === "booking")

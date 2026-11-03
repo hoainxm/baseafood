@@ -25,7 +25,7 @@ import { termsOf, workingRevision, type ExportData } from "@/lib/exportPlanning"
 import type { Customer, ExportContract, ExportShipment, ExportStepItem, InvoiceComposition } from "@/types";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { useExportOptionPicker } from "./exportOptionPicker";
-import { downloadInvoiceDocument, invoiceDocumentFor } from "./invoiceDocument";
+import { downloadInvoiceDocument, invoiceDocumentFor, type InvoiceFileFormat } from "./invoiceDocument";
 
 export function InvoiceComposePanel({
   data,
@@ -69,7 +69,7 @@ export function InvoiceComposePanel({
     );
   }
 
-  const download = async (format: "xlsx" | "pdf") => {
+  const download = async (format: InvoiceFileFormat) => {
     setBusy(true);
     // Ô tổng đang trống ⇒ điền theo invoice vừa lập (như Đọc invoice — không ghi đè số đã có).
     const patch: Partial<ExportStepItem> = {};
@@ -167,6 +167,10 @@ export function InvoiceComposePanel({
         <Button className="h-auto min-h-9 max-w-full whitespace-normal" onClick={() => void download("pdf")} disabled={busy} title={`Tải bản PDF in sẵn theo mẫu INVOICE 275/26: mỗi chứng từ một trang A4 (Invoice, Packing list${doc.sheets.length > 2 ? ", Expiry date list" : ""}).`}>
           <FileText className="mr-2 h-4 w-4" aria-hidden />
           {busy ? "Đang tạo file…" : "Tải file Invoice (PDF)"}
+        </Button>
+        <Button variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal" onClick={() => void download("docx")} disabled={busy} title={`Tải file Word (.docx) cùng bố cục bản PDF để sửa tiếp chữ, thêm dòng khách yêu cầu: Invoice, Packing list${doc.sheets.length > 2 ? ", Expiry date list" : ""}.`}>
+          <FileText className="mr-2 h-4 w-4" aria-hidden />
+          Tải file Word
         </Button>
         <Button variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal" onClick={() => void download("xlsx")} disabled={busy} title={`Tải file ${doc.fileName} để sửa tiếp trong Excel: Invoice, Packing list${doc.sheets.length > 2 ? ", Expiry date list" : ""}.`}>
           <Download className="mr-2 h-4 w-4" aria-hidden />

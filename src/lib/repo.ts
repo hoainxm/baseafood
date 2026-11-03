@@ -2165,7 +2165,7 @@ const PAYMENT_METHOD_VALUES = new Set(["ttr", "lc", "other"]);
 const SHIPMENT_KIND_VALUES = new Set(["20RF", "40RF", "40HC-RF", "truck", "consolidated"]);
 const STEP_VALUES = new Set(["production-order", "packaging", "loading-plan", "loading-photos", "customs-declaration", "export-order", "document"]);
 /** Bước chỉ có ở `export_files` (không có mục bước): hồ sơ cấp HĐ (0079) · file booking của chuyến (0094). */
-const FILE_ONLY_STEPS: ReadonlySet<string> = new Set(["contract", "booking"]);
+const FILE_ONLY_STEPS: ReadonlySet<string> = new Set(["contract", "booking", "loading-count-photos", "package-weight-photos"]);
 const ITEM_STATE_VALUES = new Set(["not-started", "in-progress", "done", "not-applicable"]);
 const DECISION_VALUES = new Set(["approved", "needs-revision", "rejected"]);
 const ATTACHMENT_KIND_VALUES = new Set(["signed-contract", "lc", "proforma", "other"]);
@@ -2653,6 +2653,24 @@ function activityTable(table: string, localKey: string): TableMapping<ActivityLo
 export const IMPORTS_ACTIVITY_TABLE = activityTable("imports_activity_log", "bsf.imports-activity-log.v1");
 /** Nhóm Sản xuất (sản xuất thành phẩm, đóng gói). */
 export const PRODUCTION_ACTIVITY_TABLE = activityTable("production_activity_log", "bsf.production-activity-log.v1");
+
+/** Máy chủ có dòng `column = value` trong `table` chưa (dò một lần mỗi phiên) — VD view `export_file_steps`
+ *  đã có loại file mới (mig 0097). Chạy không máy chủ ⇒ có. */
+const valueProbe = new Map<string, Promise<boolean>>();
+export function serverHasValue(table: string, column: string, value: string): Promise<boolean> {
+  if (!supabase) return Promise.resolve(true);
+  const key = `${table}.${column}=${value}`;
+  let p = valueProbe.get(key);
+  if (!p) {
+    const client = supabase;
+    p = (async () => {
+      const { data, error } = await client.from(table).select(column).eq(column, value).limit(1);
+      return !error && Array.isArray(data) && data.length > 0;
+    })();
+    valueProbe.set(key, p);
+  }
+  return p;
+}
 
 /** Máy chủ đã có cột chưa (dò một lần mỗi phiên). Chạy không máy chủ ⇒ có. */
 const columnProbe = new Map<string, Promise<boolean>>();

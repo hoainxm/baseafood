@@ -3,6 +3,9 @@
 // GIẢ ĐỊNH để thử dung sai — chưa có chứng từ nối hai cái.
 import { describe, expect, it } from "vitest";
 import {
+  shipmentFilesOf,
+  isValidContainerNo,
+  normalizeContainerNo,
   customerChangeGate,
   EMPTY_EXPORT_DATA,
   buildSchedule,
@@ -1124,6 +1127,34 @@ describe("R44 — đổi khách của HĐ tới khi một chuyến xong bước 
   it("AC-82: bước 4 mới làm một phần (có số cont, chưa đủ mục) ⇒ vẫn đổi được", () => {
     const d = data({ contracts: [contract("c1")], shipments: [shipment("s1", "c1", { containerNo: "SZLU9522312", sealNo: "VN1" })], files: [file("s1", "loading-photos", "", 1)] });
     expect(customerChangeGate(d, "c1").ok).toBe(true);
+  });
+});
+
+describe("Số container ISO 6346 — 4 chữ cái + 7 chữ số (chị Vi 2026-11-03)", () => {
+  it("chuẩn hóa khoảng trắng / gạch / chữ thường rồi mới kiểm", () => {
+    expect(normalizeContainerNo(" szlu 203032-6 ")).toBe("SZLU2030326");
+    expect(isValidContainerNo("SZLU2030326")).toBe(true);
+    expect(isValidContainerNo("szlu 2030326")).toBe(true);
+    for (const bad of ["SZL2030326", "SZLU203032", "SZLU20303261", "SZ1U2030326", "SZLUA030326"]) expect(isValidContainerNo(bad)).toBe(false);
+  });
+
+  it("chỉ chặn cont lạnh; xe tải (biển số), đóng ghép, ô trống không kiểm", () => {
+    const base = { planMonth: "2026-11", loadingDate: "", etd: "", eta: "", plannedKg: null };
+    expect(validateShipment({ ...base, kind: "20RF", containerNo: "SZLU203032" }).map((i) => i.key)).toEqual(["containerNo"]);
+    expect(validateShipment({ ...base, kind: "40RF", containerNo: "SZLU2030326" })).toEqual([]);
+    expect(validateShipment({ ...base, kind: "truck", containerNo: "72C-123.45" })).toEqual([]);
+    expect(validateShipment({ ...base, kind: "40RF", containerNo: "" })).toEqual([]);
+  });
+});
+
+describe("Ảnh thêm của bước Đóng cont (mig 0097) — không làm bước 4 tự xong", () => {
+  it("lọc đúng loại + chuyến, mới nhất đầu; chỉ có ảnh thêm thì bước 4 vẫn chưa xong", () => {
+    const f1 = { ...file("s1", "package-weight-photos"), createdAt: "2026-11-03T01:00:00Z" };
+    const f2 = { ...file("s1", "package-weight-photos"), createdAt: "2026-11-03T02:00:00Z" };
+    const d = data({ contracts: [contract("c1")], shipments: [shipment("s1", "c1")], files: [f1, f2, file("s1", "loading-count-photos"), file("s2", "package-weight-photos")] });
+    expect(shipmentFilesOf(d, "s1", "package-weight-photos").map((f) => f.id)).toEqual([f2.id, f1.id]);
+    expect(shipmentFilesOf(d, "s1", "loading-count-photos")).toHaveLength(1);
+    expect(stepState(d, d.shipments[0], 4)).toBe("not-started");
   });
 });
 

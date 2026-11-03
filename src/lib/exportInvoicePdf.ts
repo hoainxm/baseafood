@@ -24,7 +24,7 @@ const PAD = 4;
 const FIT_SCALES = [1, 0.9, 0.82, 0.75];
 
 /** Ranh giới cột (pt) theo sheet — đo từ mẫu 275/26 (Invoice) và 236/26 (Packing list, Expiry list). */
-const COLUMN_EDGES: Record<string, number[]> = {
+export const COLUMN_EDGES: Record<string, number[]> = {
   INVOICE: [LEFT, 62, 285, 357, 413, 488, RIGHT],
   "PACKING LIST": [LEFT, 62, 262, 345, 408, 488, RIGHT],
   "EXPIRY DATE": [LEFT, 57, 222, 302, 362, 432, 500, RIGHT],

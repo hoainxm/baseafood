@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
-import { useCustomerProductNameStore, useCustomers, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportOptionStore, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
+import { useCustomerProductNameStore, useCustomers, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportLoadingExtraPhotosAvailable, useExportOptionStore, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { lineUnits, shipmentLinesOf } from "@/lib/exportInvoice";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNamesDialog";
@@ -84,6 +84,7 @@ import {
 } from "./RecordDialogs";
 import { ShipmentPanel } from "./ShipmentPanel";
 import { LoadingCountDialog, ShipmentLinesDialog, type LoadingCountTarget, type ShipmentLinesTarget } from "./ShipmentGoods";
+import { EXTRA_PHOTO_TEXT } from "./shipmentGoodsLogic";
 import { downloadInvoiceDocument, invoiceDocumentFor } from "./invoiceDocument";
 import {
   LoadingUploadDialog,
@@ -188,6 +189,8 @@ export default function ExportPlanningScreen() {
   const [linesTarget, setLinesTarget] = useState<ShipmentLinesTarget | null>(null);
   const [countTarget, setCountTarget] = useState<LoadingCountTarget | null>(null);
   const exportOptions = useExportOptionStore().options;
+  /** Mig 0097 — ảnh kèm số lượng thực đóng + ảnh bao bì / cân gross. */
+  const extraPhotosAvailable = useExportLoadingExtraPhotosAvailable();
   const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null);
   const [mappingTarget, setMappingTarget] = useState<ProductMappingTarget | null>(null);
   const [reasonTarget, setReasonTarget] = useState<ReasonTarget | null>(null);
@@ -483,7 +486,7 @@ export default function ExportPlanningScreen() {
     return true;
   };
 
-  const downloadShipmentInvoice = (s: ExportShipment, format: "xlsx" | "pdf") => {
+  const downloadShipmentInvoice = (s: ExportShipment, format: "xlsx" | "pdf" | "docx") => {
     const c = d.contracts.find((x) => x.id === s.contractId);
     if (!c) return;
     const ci = documentItems(d, s.id).find((x) => x.docKind === "commercial-invoice");
@@ -494,7 +497,12 @@ export default function ExportPlanningScreen() {
     const prev = d.files;
     if (!store.saveFiles([...prev, ...rows])) return false;
     const r0 = rows[0];
-    const kindText = r0?.step === "booking" ? "booking" : (SUB_STEP_LABELS[r0?.step as ExportStepItem["step"]] ?? "đóng cont");
+    const kindText =
+      r0?.step === "booking"
+        ? "booking"
+        : r0?.step === "loading-count-photos" || r0?.step === "package-weight-photos"
+          ? EXTRA_PHOTO_TEXT[r0.step].title.toLowerCase()
+          : (SUB_STEP_LABELS[r0?.step as ExportStepItem["step"]] ?? "đóng cont");
     const what = r0 ? `Đính ${rows.length} file ${kindText} cho chuyến ${shipName(d.shipments.find((x) => x.id === r0.shipmentId))}` : "";
     if (r0) track(r0.contractId, r0.shipmentId, "attach", what);
     notify.saved(`Đã đính ${rows.length} file ${r0?.step === "booking" ? "booking" : "đóng cont"}`, undoTracked(r0?.contractId ?? "", r0?.shipmentId ?? "", what, () => store.saveFiles(prev)));
@@ -833,6 +841,7 @@ export default function ExportPlanningScreen() {
           shipmentLines={store.shipmentLinesAvailable ? (d.shipmentLines ?? []) : []}
           canCount={loadingCan.create}
           onCount={openLoadingCount}
+          extraPhotosEnabled={extraPhotosAvailable}
         />
         <LoadingUploadDialog target={loadingTarget} recordedBy={recordedBy} onClose={() => setLoadingTarget(null)} onSave={saveLoadingFiles} />
         <LoadingCountDialog target={countTarget} recordedBy={recordedBy} onClose={() => setCountTarget(null)} onSave={saveLoadingCount} />
@@ -1044,6 +1053,7 @@ export default function ExportPlanningScreen() {
               onUploadLoading={setLoadingTarget}
               bookingFilesEnabled={bookingFilesEnabled}
               goodsEnabled={store.shipmentLinesAvailable}
+              extraPhotosEnabled={extraPhotosAvailable}
               onEditLines={() => dossier.selected && openShipmentLines(dossier.selected)}
               onLoadingCount={() => dossier.selected && openLoadingCount(dossier.selected)}
               onDownloadInvoice={(format) => dossier.selected && downloadShipmentInvoice(dossier.selected, format)}

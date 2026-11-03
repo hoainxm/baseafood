@@ -37,6 +37,7 @@ import {
   canMarkDone,
   filesOfStep,
   isContainerKind,
+  normalizeContainerNo,
   isRequiredDocumentItem,
   termsOf,
   requiredDocumentLabel,
@@ -49,11 +50,12 @@ import {
 } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import { invoiceNameLines } from "@/lib/invoiceReader";
-import type { Customer, CustomerProductName, ExportContractLine, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem, Product } from "@/types";
+import type { Customer, CustomerProductName, ExportContractLine, ExportLoadingExtraStep, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem, Product } from "@/types";
 import { CalendarPlus, Camera, ClipboardList, Container, Plus, Save, Trash2 } from "lucide-react";
 import { FileList, FilePicker, type PreviewTarget } from "./parts";
 import { InvoiceReadPanel, type InvoiceReadState } from "./InvoiceReadPanel";
 import { InvoiceComposePanel } from "./InvoiceComposePanel";
+import { EXTRA_PHOTO_TEXT } from "./shipmentGoodsLogic";
 
 /** Tải nhiều file lên (theo thứ tự); lỗi giữa chừng ⇒ gỡ các file đã lên rồi báo. */
 async function uploadAll(files: File[], contractId: string, area: "shipment" | "loading", prefix: string): Promise<{ path: string; fileName: string }[]> {
@@ -198,7 +200,8 @@ export function ShipmentFormDialog({
         goodsSummary: form.goodsSummary.trim(),
         lotCode: form.lotCode.trim(),
         bookingNo: form.bookingNo.trim(),
-        containerNo: form.containerNo.trim().toUpperCase(),
+        // Cont lạnh: bỏ khoảng trắng / gạch, viết hoa (ISO 6346); xe tải giữ biển số như gõ (chỉ viết hoa).
+        containerNo: isContainerKind(form.kind) ? normalizeContainerNo(form.containerNo) : form.containerNo.trim().toUpperCase(),
         sealNo: form.sealNo.trim().toUpperCase(),
         note: form.note.trim(),
         status: e?.status ?? "open",
@@ -292,7 +295,7 @@ export function ShipmentFormDialog({
               <Input value={form.vesselVoyage} onChange={(e) => set("vesselVoyage", e.target.value)} />
             </Field>
             {form.kind !== "consolidated" && (
-              <Field label={isTruck ? "Biển số xe" : "Số container"} hint={isTruck ? undefined : "VD: SZLU9522312"}>
+              <Field label={isTruck ? "Biển số xe" : "Số container"} hint={isTruck ? undefined : "11 ký tự: 4 chữ cái + 7 chữ số, VD SZLU2030326"}>
                 <Input value={form.containerNo} onChange={(e) => set("containerNo", e.target.value)} />
               </Field>
             )}
@@ -856,11 +859,13 @@ export function StepItemDialog({
 
 /* ---------- Đính ảnh / sơ đồ đóng cont (NV9 — người đóng hàng, điện thoại) ---------- */
 
+
 export interface LoadingUploadTarget {
   shipment: ExportShipment;
   contractId: string;
   /** "booking" = file booking của chuyến (ba-spec 60) — không gắn mục bước, không làm bước nào tự xong. */
-  step: Extract<ExportStep, "loading-plan" | "loading-photos"> | "booking";
+  /** "loading-count-photos" · "package-weight-photos" (mig 0097) = ảnh thêm của bước 4 — file của chuyến, không làm bước nào tự xong. */
+  step: Extract<ExportStep, "loading-plan" | "loading-photos"> | "booking" | ExportLoadingExtraStep;
   label: string;
 }
 
@@ -906,11 +911,13 @@ export function LoadingUploadDialog({
   const tgt = target ?? form?.tg ?? null;
   const isPhotos = tgt?.step === "loading-photos";
   const isBooking = tgt?.step === "booking";
+  const extra = tgt && (tgt.step === "loading-count-photos" || tgt.step === "package-weight-photos") ? EXTRA_PHOTO_TEXT[tgt.step] : null;
+  const isImage = isPhotos || !!extra;
 
   const save = async () => {
     if (!form || !tgt || busy) return;
     const errs: FieldError[] = [];
-    if (!files.length) errs.push({ field: "File", message: isPhotos ? "Chọn hoặc chụp ít nhất một ảnh" : isBooking ? "Chọn file booking" : "Chọn file sơ đồ container" });
+    if (!files.length) errs.push({ field: "File", message: isImage ? "Chọn hoặc chụp ít nhất một ảnh" : isBooking ? "Chọn file booking" : "Chọn file sơ đồ container" });
     if (!hasExportStorage) errs.push({ field: "Máy chủ", message: "Đang chạy không nối máy chủ — chưa tải ảnh lên được" });
     setErrors(errs);
     if (errs.length) return;
@@ -951,15 +958,17 @@ export function LoadingUploadDialog({
         draft.dismiss();
         onClose();
       }}
-      title={`${isPhotos ? "Ảnh đóng cont" : isBooking ? "File booking" : "Sơ đồ container"} · ${tgt?.label ?? ""}`}
+      title={`${extra ? extra.title : isPhotos ? "Ảnh đóng cont" : isBooking ? "File booking" : "Sơ đồ container"} · ${tgt?.label ?? ""}`}
       description={
-        isPhotos
+        extra
+          ? extra.description
+          : isPhotos
           ? "Chụp từng lớp hàng (có tờ giấy ghi lớp / số thùng), ảnh seal và ảnh số cont. Chọn nhiều ảnh một lần được."
           : isBooking
             ? "Đính bản xác nhận booking của hãng tàu (PDF / ảnh / Word). Booking sửa đổi thì đính thêm — bản mới nhất hiện đầu."
             : "Đính file sơ đồ xếp hàng (Excel / PDF / ảnh)."
       }
-      icon={isPhotos ? Camera : ClipboardList}
+      icon={isImage ? Camera : ClipboardList}
       size="md"
       footer={
         <>
@@ -984,7 +993,7 @@ export function LoadingUploadDialog({
       {form && (
         <div className="grid gap-4 py-2">
           <ErrorSummary errors={errors} />
-          <FilePicker files={files} onChange={setFiles} accept={isPhotos ? "image/*" : undefined} label={isPhotos ? "Chụp / chọn ảnh" : "Chọn file"} />
+          <FilePicker files={files} onChange={setFiles} accept={isImage ? "image/*" : undefined} label={isImage ? "Chụp / chọn ảnh" : "Chọn file"} />
           {isPhotos && (
             <NumberField
               label="Đánh số lớp từ"
@@ -994,7 +1003,7 @@ export function LoadingUploadDialog({
               hint="Chọn ảnh theo thứ tự lớp 1 → 25 thì ghi 1; ảnh seal / số cont để trống."
             />
           )}
-          <Field label="Chú thích" hint={isPhotos ? "VD: ảnh seal, cửa cont" : undefined}>
+          <Field label="Chú thích" hint={extra ? extra.captionHint : isPhotos ? "VD: ảnh seal, cửa cont" : undefined}>
             <Input value={form.caption} onChange={(e) => setForm((f) => (f ? { ...f, caption: e.target.value } : f))} />
           </Field>
         </div>

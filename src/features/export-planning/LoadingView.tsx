@@ -8,13 +8,13 @@
 // giá, không sửa chuyến. Số cont + seal do phòng Kế hoạch điền từ ảnh gửi lên.
 import { useState } from "react";
 import { Button, Card, CardContent, EmptyState, Field, Input, Tag, addDays } from "@/design-system";
-import { filesOfStep, shipmentKindLabel } from "@/lib/exportPlanning";
+import { filesOfStep, shipmentFilesOf, shipmentKindLabel } from "@/lib/exportPlanning";
 import { formatDateVN } from "@/lib/format";
 import type { Customer, ExportContract, ExportFile, ExportShipment, ExportShipmentLine } from "@/types";
 import { Camera, ClipboardCheck, ClipboardList, Container } from "lucide-react";
 import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
 import { ShipmentLineSummary } from "./ShipmentGoods";
-import { loadingCountText } from "./shipmentGoodsLogic";
+import { EXTRA_PHOTO_TEXT, loadingCountText } from "./shipmentGoodsLogic";
 import { FileList, type PreviewTarget } from "./parts";
 import type { LoadingUploadTarget } from "./ShipmentDialogs";
 
@@ -30,6 +30,7 @@ export function LoadingView({
   shipmentLines,
   canCount,
   onCount,
+  extraPhotosEnabled,
 }: {
   shipments: readonly ExportShipment[];
   contracts: readonly ExportContract[];
@@ -44,6 +45,8 @@ export function LoadingView({
   /** Quyền `export-plans.loading` thêm ⇒ điền được số thực đóng. */
   canCount: boolean;
   onCount: (s: ExportShipment) => void;
+  /** Mig 0097 đã chạy ⇒ đính ảnh số lượng thực đóng + ảnh bao bì / cân gross. */
+  extraPhotosEnabled: boolean;
 }) {
   const [query, setQuery] = useState("");
   const from = addDays(today, -7);
@@ -112,6 +115,20 @@ export function LoadingView({
                         {loadingCountSummary(goodsOf(s)).filledCount ? "Sửa số thực đóng" : "Điền số thực đóng"}
                       </Button>
                     )}
+                  </div>
+                )}
+                {canUpload && extraPhotosEnabled && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {(["loading-count-photos", "package-weight-photos"] as const).map((step) => {
+                      const n = shipmentFilesOf(data, s.id, step).length;
+                      return (
+                        <Button key={step} variant="outline" className="h-auto min-h-9 whitespace-normal" onClick={() => onUpload({ shipment: s, contractId: s.contractId, step, label })} title={EXTRA_PHOTO_TEXT[step].description}>
+                          <Camera className="mr-2 h-4 w-4" aria-hidden />
+                          {EXTRA_PHOTO_TEXT[step].title}
+                          {n ? ` (${n})` : ""}
+                        </Button>
+                      );
+                    })}
                   </div>
                 )}
                 {canUpload && (

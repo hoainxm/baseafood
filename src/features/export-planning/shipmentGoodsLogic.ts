@@ -5,7 +5,7 @@
 // ============================================================
 import { formatNumber } from "@/design-system";
 import { loadingCountSummary, shipmentLineFromContract } from "@/lib/exportInvoice";
-import type { ExportContractLine, ExportShipment, ExportShipmentLine } from "@/types";
+import type { ExportContractLine, ExportLoadingExtraStep, ExportShipment, ExportShipmentLine } from "@/types";
 
 /** "Đã điền 2/2 dòng · 658 thùng (kế hoạch 661, thiếu 3)" — hàng Số thực đóng ở bước 4. */
 export function loadingCountText(lines: readonly ExportShipmentLine[]): string {
@@ -61,3 +61,17 @@ export function linesFromDraft(tg: ShipmentLinesTarget, rows: readonly LineDraft
   });
   return out;
 }
+
+/** Chữ của 2 loại ảnh thêm ở bước 4 (mig 0097, chị Vi 2026-11-03). */
+export const EXTRA_PHOTO_TEXT: Record<ExportLoadingExtraStep, { title: string; description: string; captionHint: string }> = {
+  "loading-count-photos": {
+    title: "Ảnh số lượng thực đóng",
+    description: "Chụp tờ đếm / bảng ghi số thùng thực đóng, ảnh lớp hàng làm bằng chứng cho số thực đóng. Chọn nhiều ảnh một lần được.",
+    captionHint: "VD: tờ đếm thùng ca sáng",
+  },
+  "package-weight-photos": {
+    title: "Ảnh bao bì + cân gross",
+    description: "Chụp thùng / nhãn bao bì và ảnh cân kg cả bì (gross) của thùng mẫu. Chọn nhiều ảnh một lần được.",
+    captionHint: "VD: cân thùng size 2-4 = 11,2 kg",
+  },
+};

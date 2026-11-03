@@ -10,7 +10,6 @@ import { Button, InlineConfirmDelete, Tag, formatNumber, AbbrHint } from "@/desi
 import { newId } from "@/lib/store";
 import {
   ITEM_STATE_LABELS,
-  LOADING_STEPS,
   bookingFilesOf,
   STEP_TITLES,
   SUB_STEP_LABELS,
@@ -26,6 +25,7 @@ import {
   shipmentActuals,
   shipmentKindLabel,
   shipmentPaymentSummary,
+  shipmentFilesOf,
   sharedSource,
   stepItem,
   subStepState,
@@ -33,10 +33,11 @@ import {
   type StepNo,
 } from "@/lib/exportPlanning";
 import { formatDateVN, formatMoney } from "@/lib/format";
-import type { ExportContract, ExportFile, ExportItemState, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
+import type { ExportContract, ExportFile, ExportItemState, ExportLoadingExtraStep, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
 import { Ban, Boxes, Camera, ClipboardCheck, ClipboardList, Download, FilePlus2, Pencil, Plus, RotateCcw, Send, Trash2, Wallet } from "lucide-react";
 import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
 import { ShipmentLineSummary } from "./ShipmentGoods";
+import { EXTRA_PHOTO_TEXT } from "./shipmentGoodsLogic";
 import { loadingCountText } from "./shipmentGoodsLogic";
 import { FileList, StateTag, StepDot, StepStepper, type PreviewTarget } from "./parts";
 import { progressText, shipmentProgress, stepMissing } from "./progress";
@@ -137,6 +138,7 @@ export function ShipmentPanel({
   onRemoveFile,
   bookingFilesEnabled,
   goodsEnabled,
+  extraPhotosEnabled,
   onEditLines,
   onLoadingCount,
   onDownloadInvoice,
@@ -163,9 +165,11 @@ export function ShipmentPanel({
   bookingFilesEnabled: boolean;
   /** Máy chủ đã chạy 0096 ⇒ có khối Hàng của chuyến, Số thực đóng, Tải invoice (ba-spec 63). */
   goodsEnabled: boolean;
+  /** Máy chủ đã chạy 0097 ⇒ đính ảnh kèm số lượng thực đóng + hàng "Hình ảnh bao bì + cân gross". */
+  extraPhotosEnabled: boolean;
   onEditLines: () => void;
   onLoadingCount: () => void;
-  onDownloadInvoice: (format: "xlsx" | "pdf") => void;
+  onDownloadInvoice: (format: "xlsx" | "pdf" | "docx") => void;
 }) {
   const opts = { filesAvailable };
   const label = [shipment.lotCode && `Lô ${shipment.lotCode}`, shipmentKindLabel(shipment.kind), shipment.containerNo].filter(Boolean).join(" · ");
@@ -321,6 +325,23 @@ export function ShipmentPanel({
   const goods = shipmentLinesOf(data.shipmentLines ?? [], shipment.id);
   const counted = loadingCountSummary(goods);
   /** Hàng Số lượng thực đóng (bước 4) — kho điền sau khi đóng cont; KHÔNG chặn bước 4 xong (ba-spec 63 R4). */
+  /** Nút "Đính ảnh" cho ảnh thêm của bước 4 (mig 0097) — người đóng hàng hoặc người ghi Xuất khẩu. */
+  const extraPhotoButton = (step: ExportLoadingExtraStep) =>
+    !isCancelled &&
+    extraPhotosEnabled &&
+    filesAvailable &&
+    (can.loadingCreate || can.update) && (
+      <Button size="sm" variant="outline" onClick={() => onUploadLoading({ shipment, contractId: contract.id, step, label })} title={EXTRA_PHOTO_TEXT[step].description}>
+        <Camera className="mr-1 h-4 w-4" aria-hidden />
+        Đính ảnh
+      </Button>
+    );
+  const extraPhotos = (step: ExportLoadingExtraStep) => {
+    const files = shipmentFilesOf(data, shipment.id, step);
+    return files.length ? (
+      <FileList files={files} onPreview={onPreview} caption={`${label} · ${EXTRA_PHOTO_TEXT[step].title}`} onRemove={can.update && !isCancelled ? onRemoveFile : undefined} />
+    ) : null;
+  };
   const loadingCountRow = () => (
     <ChecklistRow
       key="loading-count"
@@ -328,18 +349,33 @@ export function ShipmentPanel({
       state={counted.complete ? "done" : counted.filledCount ? "in-progress" : "not-started"}
       actions={
         !isCancelled &&
-        goods.length > 0 &&
         (can.loadingCreate || can.update) && (
-          <Button size="sm" variant={counted.filledCount ? "edit" : "default"} onClick={onLoadingCount} title="Đóng cont xong: ghi số kiện thực đã đóng của từng dòng hàng.">
-            <ClipboardCheck className="mr-1 h-4 w-4" aria-hidden />
-            {counted.filledCount ? "Sửa số thực đóng" : "Điền số thực đóng"}
-          </Button>
+          <>
+            {goods.length > 0 && (
+              <Button size="sm" variant={counted.filledCount ? "edit" : "default"} onClick={onLoadingCount} title="Đóng cont xong: ghi số kiện thực đã đóng của từng dòng hàng.">
+                <ClipboardCheck className="mr-1 h-4 w-4" aria-hidden />
+                {counted.filledCount ? "Sửa số thực đóng" : "Điền số thực đóng"}
+              </Button>
+            )}
+            {extraPhotoButton("loading-count-photos")}
+          </>
         )
       }
     >
       <span className="tnum">{loadingCountText(goods)}</span>
+      {extraPhotos("loading-count-photos")}
     </ChecklistRow>
   );
+  /** Hình ảnh bao bì + cân gross (mig 0097): có ảnh ⇒ Xong; KHÔNG chặn bước 4 (như số lượng thực đóng). */
+  const packageWeightRow = () => {
+    const n = shipmentFilesOf(data, shipment.id, "package-weight-photos").length;
+    return (
+      <ChecklistRow key="package-weight" label="Hình ảnh bao bì + cân gross" state={n ? "done" : "not-started"} actions={extraPhotoButton("package-weight-photos")}>
+        {n ? <span className="text-muted-foreground">{n} ảnh</span> : <span className="text-muted-foreground">Chưa có ảnh — chụp thùng / nhãn bao bì và ảnh cân kg cả bì.</span>}
+        {extraPhotos("package-weight-photos")}
+      </ChecklistRow>
+    );
+  };
   const docs = documentItems(data, shipment.id);
   const payments = data.payments.filter((p) => p.shipmentId === shipment.id).sort((a, b) => a.date.localeCompare(b.date));
   const goTo = (n: StepNo) => document.getElementById(`ship-step-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -464,6 +500,10 @@ export function ShipmentPanel({
       </StepBlock>
 
       <StepBlock n={4} state={progress.steps[4]} summary={summaryOf(4)} isCurrent={progress.next === 4}>
+        {/* Thứ tự theo trình tự đóng cont thật (chị Vi 2026-11-03): booking → lệnh xuất → số cont / seal →
+            số lượng thực đóng → sơ đồ → hình ảnh → tờ khai. */}
+        {can.view && bookingRow()}
+        {singleRow("export-order", 4)}
         <ChecklistRow
           label={shipment.kind === "truck" ? "Biển số xe" : "Số cont + seal"}
           state={shipment.kind === "consolidated" ? "not-applicable" : containerIdentityOk(shipment) ? "done" : "not-started"}
@@ -483,9 +523,11 @@ export function ShipmentPanel({
               : [shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ") || <span className="text-muted-foreground">Chưa điền</span>}
           </span>
         </ChecklistRow>
-        {can.view && bookingRow()}
-        {LOADING_STEPS.map((st) => (st === "loading-plan" || st === "loading-photos" ? uploadRow(st) : singleRow(st, 4)))}
         {goodsEnabled && loadingCountRow()}
+        {extraPhotosEnabled && packageWeightRow()}
+        {uploadRow("loading-plan")}
+        {uploadRow("loading-photos")}
+        {singleRow("customs-declaration", 4)}
       </StepBlock>
 
       <StepBlock n={5} state={progress.steps[5]} summary={summaryOf(5)} isCurrent={progress.next === 5}>
@@ -502,6 +544,10 @@ export function ShipmentPanel({
               <Button size="sm" variant="outline" onClick={() => onDownloadInvoice("pdf")} title="Tải bản PDF Invoice, Packing list (và Expiry date list khi có hạn dùng) của chuyến này — mỗi chứng từ một trang A4.">
                 <Download className="mr-1 h-4 w-4" aria-hidden />
                 Tải PDF
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => onDownloadInvoice("docx")} title="Tải file Word Invoice, Packing list (và Expiry date list khi có hạn dùng) của chuyến này để sửa tiếp chữ.">
+                <Download className="mr-1 h-4 w-4" aria-hidden />
+                Tải Word
               </Button>
               <Button size="sm" variant="outline" onClick={() => onDownloadInvoice("xlsx")} title="Tải file Excel Invoice, Packing list (và Expiry date list khi có hạn dùng) của chuyến này để sửa tiếp.">
                 <Download className="mr-1 h-4 w-4" aria-hidden />

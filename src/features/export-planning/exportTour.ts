@@ -254,7 +254,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Bước đang làm",
         body:
           "Bước có viền xanh là bước đầu tiên chưa xong. Đầu mỗi bước ghi \"Xong\", hoặc \"Còn thiếu\" kèm tên các mục chưa xong.\n" +
-          "Mỗi hàng trong bước là một mục cần làm. Ví dụ bước Đóng cont gồm: số cont và seal, sơ đồ container, hình ảnh đóng cont, tờ khai, lệnh xuất.",
+          "Mỗi hàng trong bước là một mục cần làm. Ví dụ bước Đóng cont theo đúng trình tự đóng hàng: file booking, lệnh xuất, số cont và seal (số container 11 ký tự: 4 chữ cái + 7 chữ số), số lượng thực đóng (đính ảnh tờ đếm), hình ảnh bao bì + cân gross, sơ đồ container, hình ảnh đóng cont, tờ khai. Hai mục ảnh thêm có ảnh là Xong và không bắt buộc cho bước Đóng cont.",
       }),
       dossier({
         id: "item-status",
@@ -283,7 +283,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           body:
             "Chọn Cập nhật ở hàng của mục để ghi trạng thái, số, ngày, ghi chú và đính file. Ở bước Đóng cont: Sửa số cont để điền số container và seal; Đính sơ đồ, Đính ảnh để tải file lên.\n" +
             "Commercial Invoice: đính file Excel gốc hoặc PDF xuất từ Excel thì hệ thống tự đọc — điền số, ngày, tổng thùng, kg, tiền còn trống; ô đã có số khác thì báo để chọn, không tự ghi đè; nối từng dòng với mặt hàng để trích xuất tên hàng của khách khi Lưu. Bản scan (ảnh) không đọc, vẫn đính làm bằng chứng.\n" +
-            "Lập invoice từ app (chuyến đã có hàng của chuyến): trong mục Commercial Invoice chọn Tài khoản nhận tiền, Điều kiện giao, đơn giá từng dòng (mặc định theo hợp đồng), thông tin riêng khách yêu cầu; chọn Tải file Invoice (Excel) để có một file gồm Invoice, Packing list và Expiry date list khi có hạn dùng. Ô tổng còn trống thì tự điền theo invoice lập; phần lập ghi vào sổ khi chọn Lưu.\n" +
+            "Lập invoice từ app (chuyến đã có hàng của chuyến): trong mục Commercial Invoice chọn Tài khoản nhận tiền, Điều kiện giao, đơn giá từng dòng (mặc định theo hợp đồng), thông tin riêng khách yêu cầu; chọn Tải file Invoice (PDF) để có bản in sẵn theo mẫu, hoặc Tải file Word / Tải file Excel để sửa tiếp; mỗi bản gồm Invoice, Packing list và Expiry date list khi có hạn dùng. Ô tổng còn trống thì tự điền theo invoice lập; phần lập ghi vào sổ khi chọn Lưu.\n" +
             "Khi mọi mục của bước là Xong hoặc Không áp dụng, bước chuyển xanh và thanh tiến độ thêm một khúc.",
         }),
       );

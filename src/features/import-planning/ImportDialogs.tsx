@@ -28,6 +28,7 @@ import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { FilePicker } from "@/features/export-planning/parts";
 import { ContractReadPanel, type ContractFillReport } from "@/features/export-planning/ContractReadPanel";
 import { applyImportConflicts, fillImportContract, type ImportContractFillValues, type FillConflict, type ReadContract } from "@/lib/contractReader";
+import { validityError } from "@/lib/contractValidity";
 import { LineProductLabel } from "./parts";
 import { useDialogDraft } from "@/lib/formDraft";
 import { useGoodsTypePicker } from "@/features/export-planning/goodsTypePicker";
@@ -124,13 +125,15 @@ interface ContractForm {
   supplierId: string;
   contractNo: string;
   signedDate: string;
+  /** Hạn hợp đồng (ba-spec 69) — "" = chưa ghi; bản nháp cũ không có ⇒ coi như "". */
+  validUntil?: string;
   importType: ImportType | "";
   currency: string;
   note: string;
   lines: LineForm[];
   initial: string;
 }
-const contractSnap = (f: ContractForm) => JSON.stringify([f.supplierId, f.contractNo, f.signedDate, f.importType, f.currency, f.note, f.lines]);
+const contractSnap = (f: ContractForm) => JSON.stringify([f.supplierId, f.contractNo, f.signedDate, f.validUntil ?? "", f.importType, f.currency, f.note, f.lines]);
 const blankLine = (): LineForm => ({ id: newId(), productName: "", productId: "", goodsTypeId: "", kg: null, unitPrice: null });
 
 export interface ContractSavePayload {
@@ -177,19 +180,21 @@ export function ContractFormDialog({
   const [suggestedLines, setSuggestedLines] = useState<Set<string>>(new Set());
   // R22: máy chủ chưa chạy 0084 ⇒ không nối (không gửi product_id, khỏi kẹt hàng chờ).
   const canLink = data.productLinkAvailable !== false;
+  // Hạn HĐ nhập (mig 0100): máy chủ chưa có cột ⇒ ẩn ô, không gửi.
+  const validityOn = data.validityAvailable !== false;
 
   useEffect(() => {
     if (!target) return;
     let f: ContractForm;
     if (target.mode === "create") {
-      f = { key: "new", mode: "create", id: newId(), supplierId: "", contractNo: "", signedDate: "", importType: "", currency: "USD", note: "", lines: [blankLine()], initial: "" };
+      f = { key: "new", mode: "create", id: newId(), supplierId: "", contractNo: "", signedDate: "", validUntil: "", importType: "", currency: "USD", note: "", lines: [blankLine()], initial: "" };
     } else {
       const c = target.contract;
       const lines = data.lines
         .filter((l) => l.contractId === c.id)
         .sort((a, b) => a.lineNo - b.lineNo)
         .map((l) => ({ id: l.id, productName: l.productName, productId: l.productId ?? "", goodsTypeId: l.goodsTypeId ?? "", kg: l.kg, unitPrice: c.linePrices[l.id] ?? null }));
-      f = { key: c.id, mode: "edit", id: c.id, supplierId: c.supplierId, contractNo: c.contractNo, signedDate: c.signedDate, importType: c.importType, currency: c.currency, note: c.note, lines, initial: "" };
+      f = { key: c.id, mode: "edit", id: c.id, supplierId: c.supplierId, contractNo: c.contractNo, signedDate: c.signedDate, validUntil: c.validUntil ?? "", importType: c.importType, currency: c.currency, note: c.note, lines, initial: "" };
     }
     const fresh = { ...f, initial: contractSnap(f) };
     const kept = draft.takeKept();
@@ -250,7 +255,14 @@ export function ContractFormDialog({
   /* Đọc file HĐ nhập (ba-spec 66 NV3): đối tác = bên bán; chỉ điền ô trống; loại hình vẫn chọn tay. */
   const formRef = useRef(form);
   formRef.current = form;
-  const fillValues = (f: ContractForm): ImportContractFillValues => ({ supplierId: f.supplierId, contractNo: f.contractNo, signedDate: f.signedDate, currency: f.currency, lines: f.lines });
+  const fillValues = (f: ContractForm): ImportContractFillValues => ({
+    supplierId: f.supplierId,
+    contractNo: f.contractNo,
+    signedDate: f.signedDate,
+    ...(validityOn ? { validUntil: f.validUntil ?? "" } : {}),
+    currency: f.currency,
+    lines: f.lines,
+  });
   const fillFromRead = (read: ReadContract): ContractFillReport | null => {
     const f = formRef.current;
     if (!f) return null;
@@ -284,6 +296,9 @@ export function ContractFormDialog({
     }));
     const head = { id: form.id, supplierId: form.supplierId, contractNo: form.contractNo.trim(), signedDate: form.signedDate, importType: form.importType };
     const errs = issuesToErrors(validateContract(head, lines, data.contracts, data), "Hợp đồng");
+    // Hạn hợp đồng (ba-spec 69 R2): không bắt buộc, có thì không trước ngày ký.
+    const validity = validityOn ? validityError(form.signedDate, form.validUntil) : "";
+    if (validity) errs.push({ field: "Hạn hợp đồng", message: validity });
     for (const f of allFiles) {
       const fe = checkImportFile(f);
       if (fe) errs.push({ field: "File hợp đồng", message: fe });
@@ -310,6 +325,8 @@ export function ContractFormDialog({
         cancelReason: old?.cancelReason ?? "",
         note: form.note.trim(),
         createdAt: old?.createdAt ?? new Date().toISOString(),
+        // mig 0100 chưa chạy ⇒ không gửi cột (giữ nguyên trường đọc về nếu có).
+        ...(validityOn ? { validUntil: form.validUntil ?? "" } : old?.validUntil !== undefined ? { validUntil: old.validUntil } : {}),
       };
       if (!onSave({ contract, lines, files: up, isNew: form.mode === "create" })) {
         if (up.length) void removeImportFiles(up.map((x) => x.path));
@@ -386,6 +403,14 @@ export function ContractFormDialog({
                 <Input value={form.contractNo} onChange={(e) => set("contractNo", e.target.value)} aria-required />
               </Field>
               <DateField label="Ngày ký" required value={form.signedDate} onChange={(v) => set("signedDate", v)} />
+              {validityOn && (
+                <DateField
+                  label="Hạn hợp đồng"
+                  hint={'Ngày hợp đồng hết hiệu lực ("binding … to …"). Không bắt buộc.'}
+                  value={form.validUntil ?? ""}
+                  onChange={(v) => set("validUntil", v)}
+                />
+              )}
               <Field label="Tiền tệ">
                 <Input value={form.currency} onChange={(e) => set("currency", e.target.value.toUpperCase())} />
               </Field>

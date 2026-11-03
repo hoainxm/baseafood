@@ -3,6 +3,7 @@
 > Load khi: chỉnh giao diện màn Nhập khẩu `/planning-import` (lô nhập theo tháng, danh sách hợp đồng nhập, hồ sơ HĐ, hộp lần nhập / chứng từ / thực nhập / đóng HĐ, phần thủ kho).
 covers: src/features/import-planning/**
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (ba-spec 69) — hộp HĐ nhập mục 1: ô ngày **Hạn hợp đồng** ngay sau Ngày ký (ẩn khi máy chủ chưa chạy 0100); hồ sơ HĐ: ô "Hạn hợp đồng" sau Ngày ký. -->
 <!-- updated: 2026-11-03 (2026-11-03 tên hàng) — dòng hàng HĐ nhập: Tên hàng là Textarea tự giãn, Combobox Mặt hàng `wrapValue`. -->
 <!-- updated: 2026-11-03 (đọc file HĐ, ba-spec 66) — hộp Lập / Sửa HĐ nhập có cùng khối **Đọc file hợp đồng** của Xuất khẩu (`ContractReadPanel`, mốc `import-contract-read`) đầu phiếu, trước mục 1. -->
 <!-- updated: 2026-11-02 (xem file) — hộp xem chứng từ dùng `FileViewer` chung (ba-spec 61): Word / Excel / văn bản xem ngay trong app; "Mở tab mới" mở trang `#/file-view`, không tải về. -->

@@ -8,7 +8,8 @@ import { useEffect, useState } from "react";
 import { ActivityLogBlock, type ActivityLogRow } from "@/features/shared/ActivityLogBlock";
 import { Button, Popover, PopoverContent, PopoverTrigger, RecordTable, Tag, formatNumber, type RecordTableColumn } from "@/design-system";
 import { CollapsibleSection } from "@/features/export-planning/parts";
-import { formatDateVN, formatMoney } from "@/lib/format";
+import { formatDateVN, formatMoney, todayISO } from "@/lib/format";
+import { validityLabel, validityState } from "@/lib/contractValidity";
 import { useGoodsTypeStore } from "@/lib/catalogRepo";
 import { goodsTypeName } from "@/lib/goodsTypes";
 import {
@@ -279,6 +280,14 @@ export function ImportDossier({
       <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 rounded-xl border border-border bg-card p-4">
         <Info label="Đối tác">{contract.supplierName || "—"}</Info>
         <Info label="Ngày ký">{formatDateVN(contract.signedDate)}</Info>
+        {data.validityAvailable !== false && (
+          // Hạn hợp đồng (ba-spec 69 R4): "31/12/2026 · Còn n ngày" / "· Đã hết hạn"; chưa ghi ⇒ "Chưa ghi". Ẩn khi máy chủ chưa chạy 0100.
+          <Info label="Hạn hợp đồng">
+            {contract.validUntil
+              ? [formatDateVN(contract.validUntil), validityLabel(validityState(contract.validUntil, todayISO(), contract.status === "open"))].filter(Boolean).join(" · ")
+              : "Chưa ghi"}
+          </Info>
+        )}
         <Info label="Loại hình">{importTypeLabel(contract.importType) || "—"}</Info>
         <Info label="Tổng kg">
           <span className="tnum">{formatNumber(totals.totalKg)} kg</span>

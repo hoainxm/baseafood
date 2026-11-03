@@ -1,8 +1,9 @@
-# 69 — ba-spec: Hạn hợp đồng (ngày hợp đồng hết hiệu lực) — Xuất khẩu
+# 69 — ba-spec: Hạn hợp đồng (ngày hợp đồng hết hiệu lực) — Xuất khẩu + Nhập khẩu
 
 > Load khi: thêm / sửa ô "Hạn hợp đồng" của HĐ xuất (form Lập / Sửa / Ghi bản sửa, hồ sơ HĐ), luật hết hạn / sắp hết hạn, bộ đọc file điền hạn HĐ.
-covers: src/lib/contractValidity.ts, src/features/export-planning/ContractFormDialog.tsx, src/features/export-planning/ContractDossier.tsx, src/lib/contractReader.ts
+covers: src/lib/contractValidity.ts, src/features/export-planning/ContractFormDialog.tsx, src/features/export-planning/ContractDossier.tsx, src/lib/contractReader.ts, src/features/import-planning/ImportDialogs.tsx, src/features/import-planning/ImportDossier.tsx, supabase/migrations/0100_import_contract_valid_until.sql
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (v2) — HĐ NHẬP cũng có Hạn hợp đồng: cột `import_contracts.valid_until` (mig 0100, CHƯA chạy ⇒ app ẩn ô, không gửi cột); cùng luật R1–R5 (R1 lưu ở cột thay vì terms). Mục OUT "HĐ nhập" và A3 đã đóng. Test thêm: `contractReader.test.ts` (đọc MSA ⇒ 31/12/2026, chỉ điền khi máy chủ có cột). -->
 ttl_days: 90
 status: v1 ĐÃ BUILD 2026-11-03 — `lib/contractValidity.ts` (+ test AC-1…4), `contractReader.ts` (AC-5), ô ở `ContractFormDialog.tsx`, dòng ở `ContractDossier.tsx`. Không migration: hạn HĐ nằm trong `terms` (jsonb) của từng bản HĐ, như các điều khoản khác.
 
@@ -140,4 +141,5 @@ status: v1 ĐÃ BUILD 2026-11-03 — `lib/contractValidity.ts` (+ test AC-1…4)
 
 ## History
 
+- 2026-11-03 — v2: HĐ nhập (mig 0100).
 - 2026-11-03 — v1.

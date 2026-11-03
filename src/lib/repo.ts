@@ -2918,6 +2918,8 @@ export const IMPORT_CONTRACT_TABLE: TableMapping<ImportContract> = {
     close_reason: x.closeReason,
     cancel_reason: x.cancelReason,
     note: x.note,
+    // mig 0100: chỉ gửi khi bản ghi có trường (máy chủ chưa có cột ⇒ không kẹt hàng chờ).
+    ...(x.validUntil !== undefined ? { valid_until: dateOrNull(x.validUntil) } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -2933,6 +2935,7 @@ export const IMPORT_CONTRACT_TABLE: TableMapping<ImportContract> = {
     cancelReason: s(r.cancel_reason),
     note: s(r.note),
     createdAt: s(r.created_at),
+    ...(r.valid_until !== undefined ? { validUntil: s(r.valid_until).slice(0, 10) } : {}),
   }),
 };
 

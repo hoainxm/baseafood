@@ -1085,6 +1085,8 @@ export interface ImportContractFillValues {
   supplierId: string;
   contractNo: string;
   signedDate: string;
+  /** Hạn hợp đồng (ba-spec 69) — undefined = máy chủ chưa có cột ⇒ không điền. */
+  validUntil?: string;
   currency: string;
   lines: ImportLineFillValues[];
 }
@@ -1111,6 +1113,7 @@ export function fillImportContract(values: ImportContractFillValues, read: ReadC
   }
   v.contractNo = a.put("contractNo", "Số hợp đồng", v.contractNo, read.contractNo);
   v.signedDate = a.put("signedDate", "Ngày ký", v.signedDate, read.signedOn, { show: showDate });
+  if (v.validUntil !== undefined) v.validUntil = a.put("validUntil", "Hạn hợp đồng", v.validUntil, read.contractValidUntil, { show: showDate });
   v.currency = a.put("currency", "Tiền tệ", v.currency, read.currency, { baseline: ctx.mode === "create" ? ctx.baselineCurrency : undefined });
   const toLine = (l: ReadContractLine): ImportLineFillValues => {
     const line: ImportLineFillValues = {

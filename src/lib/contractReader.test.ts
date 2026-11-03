@@ -462,6 +462,14 @@ describe("ba-spec 66 — HĐ thật anh gửi 2026-11-03", () => {
       { mode: "create", baselineCurrency: "USD", suppliers: [{ id: "s9", code: "MSA", shortName: "MSA Sea Foods", fullName: "" }], newLineId: () => `m${++seq}` },
     );
     expect([f.values.supplierId, f.values.contractNo, f.values.signedDate]).toEqual(["s9", "001N.26-MSA", "2026-09-24"]);
+    // ba-spec 69 v2: hạn HĐ nhập — máy chủ chưa có cột (undefined) thì không điền; có cột thì điền ô trống.
+    expect(f.values.validUntil).toBeUndefined();
+    const g = fillImportContract(
+      { supplierId: "", contractNo: "", signedDate: "", validUntil: "", currency: "USD", lines: [] },
+      c,
+      { mode: "create", baselineCurrency: "USD", suppliers: [], newLineId: () => `v${++seq}` },
+    );
+    expect(g.values.validUntil).toBe("2026-12-31");
     expect(f.values.lines.map((l) => [l.productName, l.kg, l.unitPrice])).toEqual([
       ["FROZEN OCTOPUS WHOLE ROUND SHORT ARM 100/200", 18000, 4],
       ["FROZEN OCTOPUS WHOLE ROUND SHORT ARM 200/300", 5000, 4],

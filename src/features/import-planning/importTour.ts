@@ -66,6 +66,7 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
           "Mỗi dòng hàng chọn Mặt hàng (danh mục) để mọi khu cùng gọi một tên. Gõ tên hàng xong app tự gợi ý khi tên đã nối ở hợp đồng trước (khớp cả khi khác hoa thường, dấu câu, khoảng trắng); ô Tên hàng hiện đủ tên dài. Chưa nối vẫn lưu được.\n" +
           "Dòng gần giống dòng trước thì chọn Chép dòng: dòng mới nằm ngay dưới, giữ mọi ô, chỉ sửa ô khác.\n" +
           "Có file Word (.docx, .doc) hoặc PDF có chữ của hợp đồng thì chọn ở khối Đọc file hợp đồng đầu phiếu: app điền sẵn ô còn trống (đối tác là bên bán, số, ngày ký, tiền tệ, dòng hàng), ô khác file thì liệt kê để chọn, không tự lưu. Loại hình vẫn chọn tay. Bản scan không đọc: đọc bản Word rồi đính bản scan đã ký ở mục File.\n" +
+          "Hạn hợp đồng là ngày hợp đồng hết hiệu lực (câu \"binding … to …\"), không bắt buộc, không được trước ngày ký; hồ sơ hợp đồng hiện kèm Còn n ngày (30 ngày trở xuống) hoặc Đã hết hạn khi hợp đồng còn mở.\n" +
           "Hàng gia công không ghi giá thì để trống đơn giá. Lưu xong hợp đồng ở trạng thái Chưa có lần nhập.",
       }),
     );

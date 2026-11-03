@@ -1703,6 +1703,11 @@ export interface ImportContract {
   closeReason: string;
   cancelReason: string;
   note: string;
+  /**
+   * Hạn hợp đồng — ngày HĐ nhập hết hiệu lực (mig 0100, ba-spec 69). "" = chưa ghi; undefined = máy chủ chưa có
+   * cột (chưa chạy 0100) ⇒ repo KHÔNG gửi cột, app ẩn ô.
+   */
+  validUntil?: string;
   createdAt: string;
 }
 

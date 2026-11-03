@@ -35,7 +35,7 @@ export const IMPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Lập hợp đồng nhập",
     needs: ["import-plans", "create"],
     actors: ["planning"],
-    text: "Chọn Lập hợp đồng nhập: đối tác (danh mục NCC nhập khẩu), số hợp đồng, ngày ký, loại hình; mỗi dòng hàng ghi tên như trên hợp đồng, mặt hàng (danh mục), kg, đơn giá. Có file Word (.docx, .doc) hoặc PDF có chữ thì chọn ở Đọc file hợp đồng: app điền sẵn ô còn trống (đối tác là bên bán), ô khác file liệt kê để chọn, không tự lưu, loại hình vẫn chọn tay; bản scan không đọc.",
+    text: "Chọn Lập hợp đồng nhập: đối tác (danh mục NCC nhập khẩu), số hợp đồng, ngày ký, hạn hợp đồng (không bắt buộc), loại hình; mỗi dòng hàng ghi tên như trên hợp đồng, mặt hàng (danh mục), kg, đơn giá. Có file Word (.docx, .doc) hoặc PDF có chữ thì chọn ở Đọc file hợp đồng: app điền sẵn ô còn trống (đối tác là bên bán), ô khác file liệt kê để chọn, không tự lưu, loại hình vẫn chọn tay; bản scan không đọc.",
     done: "Lưu xong, không cần ai duyệt",
     result: { label: CONTRACT_STATE_LABELS["no-receipts"], tone: "muted" },
   },

@@ -89,6 +89,8 @@ export interface ImportData {
   filesAvailable?: boolean;
   /** `false` = máy chủ chưa chạy 0084 (chưa có cột mặt hàng của dòng) ⇒ không bắt nối khi đóng HĐ (R22). */
   productLinkAvailable?: boolean;
+  /** `false` = máy chủ chưa chạy 0100 (chưa có cột hạn HĐ nhập) ⇒ ẩn ô Hạn hợp đồng, không gửi cột (ba-spec 69). */
+  validityAvailable?: boolean;
   /** Danh mục Mặt hàng (R20) — có thì dòng trỏ mặt hàng đã xóa tính là chưa nối, tra số theo tên mặt hàng. */
   products?: readonly ImportProductRef[];
   /** Kiểm mẫu của kho theo lần nhập (v4, mig 0085) — chỉ lưu, không vào luật trạng thái (R23). */

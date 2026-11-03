@@ -3,6 +3,7 @@
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
 last_verified: 2026-11-03
+<!-- updated: 2026-11-03 (ba-spec 69 v2) — tour + hộp "?" Lập hợp đồng nhập thêm Hạn hợp đồng. -->
 <!-- updated: 2026-11-03 (ba-spec 69) — tour + hộp "?" Lập hợp đồng (Xuất khẩu) thêm Hạn hợp đồng: nghĩa, không bắt buộc, nhắc lệch hạn giao, nhãn Còn n ngày / Đã hết hạn ở hồ sơ. -->
 <!-- updated: 2026-11-03 (ba-spec 68) — tour + hộp "?" Xuất khẩu: thêm bảng "Sửa hợp đồng: sửa được gì, khóa khi nào" (ba-spec 68). -->
 <!-- updated: 2026-11-03 (ba-spec 66 v1.2) — tour + hộp "?" Lập hợp đồng (Xuất, Nhập): Word .docx và .doc đều đọc được; bản scan không đọc ⇒ đọc bản Word, đính bản scan ở mục File. -->

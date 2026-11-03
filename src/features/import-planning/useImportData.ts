@@ -36,9 +36,11 @@ export function useImportData() {
   // R22 (ba-spec 45 v3): máy chủ chỉ trả `product_id` khi đã chạy 0084 ⇒ dò ở dòng đọc về. Chưa có
   // dòng nào thì chưa biết ⇒ coi như chưa có cột (không gửi, không bắt nối).
   const productLinkAvailable = !isServerConnected || lines.some((l) => l.productId !== undefined);
+  // Hạn HĐ nhập (mig 0100, ba-spec 69): dò như trên — HĐ đọc về có trường ⇒ máy chủ có cột.
+  const validityAvailable = !isServerConnected || contracts.some((c) => c.validUntil !== undefined);
   const data: ImportData = useMemo(
-    () => ({ contracts, lines, receipts, receiptLines, documents, files, sampleChecks, filesAvailable: hasImportStorage, productLinkAvailable }),
-    [contracts, lines, receipts, receiptLines, documents, files, sampleChecks, productLinkAvailable],
+    () => ({ contracts, lines, receipts, receiptLines, documents, files, sampleChecks, filesAvailable: hasImportStorage, productLinkAvailable, validityAvailable }),
+    [contracts, lines, receipts, receiptLines, documents, files, sampleChecks, productLinkAvailable, validityAvailable],
   );
   // Thủ kho không đọc được bảng HĐ (RLS) ⇒ dò "máy chủ chưa có bảng" ở bảng lần nhập (ai cũng đọc).
   const probe = receiptsMeta;

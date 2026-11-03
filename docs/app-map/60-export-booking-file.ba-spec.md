@@ -2,9 +2,11 @@
 
 > Load khi: sửa đính / xem file booking (xác nhận booking của hãng tàu) của chuyến xuất khẩu — hộp Ghi / Sửa chuyến, khối Đóng cont trong hồ sơ HĐ.
 covers: src/lib/exportPlanning.ts, src/features/export-planning
-last_verified: 2026-11-02
+last_verified: 2026-11-03
 ttl_days: 90
 status: v1 ĐÃ BUILD 2026-11-02 — mig `0094` (nới `export_files_step_check` + view `export_file_steps` để app dò; ✅ đã chạy DB thật 2026-11-02), `bookingFilesOf` (test AC-1…AC-3), ô "Đính file booking" trong hộp Ghi / Sửa chuyến, hàng "File booking" (không trạng thái) ở bước 4 của `ShipmentPanel` (đính thêm qua `LoadingUploadDialog` step "booking", vùng kho "shipment"), nhật ký HĐ, demo 1 file giữ chỗ / chuyến đã đóng. Tour (bước "Thông tin và trạng thái chuyến") + hộp "?" kể File booking (AC-6). Thử sandbox 2026-11-02: hàng File booking hiện đúng, 360px không tràn; đính thật chờ chạy 0094 (AC-4, AC-5 kiểm tay). Bổ sung [41](41-export-planning.ba-spec.md) NV7 (ghi chuyến) + bước 4 Đóng cont. Cần migration 🟡 nới ràng buộc `export_files.step` thêm `booking` (không đổi RLS).
+
+> **Sửa lỗi 2026-11-03:** file booking đính xong rồi "mất" — file vẫn ở máy chủ (5 file, kiểm chỉ-đọc) nhưng `EXPORT_FILE_TABLE.fromRow` chỉ nhận bước cũ + `contract`, đọc `booking` thành `document` ⇒ không hiện ở hàng File booking. Sửa: `FILE_ONLY_STEPS` = contract · booking (`repo.ts`) + test vòng toRow → fromRow (`repo.test.ts`). Tải lại app là 5 file hiện lại.
 
 > **Mục đích:** oracle HÀNH VI. Không mô tả giao diện (việc của [42](42-export-planning-ui.design-spec.md)).
 

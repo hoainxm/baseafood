@@ -3,6 +3,7 @@
 // GIẢ ĐỊNH để thử dung sai — chưa có chứng từ nối hai cái.
 import { describe, expect, it } from "vitest";
 import {
+  customerChangeGate,
   EMPTY_EXPORT_DATA,
   buildSchedule,
   canEditContractDirectly,
@@ -1104,3 +1105,25 @@ describe("ba-spec 60 · file booking của chuyến (mig 0094)", () => {
     expect(bookingFilesOf(d, "s2")).toHaveLength(0);
   });
 });
+
+describe("R44 — đổi khách của HĐ tới khi một chuyến xong bước 4 Đóng cont", () => {
+  it("AC-81: HĐ đã duyệt, có lịch xuất hàng (chuyến chưa đóng) ⇒ đổi được", () => {
+    const d = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], approvals: [approval("r0", "c1", "approved")], shipments: [shipment("s1", "c1"), shipment("s2", "c1")] });
+    expect(customerChangeGate(d, "c1")).toEqual({ ok: true });
+  });
+
+  it("AC-82: một chuyến xong bước 4 (đủ mục + số cont, seal) ⇒ khóa, chỉ ra chuyến đó; chuyến đó bị hủy ⇒ mở lại", () => {
+    const d = closedShipmentData({ cartons: 1, netKg: 1, amount: 1 });
+    const gate = customerChangeGate(d, "c1");
+    expect(gate.ok).toBe(false);
+    if (!gate.ok) expect(gate.shipment.id).toBe("s1");
+    const cancelled = { ...d, shipments: d.shipments.map((s) => ({ ...s, status: "cancelled" as const })) };
+    expect(customerChangeGate(cancelled, "c1").ok).toBe(true);
+  });
+
+  it("AC-82: bước 4 mới làm một phần (có số cont, chưa đủ mục) ⇒ vẫn đổi được", () => {
+    const d = data({ contracts: [contract("c1")], shipments: [shipment("s1", "c1", { containerNo: "SZLU9522312", sealNo: "VN1" })], files: [file("s1", "loading-photos", "", 1)] });
+    expect(customerChangeGate(d, "c1").ok).toBe(true);
+  });
+});
+

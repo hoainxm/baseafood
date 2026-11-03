@@ -37,6 +37,7 @@ import {
   copyContractLine,
   insertCopiedLine,
   contractTotals,
+  customerChangeGate,
   emptyTerms,
   lineAmount,
   lineKg,
@@ -207,7 +208,8 @@ export function ContractFormDialog({
   customerNames: readonly CustomerProductName[];
   setProducts: (rows: Product[]) => boolean | void;
   /** Dữ liệu module — gợi ý mặt hàng theo tên tiếng Anh đã nối ở HĐ trước. */
-  data: Pick<ExportData, "contracts" | "revisions">;
+  /** Cả khối Xuất khẩu: số HĐ trùng, gợi ý mặt hàng, và luật khóa đổi khách (R44 — cần chuyến, mục, file). */
+  data: ExportData;
   /** Danh mục loại chứng từ (mig 0081) — ô Chứng từ khách yêu cầu thêm / sửa loại tại chỗ (luật 7). */
   documentKindSource: DocumentKindSource;
   recordedBy: string;
@@ -324,6 +326,9 @@ export function ContractFormDialog({
   };
 
   const identityLocked = form?.mode === "revise" || (form?.mode === "edit" && form.revisionNo > 0);
+  // Khách: đổi được (cả ở bản sửa) tới khi một chuyến của HĐ xong bước 4 Đóng cont (R44, 2026-11-03).
+  const customerGate = form && form.mode !== "create" ? customerChangeGate(data, form.contractId) : ({ ok: true } as const);
+  const customerLocked = !customerGate.ok;
 
   const save = async (thenCreateOrder = false) => {
     // Không đòi `target`: tải lại trang thì hộp mở lại từ NHÁP (target rỗng) — Lưu vẫn phải chạy.
@@ -494,13 +499,21 @@ export function ContractFormDialog({
 
           <FormSection no={1} title="Hợp đồng" hint="VD số HĐ: 18.26/BSF-SCM.2026 · số PO của khách (dòng Order trên HĐ): #B182">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {identityLocked ? (
-                <Field label="Khách hàng">
+              {customerLocked ? (
+                <Field
+                  label="Khách hàng"
+                  hint={
+                    !customerGate.ok
+                      ? `Chuyến ${[customerGate.shipment.lotCode && `lô ${customerGate.shipment.lotCode}`, customerGate.shipment.containerNo].filter(Boolean).join(" · ") || "đầu tiên"} đã xong bước Đóng cont — không đổi khách được nữa.`
+                      : undefined
+                  }
+                >
                   <Input value={customers.find((c) => c.id === form.customerId)?.name ?? ""} readOnly />
                 </Field>
               ) : (
                 <Combobox
                   label="Khách hàng"
+                  hint={form.mode !== "create" ? "Đổi được tới khi một chuyến của hợp đồng xong bước Đóng cont." : undefined}
                   required
                   value={form.customerId}
                   onChange={pickCustomer}

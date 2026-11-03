@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/supabase", () => ({ supabase: null, hasSupabase: false, SITE_ID: "test" }));
 
 import {
+  EXPORT_FILE_TABLE,
+  EXPORT_SHIPMENT_LINE_TABLE,
+  EXPORT_STEP_ITEM_TABLE,
   CUSTOMER_TABLE,
   PRODUCT_TABLE,
   EXPORT_CONTRACT_REVISION_TABLE,
@@ -282,3 +285,25 @@ describe("bản hợp đồng xuất khẩu — dòng hàng đọc lại từ m�
     expect("productId" in back.lines[1]).toBe(false);
   });
 });
+
+describe("Xuất khẩu — file booking + hàng của chuyến qua vòng toRow → fromRow", () => {
+  const file = { id: "f1", contractId: "c1", shipmentId: "s1", stepItemId: "", path: "bsf1/export-files/c1/shipment/x.pdf", fileName: "booking.pdf", layerNo: null, caption: "", uploadedBy: "KH", createdAt: "2026-11-03" };
+
+  it("file booking (0094) đọc lại vẫn là booking — trước 2026-11-03 bị đổi thành document nên biến khỏi hàng File booking", () => {
+    const row = EXPORT_FILE_TABLE.toRow({ ...file, step: "booking" });
+    expect(row.step).toBe("booking");
+    expect(EXPORT_FILE_TABLE.fromRow({ ...row, created_at: "2026-11-03" }).step).toBe("booking");
+    expect(EXPORT_FILE_TABLE.fromRow({ ...EXPORT_FILE_TABLE.toRow({ ...file, step: "contract", attachmentKind: "lc" }), created_at: "" }).step).toBe("contract");
+    expect(EXPORT_FILE_TABLE.fromRow({ ...row, step: "lạ" }).step).toBe("document");
+  });
+
+  it("hàng của chuyến + phần lập invoice giữ nguyên sau vòng ghi / đọc", () => {
+    const line = { id: "l1", shipmentId: "s1", contractId: "c1", sortOrder: 10, contractLineId: "cl1", productId: "p1", description: "CRAB", size: "2-4", packing: "500gr", unitKind: "bundle" as const, cartonsPerUnit: 2, netKgPerCarton: 6, grossKgPerUnit: 14, plannedUnits: 20, loadedUnits: 19, loadedBy: "Kho", loadedAt: "2026-11-03T01:00:00.000Z", expiry: "2028.01", note: "" };
+    expect(EXPORT_SHIPMENT_LINE_TABLE.fromRow(EXPORT_SHIPMENT_LINE_TABLE.toRow(line))).toEqual(line);
+    const comp = { bankOptionId: "bank-account-msb-vung-tau", unitPrices: { l1: 6.45 }, tradeTerms: "", originNote: "Produced in Vietnam", specialNotes: "*NOTE:" };
+    const item = { id: "i1", shipmentId: "s1", step: "document" as const, docKind: "commercial-invoice", docForm: "", docIssuer: "", state: "done" as const, number: "275/26", issuedOn: "2026-11-02", note: "", naReason: "", sharedFromId: "", cartons: 658, netKg: 6580, amount: 42442, onBoardDate: "", createdAt: "" };
+    expect(EXPORT_STEP_ITEM_TABLE.toRow(item)).not.toHaveProperty("invoice_composition");
+    expect(EXPORT_STEP_ITEM_TABLE.fromRow({ ...EXPORT_STEP_ITEM_TABLE.toRow({ ...item, invoiceComposition: comp }), created_at: "" }).invoiceComposition).toEqual(comp);
+  });
+});
+

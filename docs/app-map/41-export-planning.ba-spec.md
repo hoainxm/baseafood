@@ -2,7 +2,7 @@
 
 > Load khi: xây hoặc sửa module Xuất khẩu của Phòng Kế hoạch đợt 1: hồ sơ hợp đồng (dòng hàng, bản sửa, gia hạn, file ký, kết quả duyệt giấy), chuyến (mã lô MSL, booking, cont, seal, ngày đóng/ETD), 6 bước dạng checklist tay kèm file, thực xuất lấy từ invoice, khép kín chuyến/hợp đồng theo dung sai, tiền về, vai trò Phòng Kế hoạch, mở rộng danh mục khách.
 covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql, supabase/migrations/0079_export_approval_workflow.sql, src/lib/abbreviations.ts, supabase/migrations/0081_export_document_kinds.sql
-last_verified: 2026-11-02
+last_verified: 2026-11-03
 <!-- updated: 2026-11-02 (danh sách chọn) — ba-spec [62](62-export-option-lists.ba-spec.md) ĐÃ BUILD: Cảng xếp · Cảng đích · Loại container · Tiền tệ của HĐ và Cảng đến của chuyến chọn theo danh sách (bảng `export_options`, mig 0095 chưa chạy), thêm / bút chì / thùng rác ngay trong ô; HĐ lưu CHỮ (đổi tên / xóa mục không đổi HĐ cũ). Tab **Danh mục** của trang Xuất khẩu (`?view=catalog&list=`) gom 6 danh sách — Loại chứng từ (§0b R37) và Loại hàng chuyển từ màn Danh mục chung sang. -->
 <!-- updated: 2026-11-02 (v9.4 ĐÃ BUILD) — §0d+ NV19 v2 / R42 / R43 (Số booking · Ngày đóng cont · ETD · ETA trên từng chuyến của lịch) / AC-78…80: lịch xuất hàng nằm trong form Lập HĐ (đã có NV19 dạng hộp hỏi SAU khi lưu; đường Lưu & lập lệnh bỏ qua hộp đó). ĐÃ BUILD sau commit 81df805. -->
 <!-- updated: 2026-11-02 (booking) — ba-spec [60](60-export-booking-file.ba-spec.md) ĐÃ BUILD: file booking của chuyến (`export_files.step = booking`, mig 0094 chưa chạy) — đính ở ô Số booking khi ghi chuyến + hàng File booking ở bước 4; không làm bước nào tự xong; `export-plans.loading` không thấy (RLS 0075 giữ nguyên). -->
@@ -35,9 +35,25 @@ status: ba-spec v9.1 (2026-10-29: danh mục Loại chứng từ — §0b) · v9
 > **Nguồn đã chốt:** kế hoạch [`spec/xuat-khau-phong-ke-hoach.md`](../spec/xuat-khau-phong-ke-hoach.md) (§9 chốt 11 câu 2026-10-20) · quy trình [`QTI-KH-01`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) (luật KH-R1…R16) · phân quyền [`spec/role-permissions.md`](../spec/role-permissions.md) · tài liệu công ty [`40-documents.md`](40-documents.md) (khuôn file + RLS).
 
 
+## 0f. v9.6 (2026-11-03, ĐÃ BUILD) — đổi khách của HĐ tới khi đóng cont
+
+- **Nguồn:** chủ dự án 2026-11-03: "Đổi tên KH sau khi tạo xong HĐ và kế hoạch xuất hàng: cần cho phép đổi…", bổ sung "xong bước thứ 4 là đóng cont thì không cho đổi nữa". Trước đây ô khách khóa ngay khi HĐ có bản duyệt (ghi bản sửa) ⇒ lập nhầm khách thì phải xóa HĐ làm lại, mất lịch xuất hàng.
+- **Owner:** U1 (Nhân viên Kế hoạch) — sửa bản 0 hoặc ghi bản sửa. Không cross-user (BGĐ chỉ xem).
+- **Flow:** Input = HĐ chưa hủy / chưa đóng + khách mới (danh mục). Output = HĐ mang khách mới; chuyến, lịch, chứng từ, tiền về giữ nguyên (thuộc HĐ, không thuộc khách); tên hàng theo khách trích xuất cho khách MỚI khi lưu (NV16, không xóa tên đã trích cho khách cũ). End = nhật ký HĐ ghi lần lưu.
+- **R44:** đổi khách được tới khi **một chuyến chưa hủy** của HĐ có bước 4 Đóng cont ở trạng thái Xong / Không áp dụng (đủ 4a–4d + số cont, seal — luật NV8). Từ đó khóa, chỉ ra chuyến đã đóng. Chuyến đó bị hủy ⇒ mở lại. Số HĐ vẫn khóa ở bản sửa như cũ (chỉ khách được nới).
+- **Flow optimization log:** A "khóa khi xong chứng từ bước 5" (yêu cầu lần 1) · B "khóa khi xong bước 4" (chủ dự án chốt lần 2) · C "khóa khi có bản duyệt" (cũ). Chọn **B**: cont đóng rồi là hàng, seal, tờ khai đã theo khách đó; trước đó mọi giấy còn sửa được.
+
+### AC-81 — Đổi khách khi chưa chuyến nào đóng cont · Maps to: 0f, R44 · Test: unit + manual
+- **Given** HĐ đã duyệt, có lịch xuất hàng 2 chuyến chưa đóng **When** ghi bản sửa với khách khác **Then** lưu được, HĐ mang khách mới.
+- **Assert:** `customerChangeGate(d, "c1") == { ok: true }`.
+
+### AC-82 — Khóa khi một chuyến xong bước 4 · Maps to: 0f, R44 · Test: unit
+- **Given** chuyến s1 đủ mục 4a–4d + số cont, seal **When** mở sửa / bản sửa HĐ **Then** khách khóa, nêu chuyến s1; s1 bị hủy ⇒ đổi lại được; bước 4 mới làm một phần ⇒ vẫn đổi được.
+- **Assert:** `gate.ok == false` và `gate.shipment.id == "s1"`; sau khi hủy s1 `ok == true`; có số cont + 1 ảnh, thiếu mục ⇒ `ok == true`.
+
 ## 0e. v9.5 (2026-11-02, ĐÃ BUILD) — Hàng của chuyến, số thực đóng của kho, lập Invoice / Packing list từ app
 
-Chi tiết + AC ở [63](63-export-invoice-from-app.ba-spec.md). Đổi so với các mục dưới: chuyến có thêm **hàng chi tiết** (chọn từ dòng HĐ, không giá); bước 4 có hàng **Số lượng thực đóng** do người đóng hàng điền (KHÔNG chặn bước 4 — R4 của 63; R10 ở đây giữ nguyên: người đóng hàng vẫn không thấy giá); mục Commercial Invoice (bước 5) có phần **Lập invoice từ app** — tải một file Invoice · Packing list (+ Expiry date list). Thực xuất (R7) vẫn là 3 ô tổng của mục; ô trống thì tự điền theo invoice lập. Mig `0096` chưa chạy ⇒ ẩn cả phần mới.
+Chi tiết + AC ở [63](63-export-invoice-from-app.ba-spec.md). Đổi so với các mục dưới: chuyến có thêm **hàng chi tiết** (chọn từ dòng HĐ, không giá); bước 4 có hàng **Số lượng thực đóng** do người đóng hàng điền (KHÔNG chặn bước 4 — R4 của 63; R10 ở đây giữ nguyên: người đóng hàng vẫn không thấy giá); mục Commercial Invoice (bước 5) có phần **Lập invoice từ app** — tải một file Invoice · Packing list (+ Expiry date list). Thực xuất (R7) vẫn là 3 ô tổng của mục; ô trống thì tự điền theo invoice lập. Mig `0096` ✅ đã chạy DB thật (2026-11-03); máy chủ thiếu bảng thì app ẩn cả phần mới.
 
 ## 0d. v9.3 (2026-10-31) — tạo lịch xuất hàng ngay khi lập hợp đồng · ✅ ĐÃ BUILD 2026-10-31
 

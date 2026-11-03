@@ -1133,6 +1133,22 @@ export function contractFlowIndex(state: ContractState): number {
   return CONTRACT_FLOW_STAGES.findIndex((s) => s.state === state);
 }
 
+/**
+ * Đổi khách của HĐ (ba-spec 41 R44, chủ dự án 2026-11-03): được đổi — kể cả khi HĐ đã có bản duyệt, đã lên
+ * lịch xuất hàng — tới khi MỘT chuyến chưa hủy của HĐ xong bước 4 Đóng cont (cont đã đóng = hàng đã đi theo
+ * khách đó); từ đó khóa. Chuyến đã hủy không tính.
+ */
+export type CustomerChangeGate = { ok: true } | { ok: false; shipment: ExportShipment };
+
+export function customerChangeGate(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): CustomerChangeGate {
+  const loaded = d.shipments.find((s) => {
+    if (s.contractId !== contractId || s.status === "cancelled") return false;
+    const st = stepState(d, s, 4, opts);
+    return st === "done" || st === "not-applicable";
+  });
+  return loaded ? { ok: false, shipment: loaded } : { ok: true };
+}
+
 export type ShipmentGate =
   | { ok: true }
   | { ok: false; reason: "not-open" | "no-revision" | "attachments-missing"; missing: ExportContractAttachmentKind[] };

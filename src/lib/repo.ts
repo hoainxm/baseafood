@@ -2164,6 +2164,8 @@ const jsonOf = (v: unknown): unknown => {
 const PAYMENT_METHOD_VALUES = new Set(["ttr", "lc", "other"]);
 const SHIPMENT_KIND_VALUES = new Set(["20RF", "40RF", "40HC-RF", "truck", "consolidated"]);
 const STEP_VALUES = new Set(["production-order", "packaging", "loading-plan", "loading-photos", "customs-declaration", "export-order", "document"]);
+/** Bước chỉ có ở `export_files` (không có mục bước): hồ sơ cấp HĐ (0079) · file booking của chuyến (0094). */
+const FILE_ONLY_STEPS: ReadonlySet<string> = new Set(["contract", "booking"]);
 const ITEM_STATE_VALUES = new Set(["not-started", "in-progress", "done", "not-applicable"]);
 const DECISION_VALUES = new Set(["approved", "needs-revision", "rejected"]);
 const ATTACHMENT_KIND_VALUES = new Set(["signed-contract", "lc", "proforma", "other"]);
@@ -2530,7 +2532,9 @@ export const EXPORT_FILE_TABLE: TableMapping<ExportFile> = {
     contractId: s(r.contract_id),
     shipmentId: s(r.shipment_id),
     stepItemId: s(r.step_item_id),
-    step: (STEP_VALUES.has(s(r.step)) || s(r.step) === "contract" ? s(r.step) : "document") as ExportFile["step"],
+    // "contract" (0079) + "booking" (0094, ba-spec 60) KHÔNG phải bước của chuyến — thiếu "booking" ở đây
+    // làm file booking đọc lại từ máy chủ thành "document" ⇒ biến khỏi hàng File booking (lỗi 2026-11-03).
+    step: (STEP_VALUES.has(s(r.step)) || FILE_ONLY_STEPS.has(s(r.step)) ? s(r.step) : "document") as ExportFile["step"],
     ...(s(r.step) === "contract" ? { attachmentKind: (ATTACHMENT_KIND_VALUES.has(s(r.attachment_kind)) ? s(r.attachment_kind) : "other") as ExportContractAttachmentKind } : {}),
     path: s(r.path),
     fileName: s(r.file_name),

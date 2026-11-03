@@ -2,9 +2,9 @@
 
 > Load khi: sửa các ô chọn theo danh sách của Xuất khẩu (cảng xếp, cảng đích, loại container, tiền tệ của HĐ; cảng đến của chuyến), thêm / sửa / xóa tùy chọn ngay trong ô, hoặc tab Danh mục của trang Xuất khẩu (6 danh sách, gồm cả Loại chứng từ và Loại hàng chuyển từ màn Danh mục chung sang).
 covers: src/lib/exportOptions.ts, src/features/export-planning/exportOptionPicker.tsx, src/features/export-planning/ExportCatalogView.tsx, src/features/export-planning/ContractFormDialog.tsx, src/features/export-planning/ShipmentDialogs.tsx, src/features/catalog/CatalogScreen.tsx, src/features/catalog/CatalogCrudFor.tsx, src/features/catalog/catalogConfig.tsx, supabase/migrations/0095_export_options.sql
-last_verified: 2026-11-02
+last_verified: 2026-11-03
 ttl_days: 90
-status: v1 ĐÃ BUILD 2026-11-02 — chốt Q1…Q7 (§8). Mig `0095_export_options.sql` 🟡 bảng mới chỉ-thêm, ⏳ CHƯA chạy DB thật (kiểm PGlite: chuỗi 0001→0095, chạy 0095 hai lần không lỗi, RLS theo vai đúng). Chưa chạy ⇒ ô chọn dùng danh sách khởi tạo, chỉ chọn. Test `exportOptions.test.ts` (AC-1…AC-5). Thử preview demolocal 2026-11-02 (AC-6, AC-8 phần không máy chủ).
+status: v1 ĐÃ BUILD 2026-11-02 — chốt Q1…Q7 (§8). Mig `0095_export_options.sql` 🟡 bảng mới chỉ-thêm, ✅ ĐÃ chạy DB thật (kiểm chỉ-đọc 2026-11-03; kiểm PGlite: chuỗi 0001→0095, chạy 0095 hai lần không lỗi, RLS theo vai đúng). Chưa chạy ⇒ ô chọn dùng danh sách khởi tạo, chỉ chọn. Test `exportOptions.test.ts` (AC-1…AC-5). Thử preview demolocal 2026-11-02 (AC-6, AC-8 phần không máy chủ).
 
 > **Mục đích:** oracle HÀNH VI. Không mô tả giao diện (việc của [42](42-export-planning-ui.design-spec.md)). Bổ sung [41](41-export-planning.ba-spec.md) NV2 (lập HĐ), NV7 (ghi chuyến), §0b (Loại chứng từ — nơi quản lý đổi).
 

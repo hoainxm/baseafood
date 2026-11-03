@@ -483,11 +483,11 @@ export default function ExportPlanningScreen() {
     return true;
   };
 
-  const downloadShipmentInvoice = (s: ExportShipment) => {
+  const downloadShipmentInvoice = (s: ExportShipment, format: "xlsx" | "pdf") => {
     const c = d.contracts.find((x) => x.id === s.contractId);
     if (!c) return;
     const ci = documentItems(d, s.id).find((x) => x.docKind === "commercial-invoice");
-    void downloadInvoiceDocument(invoiceDocumentFor(d, s, c, customers.find((x) => x.id === c.customerId), ci, exportOptions));
+    void downloadInvoiceDocument(invoiceDocumentFor(d, s, c, customers.find((x) => x.id === c.customerId), ci, exportOptions), format);
   };
 
   const saveLoadingFiles = (rows: ExportFile[]): boolean => {
@@ -1046,7 +1046,7 @@ export default function ExportPlanningScreen() {
               goodsEnabled={store.shipmentLinesAvailable}
               onEditLines={() => dossier.selected && openShipmentLines(dossier.selected)}
               onLoadingCount={() => dossier.selected && openLoadingCount(dossier.selected)}
-              onDownloadInvoice={() => dossier.selected && downloadShipmentInvoice(dossier.selected)}
+              onDownloadInvoice={(format) => dossier.selected && downloadShipmentInvoice(dossier.selected, format)}
               onPayment={setPaymentTarget}
               onDeletePayment={deletePayment}
               onPreview={setPreview}

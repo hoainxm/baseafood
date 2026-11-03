@@ -315,9 +315,29 @@ const company = (): InvoiceSheetRow[] => [
   blank(),
 ];
 
+/**
+ * Địa chỉ bên mua thành các dòng in: có xuống dòng ⇒ theo đó; một dòng dài (ô Địa chỉ của danh mục khách là
+ * ô một dòng) ⇒ ngắt theo từ, mỗi dòng ≤ `max` ký tự — cột A in tràn sang B, cột C đã có chữ ("Vessel's
+ * name"…) nên dòng dài bị che. Mẫu 275/26: 3 dòng địa chỉ dưới tên khách.
+ */
+export function addressLines(address: string, max = 40): string[] {
+  const raw = address.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (raw.length !== 1 || raw[0].length <= max) return raw;
+  const out: string[] = [];
+  let cur = "";
+  for (const word of raw[0].split(/\s+/)) {
+    if (cur && (cur + " " + word).length > max) {
+      out.push(cur);
+      cur = word;
+    } else cur = cur ? `${cur} ${word}` : word;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
 /** Phần đầu (bên mua trái — chuyến phải), dùng chung Invoice + Packing list. */
 function headRows(input: InvoiceDocInput, title: string): InvoiceSheetRow[] {
-  const addr = (input.customer.address ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const addr = addressLines(input.customer.address ?? "");
   const shipOn = englishDate(input.shipment.etd || input.shipment.loadingDate).toUpperCase();
   const right: [string, string][] = [
     ["Shipment on/about:", shipOn],
@@ -412,7 +432,7 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
       { role: "title", cells: ["EXPIRY DATE LIST"] },
       blank(),
       { role: "head", cells: [null, "TO CONSIGNEE:", input.customer.name] },
-      ...(input.customer.address ?? "").split(/\r?\n/).filter((l) => l.trim()).map((l): InvoiceSheetRow => ({ role: "head", cells: [null, null, l.trim()] })),
+      ...addressLines(input.customer.address ?? "").map((l): InvoiceSheetRow => ({ role: "head", cells: [null, null, l] })),
       { role: "head", cells: [null, "INVOICE NO.:", input.invoiceNo, `dated ${englishDate(input.issuedOn)}`] },
       { role: "head", cells: [null, "VESSEL NAME:", input.shipment.vesselVoyage] },
       { role: "head", cells: [null, "DATE OF SHIPMENT:", englishDate(input.shipment.etd || input.shipment.loadingDate).toUpperCase()] },

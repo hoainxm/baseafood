@@ -1,6 +1,6 @@
 > Load khi: deploy app lên Vercel, đổi env production, nối repo cá nhân, hoặc người mới tiếp nhận cần dựng bản chạy thật.
 covers: index.html, package.json, vite.config.ts, src/lib/supabase.ts
-last_verified: 2026-11-02
+last_verified: 2026-11-03
 ttl_days: 90
 
 # Deploy Vercel — Baseafood MES
@@ -93,6 +93,7 @@ Không thao tác thêm. Mỗi branch/PR khác sinh **Preview deploy** riêng.
 | Favicon | `public/favicon.png` + `?v=2` trong [`index.html`](../../index.html) | cache-bust; đã bỏ `favicon.svg` rác template |
 | `pdfjs-dist` (đọc PDF Commercial Invoice, 2026-10-22) | nạp động khi đính PDF; worker là file riêng `assets/pdf.worker.min-*.mjs` (~1,3 MB) qua `?url` | không làm nặng trang đầu; Vercel phục vụ `.mjs` đúng kiểu JS, không cần cấu hình. Gói khai `engines` Node ≥ 22.13 — Node 22 mặc định của Vercel đủ |
 | `docxtemplater` 3.71.1 + `pizzip` 3.3.0 (bộ soạn văn bản Word, ba-spec 54, 2026-10-31) | chỉ `lib/docxTemplate.ts` dùng; màn bộ soạn (P3) phải nạp động để không vào gói trang đầu. **Không** dùng `docxtemplater/js/inspect-module.js` (đòi `lodash` không khai trong gói) — thẻ khuôn tự đọc ở `readTemplateTags` | chạy hoàn toàn trên trình duyệt, không cần máy chủ đổi file |
+| `pdf-lib` 1.17.1 (ghi PDF Invoice · Packing list, ba-spec 63, 2026-11-03) | `lib/exportInvoicePdf.ts` nạp động khi bấm Tải file Invoice (PDF); font chuẩn Times (không nhúng font) + logo `public/invoice-logo.jpg` 32 KB ⇒ file ~40 KB | không vào gói trang đầu. Dev: lần đầu bấm, Vite tối ưu gói rồi tải lại trang (chỉ ở dev) |
 | `docx-preview` 0.4.1 (xem trước file Word, ba-spec 54, 2026-11-02) | `design-system/patterns/DocxPreview.tsx` nạp động khi mở trang soạn; phụ thuộc `jszip` (đã có qua exceljs) | không vào gói trang đầu |
 
 ## Nhắc "có bản cập nhật mới" (version.json)

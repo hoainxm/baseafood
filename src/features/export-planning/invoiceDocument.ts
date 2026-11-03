@@ -37,11 +37,32 @@ export function invoiceDocumentFor(data: ExportData, shipment: ExportShipment, c
 }
 
 /** Tải bộ chứng từ (exceljs nạp động — không kéo vào bundle chính). Lỗi ⇒ báo (luật 13: lỗi luôn báo). */
-export async function downloadInvoiceDocument(doc: ReturnType<typeof buildInvoiceDocument>): Promise<void> {
+export async function downloadInvoiceDocument(doc: ReturnType<typeof buildInvoiceDocument>, format: "xlsx" | "pdf" = "xlsx"): Promise<void> {
   try {
+    if (format === "pdf") {
+      const { invoicePdfBytes, invoicePdfFileName } = await import("@/lib/exportInvoicePdf");
+      // Logo cho PDF (public/invoice-logo.jpg, từ logo gốc docs/brand) — không tải được thì in chữ, vẫn ra PDF.
+      const logo = await fetch(`${import.meta.env.BASE_URL}invoice-logo.jpg`)
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .catch(() => null);
+      saveBlob(new Blob([(await invoicePdfBytes(doc, logo)) as BlobPart], { type: "application/pdf" }), invoicePdfFileName(doc));
+      return;
+    }
     const { downloadInvoiceWorkbook } = await import("@/lib/exportInvoiceExcel");
     await downloadInvoiceWorkbook(doc);
   } catch (e) {
-    notify.error(e instanceof Error ? `Không tạo được file Excel: ${e.message}` : "Không tạo được file Excel");
+    const what = format === "pdf" ? "PDF" : "Excel";
+    notify.error(e instanceof Error ? `Không tạo được file ${what}: ${e.message}` : `Không tạo được file ${what}`);
   }
+}
+
+function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

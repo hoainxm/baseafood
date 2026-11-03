@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExportContractLine, ExportShipmentLine } from "@/types";
 import {
+  addressLines,
   amountInWords,
   bankBlockLines,
   buildInvoiceDocument,
@@ -120,6 +121,17 @@ describe("exportInvoice — chữ in", () => {
     expect(amountInWords(42442, "USD")).toBe("United States Dollars Forty two thousand four hundred forty two only.");
     expect(amountInWords(36249.71, "USD")).toBe("United States Dollars Thirty six thousand two hundred forty nine and seventy one cents only.");
     expect(amountInWords(1000000, "JPY")).toBe("Japanese Yen One million only.");
+  });
+
+  it("địa chỉ một dòng dài ⇒ ngắt theo từ, ≤ 40 ký tự (ra đúng 3 dòng như PDF 275/26); có xuống dòng ⇒ giữ nguyên", () => {
+    expect(addressLines("NO. 2-3, 1-CHOME HIGASHIYAMATO-MACHI, SHIMONOSEKI CITY, YAMAGUCHI PREFECTURE 750-0066, JAPAN")).toEqual([
+      "NO. 2-3, 1-CHOME HIGASHIYAMATO-MACHI,",
+      "SHIMONOSEKI CITY, YAMAGUCHI PREFECTURE",
+      "750-0066, JAPAN",
+    ]);
+    expect(addressLines("4-1-9 TSUKIJI CHUO-KU TOKYO JAPAN")).toEqual(["4-1-9 TSUKIJI CHUO-KU TOKYO JAPAN"]);
+    expect(addressLines("Dòng 1\nDòng 2")).toEqual(["Dòng 1", "Dòng 2"]);
+    expect(addressLines("")).toEqual([]);
   });
 
   it("ngày tiếng Anh, tên file, nhãn kiện", () => {

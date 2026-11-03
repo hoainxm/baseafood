@@ -26,6 +26,7 @@
     "exceljs": "^4.4.0",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.28.0",
+    "pdf-lib": "1.17.1",
     "pdfjs-dist": "^6.3.289",
     "pizzip": "^3.3.0",
     "qrcode": "^1.5.4",

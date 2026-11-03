@@ -2,7 +2,7 @@
 
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
-last_verified: 2026-11-02
+last_verified: 2026-11-03
 <!-- updated: 2026-11-02 (v9.4) — form Lập HĐ có mục 6 "Lịch xuất hàng" (sau mục 5): ChoiceGroup Có / Không, ghi chú "tự chia" / "đã sửa tay" + "Chia lại theo hợp đồng", `ScheduleRowsEditor` (mỗi chuyến: tháng · kg · Bỏ / Số booking · Ngày đóng cont · ETD · ETA). Bỏ hộp hỏi lịch sau khi lưu. -->
 <!-- updated: 2026-11-02 (danh sách chọn) — tab thứ 4 **Danh mục** cạnh Lịch xuất hàng · Hợp đồng · Báo cáo (điện thoại: 4 tab lưới 2×2); trong tab là hàng tab con 6 danh sách (`?list=`, mốc `export-catalog-lists`), mỗi danh sách một bảng CatalogCrud. 4 ô điều khoản (Cảng xếp, Cảng đích, Tiền tệ, Loại container) + Cảng đến của chuyến thành Combobox có Thêm mới / bút chì / thùng rác; giá trị cũ khác danh sách hiện đầu danh sách với dòng phụ "Ngoài danh sách…" (ba-spec 62). -->
 <!-- updated: 2026-11-02 (lập HĐ) — chân hộp Lập HĐ: Hủy · Lưu & lập lệnh sản xuất (save, chỉ lập mới + quyền Lệnh SX) · Lưu hợp đồng (save). -->
@@ -30,6 +30,7 @@ ttl_days: 90
 > **Vì sao có doc này (chủ dự án 2026-10-20):** bản đầu "chưa trực quan": 6 chấm số không nói thiếu gì, hồ sơ 6 nút ngang không rõ việc tiếp, bước chuyến là thẻ lồng hộp lồng nút, form dài một mạch và lệch hàng.
 
 > **2026-11-02 (ba-spec [63](63-export-invoice-from-app.ba-spec.md)):** hồ sơ chuyến có khối **Hàng của chuyến** ngay dưới thẻ chuyến (danh sách dòng: tên · quy cách · kế hoạch → thực đóng · kg; nút Nhập / Sửa hàng của chuyến); bước 4 thêm hàng **Số lượng thực đóng** (nút Điền / Sửa số thực đóng — cả ở màn người đóng hàng); bước 5 có dải **Tải Invoice · Packing list**; hộp mục Commercial Invoice có khung **Lập invoice từ app** (tài khoản nhận tiền, điều kiện giao, đơn giá từng dòng, thông tin riêng của khách, tổng + nút Tải file). Lưới các khung dùng `grid-cols-[minmax(0,1fr)]`, nút chữ dài cho xuống dòng — 360px × 130% không tràn.
+> **2026-11-03:** khung Lập invoice có 2 nút — **Tải file Invoice (PDF)** (chính, `default`) và **Tải file Excel** (`outline`); dải bước 5 có **Tải PDF** · **Tải Excel**. Bố cục bản PDF: R9 ba-spec 63.
 
 ## Thang người dùng
 

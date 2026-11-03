@@ -165,7 +165,7 @@ export function ShipmentPanel({
   goodsEnabled: boolean;
   onEditLines: () => void;
   onLoadingCount: () => void;
-  onDownloadInvoice: () => void;
+  onDownloadInvoice: (format: "xlsx" | "pdf") => void;
 }) {
   const opts = { filesAvailable };
   const label = [shipment.lotCode && `Lô ${shipment.lotCode}`, shipmentKindLabel(shipment.kind), shipment.containerNo].filter(Boolean).join(" · ");
@@ -498,10 +498,16 @@ export function ShipmentPanel({
         {goodsEnabled && goods.length > 0 && can.viewPrice && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border py-3">
             <span className="text-sm text-muted-foreground">Bộ Invoice · Packing list lập từ hàng của chuyến (tài khoản, đơn giá, ghi chú riêng sửa ở mục Commercial Invoice).</span>
-            <Button size="sm" variant="outline" onClick={onDownloadInvoice} title="Tải file Excel gồm Invoice, Packing list (và Expiry date list khi có hạn dùng) của chuyến này.">
-              <Download className="mr-1 h-4 w-4" aria-hidden />
-              Tải Invoice · Packing list
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => onDownloadInvoice("pdf")} title="Tải bản PDF Invoice, Packing list (và Expiry date list khi có hạn dùng) của chuyến này — mỗi chứng từ một trang A4.">
+                <Download className="mr-1 h-4 w-4" aria-hidden />
+                Tải PDF
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => onDownloadInvoice("xlsx")} title="Tải file Excel Invoice, Packing list (và Expiry date list khi có hạn dùng) của chuyến này để sửa tiếp.">
+                <Download className="mr-1 h-4 w-4" aria-hidden />
+                Tải Excel
+              </Button>
+            </div>
           </div>
         )}
         {!docs.length && <p className="py-3 text-sm text-muted-foreground">Chưa có mục chứng từ.</p>}

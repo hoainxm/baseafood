@@ -30,7 +30,7 @@ import {
 } from "@/lib/balancingGrid";
 import { depositPriceOn } from "@/lib/balancingStockLines";
 import { Button } from "@/design-system";
-import { num } from "@/lib/format";
+import { num, price } from "@/lib/format";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { ChevronsLeftRight, Coins, Printer, X } from "lucide-react";
 
@@ -221,7 +221,7 @@ export default function BalancingTable({
                       <Td right></Td>
                       {materialDateColumns.map((iso) => (
                         <Td key={iso} right>
-                          <span className="text-xs text-slate-600">{line.prices[iso] != null ? num(line.prices[iso]) : ""}</span>
+                          <span className="text-xs text-slate-600">{line.prices[iso] != null ? price(line.prices[iso]) : ""}</span>
                         </Td>
                       ))}
                       {isMaterialDaysOpen && hasLegacyCarryOver && <Td right></Td>}
@@ -317,7 +317,7 @@ export default function BalancingTable({
                     <Td right>{num(r.total)}</Td>
                     {!hideAmounts && (
                       <Td right>
-                        {num(r.unitPrice)}
+                        {price(r.unitPrice)}
                         {xk ? " $" : ""}
                       </Td>
                     )}

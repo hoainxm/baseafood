@@ -6,7 +6,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { formatNumber } from "./numberExpression";
+import { formatNumberInput } from "./numberExpression";
 import { useNumberInput } from "./useNumberInput";
 import { navigateNumberColumn } from "./numberColumnNav";
 
@@ -64,7 +64,7 @@ export function ExpressionPreview({
           >
             {result == null
               ? "Đang gõ phép tính…"
-              : `= ${formatNumber(result)}${unit ? ` ${unit}` : ""}`}
+              : `= ${formatNumberInput(result)}${unit ? ` ${unit}` : ""}`}
           </span>,
           document.body
         )}

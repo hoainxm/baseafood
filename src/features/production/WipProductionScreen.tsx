@@ -81,7 +81,7 @@ import {
   type ComboboxOption,
   PeriodPicker,
 } from "@/design-system";
-import { kg, num, todayISO, formatDateVN } from "@/lib/format";
+import { kg, num, price, todayISO, formatDateVN } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { appendAuditEntries } from "@/lib/audit";
 import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
@@ -1114,7 +1114,7 @@ export default function WipProductionScreen() {
       header: "Đơn giá (đ/kg)",
       numeric: true,
       render: (r) =>
-        r.unitPrice != null ? num(r.unitPrice) : <span className="text-muted-foreground">—</span>,
+        r.unitPrice != null ? price(r.unitPrice) : <span className="text-muted-foreground">—</span>,
       getSortValue: (r) => r.unitPrice ?? 0,
     },
     {

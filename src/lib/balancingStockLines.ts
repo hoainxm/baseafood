@@ -14,7 +14,7 @@ import {
   propagateLotsForward,
   type MonthlyStockRow,
 } from "@/lib/monthlyStock";
-import { num, formatDateVN } from "@/lib/format";
+import { num, price, formatDateVN } from "@/lib/format";
 
 /**
  * VÌ SAO — khối NL ở Cân đối có hai dòng kho (chốt 2026-10-06):
@@ -562,7 +562,7 @@ export function listThawLotOptions(
       label: `${r.itemName}${r.size ? ` ${r.size}` : ""}${r.origin ? ` · ${r.origin}` : ""}`,
       // Giá của lô (giá lúc gửi với lô gửi đông) — kế toán thấy ngay khi chọn lô để lấy.
       subLabel: `còn ${num(r.closeKg)} kg${r.importDate ? ` · nhập ${formatDateVN(r.importDate)}` : ""}${
-        r.unitPrice != null ? ` · giá ${num(r.unitPrice)} đ` : ""
+        r.unitPrice != null ? ` · giá ${price(r.unitPrice)} đ` : ""
       } · ${shortLocationName(r)}`,
       stockKg: r.closeKg,
       price: r.unitPrice,

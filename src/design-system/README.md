@@ -408,7 +408,7 @@ Luật khi dùng:
 
 | Lớp | File | Vai trò |
 |---|---|---|
-| Hàm thuần | `patterns/numberExpression.ts` (+ `numberExpression.test.ts`) | `parseVnNumber` · `formatNumber` · `isExpression` · `evaluateExpression` · `parseNumberOrExpression` |
+| Hàm thuần | `patterns/numberExpression.ts` (+ `numberExpression.test.ts`) | `parseVnNumber` · `formatNumber` (hiển thị, 3 số lẻ) · `formatNumberInput` (ô nhập, 6 số lẻ) · `roundInputNumber` · `isExpression` · `evaluateExpression` · `parseNumberOrExpression` |
 | Hành vi ô | `patterns/useNumberInput.ts` | ghi theo phím, Esc trả số cũ, rời ô định dạng lại, trả `preview` |
 | Ô dựng sẵn | `NumberField` (có nhãn) · ô lưới `EditableGrid` · `ONhapSo` (ô trần, không nhãn) | cùng gọi `useNumberInput` + `ExpressionPreview` |
 
@@ -419,6 +419,11 @@ Luật khi dùng:
 - Đang gõ biểu thức: nhãn nổi **"= 550 kg"** ngay dưới ô (portal ra `body`, nên không
   bị khung cuộn bảng / hộp thoại cắt). Biểu thức **dở** ("250+") ⇒ **chưa ghi**, giữ số
   cũ — không ghi tạm 0/null làm mất số thật. **Esc** trả về số lúc vào ô.
+- **6 số lẻ (từ 2026-11-04, chị Thảo):** mọi ô số giữ tới **6 số sau dấu phẩy** — rời ô hiện lại
+  bằng `formatNumberInput` (không thêm số 0 thừa: `12,345678`, `1.234,5`), gõ quá 6 số lẻ làm tròn về 6.
+  ĐỪNG hiện lại số trong ô bằng `formatNumber` (3 số lẻ) — sửa lại ô là mất số lẻ. Hiển thị đơn giá
+  ngoài ô: `price()` (VND, tối đa 6 số lẻ) · `formatUnitPrice()` (ngoại tệ, 2–6 số lẻ) ở `lib/format.ts`.
+  Cột đơn giá trên máy chủ giữ 6 số lẻ (mig 0104); cột kg giữ 3 số lẻ.
 - **Luật:** ô số mới **phải** là `NumberField` (có nhãn) hoặc `ONhapSo` (ô trần trong
   bảng / thanh cấu hình) — **cấm** `<Input inputMode="decimal">` / `type="number"` tự
   parse. Màn KHÔNG tự parse số. Ngoại lệ: ô **năm** (số nguyên không phân nghìn).

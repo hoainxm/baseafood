@@ -11,7 +11,7 @@ import type { MaterialImportItem } from "@/types";
 import { calculateImportAmount } from "@/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/design-system";
 import { formatDayLabel } from "@/lib/balancingGrid";
-import { num } from "@/lib/format";
+import { num, price } from "@/lib/format";
 
 export function TripPriceList({
   rowName,
@@ -66,7 +66,7 @@ export function TripPriceList({
                 </td>
                 <td className="py-1 pr-3 text-right">{num(i.quantityKg)}</td>
                 <td className="py-1 pr-3 text-right">
-                  {i.unitPrice != null ? num(i.unitPrice) : <span className="text-destructive">chưa có giá</span>}
+                  {i.unitPrice != null ? price(i.unitPrice) : <span className="text-destructive">chưa có giá</span>}
                 </td>
                 <td className="py-1 text-right">{i.unitPrice != null ? num(calculateImportAmount(i)) : "—"}</td>
               </tr>

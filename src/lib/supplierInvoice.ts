@@ -18,7 +18,7 @@ import type {
   SupplierInvoicePdfLine,
   Workshop,
 } from "@/types";
-import { formatDateVN, num } from "./format";
+import { formatDateVN, num, price } from "./format";
 
 // ---------- Nhãn ----------
 
@@ -666,7 +666,7 @@ export function applyInvoiceToTripLine(
 ): MaterialImportItem {
   const parts = [
     trip.quantityKg !== line.quantityKg ? `kg ${num(trip.quantityKg)} → ${num(line.quantityKg)}` : "",
-    trip.unitPrice !== line.unitPrice ? `giá ${trip.unitPrice == null ? "—" : num(trip.unitPrice)} → ${num(line.unitPrice)}` : "",
+    trip.unitPrice !== line.unitPrice ? `giá ${trip.unitPrice == null ? "—" : price(trip.unitPrice)} → ${price(line.unitPrice)}` : "",
   ].filter(Boolean);
   if (!parts.length) return trip;
   const afterLock = ctx.dayLocked ? ` · SAU KHI CHỐT NGÀY ${formatDateVN(trip.deliveryDate)}` : "";

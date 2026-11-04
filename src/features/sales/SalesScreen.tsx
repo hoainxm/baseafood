@@ -69,7 +69,7 @@ import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useFormDraft } from "@/lib/formDraft";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { kg, num, todayISO, formatDateVN } from "@/lib/format";
+import { kg, num, price, todayISO, formatDateVN } from "@/lib/format";
 import { sumSalesAmountByChannel } from "@/lib/salesTotals";
 import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { ALL, activeFilterCount, filterRows, matchesSearch, matchesValue } from "@/lib/recordFilters";
@@ -599,7 +599,7 @@ export default function SalesScreen() {
       numeric: true,
       render: (r) =>
         r.unitPrice != null ? (
-          num(r.unitPrice)
+          price(r.unitPrice)
         ) : (
           <Tag variant="error">Chưa có giá</Tag>
         ),

@@ -12,7 +12,7 @@ export { useFieldInput, type FieldInputProps } from "./patterns/fieldInput";
 export { NumberField } from "./patterns/NumberField";
 export { NumberInput } from "./patterns/NumberInput";
 export { useNumberInput } from "./patterns/useNumberInput";
-export { parseVnNumber, formatNumber, parseNumberOrExpression } from "./patterns/numberExpression";
+export { parseVnNumber, formatNumber, formatNumberInput, parseNumberOrExpression } from "./patterns/numberExpression";
 export { ChoiceGroup, type ChoiceOption } from "./patterns/ChoiceGroup";
 export { Combobox, type ComboboxOption } from "./patterns/Combobox";
 export {

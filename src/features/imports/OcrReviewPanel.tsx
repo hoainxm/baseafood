@@ -7,7 +7,7 @@ import { useState, type ReactNode } from "react";
 import { Button, Tag } from "@/design-system";
 import { Minus, Plus as PlusIcon, Maximize2 } from "lucide-react";
 import type { OcrResult, OcrCatalog } from "@/lib/ocr";
-import { kg as fmtKg, formatDateVN, num } from "@/lib/format";
+import { kg as fmtKg, formatDateVN, price } from "@/lib/format";
 import type { OcrHeaderField, OcrSelection } from "./importHelpers";
 
 /** Mức phóng ảnh: 1 = vừa khung. */
@@ -261,7 +261,7 @@ export function OcrReviewTable({
                       <>
                         {" · "}
                         {l.unitPrice != null ? (
-                          `${num(l.unitPrice)} đ/kg`
+                          `${price(l.unitPrice)} đ/kg`
                         ) : (
                           <span className="text-muted-foreground">
                             giữ giá lượt trước

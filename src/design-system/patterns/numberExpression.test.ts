@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isExpression, parseVnNumber, parseNumberOrExpression, evaluateExpression } from "./numberExpression";
+import { isExpression, parseVnNumber, parseNumberOrExpression, evaluateExpression, formatNumber, formatNumberInput, roundInputNumber } from "./numberExpression";
 
 describe("parseVnNumber — số thường vi-VN", () => {
   it("dấu chấm phân nghìn, phẩy thập phân", () => {
@@ -64,5 +64,24 @@ describe("parseNumberOrExpression + isExpression", () => {
     expect(isExpression("250+")).toBe(true);
     expect(parseNumberOrExpression("250+")).toBeNull();
     expect(parseNumberOrExpression("=")).toBeNull();
+  });
+});
+
+describe("formatNumberInput — ô nhập giữ tới 6 số lẻ (chị Thảo 2026-11-04)", () => {
+  it("giữ đủ 6 số lẻ, không thêm số 0 thừa", () => {
+    expect(formatNumberInput(12.345678)).toBe("12,345678");
+    expect(formatNumberInput(1234.5)).toBe("1.234,5");
+    expect(formatNumberInput(7)).toBe("7");
+    expect(formatNumberInput(null)).toBe("");
+  });
+  it("gõ → hiện lại → đọc lại vẫn đúng số (không mất số lẻ khi sửa lại)", () => {
+    for (const n of [12.345678, 0.000001, 1234567.123456]) expect(parseVnNumber(formatNumberInput(n))).toBe(n);
+  });
+  it("quá 6 số lẻ ⇒ làm tròn về 6", () => {
+    expect(roundInputNumber(1.23456789)).toBe(1.234568);
+    expect(roundInputNumber(parseNumberOrExpression("0,1+0,2") ?? 0)).toBe(0.3);
+  });
+  it("formatNumber (hiển thị bảng) giữ 3 số lẻ như cũ", () => {
+    expect(formatNumber(12.345678)).toBe("12,346");
   });
 });

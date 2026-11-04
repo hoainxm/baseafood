@@ -20,7 +20,7 @@ import {
   Field,
 } from "@/design-system";
 import { cn } from "@/lib/utils";
-import { num } from "@/lib/format";
+import { num, price } from "@/lib/format";
 import {
   joinDepositLocation,
   shortLocationName,
@@ -210,7 +210,7 @@ export function DepositTargetDialog({
                             <td className="px-3 py-1.5 text-muted-foreground">{r.origin || "—"}</td>
                             <td className="px-3 py-1.5 text-muted-foreground">{shortLocationName(r)}</td>
                             <td className="tnum px-3 py-1.5 text-right">{num(r.closeKg)}</td>
-                            <td className="tnum px-3 py-1.5 text-right">{r.unitPrice != null ? num(r.unitPrice) : "—"}</td>
+                            <td className="tnum px-3 py-1.5 text-right">{r.unitPrice != null ? price(r.unitPrice) : "—"}</td>
                           </tr>
                         ))}
                       </tbody>

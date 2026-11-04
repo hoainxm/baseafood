@@ -15,7 +15,7 @@ import type {
 } from "@/types";
 import { BSF1_WAREHOUSES } from "@/types";
 import { uid } from "@/lib/db";
-import { num, todayISO, formatDateVN } from "@/lib/format";
+import { num, price, todayISO, formatDateVN } from "@/lib/format";
 import { notify } from "@/design-system";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { calculateBalancing, type BalancingResult } from "@/lib/balancingCalc";
@@ -503,7 +503,7 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
           if (!c) return r;
           const parts = [
             r.quantityKg !== c.quantityKg ? `kg ${num(r.quantityKg)} → ${num(c.quantityKg)}` : "",
-            r.unitPrice !== c.unitPrice ? `giá ${r.unitPrice == null ? "—" : num(r.unitPrice)} → ${c.unitPrice == null ? "—" : num(c.unitPrice)}` : "",
+            r.unitPrice !== c.unitPrice ? `giá ${r.unitPrice == null ? "—" : price(r.unitPrice)} → ${c.unitPrice == null ? "—" : price(c.unitPrice)}` : "",
           ].filter(Boolean);
           // Dòng vết đọc được ngay ở màn Nhập hàng (nhật ký thao tác vẫn tự ghi trước/sau mọi trường).
           const afterLock = isImportDayLocked(r.deliveryDate, r.workshop) ? ` · SAU KHI CHỐT NGÀY ${formatDateVN(r.deliveryDate)}` : "";

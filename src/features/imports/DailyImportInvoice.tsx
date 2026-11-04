@@ -10,7 +10,7 @@ import {
   getDatesInRange,
   PeriodPicker,
 } from "@/design-system";
-import { num } from "@/lib/format";
+import { num, price } from "@/lib/format";
 import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { Printer, X } from "lucide-react";
 
@@ -261,7 +261,7 @@ function DaySection({
                 </Td>
                 {showPrice && (
                   <Td right className="tnum">
-                    {r.unitPrice != null ? num(r.unitPrice) : ""}
+                    {r.unitPrice != null ? price(r.unitPrice) : ""}
                   </Td>
                 )}
                 {i === 0 && (

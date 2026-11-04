@@ -31,7 +31,7 @@ import type { AccountingCodeMap, DailyLock, ExportActivityAction, ImportShipment
 import { dayRecordId, type ActivityInput } from "@/features/shared/activityLog";
 import { useSupplierInvoiceStore } from "@/lib/catalogRepo";
 import { newId } from "@/lib/store";
-import { formatDateVN, kg, num, todayISO } from "@/lib/format";
+import { formatDateVN, kg, num, price, todayISO } from "@/lib/format";
 import { ALL, activeFilterCount, countedLabel, matchesSearch, matchesValue, statusOptions } from "@/lib/recordFilters";
 import {
   IMPORT_CHANGE_LABELS,
@@ -474,7 +474,7 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
   const tripCell = (r: RowView) =>
     r.trip ? (
       <span className="tnum">
-        {num(r.trip.quantityKg)} kg{p.canViewPrice ? ` · ${r.trip.unitPrice == null ? "chưa giá" : num(r.trip.unitPrice)}` : ""}
+        {num(r.trip.quantityKg)} kg{p.canViewPrice ? ` · ${r.trip.unitPrice == null ? "chưa giá" : price(r.trip.unitPrice)}` : ""}
         <span className="block text-sm text-muted-foreground">{r.trip.workshop} · {r.trip.licensePlate || "—"}</span>
       </span>
     ) : (
@@ -506,7 +506,7 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
     { key: "kg", header: "Kg (HĐ)", numeric: true, sortValue: (r) => r.line.quantityKg, render: (r) => num(r.line.quantityKg), total: (rs) => num(rs.reduce((s, r) => s + r.line.quantityKg, 0)) },
     ...(p.canViewPrice
       ? [
-          { key: "price", header: "Đơn giá (HĐ)", numeric: true, sortValue: (r: RowView) => r.line.unitPrice, render: (r: RowView) => num(r.line.unitPrice) },
+          { key: "price", header: "Đơn giá (HĐ)", numeric: true, sortValue: (r: RowView) => r.line.unitPrice, render: (r: RowView) => price(r.line.unitPrice) },
           { key: "amount", header: "Thành tiền", numeric: true, sortValue: (r: RowView) => r.line.amount, render: (r: RowView) => num(r.line.amount), total: (rs: RowView[]) => num(rs.reduce((s, r) => s + r.line.amount, 0)) },
         ]
       : []),

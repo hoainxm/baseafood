@@ -59,7 +59,7 @@ import {
   shipmentMonth,
   type ExportData,
 } from "@/lib/exportPlanning";
-import { formatDateVN, formatMoney, formatDateTimeVN, todayISO } from "@/lib/format";
+import { formatDateVN, formatMoney, formatUnitPrice, formatDateTimeVN, todayISO } from "@/lib/format";
 import { validityLabel, validityState } from "@/lib/contractValidity";
 import { useGoodsTypeStore } from "@/lib/catalogRepo";
 import { goodsTypeName } from "@/lib/goodsTypes";
@@ -274,7 +274,7 @@ export function ContractDossier({
       : []),
     ...(can.viewPrice
       ? [
-          { key: "price", header: `Đơn giá (${currency}/kg)`, numeric: true, render: (l: ExportContractLine) => formatMoney(l.unitPrice) },
+          { key: "price", header: `Đơn giá (${currency}/kg)`, numeric: true, render: (l: ExportContractLine) => formatUnitPrice(l.unitPrice) },
           { key: "amount", header: `Tiền (${currency})`, numeric: true, render: (l: ExportContractLine) => formatMoney(lineAmount(l)) },
         ]
       : []),

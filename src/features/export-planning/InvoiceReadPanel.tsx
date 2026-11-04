@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Combobox, Tag, formatNumber, notify, type ComboboxOption } from "@/design-system";
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { newId } from "@/lib/store";
-import { formatDateVN, formatMoney } from "@/lib/format";
+import { formatDateVN, formatMoney, formatUnitPrice } from "@/lib/format";
 import { findCustomerName } from "@/lib/customerProductNames";
 import { rankProductsForLine } from "@/lib/exportPlanning";
 import { compareInvoiceToContract, fillInvoiceItem, isReadableInvoiceFile, matchInvoiceLines, type InvoiceReadResult, type InvoiceTotalField } from "@/lib/invoiceReader";
@@ -264,7 +264,7 @@ export function InvoiceReadPanel({
                     {(l.size || l.packing) && <span className="break-words text-muted-foreground">{[l.size, l.packing].filter(Boolean).join(" · ")}</span>}
                     <span className="tnum">
                       {formatNumber(l.cartons)} thùng · {formatNumber(l.netKg)} kg
-                      {canViewPrice && l.unitPrice != null ? ` · ${formatNumber(l.unitPrice)} ${currency}/kg` : ""}
+                      {canViewPrice && l.unitPrice != null ? ` · ${formatUnitPrice(l.unitPrice)} ${currency}/kg` : ""}
                       {canViewPrice && l.amount != null ? ` · ${formatMoney(l.amount)} ${currency}` : ""}
                     </span>
                   </div>

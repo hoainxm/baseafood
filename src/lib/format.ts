@@ -17,6 +17,21 @@ export function num(v: number | null | undefined): string {
   return nf.format(chuan0(v));
 }
 
+const priceNf = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 6 });
+const foreignPriceNf = new Intl.NumberFormat("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+
+/** Đơn giá VND: tối đa 6 số lẻ, không thêm số 0 thừa (chị Thảo 2026-11-04: đơn giá 6 số sau dấu phẩy). */
+export function price(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return "";
+  return priceNf.format(chuan0(v));
+}
+
+/** Đơn giá ngoại tệ (USD/kg…): tối thiểu 2, tối đa 6 số lẻ — 12,50 · 12,345678. Như cột UNIT PRICE của invoice. */
+export function formatUnitPrice(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "";
+  return foreignPriceNf.format(chuan0(v));
+}
+
 /** kg hiển thị kèm đơn vị. */
 export function kg(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return "";

@@ -27,7 +27,7 @@ import {
   type FieldError,
 } from "@/design-system";
 import { formatDayLabel } from "@/lib/balancingGrid";
-import { num } from "@/lib/format";
+import { num, price } from "@/lib/format";
 import { useDialogDraft } from "@/lib/formDraft";
 import type { ImportTripEdit } from "./usePeriodGrid";
 
@@ -199,7 +199,7 @@ export function EditImportTripsDialog({
                   )}
                   {v.price !== i.unitPrice && (
                     <span className="tnum block">
-                      Đơn giá: {i.unitPrice == null ? "—" : num(i.unitPrice)} → <strong>{v.price == null ? "—" : num(v.price)}</strong> đ/kg
+                      Đơn giá: {i.unitPrice == null ? "—" : price(i.unitPrice)} → <strong>{v.price == null ? "—" : price(v.price)}</strong> đ/kg
                     </span>
                   )}
                 </li>

@@ -14,7 +14,7 @@ import type { Customer, ExportContractLine, ExportContractTerms, ExportOption, E
 import { nameKey } from "./customerProductNames";
 import { INCOTERMS } from "./exportPlanning";
 import { exportOptionListMeta, exportOptionsOf, optionKey } from "./exportOptions";
-import { formatDateVN, formatMoney, num } from "./format";
+import { formatDateVN, formatMoney, formatUnitPrice, num } from "./format";
 import { parseInvoiceDate, parseInvoiceNumber, rowsFromTextItems, sizeKey, type PdfTextItem } from "./invoiceReader";
 
 /* ---------- Kết quả đọc ---------- */
@@ -718,7 +718,7 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
     if (Math.abs(diff) <= 0.01) return;
     lineIssues.push({ lineIndex: i, expected, actual: l.amount, diff });
     priceWarnings.push(
-      `Dòng ${i + 1}${l.size ? ` (${l.size})` : ""}: ${num(l.kg)} kg × ${num(l.unitPrice)} = ${formatMoney(expected)}, file ghi ${formatMoney(l.amount)} (chênh ${formatMoney(diff)}) — kiểm lại file.`,
+      `Dòng ${i + 1}${l.size ? ` (${l.size})` : ""}: ${num(l.kg)} kg × ${formatUnitPrice(l.unitPrice)} = ${formatMoney(expected)}, file ghi ${formatMoney(l.amount)} (chênh ${formatMoney(diff)}) — kiểm lại file.`,
     );
   });
   const sumKg = round2(lines.reduce((s, l) => s + (l.kg ?? 0), 0));

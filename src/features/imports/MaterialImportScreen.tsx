@@ -59,7 +59,7 @@ import {
   type ComboboxOption,
   PeriodPicker,
 } from "@/design-system";
-import { kg, num, todayISO, formatDateVN } from "@/lib/format";
+import { kg, num, price, todayISO, formatDateVN } from "@/lib/format";
 import { formatMaterialLotLabel } from "@/lib/lotTraceability";
 import { useAuth } from "@/lib/auth";
 import { dayRecordId, entriesOf, useImportsActivityLog } from "@/features/shared/activityLog";
@@ -1133,7 +1133,7 @@ export default function MaterialImportScreen() {
             numeric: true,
             render: (r) =>
               r.unitPrice != null ? (
-                num(r.unitPrice)
+                price(r.unitPrice)
               ) : (
                 <Tag variant="error">Chưa có giá</Tag>
               ),

@@ -32,6 +32,21 @@ export function formatNumber(n: number | null): string {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
 }
 
+/** Số lẻ tối đa của ô nhập số (chị Thảo 2026-11-04: đơn giá 6 số sau dấu phẩy — áp cho mọi ô số). */
+export const INPUT_FRACTION_DIGITS = 6;
+
+/** Làm tròn số gõ vào ô về `INPUT_FRACTION_DIGITS` số lẻ (bỏ nhiễu dấu phẩy động). */
+export const roundInputNumber = (n: number): number => Math.round(n * 10 ** INPUT_FRACTION_DIGITS) / 10 ** INPUT_FRACTION_DIGITS;
+
+/**
+ * Hiện lại số TRONG Ô NHẬP: tối đa 6 số lẻ, không thêm số 0 thừa (12,345678 · 1.234,5).
+ * Khác `formatNumber` (hiển thị bảng / báo cáo, 3 số lẻ): ô nhập mà cắt bớt thì sửa lại là mất số.
+ */
+export function formatNumberInput(n: number | null): string {
+  if (n == null) return "";
+  return n.toLocaleString("vi-VN", { maximumFractionDigits: INPUT_FRACTION_DIGITS });
+}
+
 /**
  * Chuẩn hoá chuỗi người gõ về dạng máy tính được:
  *  - bỏ dấu "=" đầu (thói quen Excel: "=250+300")
@@ -141,7 +156,7 @@ export function evaluateExpression(raw: string): number | null {
   if (!/^[-+*/%().\d]+$/.test(s)) return null; // lẫn ký tự lạ ⇒ không tính
   const result = evaluate(s);
   // Làm tròn nhiễu dấu phẩy động (0,1+0,2 = 0,30000000000000004) về 6 chữ số lẻ.
-  return result == null ? null : Math.round(result * 1e6) / 1e6;
+  return result == null ? null : roundInputNumber(result);
 }
 
 /**

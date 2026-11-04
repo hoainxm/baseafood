@@ -5,6 +5,7 @@ covers: src/features/production-orders/*, src/lib/productionOrder.ts, src/lib/pr
 tours: src/features/production-orders/productionOrderTour.ts
 guides: src/features/shared/guides/productionOrderGuide.tsx
 last_verified: 2026-11-04
+<!-- re-verified: 2026-11-04 (chần / luộc) — Quy cách dòng lệnh thêm "Chần / luộc …" từ ô Thời gian chần / luộc của dòng HĐ (`contractLineSpec`). -->
 <!-- re-verified: 2026-11-04 (chuyến gộp) — gắn chuyến: mọi chuyến có hàng của HĐ (cả chuyến gộp). Lệnh xuất lấy dòng lệnh theo HĐ + số lượng theo chuyến (ba-spec 72 R2b, R3b). Quyền: vai đã chỉnh cần mig 0105. -->
 <!-- re-verified: 2026-11-04 — nhãn "Kg (tự tính)" của dòng lệnh đổi thành "Kg tịnh (tự tính)" (ô gõ tay: "Kg tịnh") cho khỏi nhầm với kg cả bì; không đổi luật, không đổi quyền. -->
 ttl_days: 90

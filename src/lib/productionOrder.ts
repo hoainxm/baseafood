@@ -74,7 +74,7 @@ export function formatProductionDates(ds: readonly string[]): string {
 }
 
 /** Quy cách dòng lệnh từ dòng HĐ (R17): Size · Dài · Số miếng · Tỉ lệ · Packing — như ô Quy cách của LSX giấy. */
-export function contractLineSpec(cl: Pick<ExportContractLine, "size" | "packing" | "pieceLength" | "partRatio" | "piecesPerKg">): string {
+export function contractLineSpec(cl: Pick<ExportContractLine, "size" | "packing" | "pieceLength" | "partRatio" | "piecesPerKg" | "cookTime">): string {
   const t = (v: string | undefined) => (v ?? "").trim();
   const pieces = t(cl.piecesPerKg);
   return [
@@ -83,6 +83,7 @@ export function contractLineSpec(cl: Pick<ExportContractLine, "size" | "packing"
     // Đã ghi đơn vị (VD "590 – 770 pcs/kg") thì giữ nguyên, chỉ gõ số thì thêm "miếng/kg".
     pieces && (/\/\s*kg/i.test(pieces) ? pieces : `${pieces} miếng/kg`),
     t(cl.partRatio) && `Tỉ lệ ${t(cl.partRatio)}`,
+    t(cl.cookTime) && `Chần / luộc ${t(cl.cookTime)}`,
     t(cl.packing),
   ]
     .filter(Boolean)

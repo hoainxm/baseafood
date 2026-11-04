@@ -1311,6 +1311,8 @@ export interface ExportContractLine {
   partRatio?: string;
   /** Số miếng mỗi kg — "Number pcs/kg", VD "590 – 770". */
   piecesPerKg?: string;
+  /** Thời gian chần / luộc — "Boiling time", VD "60 giây" (Phòng KH 2026-11-04). */
+  cookTime?: string;
   /** Ghi chú của dòng — chép sang ghi chú dòng Lệnh SX. */
   note?: string;
 }

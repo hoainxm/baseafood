@@ -830,8 +830,9 @@ export function ContractFormDialog({
                             // R23: tên hàng còn trống ⇒ điền tên thương mại của mặt hàng vừa chọn.
                             // R23 v6: ô tên · size · quy cách · mã HS đang trống ⇒ theo tên của khách (chưa có ⇒ tên mặc định).
                             setLine(l.id, {
-                              productId: v || undefined,
                               ...(v ? lineTextAfterPick(l, products.find((p) => p.id === v), findCustomerName(customerNames, form.customerId, v)) : {}),
+                              // Mặt hàng vừa chọn ghi SAU cùng — không gì đè được.
+                              productId: v || undefined,
                             });
                             setSuggestedLines((s) => {
                               const n = new Map(s);
@@ -901,7 +902,7 @@ export function ContractFormDialog({
                       {canSeePrice && <NumberField label="Đơn giá" unit={`${currency}/kg`} value={l.unitPrice} onChange={(v) => setLine(l.id, { unitPrice: v })} />}
                     </div>
                     {/* R38: yêu cầu NL như cột trên HĐ — tự chép sang dòng Lệnh sản xuất (Quy cách + ghi chú). */}
-                    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,2fr)]">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,2fr)]">
                       <Field label="Chiều dài">
                         <Input value={l.pieceLength ?? ""} onChange={(e) => setLine(l.id, { pieceLength: e.target.value || undefined })} />
                       </Field>
@@ -911,7 +912,10 @@ export function ContractFormDialog({
                       <Field label="Số miếng / kg">
                         <Input value={l.piecesPerKg ?? ""} onChange={(e) => setLine(l.id, { piecesPerKg: e.target.value || undefined })} />
                       </Field>
-                      <Field label="Ghi chú dòng" className="sm:col-span-3 lg:col-span-1">
+                      <Field label="Thời gian chần / luộc" hint="VD 60 giây">
+                        <Input value={l.cookTime ?? ""} onChange={(e) => setLine(l.id, { cookTime: e.target.value || undefined })} />
+                      </Field>
+                      <Field label="Ghi chú dòng" className="sm:col-span-2 lg:col-span-1">
                         <Textarea rows={1} className="min-h-10" value={l.note ?? ""} onChange={(e) => setLine(l.id, { note: e.target.value || undefined })} />
                       </Field>
                     </div>

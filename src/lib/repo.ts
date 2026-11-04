@@ -2227,6 +2227,7 @@ function parseLines(v: unknown): ExportContractLine[] {
     ...(l.pieceLength ? { pieceLength: s(l.pieceLength) } : {}),
     ...(l.partRatio ? { partRatio: s(l.partRatio) } : {}),
     ...(l.piecesPerKg ? { piecesPerKg: s(l.piecesPerKg) } : {}),
+    ...(l.cookTime ? { cookTime: s(l.cookTime) } : {}),
     ...(l.note ? { note: s(l.note) } : {}),
   }));
 }

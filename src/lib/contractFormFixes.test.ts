@@ -1,7 +1,8 @@
 // Phòng KH 2026-11-04: địa chỉ khách đọc từ file HĐ; hợp đồng ký đính nhầm loại / ở file của bản HĐ vẫn báo Thiếu.
 import { describe, expect, it } from "vitest";
 import type { ExportContractRevision, ExportFile } from "@/types";
-import { parseContractRows, specificationDetails, splitSpecification } from "./contractReader";
+import { matchOption, parseContractRows, specificationDetails, splitSpecification } from "./contractReader";
+import { contractLineSpec } from "./productionOrder";
 import { EMPTY_EXPORT_DATA, attachmentCandidates, type ExportData } from "./exportPlanning";
 
 const head = [
@@ -85,5 +86,40 @@ describe("đọc HĐ ghi tên hàng một lần rồi liệt kê Specification (
     expect(splitSpecification("Frozen octopus Specification 2: - Size 1-2 gr")).toEqual({ title: "Frozen octopus", spec: "- Size 1-2 gr" });
     expect(splitSpecification("FROZEN CRAB KARAAGE")).toEqual({ title: "FROZEN CRAB KARAAGE", spec: "" });
     expect(specificationDetails("- Size 2-4 g")).toMatchObject({ size: "2-4 g", piecesPerKg: "" });
+  });
+});
+
+describe("Cảng đích và thời gian chần / luộc (Phòng KH 2026-11-04)", () => {
+  const ports = ["NIIGATA, JAPAN", "Nagoya, Japan", "Tokyo, Japan"].map((name, i) => ({ id: `p${i}`, listKind: "discharge-port", name, sortOrder: i }) as unknown as import("@/types").ExportOption);
+
+  it("cảng trên file ghi kèm port / Port of ⇒ khớp đúng mục trong danh sách", () => {
+    expect(matchOption("Niigata port", ports, "discharge-port").name).toBe("NIIGATA, JAPAN");
+    expect(matchOption("Port of Nagoya", ports, "discharge-port").name).toBe("Nagoya, Japan");
+    expect(matchOption("TOKYO", ports, "discharge-port").name).toBe("Tokyo, Japan");
+    expect(matchOption("Osaka", ports, "discharge-port").name).toBe("");
+  });
+
+  it("đọc \"Discharging port: …\" và \"CFR Niigata port, Japan\"", () => {
+    const a = parseContractRows([...head, ["Discharging port: Nagoya port, Japan"], ...table], "export").contract!;
+    expect(a.portOfDischarge).toMatch(/nagoya/i);
+    const b = parseContractRows([...head, ["Price: CFR Niigata port, Japan"], ...table], "export").contract!;
+    expect(b.portOfDischarge).toMatch(/niigata/i);
+  });
+
+  it("thời gian chần / luộc: trong chữ spec, dòng mô tả tiếp, cột riêng; chép sang quy cách Lệnh sản xuất", () => {
+    expect(specificationDetails("- Size 2-4 gr - Boiling time: 60 seconds").cookTime).toBe("60 seconds");
+    expect(specificationDetails("thời gian luộc 60 giây").cookTime).toBe("60 giây");
+    const H = [["Mark", "Commodities", "Packing", "Price CFR", "Quantity", "", "Amount (usd)"], ["", "", "", "", "Ctns", "Kgs", ""]];
+    const lines = parseContractRows([...head, ...H,
+      ["1", "Frozen octopus", "", "", "", "", ""],
+      ["", "Specification 1: - Size 1.3 – 1.4 gr", "IQF, 1 Kg / pe X 10 pe / Ctn", "9.05", "9,700", "97,000.00", "877,850.00"],
+      ["", "- Blanching time: 45 – 60 seconds", "", "", "", "", ""],
+      ["II. PAYMENT: TTR"]], "export").contract!.lines;
+    expect(lines[0].cookTime).toBe("45 – 60 seconds");
+    const col = parseContractRows([...head,
+      ["No", "Description", "Size", "Boiling time", "Packing", "Price", "Quantity (kgs)", "Amount"],
+      ["1", "Boiled octopus", "2-4 gr", "60 giây", "10kg/ctn", "6.45", "6,570", "42,376.5"]], "export").contract!.lines;
+    expect(col[0].cookTime).toBe("60 giây");
+    expect(contractLineSpec({ size: "2-4 gr", packing: "", cookTime: "60 giây" })).toBe("Size 2-4 gr · Chần / luộc 60 giây");
   });
 });

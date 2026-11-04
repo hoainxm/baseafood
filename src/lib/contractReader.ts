@@ -51,6 +51,8 @@ export interface ReadContractLine {
   piecesPerKg: string;
   pieceLength: string;
   partRatio: string;
+  /** Thời gian chần / luộc ("Boiling time: 60 seconds"). */
+  cookTime: string;
   hsCode: string;
   /** Các cột form không có ô (Assortment, Average gr/pc, Dao động…) — "tiêu đề: giá trị · …". */
   note: string;
@@ -159,6 +161,7 @@ export function packingNetKg(packing: string): number | null {
 /* ---------- Bảng dòng hàng ---------- */
 
 type Col =
+  | "cookTime"
   | "description"
   | "size"
   | "packing"
@@ -177,6 +180,7 @@ type Col =
 const COLUMN_RULES: readonly [Col, RegExp][] = [
   ["serial", /^(no\.?|stt|#|items?|itemno\.?|mark|marks|s\/n)$/],
   ["pcsPerKg", /pcs\/kg|pieces\/kg|pc\/kg|miếng\/kg/],
+  ["cookTime", /boil|blanch|cooking|luộc|chần/],
   ["extra", /average|avg|trungbình|daođộng|range|variation|assortment|cơcấu/],
   ["length", /length|chiềudài/],
   ["ratio", /ratio|tentacle|tỉlệ/],
@@ -266,6 +270,7 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
           prev.partRatio ||= d.partRatio;
           prev.piecesPerKg ||= d.piecesPerKg;
           prev.size ||= d.size;
+          prev.cookTime ||= d.cookTime;
           prev.note = [prev.note, first].filter(Boolean).join(" ");
           continue;
         }
@@ -334,6 +339,7 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
         piecesPerKg: cell("pcsPerKg") || spec?.piecesPerKg || "",
         pieceLength: cell("length") || spec?.pieceLength || "",
         partRatio: cell("ratio") || spec?.partRatio || ratio,
+        cookTime: cell("cookTime") || spec?.cookTime || "",
         hsCode: cell("hs"),
         note: [extras.join(" · "), split.spec].filter(Boolean).join(" · "),
       };
@@ -350,7 +356,7 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
 
 const SPEC_START = /\b(?:specification|spec\.?|quy\s*cách)\s*\d*\s*[:：]/i;
 /** Hàng chỉ một ô là mô tả tiếp của spec phía trên ("- Length: max 3.5 cm.") — không phải hết bảng. */
-const SPEC_CONTINUATION = /^\s*[-–•*]|^(?:size|length|ratio|pcs|bacteria|e\.?\s*coli|coliform|salmonella|tpc|chiều dài|tỉ lệ|số miếng)\b/i;
+const SPEC_CONTINUATION = /^\s*[-–•*]|^(?:size|length|ratio|pcs|boil(?:ing)?|blanch(?:ing)?|cooking|bacteria|e\.?\s*coli|coliform|salmonella|tpc|chiều dài|tỉ lệ|số miếng)\b/i;
 
 /** Tách "Frozen Blanched cut Octopus Specification 1: - Size …" ⇒ tên hàng + chữ của spec. */
 export function splitSpecification(text: string): { title: string; spec: string } {
@@ -360,13 +366,14 @@ export function splitSpecification(text: string): { title: string; spec: string 
 }
 
 /** Size · số miếng / kg · chiều dài · tỉ lệ trong chữ của spec ("- Size 1.3 – 1.4 gr (700-750 pcs/kg) - Length: max 3.5 cm."). */
-export function specificationDetails(spec: string): { size: string; piecesPerKg: string; pieceLength: string; partRatio: string } {
+export function specificationDetails(spec: string): { size: string; piecesPerKg: string; pieceLength: string; partRatio: string; cookTime: string } {
   const part = (re: RegExp) => clean(spec.match(re)?.[1]).replace(/[.;,]$/, "");
   return {
     size: part(/\bsize\s*:?\s*([\d.,]+\s*[-–~]\s*[\d.,]+\s*(?:grs?|gr|g|cm|kg)?\b\.?)/i),
     piecesPerKg: part(/([\d.,]+\s*[-–~]\s*[\d.,]+)\s*(?:pcs|pieces|pc)\s*\/\s*kg/i),
     pieceLength: part(/\blength\s*:?\s*(.+?)(?=\s+[-–]\s|\s*\bratio\b|$)/i),
     partRatio: part(/\bratio\b[^:]*:\s*(.+?)(?=\s+[-–]\s|\s*\bbacteria\b|$)/i),
+    cookTime: part(/\b(?:boil(?:ing)?|blanch(?:ing)?|cook(?:ing)?|thời\s*gian\s*(?:luộc|chần))(?:\s*time)?\s*:?\s*([\d.,]+\s*(?:-|–|~)?\s*[\d.,]*\s*(?:seconds?|secs?|s|minutes?|mins?|giây|phút))/i),
   };
 }
 
@@ -603,6 +610,7 @@ function findKeyValueLines(rows: readonly (readonly string[])[]): Table | null {
         piecesPerKg: "",
         pieceLength: "",
         partRatio: "",
+        cookTime: "",
         hsCode: "",
         note: "",
       };
@@ -723,17 +731,25 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
   let portOfLoading = "";
   let portOfDischarge = "";
   const inc = firstMatch(termTexts, INCOTERM_RE);
+  // Tiêu đề cột "Price CFR | Quantity | Ctns…" ⇒ chữ sau CFR là tên cột, không phải cảng (HĐ Peacock 2026-11-04) —
+  // bỏ, tìm tiếp lần ghi incoterm có tên cảng ("Price: CFR Niigata port, Japan").
+  const NOT_PORT = /^(incoterms?|price|usd|jpy|eur|terms?|main|any|quantity|q'?ty|ctns?|cartons?|kgs?|amount|packing|unit|value|weight)\b/i;
   if (inc) {
     incotermRaw = inc[1].toUpperCase().replace(/\s+/g, "");
     incoterm = incotermRaw === "CNF" || incotermRaw === "C&F" ? "CFR" : incotermRaw;
-    const port = clean(inc[2]);
-    if (port && !/^(incoterms?|price|usd|jpy|eur|terms?|main|any)\b/i.test(port)) {
+    const withPort = termTexts
+      .map((t) => t.match(INCOTERM_RE))
+      .find((m) => m && clean(m[2]) && !NOT_PORT.test(clean(m[2])));
+    const port = withPort ? clean(withPort[2]) : "";
+    if (port) {
       if (LOADING_TERMS.has(incoterm)) portOfLoading = port;
       else portOfDischarge = port;
     }
   }
   portOfLoading = portOfLoading || clean(firstMatch(outside, /port of loading\s*[:：]\s*([^,;]+)/i)?.[1]);
-  portOfDischarge = portOfDischarge || clean(firstMatch(outside, /port of (?:discharge|destination)\s*[:：]\s*([^,;]+)/i)?.[1]);
+  portOfDischarge =
+    portOfDischarge ||
+    clean(firstMatch(outside, /(?:port of (?:discharge|destination)|discharg(?:e|ing) port|destination(?:\s+port)?|cảng\s+(?:đến|đích|dỡ(?:\s+hàng)?))\s*[:：]\s*([^,;]+)/i)?.[1]);
   portOfDischarge =
     portOfDischarge ||
     clean(firstMatch(outside.filter((t) => /shipment/i.test(t)), /\bto\s+([A-Z][A-Za-z .'-]+?(?:,\s*[A-Z][A-Za-z .'-]+?)?)\s+(?:within|before|in|on|by|not|during|from|latest)\b/)?.[1]);
@@ -868,7 +884,12 @@ export function matchParty<T>(name: string, rows: readonly T[], namesOf: (r: T) 
 export function matchOption(raw: string, options: readonly ExportOption[], kind: ExportOptionListKind): { name: string; candidates: number } {
   const k = optionKey(raw);
   if (!k) return { name: "", candidates: 0 };
-  const head = (v: string) => optionKey(v.split(",")[0]);
+  // So tên thành phố: bỏ "port / seaport / cảng" (file ghi "Niigata port, Japan", danh sách ghi "NIIGATA, JAPAN").
+  const head = (v: string) =>
+    optionKey(v.split(",")[0])
+      .replace(/\b(?:sea\s*)?port(?:\s+of)?\b|\bcảng\b|\bterminal\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   const all = exportOptionsOf(options, kind);
   const hits = all.filter((o) => optionKey(o.name) === k);
   const near = hits.length ? hits : all.filter((o) => head(o.name) === head(raw) || optionKey(o.name).replace(/[\s-]/g, "") === k.replace(/[\s-]/g, ""));
@@ -1057,7 +1078,7 @@ export function fillExportContract(values: ExportContractFillValues, read: ReadC
   const toLine = (l: ReadContractLine): ExportContractLine => {
     const pid = ctx.suggestProduct?.(l.description, l.size, v.customerId) ?? "";
     const unitPrice = ctx.canSeePrice ? l.unitPrice : null;
-    a.countLine([l.description, l.hsCode, l.size, l.packing, l.netKgPerCarton, l.cartons, l.cartons != null && l.netKgPerCarton ? null : l.kg, unitPrice, l.pieceLength, l.partRatio, l.piecesPerKg, l.note, pid]);
+    a.countLine([l.description, l.hsCode, l.size, l.packing, l.netKgPerCarton, l.cartons, l.cartons != null && l.netKgPerCarton ? null : l.kg, unitPrice, l.pieceLength, l.partRatio, l.piecesPerKg, l.cookTime, l.note, pid]);
     return {
       id: ctx.newLineId(),
       description: l.description,
@@ -1074,6 +1095,7 @@ export function fillExportContract(values: ExportContractFillValues, read: ReadC
       pieceLength: l.pieceLength,
       partRatio: l.partRatio,
       piecesPerKg: l.piecesPerKg,
+      ...(l.cookTime ? { cookTime: l.cookTime } : {}),
       note: l.note,
       ...(pid ? { productId: pid } : {}),
     };
@@ -1109,6 +1131,7 @@ export function fillExportContract(values: ExportContractFillValues, read: ReadC
         f.piecesPerKg = a.put(tag("piecesPerKg"), lbl("Số miếng / kg"), f.piecesPerKg ?? "", rl.piecesPerKg);
         f.pieceLength = a.put(tag("pieceLength"), lbl("Chiều dài"), f.pieceLength ?? "", rl.pieceLength);
         f.partRatio = a.put(tag("partRatio"), lbl("Tỉ lệ râu / thân / cổ"), f.partRatio ?? "", rl.partRatio);
+        f.cookTime = a.put(tag("cookTime"), lbl("Thời gian chần / luộc"), f.cookTime ?? "", rl.cookTime);
         f.hsCode = a.put(tag("hsCode"), lbl("Mã HS"), f.hsCode, rl.hsCode);
         f.note = a.put(tag("note"), lbl("Ghi chú dòng"), f.note ?? "", rl.note);
       });

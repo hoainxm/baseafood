@@ -58,7 +58,9 @@ export function lineTextAfterPick(
       hsCode: keep(line.hsCode, customerName.hsCode),
     };
   }
-  return { ...line, description: keep(line.description, product?.tradeName) };
+  // Chỉ 4 ô chữ — trả cả `line` (dòng HĐ đầy đủ) thì mang theo mặt hàng CŨ, đè mặt hàng vừa chọn (Phòng KH 2026-11-04:
+  // chọn 4-5 vẫn ra 2-3; lần chọn đầu chạy vì dòng chưa có mặt hàng).
+  return { description: keep(line.description, product?.tradeName), size: line.size, packing: line.packing, hsCode: line.hsCode };
 }
 
 /**

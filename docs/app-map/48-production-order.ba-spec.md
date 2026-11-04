@@ -347,3 +347,4 @@ Thứ tự theo phụ thuộc. Mỗi pha xanh cổng `build` + `lint` + `test` +
 - v1.1 2026-10-30 — build P1 + P2: mig 0088, kiểu, quyền `production-orders` (navId tạm `planning-export` tới P3), 4 mapping + hook, bộ demo, `lib/productionOrder.ts` + 29 test. Không đặt unique index số lệnh (kiểm ở app, tránh kẹt hàng chờ).
 - v1 2026-10-29 — chủ dự án chốt Q1–Q10 theo đề xuất. Thêm design-spec 49 + kế hoạch build §12.
 - v0 2026-10-29 — nháp từ LSX 19.10 + phụ lục 01 HĐ 01-26-HAT; chờ chốt Q1–Q10.
+- 2026-11-04: R17 Quy cách dòng lệnh thêm "Chần / luộc …" từ ô Thời gian chần / luộc của dòng HĐ (`contractLineSpec`).

@@ -245,6 +245,7 @@ export function ContractDossier({
     { key: "packing", header: "Quy cách", render: (l) => l.packing || "—", hideOnMobile: true },
     // R38: yêu cầu NL như cột trên HĐ — chép sang dòng Lệnh sản xuất.
     { key: "piece-length", header: "Chiều dài", getSortValue: (l) => l.pieceLength || null, render: (l) => l.pieceLength || "—", hideOnMobile: true },
+    { key: "cook-time", header: "Chần / luộc", getSortValue: (l) => l.cookTime || null, render: (l) => l.cookTime || "—", hideOnMobile: true },
     { key: "part-ratio", header: "Tỉ lệ râu / thân / cổ", getSortValue: (l) => l.partRatio || null, render: (l) => l.partRatio || "—", hideOnMobile: true },
     { key: "pieces-per-kg", header: "Số miếng / kg", getSortValue: (l) => l.piecesPerKg || null, render: (l) => l.piecesPerKg || "—", hideOnMobile: true },
     {

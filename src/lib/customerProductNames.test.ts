@@ -93,3 +93,12 @@ describe("AC-46 — trích xuất từ HĐ, chỉ tạo, không ghi đè", () =>
     expect(extractCustomerNames([], "", lines, "x", nid)).toEqual([]);
   });
 });
+
+describe("lineTextAfterPick — chỉ trả ô chữ (Phòng KH 2026-11-04: chọn 4-5 vẫn ra 2-3)", () => {
+  it("dòng đã có mặt hàng ⇒ kết quả không mang mặt hàng cũ, đè lên mặt hàng mới không được", () => {
+    const line = { description: "Boiled octopus", size: "4-5 gr/pc", packing: "", hsCode: "", productId: "cu-2-3", quantity: 100 };
+    const out = lineTextAfterPick(line, { tradeName: "" }, undefined);
+    expect(out).toEqual({ description: "Boiled octopus", size: "4-5 gr/pc", packing: "", hsCode: "" });
+    expect({ productId: "moi-4-5", ...out }.productId).toBe("moi-4-5");
+  });
+});

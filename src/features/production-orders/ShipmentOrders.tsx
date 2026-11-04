@@ -10,7 +10,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, FormDialog, formatNumber, notify } from "@/design-system";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { useExportShipments, useProductionOrderLines, useProductionOrderShipments, useProductionOrders } from "@/lib/catalogRepo";
+import { useExportContracts, useExportShipmentLines, useExportShipments, useProductionOrderLines, useProductionOrderShipments, useProductionOrders } from "@/lib/catalogRepo";
+import { shipmentContractIds } from "@/lib/exportPlanning";
 import { newId } from "@/lib/store";
 import { linesOfOrder, orderTotals, shipmentsWithLot, visibleOrders } from "@/lib/productionOrder";
 import type { ExportShipment } from "@/types";
@@ -27,6 +28,8 @@ export function ShipmentOrders({ shipment, isCancelled }: { shipment: ExportShip
   const [lines] = useProductionOrderLines();
   const [links, setLinks] = useProductionOrderShipments();
   const [shipments, setShipments] = useExportShipments();
+  const [shipmentLines] = useExportShipmentLines();
+  const [contracts] = useExportContracts();
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const { profile } = useAuth();
@@ -40,7 +43,11 @@ export function ShipmentOrders({ shipment, isCancelled }: { shipment: ExportShip
     .filter((l) => l.shipmentId === shipment.id)
     .map((l) => mine.find((o) => o.id === l.orderId))
     .filter((o): o is NonNullable<typeof o> => !!o && o.status !== "cancelled");
-  const candidates = mine.filter((o) => o.contractId === shipment.contractId && o.status !== "cancelled" && !linked.some((x) => x.id === o.id));
+  // Chuyến gộp (ba-spec 70): lệnh của mọi HĐ có hàng trên chuyến (ba-spec 48 LS3).
+  const contractIds = shipmentContractIds({ shipmentLines }, shipment);
+  const isMulti = contractIds.length > 1;
+  const contractNo = (id: string) => contracts.find((c) => c.id === id)?.contractNo || "(chưa có số)";
+  const candidates = mine.filter((o) => contractIds.includes(o.contractId) && o.status !== "cancelled" && !linked.some((x) => x.id === o.id));
   const open = (id: string) => navigate(`/planning-production?order=${encodeURIComponent(id)}`);
 
   const saveLinks = () => {
@@ -81,6 +88,7 @@ export function ShipmentOrders({ shipment, isCancelled }: { shipment: ExportShip
                 <ClipboardList className="mr-1 h-4 w-4" aria-hidden />
                 Lệnh {o.orderNo}
               </Button>
+              {isMulti && <span className="text-sm text-muted-foreground">HĐ {contractNo(o.contractId)}</span>}
               <OrderStatusTag order={o} />
               <span className="tnum text-sm text-muted-foreground">{formatNumber(orderTotals(linesOfOrder(lines, o.id)).kg)} kg</span>
               {o.status === "draft" && <span className="text-sm text-muted-foreground">— phát hành thì bước này tự xong</span>}
@@ -92,16 +100,19 @@ export function ShipmentOrders({ shipment, isCancelled }: { shipment: ExportShip
       )}
       {canWrite && !isCancelled && (
         <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            onClick={() => navigate(`/planning-production?new=1&contract=${encodeURIComponent(shipment.contractId)}&shipment=${encodeURIComponent(shipment.id)}`)}
-            title="Lập lệnh sản xuất cho hợp đồng này; phát hành xong thì lệnh gắn chuyến này."
-          >
-            <FilePlus2 className="mr-1 h-4 w-4" aria-hidden />
-            Lập lệnh sản xuất
-          </Button>
+          {contractIds.map((id) => (
+            <Button
+              key={id}
+              size="sm"
+              onClick={() => navigate(`/planning-production?new=1&contract=${encodeURIComponent(id)}&shipment=${encodeURIComponent(shipment.id)}`)}
+              title={isMulti ? `Lập lệnh sản xuất cho hợp đồng ${contractNo(id)}; phát hành xong thì lệnh gắn chuyến này.` : "Lập lệnh sản xuất cho hợp đồng này; phát hành xong thì lệnh gắn chuyến này."}
+            >
+              <FilePlus2 className="mr-1 h-4 w-4" aria-hidden />
+              {isMulti ? `Lập lệnh sản xuất · HĐ ${contractNo(id)}` : "Lập lệnh sản xuất"}
+            </Button>
+          ))}
           {candidates.length > 0 && (
-            <Button size="sm" variant="outline" onClick={() => (setPicked([]), setPicking(true))} title="Gắn lệnh sản xuất đã lập của cùng hợp đồng vào chuyến này.">
+            <Button size="sm" variant="outline" onClick={() => (setPicked([]), setPicking(true))} title={isMulti ? "Gắn lệnh sản xuất đã lập của các hợp đồng có hàng trên chuyến này." : "Gắn lệnh sản xuất đã lập của cùng hợp đồng vào chuyến này."}>
               <Link2 className="mr-1 h-4 w-4" aria-hidden />
               Gắn lệnh có sẵn
             </Button>
@@ -112,7 +123,7 @@ export function ShipmentOrders({ shipment, isCancelled }: { shipment: ExportShip
         open={picking}
         onOpenChange={(v) => !v && setPicking(false)}
         title="Gắn lệnh có sẵn"
-        description="Chọn lệnh sản xuất của cùng hợp đồng. Lệnh đã phát hành thì bước Lệnh sản xuất của chuyến xong ngay."
+        description={isMulti ? "Chọn lệnh sản xuất của các hợp đồng có hàng trên chuyến. Lệnh đã phát hành thì bước Lệnh sản xuất của chuyến xong ngay." : "Chọn lệnh sản xuất của cùng hợp đồng. Lệnh đã phát hành thì bước Lệnh sản xuất của chuyến xong ngay."}
         icon={Link2}
         size="md"
         footer={
@@ -138,7 +149,7 @@ export function ShipmentOrders({ shipment, isCancelled }: { shipment: ExportShip
                 onChange={() => setPicked((p) => (p.includes(o.id) ? p.filter((x) => x !== o.id) : [...p, o.id]))}
               />
               <span className="min-w-0 break-words">
-                Lệnh {o.orderNo} · {formatNumber(orderTotals(linesOfOrder(lines, o.id)).kg)} kg
+                Lệnh {o.orderNo}{isMulti ? ` · HĐ ${contractNo(o.contractId)}` : ""} · {formatNumber(orderTotals(linesOfOrder(lines, o.id)).kg)} kg
                 <span className="block text-sm text-muted-foreground">
                   {o.lotCode ? `MSL ${o.lotCode}` : "Chưa có MSL"} · <OrderStatusTag order={o} />
                 </span>

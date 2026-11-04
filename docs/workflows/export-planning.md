@@ -6,6 +6,7 @@ tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-04
 <!-- re-verified: 2026-11-04 (ảnh cont / seal bắt buộc) — hàng Số cont + seal Xong khi có số VÀ ≥ 1 ảnh (ba-spec 72 R8 v1.7); chuyến cũ đã đóng xong / đóng ghép / chưa chạy 0103 không bắt. -->
+<!-- re-verified: 2026-11-04 (Lệnh xuất ⇄ LSX) — bảng hàng Lệnh xuất theo từng HĐ + số lượng theo chuyến; chuyến gộp gắn / lập LSX của mọi HĐ trên chuyến (ba-spec 72 R2b, R3b; 48 LS3). -->
 <!-- re-verified: 2026-11-04 — SI mở lại lấy tên hàng + HS theo HĐ hiện tại (giữ số kiện / gross đã gõ); ô Số của Lệnh xuất ghi định dạng STT/tháng-năm; không đổi luật Xong, không đổi quyền. -->
 <!-- re-verified: 2026-11-04 — form Lập / Sửa HĐ thêm ô Địa chỉ khách hàng (lưu vào danh mục khách, Consignee của SI) — chị Thảo; không đổi luật, không đổi quyền. -->
 <!-- re-verified: 2026-11-04 — tab Hợp đồng thêm cột Hạn hợp đồng (ngày + Còn n ngày / Đã hết hạn, sắp xếp theo ngày) — chị Thảo; chỉ hiển thị, không đổi luật. -->
@@ -101,6 +102,8 @@ Khách như DAIREI ký nhiều HĐ song song (mỗi HĐ một mã hàng, lượn
 | Chứng từ | Một bộ cho chuyến; mỗi dòng in kèm "(Contract No. …)" của HĐ gốc | `linesWithContractNo` |
 | Hồ sơ HĐ phụ | Mục **Đi chung chuyến của hợp đồng khác**: chỉ xem, các bước theo dõi ở hồ sơ HĐ chính | `carriesContract` |
 | Khóa đổi khách, xóa HĐ | Tính cả chuyến gộp có hàng của HĐ | `customerChangeGate` · `canDeleteContract` |
+| Lệnh sản xuất của chuyến gộp | Gắn / lập được lệnh của mọi HĐ có hàng trên chuyến (mỗi HĐ một nút **Lập lệnh sản xuất · HĐ …**). Bước 2 Xong khi chuyến gắn ≥ 1 lệnh đã phát hành (luật cũ) | `ShipmentOrders` · `openShipmentsOf` |
+| Bảng hàng của Lệnh xuất | Xét từng HĐ: HĐ có lệnh sản xuất đã phát hành gắn chuyến ⇒ tên hàng, MSL, ngày SX, hạn theo lệnh; HĐ chưa có lệnh ⇒ theo Hàng của chuyến. Số thùng + kg theo Hàng của chuyến (thực đóng, chưa có thì kế hoạch); chuyến chưa nhập Hàng của chuyến ⇒ số cả lệnh + cảnh báo (ba-spec [72](../app-map/72-export-order-and-si.ba-spec.md) R2b, R3b) | `buildExportOrderLines` |
 
 Bộ phận đóng cont ghi số thực đóng cho dòng của HĐ phụ đã có trên chuyến (cùng khách) — mig `0102` (CHƯA chạy DB thật; trước khi chạy, máy chủ từ chối dòng mới của HĐ phụ do đóng cont tạo). Đóng cont không tự đưa HĐ mới vào chuyến.
 

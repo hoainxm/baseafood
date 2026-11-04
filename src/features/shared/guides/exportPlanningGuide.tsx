@@ -179,8 +179,8 @@ export const exportPlanningGuide: PageGuide = {
           <li>Hai hàng Booking và Thông tin xe không có trạng thái — không làm bước nào tự xong.</li>
           <li>
             <b>Lập lệnh xuất</b> (hàng Lệnh xuất): soạn Lệnh xuất hàng mẫu QTI-KH-01-07. Hàng, MSL, ngày sản xuất, hạn dùng lấy từ Lệnh sản xuất
-            đã phát hành; size, HS code từ hợp đồng; cut-off, ETD, ETA từ booking. Ghi số lệnh (STT/tháng-năm, VD 01/10-26), số thùng / kg, phân xưởng nhận, các lưu ý Có /
-            Không (Có thì ghi rõ). Xuất Word là mục Lệnh xuất Xong.
+            đã phát hành (hợp đồng chưa có lệnh thì lấy từ Hàng của chuyến); số thùng / kg theo Hàng của chuyến, chưa nhập thì lấy số cả lệnh và báo để sửa; size, HS code từ hợp đồng;
+            cut-off, ETD, ETA từ booking. Ghi số lệnh (STT/tháng-năm, VD 01/10-26), phân xưởng nhận, các lưu ý Có / Không (Có thì ghi rõ). Xuất Word là mục Lệnh xuất Xong.
           </li>
           <li>
             <b>Ảnh cont / seal</b>: đính ở hàng Số cont + seal (người đóng hàng cũng đính được). Bắt buộc: có số cont, seal và ít nhất 1 ảnh thì hàng mới Xong (đóng ghép không cần).
@@ -196,7 +196,7 @@ export const exportPlanningGuide: PageGuide = {
       <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">
         <GuideList>
           <li>Lập lệnh <b>ngay khi lên hợp đồng</b>: ở hộp Lập hợp đồng chọn <b>Lưu &amp; lập lệnh sản xuất</b> (lưu xong mở luôn hộp lập lệnh), hoặc về sau ở hồ sơ hợp đồng chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng). Không cần chờ đính kèm hay ghi chuyến; dòng hàng phải nối mặt hàng danh mục.</li>
-          <li>Bước <b>Lệnh sản xuất</b> của chuyến: chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng và chuyến) hoặc <b>Gắn lệnh có sẵn</b>. Lệnh nháp chưa tính; phát hành thì bước tự xong.</li>
+          <li>Bước <b>Lệnh sản xuất</b> của chuyến: chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng và chuyến) hoặc <b>Gắn lệnh có sẵn</b>. Chuyến chở hàng của nhiều hợp đồng: mỗi hợp đồng một nút Lập lệnh sản xuất, gắn được lệnh của mọi hợp đồng trên chuyến. Lệnh nháp chưa tính; phát hành thì bước tự xong.</li>
           <li>Dòng hàng hợp đồng có cột <b>Đã ra lệnh (kg)</b>: còn bao nhiêu kg chưa ra lệnh, vượt dung sai thì báo.</li>
           <li>NL của lệnh lấy từ các lần <b>Nhập khẩu</b> đã ghi thực nhập.</li>
         </GuideList>

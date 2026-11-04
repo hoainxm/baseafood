@@ -8,7 +8,7 @@
 import { useCallback, useMemo } from "react";
 import { DocumentComposerView } from "@/features/document-composer";
 import { useProductionOrderLines, useProductionOrderShipments, useProductionOrders } from "@/lib/catalogRepo";
-import { buildExportOrderRows, exportOrderForm, exportOrderPreviousKey, newExportOrderDocument, type ExportOrderFormSource } from "@/lib/documentTypes/exportOrderForm";
+import { buildExportOrderLines, exportOrderForm, exportOrderPreviousKey, newExportOrderDocument, type ExportOrderFormSource } from "@/lib/documentTypes/exportOrderForm";
 import { workingRevision, type ExportData } from "@/lib/exportPlanning";
 import type { DocumentValues, ExportContract, ExportShipment } from "@/types";
 
@@ -36,23 +36,30 @@ export function ExportOrderComposer({
   const [orders] = useProductionOrders();
   const [orderLines] = useProductionOrderLines();
   const [links] = useProductionOrderShipments();
-  const source: ExportOrderFormSource = useMemo(() => {
+  const { source, notices } = useMemo((): { source: ExportOrderFormSource; notices: string[] } => {
     const linked = new Set(links.filter((l) => l.shipmentId === shipment.id).map((l) => l.orderId));
     // Dòng HĐ của mọi HĐ có hàng trên chuyến (chuyến gộp — ba-spec 70) để tra size + HS code.
-    const contractIds = new Set([shipment.contractId, ...(data.shipmentLines ?? []).filter((l) => l.shipmentId === shipment.id).map((l) => l.contractId)]);
+    const linkedOrders = orders.filter((o) => linked.has(o.id));
+    const contractIds = new Set([
+      shipment.contractId,
+      ...(data.shipmentLines ?? []).filter((l) => l.shipmentId === shipment.id).map((l) => l.contractId),
+      ...linkedOrders.map((o) => o.contractId),
+    ]);
     const contractLines = [...contractIds].flatMap((id) => workingRevision(data, id)?.lines ?? []);
-    return {
+    const built = buildExportOrderLines({
+      shipment,
+      orders: linkedOrders,
+      orderLines,
+      contractLines,
+      shipmentLines: data.shipmentLines ?? [],
+    });
+    const source = {
       shipment,
       contractNo: contract.contractNo,
       customerName,
-      rows: buildExportOrderRows({
-        shipment,
-        orders: orders.filter((o) => linked.has(o.id)),
-        orderLines,
-        contractLines,
-        shipmentLines: data.shipmentLines ?? [],
-      }),
+      rows: built.rows,
     };
+    return { source, notices: built.notices };
   }, [links, orders, orderLines, shipment, contract.contractNo, customerName, data]);
   const previousKey = useMemo(() => exportOrderPreviousKey(source), [source]);
   const isSourceLive = useCallback((id: string) => data.shipments.some((s) => s.id === id && s.status !== "cancelled"), [data.shipments]);
@@ -69,6 +76,7 @@ export function ExportOrderComposer({
       isSourceLive={isSourceLive}
       newDocument={(state, meta) => newExportOrderDocument(source, state, meta)}
       onExported={onExported}
+      notices={notices}
       canWrite={canWrite}
       isAdmin={isAdmin}
       by={by}

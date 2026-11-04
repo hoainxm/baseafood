@@ -28,7 +28,7 @@ import { DialogFooter } from "@/features/import-planning/ImportDialogs";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import { formatDateVN } from "@/lib/format";
-import { effectiveRevision } from "@/lib/exportPlanning";
+import { effectiveRevision, openShipmentsOf } from "@/lib/exportPlanning";
 import {
   DEFAULT_SHELF_LIFE_MONTHS,
   canCreateOrder,
@@ -616,7 +616,8 @@ export function IssueDialog({
   if (!target) return null;
   const o = target.order;
   const lines = linesOfOrder(data.lines, o.id);
-  const shipments = data.exportData.shipments.filter((s) => s.contractId === o.contractId && s.status === "open");
+  // Chuyến có hàng của HĐ của lệnh — kể cả chuyến gộp của HĐ khác (ba-spec 48 LS3, 70).
+  const shipments = openShipmentsOf(data.exportData, o.contractId);
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const kg = lines.reduce((s, l) => s + (l.kg ?? 0), 0);
   return (
@@ -672,7 +673,10 @@ export function IssueDialog({
               <input type="checkbox" className="size-4 accent-primary" checked={picked.includes(s.id)} onChange={() => toggle(s.id)} />
               <span className="min-w-0 break-words">
                 {shipmentLabel(s)}
-                <span className="block text-sm text-muted-foreground">{s.lotCode ? `MSL ${s.lotCode}` : o.lotCode ? `Chưa có MSL — sẽ ghi ${o.lotCode}` : "Chưa có MSL"}</span>
+                <span className="block text-sm text-muted-foreground">
+                  {s.contractId !== o.contractId && `Đi chung chuyến của HĐ ${data.exportData.contracts.find((c) => c.id === s.contractId)?.contractNo || "khác"} · `}
+                  {s.lotCode ? `MSL ${s.lotCode}` : o.lotCode ? `Chưa có MSL — sẽ ghi ${o.lotCode}` : "Chưa có MSL"}
+                </span>
               </span>
             </label>
           ))}

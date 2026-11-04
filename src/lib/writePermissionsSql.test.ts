@@ -86,4 +86,44 @@ describe("máy chủ ⇄ app: cùng ma trận, cùng bảng, cùng luật", () =
     const sql = latestWith("permission_enforcement");
     expect(sql).toMatch(/insert into public\.permission_enforcement \(id, mode\) values \(1, 'log'\)/);
   });
+
+  // Vai trò ĐÃ CHỈNH (có dòng app_roles) chỉ đọc role_permissions, không đọc ma trận mặc định ⇒ thêm tài nguyên mới
+  // mà chỉ thay default_role_permissions thì vai đó không có ô nào (lỗi 0088: Phòng KH không thấy "Lập lệnh sản xuất",
+  // sửa ở 0105). Tài nguyên mới phải có migration chèn ô của nó vào role_permissions cho vai đã chỉnh.
+  it("tài nguyên quyền mới có migration bù role_permissions cho vai đã chỉnh", () => {
+    // Nợ cũ (có trước luật này) — vai đã chỉnh trước khi có các tài nguyên này phải tick tay ở Quản trị · Vai trò.
+    const LEGACY_GAPS = new Set([
+      "my-tasks",
+      "documents",
+      "export-plans",
+      "export-plans.loading",
+      "export-plans.payments",
+      "import-plans",
+      "import-plans.receiving",
+      "catalog.import-suppliers",
+      "imports.invoices",
+      "company-profile",
+    ]);
+    const firstIn = new Map<string, string>();
+    for (const f of files) {
+      const sql = readFileSync(join(MIGRATIONS_DIR, f), "utf8");
+      const i = sql.indexOf("insert into public.default_role_permissions");
+      if (i < 0) continue;
+      for (const m of sql.slice(i, sql.indexOf(";", i)).matchAll(/\('[^']+', '([^']+)', '[^']+', '[^']+'\)/g)) {
+        if (!firstIn.has(m[1])) firstIn.set(m[1], f);
+      }
+    }
+    const base = [...firstIn.values()].sort()[0];
+    const missing = [...firstIn]
+      .filter(([resource, f]) => f > base && !LEGACY_GAPS.has(resource))
+      .filter(([resource, f]) =>
+        !files.some((x) => {
+          if (x < f) return false;
+          const sql = readFileSync(join(MIGRATIONS_DIR, x), "utf8");
+          return sql.includes("insert into public.role_permissions") && sql.includes(`'${resource}'`);
+        }),
+      )
+      .map(([resource, f]) => `${resource} (${f})`);
+    expect(missing).toEqual([]);
+  });
 });

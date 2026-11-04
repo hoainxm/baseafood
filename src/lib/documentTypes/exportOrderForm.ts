@@ -44,58 +44,98 @@ export interface ExportOrderFormSource {
 }
 
 /**
- * R2: mỗi dòng của LSX ĐÃ PHÁT HÀNH gắn chuyến ⇒ 1 dòng (tên hàng LSX, size + HS theo dòng HĐ, MSL / ngày SX / hạn
- * theo LSX). Chuyến không có LSX ⇒ Hàng của chuyến (tên, size, hạn dùng), MSL = mã lô chuyến, ngày SX trống.
+ * R2, R2b, R3b — dòng Lệnh xuất theo TỪNG HĐ trên chuyến (HĐ chính trước, rồi HĐ khác theo thứ tự Hàng của chuyến):
+ *   • HĐ có LSX ĐÃ PHÁT HÀNH gắn chuyến ⇒ 1 dòng / dòng LSX (tên hàng LSX, size + HS theo dòng HĐ, MSL / ngày SX / hạn
+ *     theo LSX); số thùng + kg theo Hàng của chuyến cùng dòng HĐ (một LSX gắn được nhiều chuyến). HĐ đã có Hàng của
+ *     chuyến mà dòng LSX không có dòng cùng dòng HĐ ⇒ bỏ (không đi chuyến này); HĐ chưa nhập Hàng của chuyến ⇒ số cả
+ *     lệnh + cảnh báo. Dòng Hàng của chuyến không thuộc dòng LSX nào ⇒ thêm như HĐ chưa có LSX.
+ *   • HĐ chưa có LSX ⇒ Hàng của chuyến (tên, size, hạn dùng), MSL = mã lô chuyến, ngày SX trống.
  */
-export function buildExportOrderRows(input: {
-  shipment: Pick<ExportShipment, "id" | "lotCode">;
+export function buildExportOrderLines(input: {
+  shipment: Pick<ExportShipment, "id" | "lotCode" | "contractId">;
   orders: readonly ProductionOrder[];
   orderLines: readonly ProductionOrderLine[];
   contractLines: readonly ExportContractLine[];
   shipmentLines: readonly ExportShipmentLine[];
-}): ExportOrderRow[] {
+}): { rows: ExportOrderRow[]; notices: string[] } {
   const byLine = new Map(input.contractLines.map((l) => [l.id, l]));
   const issued = input.orders.filter((o) => o.status === "issued");
-  if (issued.length) {
-    return issued.flatMap((o) =>
+  const shipLines = input.shipmentLines.filter((l) => l.shipmentId === input.shipment.id).sort((a, b) => a.sortOrder - b.sortOrder);
+  const contractOf = (l: ExportShipmentLine) => l.contractId || input.shipment.contractId;
+  const contractIds = [...new Set([input.shipment.contractId, ...shipLines.map(contractOf), ...issued.map((o) => o.contractId)])];
+  const shipCartons = (l: ExportShipmentLine): number | null => {
+    const units = l.loadedUnits ?? l.plannedUnits;
+    return units == null ? null : l.unitKind === "bundle" ? units * Math.max(1, l.cartonsPerUnit || 1) : units;
+  };
+  const fromShipLine = (l: ExportShipmentLine): ExportOrderRow => {
+    const cartons = shipCartons(l);
+    return {
+      productName: l.description,
+      size: l.size || byLine.get(l.contractLineId)?.size || "",
+      cartons,
+      kg: cartons != null && l.netKgPerCarton != null ? round2(cartons * l.netKgPerCarton) : null,
+      lotCode: input.shipment.lotCode,
+      productionDates: "",
+      expiry: l.expiry,
+      hsCode: byLine.get(l.contractLineId)?.hsCode ?? "",
+    };
+  };
+  const rows: ExportOrderRow[] = [];
+  const notices: string[] = [];
+  for (const contractId of contractIds) {
+    const goods = shipLines.filter((l) => contractOf(l) === contractId);
+    const orders = issued.filter((o) => o.contractId === contractId);
+    if (!orders.length) {
+      rows.push(...goods.map(fromShipLine));
+      continue;
+    }
+    const lsxLines = orders.flatMap((o) =>
       input.orderLines
         .filter((l) => l.orderId === o.id)
         .sort((a, b) => a.lineNo - b.lineNo)
-        .map((l) => {
-          const cl = byLine.get(l.contractLineId);
-          const exp = expiryDate(o.productionDates, o.shelfLifeMonths);
-          return {
-            productName: l.productName || l.description,
-            size: cl?.size ?? "",
-            cartons: lineCartons(l),
-            kg: orderLineKg(l) || null,
-            lotCode: o.lotCode,
-            productionDates: formatProductionDates(o.productionDates),
-            expiry: exp ? formatDateVN(exp) : "",
-            hsCode: cl?.hsCode ?? "",
-          };
-        }),
+        .map((l) => ({ o, l })),
     );
-  }
-  return input.shipmentLines
-    .filter((l) => l.shipmentId === input.shipment.id)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((l) => {
+    const sameLine = (id: string) => lsxLines.filter((x) => x.l.contractLineId === id).length;
+    let wholeOrder = false;
+    let shared = false;
+    for (const { o, l } of lsxLines) {
       const cl = byLine.get(l.contractLineId);
-      const units = l.loadedUnits ?? l.plannedUnits;
-      const cartons = units == null ? null : l.unitKind === "bundle" ? units * Math.max(1, l.cartonsPerUnit || 1) : units;
-      return {
-        productName: l.description,
-        size: l.size || cl?.size || "",
+      const exp = expiryDate(o.productionDates, o.shelfLifeMonths);
+      let cartons = lineCartons(l);
+      let kg: number | null = orderLineKg(l) || null;
+      const onShip = goods.filter((g) => g.contractLineId === l.contractLineId);
+      if (goods.length && !onShip.length) continue; // dòng LSX này không đi chuyến này (R3b)
+      if (sameLine(l.contractLineId) > 1) shared = true;
+      else if (onShip.some((g) => shipCartons(g) != null)) {
+        const perCarton = cartons && kg ? kg / cartons : null;
+        cartons = onShip.reduce((t, g) => t + (shipCartons(g) ?? 0), 0);
+        const net = onShip.reduce<number | null>((t, g) => (t == null || g.netKgPerCarton == null ? null : t + (shipCartons(g) ?? 0) * g.netKgPerCarton), 0);
+        kg = net ?? (perCarton != null ? round2(cartons * perCarton) : null);
+      } else wholeOrder = true;
+      rows.push({
+        productName: l.productName || l.description,
+        size: cl?.size ?? "",
         cartons,
-        kg: cartons != null && l.netKgPerCarton != null ? Math.round(cartons * l.netKgPerCarton * 100) / 100 : null,
-        lotCode: input.shipment.lotCode,
-        productionDates: "",
-        expiry: l.expiry,
+        kg,
+        lotCode: o.lotCode,
+        productionDates: formatProductionDates(o.productionDates),
+        expiry: exp ? formatDateVN(exp) : "",
         hsCode: cl?.hsCode ?? "",
-      };
-    });
+      });
+    }
+    // Hàng của chuyến không thuộc dòng LSX nào của HĐ ⇒ thêm như HĐ chưa có LSX (R2b).
+    rows.push(...goods.filter((g) => !lsxLines.some((x) => x.l.contractLineId === g.contractLineId)).map(fromShipLine));
+    const no = orders.map((o) => o.orderNo).join(", ");
+    if (wholeOrder) notices.push(`Lệnh sản xuất ${no}: số lượng lấy theo cả lệnh vì chuyến chưa nhập Hàng của chuyến — nhập Hàng của chuyến hoặc sửa tay ở bảng hàng.`);
+    if (shared) notices.push(`Lệnh sản xuất ${no}: có dòng hàng hợp đồng nằm ở nhiều dòng lệnh — số lượng giữ theo từng dòng lệnh, kiểm lại số thùng đi chuyến này.`);
+  }
+  return { rows, notices };
 }
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Chỉ dòng hàng của Lệnh xuất (R2, R2b, R3b) — xem `buildExportOrderLines`. */
+export const buildExportOrderRows = (input: Parameters<typeof buildExportOrderLines>[0]): ExportOrderRow[] => buildExportOrderLines(input).rows;
 
 const G = { head: "Đầu lệnh", lines: "Bảng hàng", delivery: "Thông tin giao hàng", loading: "Các lưu ý khi đóng hàng", docs: "Các yêu cầu về chứng từ" } as const;
 const YES_NO = ["Không", "Có"] as const;

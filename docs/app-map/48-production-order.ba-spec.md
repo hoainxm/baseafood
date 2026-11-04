@@ -2,7 +2,9 @@
 
 > Load khi: xây hoặc sửa Lệnh sản xuất của Phòng Kế hoạch: lập lệnh từ dòng hàng hợp đồng xuất, gắn nguyên liệu nhập khẩu dự kiến, phát hành tới phân xưởng / kho, gắn chuyến xuất (bước 2 của chuyến), in mẫu QTI-KH-01-04.
 covers: src/features/production-orders/**, src/lib/productionOrder.ts, src/lib/productionOrderDemo.ts, supabase/migrations/0088_production_orders.sql, src/lib/exportPlanning.ts
-last_verified: 2026-11-02
+last_verified: 2026-11-04
+<!-- updated: 2026-11-04 (chuyến gộp) — LS3: gắn LSX được vào chuyến gộp có hàng của HĐ của lệnh (`openShipmentsOf`), cả từ bước Lệnh sản xuất của chuyến (Lập lệnh / Gắn lệnh có sẵn theo từng HĐ trên chuyến). R6 không đổi (chuyến gắn ≥ 1 LSX phát hành ⇒ bước 2 Xong). Lệnh xuất dùng LSX theo từng HĐ + số lượng theo chuyến: ba-spec 72 R2b, R3b. -->
+<!-- updated: 2026-11-04 (lỗi quyền) — R9 trên DB thật: Phòng KH (vai đã chỉnh planner / planning-deputy) không có ô `production-orders` vì 0088 chỉ thay ma trận mặc định ⇒ chỉ admin thấy "Lập lệnh sản xuất". Sửa bằng mig 0105 (bù 9 ô); luật R9 không đổi. -->
 <!-- updated: 2026-11-02 (lúc lập HĐ) — hộp Lập HĐ xuất (chỉ chế độ lập mới, có quyền production-orders.create) thêm "Lưu & lập lệnh sản xuất": kiểm ≥ 1 dòng đã chọn Mặt hàng (thiếu ⇒ ErrorSummary, không lưu), lưu HĐ rồi sang `/planning-production?new=1&contract=…` (bỏ qua hỏi lịch xuất hàng — tạo sau ở hồ sơ). KHÔNG gộp ô lệnh vào form HĐ: lúc ký thường chưa có MSL / ngày SX / bao bì, hai bản ghi khác bảng + khác quyền. Đã thử sandbox: lưu → hộp lập lệnh chọn sẵn HĐ, dòng "HĐ 1.000 kg · còn 1.000". -->
 <!-- updated: 2026-11-02 (lối vào) — hồ sơ HĐ xuất có nút "Lập lệnh sản xuất" (ContractDossier, hiện khi HĐ mở + có bản hiệu lực + quyền production-orders.create) ⇒ `/planning-production?new=1&contract=…` mở hộp lập lệnh chọn sẵn HĐ. Trước đó LS1 ghi "từ hồ sơ HĐ" nhưng chưa có nút; lối qua bước 2 của chuyến phải chờ đính đủ hồ sơ mới ghi chuyến được. Đã thử: HĐ 99.26 "Chờ đính kèm", 0 chuyến ⇒ mở hộp chọn sẵn HĐ. -->
 <!-- updated: 2026-11-02 (nhật ký 56) — hồ sơ lệnh có khối "Nhật ký thao tác" (`record_type` production-order trong bảng chung nhóm Kế hoạch, mig 0092): lập, sửa (lần sửa + lý do + thay đổi), NL dự kiến, phát hành, gắn / bỏ gắn chuyến (cả từ khối Lệnh sản xuất của chuyến), giữ bản cũ, hủy + Hoàn tác. Một bộ ghi (`usePlanningActivityLog`) cho cả dòng của lệnh lẫn dòng của hồ sơ HĐ xuất. -->
@@ -125,7 +127,7 @@ Không có handoff nào tới tổ trưởng trong đợt này (Q8).
 - **Output:** dòng LSX có 0..n dòng NL dự kiến. Mỗi lần nhập hiện "đã dành X / thực nhập Y kg". Dành vượt ⇒ cảnh báo, vẫn lưu (R5). **Không** ghi sổ kho, Cân đối, Nhập khẩu (R5, 45 R11).
 
 ### LS3 — Phát hành + gắn chuyến · owner U1
-- **Input:** LSX nháp đủ R1–R3 · 0..n chuyến **cùng HĐ**, chưa hủy.
+- **Input:** LSX nháp đủ R1–R3 · 0..n chuyến **có hàng của HĐ** (chuyến của HĐ, hoặc chuyến gộp có dòng Hàng của chuyến của HĐ — ba-spec 70; 2026-11-04), còn mở.
 - **Steps:**
   1. Phát hành (Q5 = A: không cần duyệt).
   2. Gắn chuyến. MSL của LSX chép sang chuyến nếu chuyến chưa có MSL.

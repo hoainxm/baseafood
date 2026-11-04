@@ -97,6 +97,8 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 | R1 | Đầu lệnh: Số (gõ, gợi ý số lần trước + 1 nếu có dạng số), ngày lập (mặc định hôm nay, in "Bà Rịa, Ngày … Tháng … Năm …"), Kính gửi: BAN GIÁM ĐỐC · PHÂN XƯỞNG (Đông / Cá / Khô, chọn ≥ 1; mặc định theo lệnh trước của cùng HĐ) · PHÒNG KẾ TOÁN · BỘ PHẬN KHO. | chọn 2 xưởng ⇒ in "PHÂN XƯỞNG ĐÔNG, CÁ" |
 | R2 | Dòng hàng: mỗi dòng của Lệnh sản xuất **đã phát hành gắn chuyến** ⇒ 1 dòng: Tên hàng = tên hàng LSX; Size = size dòng HĐ (`contractLineId`); MSL = mã lô của LSX; Ngày sản xuất = các ngày SX của LSX (gộp "12–14/10/2026"); Ngày hết hạn = `expiryDate` của LSX; HS code = `hsCode` dòng HĐ. | chuyến không có LSX ⇒ lấy Hàng của chuyến (tên, size, hạn dùng), MSL = mã lô chuyến, NSX trống để gõ |
 | R3 | Số lượng = số thùng (bó) + kg; điền sẵn theo LSX (hoặc kế hoạch của Hàng của chuyến), sửa được. Dòng Tổng cộng = tổng thùng + tổng kg. | 0 dòng ⇒ không xuất file, báo "chưa có hàng" |
+| R2b | **Theo từng HĐ trên chuyến** (2026-11-04, chuyến gộp ba-spec 70): HĐ có LSX đã phát hành gắn chuyến ⇒ dòng của HĐ đó lấy từ LSX (R2); HĐ chưa có LSX ⇒ dòng của HĐ đó lấy từ Hàng của chuyến. Không bỏ dòng của HĐ nào. Thứ tự: HĐ chính trước, rồi HĐ khác theo thứ tự dòng Hàng của chuyến. Dòng Hàng của chuyến của HĐ có LSX nhưng không có dòng LSX cùng dòng HĐ ⇒ thêm từ Hàng của chuyến (MSL = mã lô chuyến) | chuyến gộp HĐ A có LSX + HĐ B chưa có ⇒ dòng A theo LSX + dòng B theo Hàng của chuyến |
+| R3b | **Số lượng theo chuyến** (2026-11-04): một LSX gắn được nhiều chuyến ⇒ số thùng + kg của dòng LSX lấy theo **Hàng của chuyến cùng dòng HĐ** (thực đóng; chưa có ⇒ kế hoạch; bó ⇒ × thùng / bó; kg = thùng × kg tịnh / thùng, thiếu kg tịnh ⇒ chia theo kg / thùng của dòng LSX). HĐ đã có Hàng của chuyến mà dòng LSX không có dòng cùng dòng HĐ ⇒ dòng LSX đó không đi chuyến này, bỏ. HĐ chưa nhập Hàng của chuyến ⇒ giữ số của cả lệnh + cảnh báo "số lượng lấy theo cả lệnh — nhập Hàng của chuyến hoặc sửa tay". Hai dòng LSX cùng một dòng HĐ ⇒ giữ số từng dòng LSX + cảnh báo | LSX 1.000 thùng gắn 2 chuyến, chuyến 1 kế hoạch 400 ⇒ Lệnh xuất chuyến 1 ghi 400 thùng |
 | R4 | Thông tin giao hàng lấy theo chuyến lúc xuất file, chỉ xem: Số lượng × Loại container = "1 × 20RF" (loại chuyến); Doc cut-off, VGM cut-off, Thời hạn hạ bãi (71); Cảng hạ = Cảng đến; ETD, ETA. Ngày đóng hàng: mặc định ngày đóng cont của chuyến, sửa được trong lệnh (không ghi ngược vào chuyến). | ô chưa có ⇒ in "…" để điền tay |
 | R5 | Lưu ý đóng hàng (theo size · theo ngày sản xuất · hàng mẫu) và Yêu cầu chứng từ (vi sinh · hóa học · khác): mỗi mục Không / Có; Có ⇒ phải ghi rõ. | Có mà trống ⇒ không lưu, báo đúng mục |
 | R6 | Lưu & xuất ⇒ file `.docx` đúng mẫu QTI-KH-01-07 lưu làm file mục Lệnh xuất (`step = export-order`) ⇒ mục Xong (luật file sẵn có). Xuất lại ⇒ thêm file mới, bản mới nhất đầu. Bản ký tay đính thêm như cũ. | không có kho file ⇒ tải file về máy + ghi chú thay file (như luật sẵn có) |
@@ -210,6 +212,24 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 - **Then** có "Lệnh xuất", "ảnh cont", "SI"
 - **Assert** số chỗ thiếu `== 0`
 
+### AC-14 — Số lượng theo chuyến · R3b · Test: unit
+- **Given** LSX phát hành 1.000 thùng × 12 kg gắn chuyến S1 + S2; Hàng của chuyến S1 cùng dòng HĐ: kế hoạch 400 thùng, kg tịnh 12
+- **When** dựng dòng Lệnh xuất của S1
+- **Then** 1 dòng 400 thùng, 4.800 kg, MSL của LSX, không cảnh báo
+- **Assert** `rows[0].cartons == 400` · `rows[0].kg == 4800` · `notices.length == 0`
+
+### AC-15 — Chưa có Hàng của chuyến ⇒ số cả lệnh + cảnh báo · R3b · Test: unit
+- **Given** như AC-14 nhưng S1 chưa có dòng Hàng của chuyến
+- **When** dựng dòng
+- **Then** 1.000 thùng, 12.000 kg, 1 cảnh báo
+- **Assert** `rows[0].cartons == 1000` · `notices.length == 1`
+
+### AC-16 — Chuyến gộp: HĐ chưa có LSX vẫn có dòng · R2b · Test: unit
+- **Given** chuyến HĐ chính A gắn LSX của A (1 dòng); Hàng của chuyến có 1 dòng của A + 2 dòng của HĐ B; B chưa có LSX
+- **When** dựng dòng
+- **Then** 3 dòng: dòng A theo LSX (MSL LSX) rồi 2 dòng B theo Hàng của chuyến (MSL chuyến, size + HS theo dòng HĐ B)
+- **Assert** `rows.length == 3` · `rows[0].lotCode == LSX.lotCode` · `rows[1].lotCode == shipment.lotCode`
+
 ## 11. Assumptions / Open
 
 - **Đã khác đặc tả lúc build:** R16 (lưu ở `composed_documents`, không cột JSON); số kiện SI ghi số theo từng dòng (mẫu cộng bằng công thức), không ghi "790 CARTONS"; "SI" gửi trước khi có seal vẫn xuất được, chỉ cảnh báo; bộ demo (R17) thêm file SI + ảnh cont / seal giữ chỗ cho mọi chuyến cont lạnh đã đóng (không phải một chuyến) để chuyến demo không tụt bước 4.
@@ -225,4 +245,5 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 - v1.3 (2026-11-04): người dùng hỏi vì sao chuyến báo "Không áp dụng — chuyến xong trước khi có mục SI" (mốc 05/11 ⇒ mọi chuyến hiện có là "cũ", nút Lập SI bị ẩn) ⇒ R14: chuyến cũ được miễn vẫn lập SI được, hàng SI ghi rõ lý do.
 - v1.4 (2026-11-04): Consignee chỉ có tên vì khách chưa có địa chỉ ⇒ form Lập / Sửa HĐ thêm ô **Địa chỉ khách hàng** (hiện khi đã chọn khách), lưu vào `Customer.address` của danh mục — R12 lấy tên + địa chỉ từ đó.
 - v1.5 (2026-11-04): chị Thảo: ô Số của Lệnh xuất ghi định dạng "STT/tháng-năm, VD 01/10-26" ngay ở nhãn. Chị Vi: sửa tên hàng ở HĐ mà SI không đổi ⇒ R11: mỗi lần mở SI, dòng hàng dựng lại — tên tiếng Anh + HS theo dòng HĐ HIỆN TẠI (dòng Hàng của chuyến chỉ dùng khi không nối dòng HĐ); số kiện / gross đã gõ giữ theo dòng HĐ (`mergeSavedGoods`).
+- v1.6 (2026-11-04): ĐÃ BUILD (`buildExportOrderLines`, cảnh báo ở bộ soạn; AC-14…16 = `exportOrderForm.test.ts`; thử sandbox: chuyến gộp TEST-B + TEST-E, LSX 1.000 thùng ⇒ Lệnh xuất 400 thùng theo chuyến, dòng LSX không đi chuyến bị bỏ, dòng HĐ phụ theo Hàng của chuyến; bỏ Hàng của chuyến ⇒ số cả lệnh + 1 cảnh báo; 360px không tràn). Chủ dự án duyệt — R2b (bảng hàng xét theo từng HĐ trên chuyến gộp, HĐ chưa có LSX lấy Hàng của chuyến) + R3b (số lượng theo Hàng của chuyến, không lấy số cả lệnh khi LSX gắn nhiều chuyến); AC-14…16.
 - v1.7 (2026-11-04): Phòng KH: "chỗ số cont / seal phải đính kèm lên mới xong bước này" ⇒ R8 + AC-6 đổi: ảnh cont / seal bắt buộc (đóng ghép, chưa chạy 0103, chuyến cũ đã đóng xong thì không); demo có ảnh giữ chỗ cho cả chuyến xe tải.

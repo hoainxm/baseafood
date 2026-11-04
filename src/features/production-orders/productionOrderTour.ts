@@ -133,7 +133,7 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
       target: "order-shipments",
       title: "Chuyến xuất",
       body:
-        "Lệnh gắn một hoặc nhiều chuyến của cùng hợp đồng. Lệnh đã phát hành thì bước Lệnh sản xuất của các chuyến đã gắn tự xong ở trang Xuất khẩu; phát hành chưa tick chuyến thì gắn sau.\n" +
+        "Lệnh gắn một hoặc nhiều chuyến có hàng của hợp đồng, kể cả chuyến chở chung hàng của hợp đồng khác cùng khách. Lệnh xuất hàng của chuyến lấy dòng của lệnh theo đúng hợp đồng, số thùng / kg theo Hàng của chuyến. Lệnh đã phát hành thì bước Lệnh sản xuất của các chuyến đã gắn tự xong ở trang Xuất khẩu; phát hành chưa tick chuyến thì gắn sau.\n" +
         "Chuyến chưa có mã số lô nhận mã của lệnh; chuyến có mã khác thì hiện Lệch MSL. Hủy lệnh thì chuyến được nhả.",
     }),
   );

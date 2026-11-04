@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ExportContractLine, ExportShipment, ExportShipmentLine, ProductionOrder, ProductionOrderLine } from "@/types";
 import { checkTemplateTags, prefill, validateComposed } from "../documentComposer";
 import { docxPlainText, fillDocx, readTemplateTags } from "../docxTemplate";
-import { buildExportOrderRows, exportOrderForm, exportOrderMissingDetails, exportOrderTemplateData, workshopLine } from "./exportOrderForm";
+import { buildExportOrderLines, buildExportOrderRows, exportOrderForm, exportOrderMissingDetails, exportOrderTemplateData, workshopLine } from "./exportOrderForm";
 import { buildExportOrderTemplate } from "./exportOrderTemplate";
 
 const shipment = (over: Partial<ExportShipment> = {}): ExportShipment => ({
@@ -42,7 +42,7 @@ const shipment = (over: Partial<ExportShipment> = {}): ExportShipment => ({
 
 const cl = (id: string, size: string, hsCode: string) => ({ id, size, hsCode }) as ExportContractLine;
 const order = (over: Partial<ProductionOrder> = {}) =>
-  ({ id: "o1", status: "issued", lotCode: "181", productionDates: ["2026-10-14", "2026-10-12"], shelfLifeMonths: 24, ...over }) as ProductionOrder;
+  ({ id: "o1", contractId: "c1", orderNo: "19.10", status: "issued", lotCode: "181", productionDates: ["2026-10-14", "2026-10-12"], shelfLifeMonths: 24, ...over }) as ProductionOrder;
 const oline = (lineNo: number, contractLineId: string, units: number, kg: number) =>
   ({ id: `ol${lineNo}`, orderId: "o1", lineNo, contractLineId, productName: `Bạch tuộc ${lineNo}`, description: "", unitKind: "carton", cartonsPerUnit: 1, netKgPerCarton: 10, units, kg }) as ProductionOrderLine;
 
@@ -73,6 +73,60 @@ describe("buildExportOrderRows", () => {
     expect(rows).toHaveLength(3);
     expect(rows.every((r) => r.productionDates === "" && r.lotCode === "006")).toBe(true);
     expect(rows[0]).toMatchObject({ productName: "Hàng 1", size: "S", cartons: 100, kg: 1000, expiry: "2028.01" });
+  });
+});
+
+describe("buildExportOrderLines — số lượng theo chuyến, chuyến gộp (ba-spec 72 R2b, R3b)", () => {
+  const sl = (over: Partial<ExportShipmentLine>): ExportShipmentLine =>
+    ({ id: "l1", shipmentId: "s1", contractId: "c1", sortOrder: 1, contractLineId: "cl1", description: "Hàng", size: "", unitKind: "carton", cartonsPerUnit: 1, netKgPerCarton: 12, plannedUnits: 400, loadedUnits: null, expiry: "", ...over }) as ExportShipmentLine;
+  const lsx = { orders: [order()], orderLines: [{ ...oline(1, "cl1", 1000, 12000), netKgPerCarton: 12 }], contractLines: [cl("cl1", "2-3", "0307.52")] };
+
+  it("AC-14: LSX gắn nhiều chuyến ⇒ số thùng + kg theo Hàng của chuyến này", () => {
+    const { rows, notices } = buildExportOrderLines({ shipment: shipment(), ...lsx, shipmentLines: [sl({})] });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ cartons: 400, kg: 4800, lotCode: "181", hsCode: "0307.52" });
+    expect(notices).toHaveLength(0);
+  });
+
+  it("thực đóng thắng kế hoạch", () => {
+    const { rows } = buildExportOrderLines({ shipment: shipment(), ...lsx, shipmentLines: [sl({ loadedUnits: 395 })] });
+    expect(rows[0]).toMatchObject({ cartons: 395, kg: 4740 });
+  });
+
+  it("AC-15: chuyến chưa nhập Hàng của chuyến ⇒ số cả lệnh + 1 cảnh báo", () => {
+    const { rows, notices } = buildExportOrderLines({ shipment: shipment(), ...lsx, shipmentLines: [] });
+    expect(rows[0]).toMatchObject({ cartons: 1000, kg: 12000 });
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toContain("19.10");
+  });
+
+  it("dòng LSX không có trên Hàng của chuyến ⇒ không đi chuyến này", () => {
+    const { rows } = buildExportOrderLines({ shipment: shipment(), ...lsx, orderLines: [...lsx.orderLines, oline(2, "cl2", 50, 500)], shipmentLines: [sl({})] });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("AC-16: chuyến gộp — HĐ chưa có LSX vẫn có dòng, lấy từ Hàng của chuyến", () => {
+    const { rows } = buildExportOrderLines({
+      shipment: shipment(),
+      ...lsx,
+      contractLines: [...lsx.contractLines, cl("b1", "S", "0307.43"), cl("b2", "M", "0307.43")],
+      shipmentLines: [sl({}), sl({ id: "l2", contractId: "c2", sortOrder: 2, contractLineId: "b1", description: "Mực B1" }), sl({ id: "l3", contractId: "c2", sortOrder: 3, contractLineId: "b2", description: "Mực B2" })],
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows[0].lotCode).toBe("181");
+    expect(rows[1]).toMatchObject({ productName: "Mực B1", lotCode: "006", size: "S", hsCode: "0307.43", cartons: 400 });
+    expect(rows[2].productName).toBe("Mực B2");
+  });
+
+  it("chuyến gộp — LSX của HĐ khác gắn chuyến ⇒ dòng HĐ đó theo LSX của nó", () => {
+    const { rows } = buildExportOrderLines({
+      shipment: shipment(),
+      orders: [order({ id: "o2", contractId: "c2", orderNo: "20.10", lotCode: "205" })],
+      orderLines: [{ ...oline(1, "b1", 300, 3600), orderId: "o2" }],
+      contractLines: [cl("cl1", "2-3", "0307.52"), cl("b1", "S", "0307.43")],
+      shipmentLines: [sl({}), sl({ id: "l2", contractId: "c2", sortOrder: 2, contractLineId: "b1", plannedUnits: 100 })],
+    });
+    expect(rows.map((r) => [r.lotCode, r.cartons])).toEqual([["006", 400], ["205", 100]]);
   });
 });
 

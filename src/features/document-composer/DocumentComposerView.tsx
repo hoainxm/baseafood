@@ -55,6 +55,8 @@ export interface ComposerSourceProps<T> {
   newDocument: (state: { values: DocumentValues; fieldSources: ComposedDocument["fieldSources"] }, meta: { id: string; by: string; at: string }) => ComposedDocument;
   /** Xuất Word xong — nơi gọi lưu kèm file (VD Lệnh xuất ⇒ file của mục Lệnh xuất, ba-spec 72 R6). */
   onExported?: (file: Uint8Array, fileName: string, values: DocumentValues) => void;
+  /** Cảnh báo về số liệu lấy từ nguồn (VD Lệnh xuất lấy số cả lệnh sản xuất — ba-spec 72 R3b). */
+  notices?: readonly string[];
 }
 
 const nowIso = () => new Date().toISOString();
@@ -71,6 +73,7 @@ export function DocumentComposerView<T>({
   isSourceLive,
   newDocument,
   onExported,
+  notices = [],
   canWrite,
   isAdmin,
   by,
@@ -314,6 +317,11 @@ export function DocumentComposerView<T>({
           {type.labels.stale}. {canEdit ? "Chọn Lấy lại số từ lệnh để cập nhật các ô lấy từ lệnh; ô đã sửa tay giữ nguyên." : ""}
         </p>
       )}
+      {notices.map((n) => (
+        <p key={n} role="status" className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
+          {n}
+        </p>
+      ))}
       <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={() => (draft.discard(), setEdited(null))} />
       <ErrorSummary errors={errors} />
 

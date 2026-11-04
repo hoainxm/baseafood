@@ -258,3 +258,30 @@ export function newSiDocument(
     updatedAt: meta.at,
   };
 }
+
+/**
+ * Gross (kg) từng dòng Hàng của chuyến theo SI đã lưu — Packing list lấy gross theo SI (Phòng KH 2026-11-04). Khớp
+ * theo dòng HĐ (`toCurrentLineId` nối id của bản HĐ cũ); dòng HĐ có nhiều dòng chuyến hoặc nhiều dòng SI ⇒ không lấy.
+ * Dòng SI không có khóa (bản lưu cũ) ⇒ theo thứ tự khi số dòng bằng nhau. Không có SI / không khớp ⇒ null.
+ */
+export function siGrossByLine(
+  siDoc: Pick<ComposedDocument, "values"> | null | undefined,
+  lines: readonly ExportShipmentLine[],
+  toCurrentLineId: (contractLineId: string) => string = (id) => id,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!siDoc) return out;
+  const goods = siFromValues(siDoc.values).goods.filter((r) => r.grossKg != null);
+  if (!goods.length) return out;
+  if (goods.every((r) => !r.contractLineId)) {
+    if (goods.length === lines.length) lines.forEach((l, i) => out.set(l.id, goods[i].grossKg as number));
+    return out;
+  }
+  const count = (id: string) => lines.filter((l) => l.contractLineId === id).length;
+  for (const l of lines) {
+    if (!l.contractLineId || count(l.contractLineId) !== 1) continue;
+    const rows = goods.filter((r) => r.contractLineId && toCurrentLineId(r.contractLineId) === l.contractLineId);
+    if (rows.length === 1) out.set(l.id, rows[0].grossKg as number);
+  }
+  return out;
+}

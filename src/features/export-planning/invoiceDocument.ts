@@ -5,18 +5,32 @@
 // ============================================================
 import { notify } from "@/design-system";
 import { EMPTY_COMPOSITION, bankAccountsOf, bankBlockLines, buildInvoiceDocument, defaultTradeTerms, invoiceUnitPrice, shipmentLinesOf } from "@/lib/exportInvoice";
-import { documentItems, linesWithContractNo, shipmentContractLines, termsOf, type ExportData } from "@/lib/exportPlanning";
+import { currentContractLineId, documentItems, linesWithContractNo, shipmentContractIds, shipmentContractLines, termsOf, type ExportData } from "@/lib/exportPlanning";
+import { siGrossByLine } from "@/lib/shippingInstruction";
 import { fetchCompanyLogoBytes } from "@/lib/companyAssets";
 import type { CompanySeller } from "@/lib/companyProfile";
-import type { Customer, ExportContract, ExportShipment, ExportStepItem } from "@/types";
+import type { ComposedDocument, Customer, ExportContract, ExportShipment, ExportStepItem } from "@/types";
 
 /** Dựng bộ chứng từ của một chuyến từ mục Commercial Invoice (đang sửa hoặc đã lưu). Dùng cả ở bước 5. */
-export function invoiceDocumentFor(data: ExportData, shipment: ExportShipment, contract: ExportContract, customer: Customer | undefined, item: ExportStepItem | undefined, bankOptions: Parameters<typeof bankAccountsOf>[0], seller?: CompanySeller) {
+export function invoiceDocumentFor(
+  data: ExportData,
+  shipment: ExportShipment,
+  contract: ExportContract,
+  customer: Customer | undefined,
+  item: ExportStepItem | undefined,
+  bankOptions: Parameters<typeof bankAccountsOf>[0],
+  seller?: CompanySeller,
+  /** SI đã lưu của chuyến — Packing list lấy gross theo SI. */
+  siDoc?: ComposedDocument | null,
+) {
   const comp = item?.invoiceComposition ?? EMPTY_COMPOSITION;
   const terms = termsOf(data, contract.id);
   // Chuyến gộp nhiều HĐ (ba-spec 70): giá theo dòng của đúng HĐ, tên hàng ghi kèm số HĐ gốc.
   const contractLines = shipmentContractLines(data, shipment);
   const lines = linesWithContractNo(data, shipment, shipmentLinesOf(data.shipmentLines ?? [], shipment.id));
+  // Gross theo SI (dòng SI có thể trỏ id dòng của bản HĐ cũ ⇒ nối sang bản đang dùng).
+  const contractIds = shipmentContractIds(data, shipment);
+  const siGross = siGrossByLine(siDoc, lines, (id) => contractIds.map((c) => currentContractLineId(data, c, id)).find((x) => x !== id) ?? id);
   const banks = bankAccountsOf(bankOptions);
   const bank = banks.find((b) => b.id === comp.bankOptionId) ?? banks[0];
   const pod = shipment.portOfDischarge || terms.portOfDischarge;
@@ -38,6 +52,7 @@ export function invoiceDocumentFor(data: ExportData, shipment: ExportShipment, c
     specialNotes: comp.specialNotes,
     // Người bán từ Thông tin công ty (ba-spec 67); chưa có ⇒ mặc định trong buildInvoiceDocument.
     seller,
+    siGrossKg: (l) => siGross.get(l.id) ?? null,
   });
 }
 

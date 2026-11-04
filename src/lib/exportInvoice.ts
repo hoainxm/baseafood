@@ -280,6 +280,8 @@ export interface InvoiceDocInput {
   specialNotes: string;
   /** Người bán từ Thông tin công ty (ba-spec 67); không có ⇒ `SELLER` mặc định. */
   seller?: CompanySeller;
+  /** Gross (kg) của dòng theo SI đã lưu — Packing list lấy gross theo SI (Phòng KH 2026-11-04); null ⇒ kg cả bì × số kiện. */
+  siGrossKg?: (line: ExportShipmentLine) => number | null;
 }
 
 export interface InvoiceTotals {
@@ -294,6 +296,8 @@ export interface InvoiceDocument {
   totals: InvoiceTotals;
   /** Dòng chuyến chưa đủ số để in (thiếu số kiện / kg / đơn giá). */
   incompleteLineIds: string[];
+  /** Như trên, kèm thiếu gì — để báo đích danh từng dòng. */
+  incompleteLines: { lineId: string; missing: ("units" | "netKg" | "unitPrice")[] }[];
   fileName: string;
 }
 
@@ -434,7 +438,8 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
     const units = lineUnits(line);
     const netKg = lineNetKg(line);
     const unitPrice = input.unitPrice(line);
-    return { line, units, netKg, grossKg: lineGrossKg(line), unitPrice, amount: netKg != null && unitPrice != null ? round(netKg * unitPrice, 2) : null };
+    const grossKg = input.siGrossKg?.(line) ?? lineGrossKg(line);
+    return { line, units, netKg, grossKg, unitPrice, amount: netKg != null && unitPrice != null ? round(netKg * unitPrice, 2) : null };
   });
   const totals: InvoiceTotals = {
     units: round(printed.reduce((t, p) => t + (p.units ?? 0), 0), 3),
@@ -478,7 +483,9 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
   const nwgw = (p: PrintedLine): InvoiceCell => {
     const net = netKgPerUnit(p.line);
     if (net == null) return null;
-    return p.line.grossKgPerUnit != null ? `${net}kgs/${p.line.grossKgPerUnit}kgs` : `${net}kgs`;
+    // Gross mỗi kiện: theo Hàng của chuyến; chỉ có gross theo SI ⇒ gross ÷ số kiện.
+    const gpu = p.line.grossKgPerUnit ?? (p.grossKg != null && p.units ? round(p.grossKg / p.units, 2) : null);
+    return gpu != null ? `${net}kgs/${gpu}kgs` : `${net}kgs`;
   };
   groups.forEach((g, i) => pl.push(...groupRows(g, i + 1, (p) => [nwgw(p), p.units, p.netKg, p.grossKg])));
   pl.push({ role: "total", cells: [null, "TOTAL", null, totals.units, totals.netKg, totals.grossKg || null] }, blank());
@@ -518,6 +525,14 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
     sheets,
     totals,
     incompleteLineIds: printed.filter((p) => p.units == null || p.netKg == null || p.unitPrice == null).map((p) => p.line.id),
+    incompleteLines: printed
+      .map((p) => ({
+        lineId: p.line.id,
+        missing: [p.units == null && "units", p.units != null && p.netKg == null && "netKg", p.unitPrice == null && "unitPrice"].filter(
+          (x): x is "units" | "netKg" | "unitPrice" => !!x,
+        ),
+      }))
+      .filter((x) => x.missing.length),
     fileName: invoiceFileName(input.invoiceNo),
   };
 }

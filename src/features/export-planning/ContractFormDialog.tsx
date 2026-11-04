@@ -169,7 +169,8 @@ function formFor(target: ContractFormTarget, today: string): ContractForm {
       revisedOn: target.mode === "edit" ? r.revisedOn : today,
       changeSummary: target.mode === "edit" ? r.changeSummary : "",
       terms: structuredClone(r.terms),
-      lines: r.lines.map((l) => ({ ...l, id: target.mode === "edit" ? l.id : newId() })),
+      // Bản sửa GIỮ id dòng (2026-11-04): hàng của chuyến, lệnh sản xuất trỏ id dòng HĐ — đổi id là mất đơn giá / size / HS.
+      lines: r.lines.map((l) => ({ ...l })),
       filePath: target.mode === "edit" ? r.filePath : "",
       fileName: target.mode === "edit" ? r.fileName : "",
       initial: "",

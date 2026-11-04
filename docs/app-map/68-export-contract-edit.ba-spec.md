@@ -2,7 +2,7 @@
 
 > Load khi: sửa luật Sửa hợp đồng / Ghi bản sửa / đổi số HĐ / đổi khách của Xuất khẩu, hoặc nhật ký sửa hợp đồng.
 covers: src/features/export-planning/ContractFormDialog.tsx, src/features/export-planning/ExportPlanningScreen.tsx, src/lib/exportPlanning.ts
-last_verified: 2026-11-03
+last_verified: 2026-11-04
 ttl_days: 90
 status: v1 CHỐT + BUILD 2026-11-03 (lỗi người dùng báo).
 
@@ -75,3 +75,4 @@ IN: Số HĐ mở ở mọi lần sửa; bảng khóa theo trạng thái (sơ đ
 
 ## History
 - 2026-11-03 — v1 tạo + build.
+- 2026-11-04: bản sửa HĐ **giữ id dòng hàng** của bản trước (trước đó mỗi bản cấp id mới ⇒ hàng của chuyến / lệnh sản xuất mất nối, invoice đơn giá 0 — KAISEI 04-26-KMP bản 2). Dữ liệu cũ tự nối khi nạp (`remapLegacyContractLineIds`, `currentContractLineId`); Lệnh xuất nối cả dòng lệnh sản xuất.

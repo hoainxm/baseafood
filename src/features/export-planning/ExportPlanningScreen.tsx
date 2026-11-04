@@ -11,9 +11,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
 import { useCustomerProductNameStore, useCustomers, useExportBookingDetailsAvailable, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportLoadingExtraPhotosAvailable, useExportOptionStore,
-  useCompanyProfileStore, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
+  useCompanyProfileStore, useComposedDocuments, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { lineUnits, shipmentLinesOf } from "@/lib/exportInvoice";
 import { companySellerOf } from "@/lib/companyProfile";
+import { SHIPPING_INSTRUCTION_DOC } from "@/lib/shippingInstruction";
 import { extractCustomerNames } from "@/lib/customerProductNames";
 import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNamesDialog";
 import { useAuth } from "@/lib/auth";
@@ -526,11 +527,14 @@ export default function ExportPlanningScreen() {
     return true;
   };
 
+  // Packing list lấy gross theo SI đã lưu (Phòng KH 2026-11-04).
+  const [composedDocs] = useComposedDocuments();
   const downloadShipmentInvoice = (s: ExportShipment, format: "xlsx" | "pdf" | "docx") => {
     const c = d.contracts.find((x) => x.id === s.contractId);
     if (!c) return;
     const ci = documentItems(d, s.id).find((x) => x.docKind === "commercial-invoice");
-    void downloadInvoiceDocument(invoiceDocumentFor(d, s, c, customers.find((x) => x.id === c.customerId), ci, exportOptions, companySellerOf(company.profile)), format, company.profile.logoPath);
+    const siDoc = composedDocs.find((x) => x.docType === SHIPPING_INSTRUCTION_DOC && x.sourceId === s.id) ?? null;
+    void downloadInvoiceDocument(invoiceDocumentFor(d, s, c, customers.find((x) => x.id === c.customerId), ci, exportOptions, companySellerOf(company.profile), siDoc), format, company.profile.logoPath);
   };
 
   const saveLoadingFiles = (rows: ExportFile[]): boolean => {

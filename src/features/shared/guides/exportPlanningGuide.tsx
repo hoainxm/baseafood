@@ -80,7 +80,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Hàng của chuyến · invoice",
     needs: ["export-plans", "update"],
     actors: KH,
-    text: "Nhập hàng của chuyến từ dòng hàng hợp đồng (số kiện, kg cả bì, hạn dùng); cont chở hàng của nhiều hợp đồng cùng khách thì thêm hàng của hợp đồng đó vào cùng chuyến, mỗi hợp đồng tự tính đã giao theo dòng của mình. Ở mục Commercial Invoice chọn tài khoản nhận tiền, sửa đơn giá, thêm thông tin riêng của khách rồi tải file Invoice · Packing list (chuyến gộp: mỗi dòng ghi số hợp đồng gốc).",
+    text: "Nhập hàng của chuyến từ dòng hàng hợp đồng (số kiện, kg cả bì, hạn dùng); cont chở hàng của nhiều hợp đồng cùng khách thì thêm hàng của hợp đồng đó vào cùng chuyến, mỗi hợp đồng tự tính đã giao theo dòng của mình. Ở mục Commercial Invoice chọn tài khoản nhận tiền, sửa đơn giá, thêm thông tin riêng của khách rồi tải file Invoice · Packing list (gross theo SI; chuyến gộp: mỗi dòng ghi số hợp đồng gốc).",
     done: "Ô tổng trống tự điền theo invoice lập",
   },
   {

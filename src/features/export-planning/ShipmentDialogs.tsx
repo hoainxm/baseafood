@@ -36,6 +36,7 @@ import {
   SHIPMENT_KINDS,
   SUB_STEP_LABELS,
   canMarkDone,
+  documentItems,
   filesOfStep,
   isContainerKind,
   normalizeContainerNo,
@@ -50,6 +51,8 @@ import {
   validateScheduleRows,
 } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
+import { useComposedDocuments } from "@/lib/catalogRepo";
+import { SHIPPING_INSTRUCTION_DOC, siFromValues, siTotals } from "@/lib/shippingInstruction";
 import { invoiceNameLines } from "@/lib/invoiceReader";
 import type { Customer, CustomerProductName, ExportContractLine, ExportLoadingExtraStep, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem, Product } from "@/types";
 import { CalendarPlus, Camera, ClipboardList, Container, Plus, Save, Trash2 } from "lucide-react";
@@ -611,7 +614,10 @@ export function StepItemDialog({
 
   useEffect(() => {
     if (!target) return;
-    const fresh: StepItemForm = { key: target.item.id, item: target.item, tg: target, initial: itemSnap(target.item) };
+    // Packing list lấy số + ngày theo Commercial Invoice của chuyến khi còn trống (Phòng KH 2026-11-04).
+    const ci = target.item.docKind === "packing-list" ? documentItems(data, target.item.shipmentId).find((x) => x.docKind === "commercial-invoice") : undefined;
+    const prefilled = ci ? { ...target.item, number: target.item.number || ci.number, issuedOn: target.item.issuedOn || ci.issuedOn } : target.item;
+    const fresh: StepItemForm = { key: target.item.id, item: prefilled, tg: target, initial: itemSnap(target.item) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
     setFiles([]);
@@ -634,6 +640,16 @@ export function StepItemDialog({
   const isDoc = item?.step === "document";
   const isInvoice = item?.docKind === "commercial-invoice";
   const isBl = item?.docKind === "bill-of-lading";
+  const isPackingList = item?.docKind === "packing-list";
+  const [composedDocs] = useComposedDocuments();
+  const packingRef = useMemo(() => {
+    if (!isPackingList || !item) return null;
+    const ci = documentItems(data, item.shipmentId).find((x) => x.docKind === "commercial-invoice");
+    if (!ci) return null;
+    const si = composedDocs.find((x) => x.docType === SHIPPING_INSTRUCTION_DOC && x.sourceId === item.shipmentId);
+    const gross = si ? siTotals(siFromValues(si.values).goods).grossKg : 0;
+    return { ci, grossKg: gross > 0 ? gross : null };
+  }, [isPackingList, item, data, composedDocs]);
   const invoiceContract = isInvoice && tgt ? data.contracts.find((c) => c.id === tgt.contractId) : undefined;
   const title = item ? (isDoc ? requiredDocumentLabel({ kind: item.docKind, form: item.docForm, issuer: item.docIssuer }, data.documentKinds) : SUB_STEP_LABELS[item.step]) : "";
 
@@ -812,6 +828,16 @@ export function StepItemDialog({
                   </Field>
                   <DateField label="Ngày" value={item.issuedOn} onChange={(v) => set("issuedOn", v)} />
                 </div>
+              )}
+              {isPackingList && packingRef && (
+                <p className="tnum rounded-lg bg-muted px-4 py-2 text-sm">
+                  Theo Commercial Invoice{packingRef.ci.number ? ` số ${packingRef.ci.number}` : ""}
+                  {packingRef.ci.cartons != null || packingRef.ci.netKg != null
+                    ? `: ${packingRef.ci.cartons != null ? `${formatNumber(packingRef.ci.cartons)} kiện` : ""}${packingRef.ci.cartons != null && packingRef.ci.netKg != null ? " · " : ""}${packingRef.ci.netKg != null ? `${formatNumber(packingRef.ci.netKg)} kg tịnh` : ""}`
+                    : " (chưa ghi tổng)"}
+                  {" · "}
+                  {packingRef.grossKg != null ? `gross ${formatNumber(packingRef.grossKg)} kg theo SI` : "chưa có SI — gross lấy theo kg cả bì của Hàng của chuyến"}. Số, ngày lấy theo invoice khi còn trống; file Packing list tải ở mục Commercial Invoice.
+                </p>
               )}
               {isInvoice && (
                 <div className="grid gap-4 sm:grid-cols-3">

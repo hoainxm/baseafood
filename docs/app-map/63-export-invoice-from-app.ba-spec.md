@@ -2,7 +2,7 @@
 
 > Load khi: sửa khối Hàng của chuyến, hàng Số lượng thực đóng (bước 4), phần Lập invoice từ app ở mục Commercial Invoice, file Excel Invoice · Packing list · Expiry date list, danh sách Tài khoản ngân hàng.
 covers: src/lib/exportInvoice.ts, src/lib/exportInvoiceExcel.ts, src/lib/exportInvoicePdf.ts, src/lib/exportInvoiceDocx.ts, src/features/export-planning/ShipmentGoods.tsx, src/features/export-planning/shipmentGoodsLogic.ts, src/features/export-planning/InvoiceComposePanel.tsx, src/features/export-planning/invoiceDocument.ts, supabase/migrations/0096_export_shipment_lines.sql
-last_verified: 2026-11-03
+last_verified: 2026-11-04
 <!-- updated: 2026-11-03 (ba-spec 67) — người bán (tên, địa chỉ, nơi lập, người ký) + logo PDF / Word lấy từ Thông tin công ty (`companySellerOf`, `fetchCompanyLogoBytes`) — ba-spec 67; `SELLER` chỉ còn là mặc định. Tài khoản ngân hàng quản lý ở Thông tin công ty (bỏ khỏi tab Danh mục của Xuất khẩu), invoice chọn như cũ. -->
 <!-- updated: 2026-11-03 (c) — R11 / AC-11: đóng cont điền số thực đóng không chờ Hàng của chuyến (dòng tạm từ dòng HĐ, mig 0098); R4 giữ dòng đã điền khi KH lưu trống kế hoạch. -->
 ttl_days: 90
@@ -89,6 +89,8 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 | R7 | Đơn giá sửa ở invoice chỉ lưu trong mục CI; không đổi đơn giá HĐ |
 | R9 | **PDF** (`exportInvoicePdf.ts`, `pdf-lib`): vẽ từ CÙNG bảng của file Excel ⇒ hai bản cùng số. Bố cục đo từ PDF mẫu 275/26: logo (`public/invoice-logo.jpg` — 480 px, thu từ logo gốc rõ nét `docs/brand/baseafood-logo-original.jpg`) + tên công ty, kẻ ngang, "Ba Ria, <ngày>" nghiêng canh phải, tiêu đề 22pt + số đóng khung, bảng kẻ lưới (ô cuối dòng tiêu đề phủ các cột con: "IN US. DOLLARS", "TOTAL WEIGHT"; "Trade Terms: CFR" / cảng phủ 2 cột tiền; dòng đơn vị gạch chân; TOTAL đóng khung), "Says" đậm nghiêng, chữ ký công ty bên phải, khối ngân hàng 9pt đóng khung góc trái (chừa chỗ dấu + chữ ký tay). Mỗi chứng từ cố vừa MỘT trang: tràn thì vẽ lại ở 90 % · 82 % · 75 %; vẫn tràn ⇒ sang trang, không mất dòng. Font chuẩn PDF không có chữ Việt ⇒ bỏ dấu khi in. Dấu + chữ ký giám đốc KHÔNG in (ký tay / đóng dấu trên bản in) |
 | R10 | **Word** (`exportInvoiceDocx.ts`, dựng WordprocessingML bằng `pizzip`, không khuôn): cùng bảng + cùng bố cục bản PDF (R9); mỗi chứng từ một trang (ngắt trang là đoạn riêng — đặt trong ô bảng Word bỏ qua); GIỮ dấu tiếng Việt (khác PDF). Để phòng KH sửa chữ / thêm dòng khách yêu cầu rồi in (chủ dự án 2026-11-03) |
+| R11 | (2026-11-04, Phòng KH, chuyến KAISEI 02/11) Đơn giá mặc định lấy dòng HĐ của **bản đang dùng**; dòng chuyến trỏ id dòng của bản cũ ⇒ nối sang dòng tương ứng (mặt hàng + size + tên; không được thì cùng vị trí). Dòng chưa tính được tiền ⇒ báo từng dòng thiếu gì (số kiện / kg/thùng / đơn giá) và chỗ bổ sung | bản sửa đổi size ⇒ nối theo vị trí khi cùng mặt hàng |
+| R12 | Packing list: số, ngày, lượng theo invoice; **gross theo SI đã lưu** của chuyến (khớp dòng HĐ; gross mỗi kiện = gross ÷ số kiện khi Hàng của chuyến chưa có kg cả bì). Chưa có SI / không khớp ⇒ kg cả bì × số kiện. Mục chứng từ Packing List tự điền số + ngày theo Commercial Invoice khi còn trống | một dòng HĐ ở nhiều dòng chuyến ⇒ không lấy gross SI |
 | R8 | Địa chỉ bên mua: có xuống dòng ⇒ theo đó; một dòng dài (ô Địa chỉ của danh mục khách là ô một dòng) ⇒ ngắt theo từ, ≤ 40 ký tự / dòng (`addressLines`) — cột C đã có chữ nên dòng dài bị che. Hướng dẫn người dùng: [ops/export-invoice-user-guide](../ops/export-invoice-user-guide.md) |
 
 ## 10. Acceptance Criteria
@@ -149,3 +151,4 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 - 2026-11-03 — R9 + AC-9: tải bản PDF theo mẫu 275/26 (chủ dự án).
 - 2026-11-03 — R10 + AC-10: tải bản Word (chủ dự án).
 - 2026-11-03 — R11 + AC-11, R4/R5 sửa: bộ phận đóng cont tự điền số thực đóng không chờ Phòng KH; mig 0098 mở cho U4 thêm dòng lấy từ dòng HĐ (chủ dự án đồng ý, 🔴 đổi luật quyền).
+- 2026-11-04: R11 (đơn giá theo bản HĐ đang dùng, nối dòng của bản cũ; cảnh báo đích danh) + R12 (Packing list gross theo SI, mục PL tự điền theo invoice). Test `contractLineRevisions.test.ts`.

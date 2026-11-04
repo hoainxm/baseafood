@@ -1221,6 +1221,54 @@ export function shipmentContractPlannedKg(d: LineData, s: ExportShipment, contra
   );
 }
 
+const lineKey = (l: ExportContractLine) => [l.productId ?? "", l.size, l.description].map((x) => x.trim().toLowerCase()).join("|");
+
+/**
+ * Dòng của bản HĐ `to` tương ứng dòng `lineId` của bản `from` — trước 2026-11-04 mỗi bản sửa cấp id mới cho mọi dòng
+ * (hàng của chuyến lập trước bản sửa mất nối ⇒ đơn giá 0, KAISEI 04-26-KMP). Khớp mặt hàng + size + tên; không duy nhất
+ * thì cùng vị trí khi cùng mặt hàng hoặc cùng tên; không được ⇒ null.
+ */
+export function matchLineAcrossRevisions(from: readonly ExportContractLine[], to: readonly ExportContractLine[], lineId: string): ExportContractLine | null {
+  const idx = from.findIndex((l) => l.id === lineId);
+  if (idx < 0) return null;
+  const old = from[idx];
+  const same = to.filter((l) => lineKey(l) === lineKey(old));
+  if (same.length === 1) return same[0];
+  const at = to[idx];
+  if (at && ((old.productId && at.productId === old.productId) || at.description.trim().toLowerCase() === old.description.trim().toLowerCase())) return at;
+  return null;
+}
+
+/** Id dòng của bản HĐ đang dùng ứng với `lineId` (có thể là id của bản cũ); không khớp được ⇒ giữ `lineId`. */
+export function currentContractLineId(d: Pick<ExportData, "revisions" | "approvals">, contractId: string, lineId: string): string {
+  const cur = workingRevision(d, contractId);
+  if (!lineId || !cur || cur.lines.some((x) => x.id === lineId)) return lineId;
+  const from = revisionsOf(d, contractId)
+    .filter((r) => r.id !== cur.id)
+    .reverse()
+    .find((r) => r.lines.some((x) => x.id === lineId));
+  return (from && matchLineAcrossRevisions(from.lines, cur.lines, lineId)?.id) || lineId;
+}
+
+/**
+ * Hàng của chuyến còn trỏ id dòng của bản HĐ cũ ⇒ trỏ sang dòng tương ứng của bản đang dùng, để đơn giá / size / HS /
+ * đã giao theo dòng HĐ đúng. Lần lưu sau ghi id mới. Không khớp được ⇒ giữ nguyên.
+ */
+export function remapLegacyContractLineIds(
+  d: Pick<ExportData, "revisions" | "approvals" | "shipments">,
+  lines: readonly ExportShipmentLine[],
+): ExportShipmentLine[] {
+  const shipContract = new Map(d.shipments.map((s) => [s.id, s.contractId]));
+  let changed = false;
+  const out = lines.map((l) => {
+    const to = currentContractLineId(d, l.contractId || shipContract.get(l.shipmentId) || "", l.contractLineId);
+    if (to === l.contractLineId) return l;
+    changed = true;
+    return { ...l, contractLineId: to };
+  });
+  return changed ? out : (lines as ExportShipmentLine[]);
+}
+
 /** Dòng HĐ (bản đang dùng) của mọi HĐ trên chuyến — tra đơn giá, nối dòng invoice. Id dòng HĐ không trùng giữa các HĐ. */
 export function shipmentContractLines(d: Pick<ExportData, "shipmentLines" | "revisions" | "approvals">, s: Pick<ExportShipment, "id" | "contractId">): ExportContractLine[] {
   return shipmentContractIds(d, s).flatMap((id) => workingRevision(d, id)?.lines ?? []);

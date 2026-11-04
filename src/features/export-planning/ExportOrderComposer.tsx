@@ -9,7 +9,7 @@ import { useCallback, useMemo } from "react";
 import { DocumentComposerView } from "@/features/document-composer";
 import { useProductionOrderLines, useProductionOrderShipments, useProductionOrders } from "@/lib/catalogRepo";
 import { buildExportOrderLines, exportOrderForm, exportOrderPreviousKey, newExportOrderDocument, type ExportOrderFormSource } from "@/lib/documentTypes/exportOrderForm";
-import { workingRevision, type ExportData } from "@/lib/exportPlanning";
+import { currentContractLineId, workingRevision, type ExportData } from "@/lib/exportPlanning";
 import type { DocumentValues, ExportContract, ExportShipment } from "@/types";
 
 export function ExportOrderComposer({
@@ -49,7 +49,12 @@ export function ExportOrderComposer({
     const built = buildExportOrderLines({
       shipment,
       orders: linkedOrders,
-      orderLines,
+      // Dòng lệnh trỏ id dòng của bản HĐ lúc lập lệnh ⇒ nối sang bản đang dùng, cùng id với Hàng của chuyến.
+      orderLines: orderLines.map((l) => {
+        const o = linkedOrders.find((x) => x.id === l.orderId);
+        const to = o ? currentContractLineId(data, o.contractId, l.contractLineId) : l.contractLineId;
+        return to === l.contractLineId ? l : { ...l, contractLineId: to };
+      }),
       contractLines,
       shipmentLines: data.shipmentLines ?? [],
     });

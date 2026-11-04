@@ -20,7 +20,7 @@ import {
   useProductionOrders,
   useExportShippingInstructionAvailable,
 } from "@/lib/catalogRepo";
-import type { ExportData } from "@/lib/exportPlanning";
+import { remapLegacyContractLineIds, type ExportData } from "@/lib/exportPlanning";
 import { issuedShipmentIds } from "@/lib/productionOrder";
 
 /** Hàm ghi của repo nhận mảng thường — bọc lại để màn truyền thẳng mảng chỉ-đọc của `ExportData`. */
@@ -41,7 +41,9 @@ export function useExportData() {
   const { activities, setActivities: saveActivities, canLog } = useExportActivityStore();
   const { kinds: documentKinds, setKinds: saveDocumentKinds, isAvailable: documentKindsAvailable } = useExportDocumentKindStore();
   // Lệnh sản xuất (mig 0088, ba-spec 48 R6): chuyến gắn lệnh đã phát hành ⇒ bước 2 xong. Chưa chạy 0088 ⇒ rỗng, luật cũ.
-  const { lines: shipmentLines, setLines: saveShipmentLines, isAvailable: shipmentLinesAvailable } = useExportShipmentLineStore();
+  const { lines: storedShipmentLines, setLines: saveShipmentLines, isAvailable: shipmentLinesAvailable } = useExportShipmentLineStore();
+  // Hàng của chuyến trỏ id dòng của bản HĐ cũ (bản sửa trước 2026-11-04 cấp id mới) ⇒ nối sang dòng của bản đang dùng.
+  const shipmentLines = useMemo(() => remapLegacyContractLineIds({ revisions, approvals, shipments }, storedShipmentLines), [revisions, approvals, shipments, storedShipmentLines]);
   const [productionOrders] = useProductionOrders();
   const [orderLinks] = useProductionOrderShipments();
   const issuedOrderShipmentIds = useMemo(() => issuedShipmentIds(productionOrders, orderLinks), [productionOrders, orderLinks]);

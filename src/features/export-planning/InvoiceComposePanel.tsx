@@ -22,12 +22,20 @@ import {
   shipmentLinesOf,
 } from "@/lib/exportInvoice";
 import { companySellerOf } from "@/lib/companyProfile";
-import { useCompanyProfileStore } from "@/lib/catalogRepo";
+import { useCompanyProfileStore, useComposedDocuments } from "@/lib/catalogRepo";
+import { SHIPPING_INSTRUCTION_DOC } from "@/lib/shippingInstruction";
 import { shipmentContractLines, termsOf, type ExportData } from "@/lib/exportPlanning";
 import type { Customer, ExportContract, ExportShipment, ExportStepItem, InvoiceComposition } from "@/types";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { useExportOptionPicker } from "./exportOptionPicker";
 import { downloadInvoiceDocument, invoiceDocumentFor, type InvoiceFileFormat } from "./invoiceDocument";
+
+/** Thiếu gì ở một dòng invoice ⇒ chỗ bổ sung. */
+const INCOMPLETE_TEXT = {
+  units: "chưa có số kiện (điền Số lượng thực đóng hoặc kế hoạch ở Hàng của chuyến)",
+  netKg: "chưa có kg tịnh mỗi thùng (sửa ở Hàng của chuyến)",
+  unitPrice: "chưa có đơn giá (gõ ở ô Đơn giá phía trên, hoặc ghi đơn giá ở dòng hàng hợp đồng)",
+} as const;
 
 export function InvoiceComposePanel({
   data,
@@ -57,7 +65,13 @@ export function InvoiceComposePanel({
   // Người bán + logo từ Thông tin công ty (ba-spec 67).
   const company = useCompanyProfileStore();
   const seller = useMemo(() => companySellerOf(company.profile), [company.profile]);
-  const doc = useMemo(() => invoiceDocumentFor(data, shipment, contract, customer, item, picker.options, seller), [data, shipment, contract, customer, item, picker.options, seller]);
+  // Packing list lấy gross theo SI đã lưu của chuyến (Phòng KH 2026-11-04).
+  const [composed] = useComposedDocuments();
+  const siDoc = useMemo(() => composed.find((x) => x.docType === SHIPPING_INSTRUCTION_DOC && x.sourceId === shipment.id) ?? null, [composed, shipment.id]);
+  const doc = useMemo(
+    () => invoiceDocumentFor(data, shipment, contract, customer, item, picker.options, seller, siDoc),
+    [data, shipment, contract, customer, item, picker.options, seller, siDoc],
+  );
   const totalsDiffer =
     item.cartons !== doc.totals.units || item.netKg !== doc.totals.netKg || item.amount !== doc.totals.amount;
   const pod = shipment.portOfDischarge || terms.portOfDischarge;
@@ -153,8 +167,22 @@ export function InvoiceComposePanel({
         <p className="tnum font-semibold">
           Invoice lập: {formatNumber(doc.totals.units)} kiện · {formatNumber(doc.totals.netKg)} kg tịnh · {formatMoney(doc.totals.amount)} {currency}
         </p>
-        {doc.incompleteLineIds.length > 0 && (
-          <p className="text-warning">{doc.incompleteLineIds.length} dòng thiếu số kiện, kg/thùng hoặc đơn giá — dòng đó in trống tiền, không cộng vào tổng.</p>
+        {doc.incompleteLines.length > 0 && (
+          <div className="grid gap-1 text-warning">
+            <p>
+              {doc.incompleteLines.length} dòng chưa tính được tiền — invoice in trống ô tiền của dòng đó và tổng tiền chưa cộng dòng đó. Bổ sung rồi tải lại file:
+            </p>
+            <ul className="grid list-disc gap-0.5 pl-5">
+              {doc.incompleteLines.map((x) => {
+                const l = lines.find((y) => y.id === x.lineId);
+                return (
+                  <li key={x.lineId} className="break-words">
+                    {[l?.description, l?.size].filter((t) => t?.trim()).join(" · ") || "Dòng hàng"}: {x.missing.map((m) => INCOMPLETE_TEXT[m]).join(", ")}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
         {!item.number.trim() && <p className="text-warning">Chưa ghi Số chứng từ (số invoice) ở trên — file in trống số invoice.</p>}
         {totalsDiffer && (item.cartons != null || item.netKg != null || item.amount != null) && (

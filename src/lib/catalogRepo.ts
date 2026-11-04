@@ -405,6 +405,21 @@ export function useExportBookingFilesAvailable(): boolean {
   }, []);
   return ok;
 }
+/**
+ * Máy chủ đã chạy 0101 (thông tin booking + xe vận chuyển của chuyến, ba-spec 71) — dò cột
+ * `export_shipments.forwarder`. Chưa có ⇒ ẩn ô Đại lý, hai khối mới và 4 danh sách chọn mới (R10). Không nối máy chủ ⇒ true.
+ */
+export function useExportBookingDetailsAvailable(): boolean {
+  const [ok, setOk] = useState<boolean>(!isServerConnected);
+  useEffect(() => {
+    let alive = true;
+    void serverHasColumn("export_shipments", "forwarder").then((v) => alive && setOk(v));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return ok;
+}
 /** Mig 0097 đã chạy ⇒ đính được ảnh kèm số lượng thực đóng + ảnh bao bì / cân gross (view có loại mới). */
 export function useExportLoadingExtraPhotosAvailable(): boolean {
   const [ok, setOk] = useState<boolean>(!isServerConnected);

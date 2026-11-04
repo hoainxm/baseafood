@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsTrigger, formatNumber, notify, todayIso } from "@/design-system";
-import { useCustomerProductNameStore, useCustomers, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportLoadingExtraPhotosAvailable, useExportOptionStore,
+import { useCustomerProductNameStore, useCustomers, useExportBookingDetailsAvailable, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportLoadingExtraPhotosAvailable, useExportOptionStore,
   useCompanyProfileStore, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { lineUnits, shipmentLinesOf } from "@/lib/exportInvoice";
 import { companySellerOf } from "@/lib/companyProfile";
@@ -100,6 +100,7 @@ import {
   type StepItemTarget,
   type InvoiceNameExtract,
 } from "./ShipmentDialogs";
+import { BookingDialog, TransportDialog, type BookingTarget, type TransportTarget } from "./BookingDialogs";
 import { useExportData } from "./useExportData";
 import { buildExportTour, pickTourContract } from "./exportTour";
 import { usePageTour } from "@/features/shared/PageTourProvider";
@@ -189,6 +190,8 @@ export default function ExportPlanningScreen() {
   const [scheduleTarget, setScheduleTarget] = useState<ScheduleTarget | null>(null);
   const [itemTarget, setItemTarget] = useState<StepItemTarget | null>(null);
   const [loadingTarget, setLoadingTarget] = useState<LoadingUploadTarget | null>(null);
+  const [bookingTarget, setBookingTarget] = useState<BookingTarget | null>(null);
+  const [transportTarget, setTransportTarget] = useState<TransportTarget | null>(null);
   const [linesTarget, setLinesTarget] = useState<ShipmentLinesTarget | null>(null);
   const [countTarget, setCountTarget] = useState<LoadingCountTarget | null>(null);
   const exportOptions = useExportOptionStore().options;
@@ -707,6 +710,42 @@ export default function ExportPlanningScreen() {
   const deferralsAvailable = useExportDeferralsAvailable();
   /** ba-spec 60: máy chủ đã chạy 0094 + có kho file ⇒ đính file booking được. */
   const bookingFilesEnabled = useExportBookingFilesAvailable() && filesAvailable;
+  /** ba-spec 71: máy chủ đã chạy 0101 ⇒ ô Đại lý + khối Booking (12 trường) + Thông tin xe vận chuyển. */
+  const bookingDetailsEnabled = useExportBookingDetailsAvailable();
+
+  /** Cập nhật booking (ba-spec 71 NV2): ghi chuyến + file booking mới cùng một lần, cùng Hoàn tác. */
+  const saveBooking = (s: ExportShipment, files: ExportFile[], readFrom: string): boolean => {
+    const prevS = d.shipments;
+    const prevF = d.files;
+    if (!store.saveShipments(prevS.map((x) => (x.id === s.id ? s : x)))) return false;
+    if (files.length) store.saveFiles([...prevF, ...files]);
+    const what =
+      `Cập nhật booking chuyến ${shipName(s)}` +
+      (readFrom ? ` — đọc từ file ${readFrom}` : "") +
+      (files.length ? ` · đính ${files.length} file booking: ${files.map((f) => f.fileName).join(", ")}` : "");
+    track(s.contractId, s.id, files.length ? "attach" : "update", what);
+    notify.saved(
+      "Đã lưu thông tin booking",
+      undoTracked(s.contractId, s.id, what, () => {
+        store.saveShipments(prevS);
+        if (files.length) store.saveFiles(prevF);
+      }),
+    );
+    setBookingTarget(null);
+    return true;
+  };
+
+  /** Thông tin xe vận chuyển (ba-spec 71 NV4). */
+  const saveTransport = (s: ExportShipment): boolean => {
+    const prevS = d.shipments;
+    const had = !!prevS.find((x) => x.id === s.id)?.transport?.haulier;
+    if (!store.saveShipments(prevS.map((x) => (x.id === s.id ? s : x)))) return false;
+    const what = `${had ? "Sửa" : "Ghi"} thông tin xe vận chuyển chuyến ${shipName(s)} — ${s.transport?.haulier ?? ""}`;
+    track(s.contractId, s.id, had ? "update" : "create", what);
+    notify.saved("Đã lưu thông tin xe vận chuyển", undoTracked(s.contractId, s.id, what, () => store.saveShipments(prevS)));
+    setTransportTarget(null);
+    return true;
+  };
 
   /** Ghi "bổ sung sau" cho một loại hồ sơ bắt buộc còn thiếu (R1–R3): mở ghi chuyến, vẫn chặn duyệt cuối. */
   const doDefer = (c: ExportContract, kind: ExportContractAttachmentKind, reason: string) => {
@@ -1074,6 +1113,9 @@ export default function ExportPlanningScreen() {
               onOpenItem={setItemTarget}
               onUploadLoading={setLoadingTarget}
               bookingFilesEnabled={bookingFilesEnabled}
+              bookingDetailsEnabled={bookingDetailsEnabled}
+              onBooking={setBookingTarget}
+              onTransport={setTransportTarget}
               goodsEnabled={store.shipmentLinesAvailable}
               extraPhotosEnabled={extraPhotosAvailable}
               onEditLines={() => dossier.selected && openShipmentLines(dossier.selected)}
@@ -1113,7 +1155,10 @@ export default function ExportPlanningScreen() {
         onSave={saveShipment}
         recordedBy={recordedBy}
         bookingFilesEnabled={bookingFilesEnabled}
+        bookingDetailsEnabled={bookingDetailsEnabled}
       />
+      <BookingDialog target={bookingTarget} recordedBy={recordedBy} filesEnabled={bookingFilesEnabled} onClose={() => setBookingTarget(null)} onSave={saveBooking} />
+      <TransportDialog target={transportTarget} onClose={() => setTransportTarget(null)} onSave={saveTransport} />
       <ScheduleDialog target={scheduleTarget} onClose={() => setScheduleTarget(null)} onSave={saveSchedule} />
       <StepItemDialog
         target={itemTarget}

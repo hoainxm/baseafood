@@ -1235,7 +1235,17 @@ export interface ExportDocumentKindRow {
 
 /** Danh sách chọn của Xuất khẩu (mig 0095, ba-spec 62) — HĐ / chuyến lưu CHỮ của tùy chọn, không lưu id. */
 /** `bank-account` (mig 0096, ba-spec 63): tài khoản thụ hưởng in trên invoice — `name` để chọn, `note` = khối in. */
-export type ExportOptionListKind = "loading-port" | "discharge-port" | "container-type" | "currency" | "bank-account";
+export type ExportOptionListKind =
+  | "loading-port"
+  | "discharge-port"
+  | "container-type"
+  | "currency"
+  | "bank-account"
+  // mig 0101 (ba-spec 71 R11)
+  | "forwarder"
+  | "haulier"
+  | "container-yard"
+  | "stuffing-place";
 
 export interface ExportOption {
   id: string;
@@ -1432,6 +1442,41 @@ export interface ExportShipment {
   cancelReason: string;
   note: string;
   createdAt: string;
+  /** Mig 0101 (ba-spec 71). `undefined` = máy chủ chưa có cột ⇒ không gửi. */
+  booking?: ExportBookingDetails;
+  transport?: ExportTransportInfo;
+}
+
+/**
+ * Thông tin booking ngoài 3 trường sẵn có của chuyến (tàu / chuyến, cảng đến, loại cont) — đọc từ file booking
+ * của hãng tàu (ba-spec 71 R1–R4). Hạn = giờ địa phương `yyyy-mm-ddThh:mm`, "" = chưa có.
+ */
+export interface ExportBookingDetails {
+  /** Đại lý (forwarder) — ghi ở hộp Ghi chuyến. */
+  forwarder: string;
+  placeOfReceipt: string;
+  portOfLoading: string;
+  placeOfDelivery: string;
+  /** Nơi hạ bãi (Full Return CY). */
+  returnYard: string;
+  /** Bãi lấy rỗng theo booking — chỉ để điền sẵn thông tin xe (R6). */
+  emptyPickupYard: string;
+  docCutoff: string;
+  vgmCutoff: string;
+  /** Thời hạn hạ bãi = Port Cargo Cut-off. */
+  cargoCutoff: string;
+}
+
+/** Thông tin xe vận chuyển (ba-spec 71 R5): 4 ô bắt buộc + cụm tài xế tùy chọn. */
+export interface ExportTransportInfo {
+  haulier: string;
+  driverName: string;
+  driverPhone: string;
+  driverIdNo: string;
+  truckPlate: string;
+  emptyPickupPlace: string;
+  stuffingPlace: string;
+  returnYard: string;
 }
 
 /**

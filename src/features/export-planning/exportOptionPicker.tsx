@@ -34,13 +34,17 @@ export function useExportOptionPicker() {
     return store.setOptions(next);
   };
   const listEditor = (kind: ExportOptionListKind) => (next: ExportOption[]) => void save(replaceExportOptionList(all, kind, next));
-  // Bốn hộp sửa nhanh — số lần gọi hook cố định, mỗi danh sách tra tên trong đúng danh sách của nó.
+  // Một hộp sửa nhanh mỗi danh sách — số lần gọi hook cố định, mỗi danh sách tra tên trong đúng danh sách của nó.
   const editors: Record<ExportOptionListKind, ReturnType<typeof useQuickCatalogEdit<"exportOption">>> = {
     "loading-port": useQuickCatalogEdit("exportOption", exportOptionsOf(all, "loading-port"), listEditor("loading-port"), { matchBy: "name" }),
     "discharge-port": useQuickCatalogEdit("exportOption", exportOptionsOf(all, "discharge-port"), listEditor("discharge-port"), { matchBy: "name" }),
     "container-type": useQuickCatalogEdit("exportOption", exportOptionsOf(all, "container-type"), listEditor("container-type"), { matchBy: "name" }),
     currency: useQuickCatalogEdit("exportOption", exportOptionsOf(all, "currency"), listEditor("currency"), { matchBy: "name" }),
     "bank-account": useQuickCatalogEdit("exportOption", exportOptionsOf(all, "bank-account"), listEditor("bank-account"), { matchBy: "name" }),
+    forwarder: useQuickCatalogEdit("exportOption", exportOptionsOf(all, "forwarder"), listEditor("forwarder"), { matchBy: "name" }),
+    haulier: useQuickCatalogEdit("exportOption", exportOptionsOf(all, "haulier"), listEditor("haulier"), { matchBy: "name" }),
+    "container-yard": useQuickCatalogEdit("exportOption", exportOptionsOf(all, "container-yard"), listEditor("container-yard"), { matchBy: "name" }),
+    "stuffing-place": useQuickCatalogEdit("exportOption", exportOptionsOf(all, "stuffing-place"), listEditor("stuffing-place"), { matchBy: "name" }),
   };
   const [deleting, setDeleting] = useState<ExportOption | null>(null);
 
@@ -91,6 +95,10 @@ export function useExportOptionPicker() {
       {editors["container-type"].dialog}
       {editors.currency.dialog}
       {editors["bank-account"].dialog}
+      {editors.forwarder.dialog}
+      {editors.haulier.dialog}
+      {editors["container-yard"].dialog}
+      {editors["stuffing-place"].dialog}
       <ConfirmDelete
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}

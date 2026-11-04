@@ -164,9 +164,19 @@ export const exportPlanningGuide: PageGuide = {
           <li>Đầu mỗi bước ghi <b>Còn thiếu</b> kèm tên mục chưa xong.</li>
           <li>Thẻ <b>Trễ hạn</b>: chuyến quá hạn giao. Thẻ <b>Chờ booking</b>: chưa có số booking và số container.</li>
           <li>
-            <b>File booking</b>: đính ở ô Số booking khi Ghi chuyến hoặc ở hàng File booking của bước Đóng cont; booking sửa đổi thì đính
-            thêm, bản mới nhất ở đầu. Chỉ để xem — không làm bước nào tự xong; người chỉ đóng hàng không thấy file này.
+            <b>File booking</b>: đính ở ô Số booking khi Ghi chuyến hoặc qua <b>Cập nhật booking</b> ở bước Đóng cont; booking sửa đổi thì
+            đính thêm, bản mới nhất ở đầu. Người chỉ đóng hàng không thấy file này.
           </li>
+          <li>
+            Hàng <b>Booking</b> (bước Đóng cont) có 12 trường. Số booking và Đại lý ghi ở Ghi chuyến. <b>Cập nhật booking</b>: chọn file PDF
+            của hãng tàu, app đọc ra tàu / chuyến, nơi nhận hàng, cảng đi, cảng đến, nơi giao hàng, loại cont, nơi hạ bãi, Doc cut-off, VGM
+            cut-off, thời hạn hạ bãi. Soát lại rồi Lưu. Ô file để trống giữ giá trị cũ. Thẻ <b>Đã qua hạn</b>: hạn đã qua mà chưa có ngày đóng cont.
+          </li>
+          <li>
+            Hàng <b>Thông tin xe vận chuyển</b>: bắt buộc tên công ty vận chuyển, địa điểm lấy container rỗng, địa điểm đóng container, địa
+            điểm hạ bãi. Tài xế, số điện thoại, số CCCD, biển số xe không bắt buộc. Người đóng hàng xem được, không sửa.
+          </li>
+          <li>Hai hàng Booking và Thông tin xe không có trạng thái — không làm bước nào tự xong.</li>
         </GuideList>
       </GuideSection>
       <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">

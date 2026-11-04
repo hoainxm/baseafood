@@ -246,7 +246,9 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         body:
           "Hợp đồng có nhiều chuyến thì chọn chuyến ở danh sách phía trên; mỗi dòng có thanh tiến độ và bước tiếp theo của chuyến.\n" +
           "Thẻ chuyến ghi booking, ngày đóng cont, ETD và ETA, tàu, số container và seal, kg kế hoạch và kg thực xuất.\n" +
-          "File booking: đính bản xác nhận booking của hãng tàu ngay ở ô Số booking khi Ghi chuyến, hoặc ở hàng File booking của bước Đóng cont (booking sửa đổi thì đính thêm, bản mới nhất ở đầu). File booking chỉ để xem, không làm bước nào tự xong; người chỉ đóng hàng không thấy file này.\n" +
+          "File booking: đính bản xác nhận booking của hãng tàu ngay ở ô Số booking khi Ghi chuyến, hoặc qua Cập nhật booking ở bước Đóng cont (booking sửa đổi thì đính thêm, bản mới nhất ở đầu). Người chỉ đóng hàng không thấy file này.\n" +
+          "Hàng Booking ở bước Đóng cont: 12 trường theo thứ tự Số booking, Đại lý, Tàu / chuyến, Nơi nhận hàng, Cảng đi, Cảng đến, Nơi giao hàng, Loại cont, Nơi hạ bãi, Doc cut-off, VGM cut-off, Thời hạn hạ bãi (Port Cargo Cut-off). Số booking và Đại lý ghi ở Ghi chuyến / Sửa chuyến. Cập nhật booking: chọn file PDF của hãng tàu, app đọc ra 10 trường còn lại; soát lại rồi Lưu. Ô file để trống thì giữ giá trị cũ; file ghi số booking khác chuyến thì app cảnh báo, không tự đổi. Bản scan (ảnh) không đọc được, gõ tay. Hạn đã qua mà chuyến chưa có ngày đóng cont ⇒ thẻ Đã qua hạn.\n" +
+          "Hàng Thông tin xe vận chuyển: Ghi thông tin xe khi đã thuê xe. Bắt buộc 4 ô: Tên công ty vận chuyển, Địa điểm lấy container rỗng, Địa điểm đóng container, Địa điểm hạ bãi (hai ô lấy rỗng / hạ bãi điền sẵn theo booking). Tài xế, số điện thoại, số CCCD, biển số xe không bắt buộc. Người đóng hàng xem được thông tin xe, không sửa. Hai hàng Booking và Thông tin xe không có trạng thái, không làm bước nào tự xong.\n" +
           "Thẻ trạng thái chuyến: Đang làm · xong k/5 bước bắt buộc (bước 1 đến 5; bước 6 không bắt buộc) · Đủ hồ sơ · Trễ hạn giao n ngày · Đã hủy.\n" +
           "Hàng 6 bước bên dưới: chọn một bước để chuyển nhanh tới phần đó.\n" +
           "Khối Hàng của chuyến (dưới thẻ): chi tiết từng mặt hàng đóng vào chuyến. Nhập hàng của chuyến (Kế hoạch, không bắt buộc): ghi số thùng / bó kế hoạch cho từng dòng hàng của hợp đồng (để trống = không đóng dòng đó), kg cả bì, hạn dùng. Bộ phận đóng cont đóng xong chọn Điền số thực đóng ở hàng Số lượng thực đóng của bước Đóng cont, không cần chờ Kế hoạch: chuyến chưa có hàng thì hộp lấy sẵn các dòng hàng của hợp đồng, dòng không đóng vào chuyến để trống. Chưa làm = chưa điền dòng nào · Đang làm = điền một phần · Xong = mọi dòng có số; hàng này không chặn bước Đóng cont xong. Bộ phận chứng từ lấy số thực đóng làm invoice và packing list, dòng chưa điền dùng số kế hoạch.",
@@ -258,7 +260,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Bước đang làm",
         body:
           "Bước có viền xanh là bước đầu tiên chưa xong. Đầu mỗi bước ghi \"Xong\", hoặc \"Còn thiếu\" kèm tên các mục chưa xong.\n" +
-          "Mỗi hàng trong bước là một mục cần làm. Ví dụ bước Đóng cont theo đúng trình tự đóng hàng: file booking, lệnh xuất, số cont và seal (số container 11 ký tự: 4 chữ cái + 7 chữ số), số lượng thực đóng (đính ảnh tờ đếm), hình ảnh bao bì + cân gross, sơ đồ container, hình ảnh đóng cont, tờ khai. Hai mục ảnh thêm có ảnh là Xong và không bắt buộc cho bước Đóng cont.",
+          "Mỗi hàng trong bước là một mục cần làm. Ví dụ bước Đóng cont theo đúng trình tự đóng hàng: booking, thông tin xe vận chuyển, lệnh xuất, số cont và seal (số container 11 ký tự: 4 chữ cái + 7 chữ số), số lượng thực đóng (đính ảnh tờ đếm), hình ảnh bao bì + cân gross, sơ đồ container, hình ảnh đóng cont, tờ khai. Hai mục ảnh thêm có ảnh là Xong và không bắt buộc cho bước Đóng cont.",
       }),
       dossier({
         id: "item-status",

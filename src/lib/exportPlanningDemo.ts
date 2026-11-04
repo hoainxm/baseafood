@@ -134,6 +134,8 @@ export interface ExportDemoOptions {
   anonymize?: boolean;
   /** Hệ số đổi giá khi ẩn tên (như phần còn lại của bộ demo). */
   priceFactor?: number;
+  /** Máy chủ đã chạy 0101 ⇒ chuyến demo có booking + thông tin xe (chưa chạy mà gửi cột ⇒ máy chủ từ chối cả lượt). */
+  bookingDetails?: boolean;
 }
 
 /** Ca 1 khi KHÔNG có gói: số tự đặt (không phải số của khách). */
@@ -194,6 +196,33 @@ export function abbreviation(name: string): string {
   return raw.replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "KH";
 }
 
+
+/** ba-spec 71 R12 — chuyến demo lô 181 (đã đóng) có đủ booking + thông tin xe. */
+function demoBooking181(T: (days: number) => string): Pick<ExportShipment, "booking" | "transport"> {
+  return {
+    booking: {
+      forwarder: "Đại lý Demo",
+      placeOfReceipt: "Cái Mép",
+      portOfLoading: "Cái Mép",
+      placeOfDelivery: "Tokyo, Japan",
+      returnYard: "Bãi Demo Cái Mép",
+      emptyPickupYard: "Bãi rỗng Demo",
+      docCutoff: `${T(-16)}T10:00`,
+      vgmCutoff: `${T(-16)}T19:00`,
+      cargoCutoff: `${T(-15)}T19:00`,
+    },
+    transport: {
+      haulier: "Vận tải Demo",
+      driverName: "Tài xế Demo",
+      driverPhone: "0900 000 181",
+      driverIdNo: "",
+      truckPlate: "72C-000.81",
+      emptyPickupPlace: "Bãi rỗng Demo",
+      stuffingPlace: "Xưởng BSF1",
+      returnYard: "Bãi Demo Cái Mép",
+    },
+  };
+}
 /**
  * 7 HĐ — đủ ca của buổi audit 2026-10-20 (+ mỗi dòng sổ kế hoạch của gói thành một HĐ):
  *  1. HĐ 18.26 + lô 165 · BGĐ yêu cầu sửa → sửa → đồng ý · gia hạn · đủ hồ sơ · ngoài dung sai ⇒ **Đã chốt HĐ**.
@@ -204,7 +233,7 @@ export function abbreviation(name: string): string {
  * Lượt duyệt bản trong bộ demo là lịch sử kiểu CŨ (BGĐ ký giấy) — từ 2026-10-29 không còn bước duyệt HĐ.
  */
 export function buildExportDemo(customers: readonly Customer[], today: string, options: ExportDemoOptions = {}): ExportDemoSet {
-  const { products = [], pack = null, originalNames = [], anonymize = false, priceFactor = 1 } = options;
+  const { products = [], pack = null, originalNames = [], anonymize = false, priceFactor = 1, bookingDetails = false } = options;
   const out = {
     contracts: [] as ExportContract[],
     revisions: [] as ExportContractRevision[],
@@ -433,7 +462,10 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
     };
     out.revisions.push(r1);
     approve(r1, "rejected", T(-9), "Khách chưa ký phụ kiện — giữ HĐ gốc");
-    const s = shipment(c, r.terms, { lotCode: "181", goodsSummary: "Bạch tuộc xiên que, luộc, tip, NCLS", plannedKg: 7200, bookingNo: "DM-BK-181", loadingDate: T(-14), etd: T(-13), eta: T(-6), vesselVoyage: "DEMO STAR 201N", containerNo: "DEMU1810001", sealNo: "DM181" });
+    const s = shipment(c, r.terms, { lotCode: "181", goodsSummary: "Bạch tuộc xiên que, luộc, tip, NCLS", plannedKg: 7200, bookingNo: "DM-BK-181", loadingDate: T(-14), etd: T(-13), eta: T(-6), vesselVoyage: "DEMO STAR 201N", containerNo: "DEMU1810001", sealNo: "DM181",
+      // ba-spec 71 R12: chuyến đã đóng có đủ booking + thông tin xe.
+      ...(bookingDetails ? demoBooking181(T) : {}),
+    });
     done(s, c, "production-order", { note: "LSX 17.09 · MSL 181 — giao 05-07/10" }, packFiles("lsx-181"));
     done(s, c, "packaging", { note: "Dự kiến đầy đủ bao bì: đã có sẵn (LSX)" }, cartons.slice(0, 4));
     done(s, c, "customs-declaration", { number: "30612345181" });

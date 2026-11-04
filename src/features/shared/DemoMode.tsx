@@ -89,6 +89,7 @@ import {
   useStorageLocations,
   useSuppliers,
   useWipProductions,
+  useExportBookingDetailsAvailable,
 } from "@/lib/catalogRepo";
 import { IS_DEMO, setDemoMode, setPendingDemoTask, readDemoBundle, readDemoJob, saveDemoBundle, clearDemoBundle } from "@/lib/demoMode";
 import { fetchExportDemoPack } from "@/lib/exportFileStorage";
@@ -355,6 +356,7 @@ function DemoGeneratorMenu({ autoCreate }: { autoCreate: boolean }) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [anonymize, setAnonymize] = useState("an");
   const [isCreating, setIsCreating] = useState(false);
+  const bookingDetails = useExportBookingDetailsAvailable();
 
   const source: DemoSource = useMemo(
     () => ({ products, materialTypes, suppliers, customers, batterTypes, storageLocations, imports, wips, periods, balancingInputs, balancingOutputs, nxtSnapshots, monthlyStock }),
@@ -366,7 +368,7 @@ function DemoGeneratorMenu({ autoCreate }: { autoCreate: boolean }) {
     setIsCreating(true);
     // Gói demo Xuất khẩu (số + file thật) nằm ở kho file riêng — chưa nạp thì bộ Xuất khẩu dùng số tự đặt.
     const exportPack = await fetchExportDemoPack();
-    const bundle = generateDemoBundle(source, { today: todayIso(), anonymize: anonymize === "an", hat: Date.now() % 100_000, exportPack });
+    const bundle = generateDemoBundle(source, { today: todayIso(), anonymize: anonymize === "an", hat: Date.now() % 100_000, exportPack, bookingDetails });
     setPendingDemoTask(null);
     if (!saveDemoBundle(bundle)) {
       setIsCreating(false);

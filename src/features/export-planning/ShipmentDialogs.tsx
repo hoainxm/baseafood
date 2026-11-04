@@ -29,6 +29,7 @@ import { useDocumentKindPicker, type DocumentKindSource } from "./documentKindPi
 import { useExportOptionPicker } from "./exportOptionPicker";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
+import { EMPTY_BOOKING_DETAILS, EMPTY_TRANSPORT_INFO } from "@/lib/exportBooking";
 import {
   ITEM_STATE_LABELS,
   MISSING_LABELS,
@@ -58,7 +59,7 @@ import { InvoiceComposePanel } from "./InvoiceComposePanel";
 import { EXTRA_PHOTO_TEXT } from "./shipmentGoodsLogic";
 
 /** Tải nhiều file lên (theo thứ tự); lỗi giữa chừng ⇒ gỡ các file đã lên rồi báo. */
-async function uploadAll(files: File[], contractId: string, area: "shipment" | "loading", prefix: string): Promise<{ path: string; fileName: string }[]> {
+export async function uploadAll(files: File[], contractId: string, area: "shipment" | "loading", prefix: string): Promise<{ path: string; fileName: string }[]> {
   const done: { path: string; fileName: string }[] = [];
   for (const f of files) {
     const err = checkExportFile(f);
@@ -93,7 +94,7 @@ interface ShipmentForm extends Omit<ExportShipment, "createdAt" | "status" | "ca
   initial: string;
 }
 const shipSnap = (f: ShipmentForm) =>
-  JSON.stringify([f.planMonth, f.kind, f.goodsSummary, f.plannedKg, f.lotCode, f.portOfDischarge, f.bookingNo, f.loadingDate, f.etd, f.eta, f.vesselVoyage, f.containerNo, f.sealNo, f.note]);
+  JSON.stringify([f.planMonth, f.kind, f.goodsSummary, f.plannedKg, f.lotCode, f.portOfDischarge, f.bookingNo, f.booking?.forwarder ?? "", f.loadingDate, f.etd, f.eta, f.vesselVoyage, f.containerNo, f.sealNo, f.note]);
 
 export function ShipmentFormDialog({
   target,
@@ -101,6 +102,7 @@ export function ShipmentFormDialog({
   onSave,
   recordedBy,
   bookingFilesEnabled,
+  bookingDetailsEnabled,
 }: {
   target: ShipmentTarget | null;
   onClose: () => void;
@@ -109,6 +111,8 @@ export function ShipmentFormDialog({
   recordedBy: string;
   /** Máy chủ đã chạy 0094 + có kho file ⇒ hiện ô chọn file booking. */
   bookingFilesEnabled: boolean;
+  /** Máy chủ đã chạy 0101 ⇒ hiện ô Đại lý (ba-spec 71 NV1). */
+  bookingDetailsEnabled: boolean;
 }) {
   const [form, setForm] = useState<ShipmentForm | null>(null);
   // Cảng đến chọn theo danh sách Cảng đích (ba-spec 62).
@@ -142,6 +146,8 @@ export function ShipmentFormDialog({
       containerNo: e?.containerNo ?? "",
       sealNo: e?.sealNo ?? "",
       note: e?.note ?? "",
+      // ba-spec 71: giữ khối booking + xe của chuyến khi sửa (hộp chỉ đổi Đại lý).
+      ...(bookingDetailsEnabled ? { booking: e?.booking ?? EMPTY_BOOKING_DETAILS, transport: e?.transport ?? EMPTY_TRANSPORT_INFO } : {}),
       initial: "",
     };
     const fresh = { ...f, initial: shipSnap(f) };
@@ -204,6 +210,7 @@ export function ShipmentFormDialog({
         containerNo: isContainerKind(form.kind) ? normalizeContainerNo(form.containerNo) : form.containerNo.trim().toUpperCase(),
         sealNo: form.sealNo.trim().toUpperCase(),
         note: form.note.trim(),
+        ...(form.booking ? { booking: { ...form.booking, forwarder: form.booking.forwarder.trim() } } : {}),
         status: e?.status ?? "open",
         cancelReason: e?.cancelReason ?? "",
         createdAt: e?.createdAt ?? new Date().toISOString(),
@@ -275,6 +282,16 @@ export function ShipmentFormDialog({
               <Field label="Số booking" hint="Trống = chờ booking">
                 <Input value={form.bookingNo} onChange={(e) => set("bookingNo", e.target.value)} />
               </Field>
+              {/* Đại lý (forwarder) — khối Booking ở bước Đóng cont lấy từ đây (ba-spec 71 NV1). */}
+              {bookingDetailsEnabled && form.booking && (
+                <Combobox
+                  label="Đại lý"
+                  hideRequiredMark
+                  hint="Forwarder đặt booking"
+                  {...optionPicker.fieldProps("forwarder", form.booking.forwarder)}
+                  onChange={(v) => set("booking", { ...(form.booking ?? EMPTY_BOOKING_DETAILS), forwarder: v })}
+                />
+              )}
               {/* File booking (ba-spec 60 NV1): không bắt buộc; booking sửa đổi đính thêm ở khối Đóng cont. */}
               {bookingFilesEnabled && <FilePicker files={bookingFiles} onChange={setBookingFiles} label="Đính file booking" />}
             </div>

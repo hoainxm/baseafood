@@ -224,6 +224,8 @@ export interface DemoOptions {
   recordedAt?: string;
   /** Gói demo Xuất khẩu (số + file thật, tải từ kho file riêng) — không có ⇒ bộ tự đặt. */
   exportPack?: ExportDemoPack | null;
+  /** Máy chủ đã chạy 0101 ⇒ chuyến demo có booking + thông tin xe (ba-spec 71 R12). */
+  bookingDetails?: boolean;
 }
 
 const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
@@ -734,6 +736,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     originalNames: baseCustomers.map((c) => c.name),
     anonymize,
     priceFactor,
+    bookingDetails: tc.bookingDetails,
   });
 
   const importDemo = buildImportDemo(tc.today, n.products);

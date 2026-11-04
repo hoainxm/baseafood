@@ -5,6 +5,7 @@ vi.mock("@/lib/supabase", () => ({ supabase: null, hasSupabase: false, SITE_ID: 
 
 import {
   EXPORT_FILE_TABLE,
+  EXPORT_SHIPMENT_TABLE,
   EXPORT_SHIPMENT_LINE_TABLE,
   EXPORT_STEP_ITEM_TABLE,
   CUSTOMER_TABLE,
@@ -20,6 +21,8 @@ import {
   type UploadPort,
   type PushError,
 } from "@/lib/repo";
+import { EMPTY_BOOKING_DETAILS, EMPTY_TRANSPORT_INFO } from "@/lib/exportBooking";
+import type { ExportShipment } from "@/types";
 
 interface Row {
   id: string;
@@ -310,3 +313,60 @@ describe("Xuất khẩu — file booking + hàng của chuyến qua vòng toRow 
   });
 });
 
+describe("EXPORT_SHIPMENT_TABLE — thông tin booking + xe (mig 0101, ba-spec 71 AC-9)", () => {
+  const base: ExportShipment = {
+    id: "s1",
+    contractId: "c1",
+    planMonth: "2026-11",
+    kind: "20RF",
+    goodsSummary: "",
+    plannedKg: null,
+    lotCode: "",
+    portOfDischarge: "Tokyo, Japan",
+    bookingNo: "SGNGCM332800",
+    loadingDate: "",
+    etd: "2026-11-05",
+    eta: "",
+    vesselVoyage: "BANGKOK BRIDGE 0518E(JTI)",
+    containerNo: "",
+    sealNo: "",
+    status: "open",
+    cancelReason: "",
+    note: "",
+    createdAt: "",
+  };
+  it("đủ 17 trường giữ nguyên qua toRow → fromRow; hạn gửi timestamp", () => {
+    const full: ExportShipment = {
+      ...base,
+      booking: {
+        forwarder: "DA PHUONG SHIPPING SERVICES",
+        placeOfReceipt: "Cái Mép",
+        portOfLoading: "Cái Mép",
+        placeOfDelivery: "Tokyo, Japan",
+        returnYard: "TCTT",
+        emptyPickupYard: "ICD Tây Nam",
+        docCutoff: "2026-11-03T10:00",
+        vgmCutoff: "2026-11-03T19:00",
+        cargoCutoff: "",
+      },
+      transport: { haulier: "VT", driverName: "A", driverPhone: "09", driverIdNo: "0790", truckPlate: "72C-123.45", emptyPickupPlace: "ICD Tây Nam", stuffingPlace: "BSF1", returnYard: "TCTT" },
+    };
+    const row = EXPORT_SHIPMENT_TABLE.toRow(full);
+    expect(row.doc_cutoff).toBe("2026-11-03T10:00:00");
+    expect(row.cargo_cutoff).toBeNull();
+    const back = EXPORT_SHIPMENT_TABLE.fromRow({ ...row, created_at: "" });
+    expect(back.booking).toEqual(full.booking);
+    expect(back.transport).toEqual(full.transport);
+  });
+  it("bản không có hai khối ⇒ không gửi cột mới; một khối ⇒ gửi đủ cả hai", () => {
+    expect(EXPORT_SHIPMENT_TABLE.toRow(base)).not.toHaveProperty("forwarder");
+    expect(EXPORT_SHIPMENT_TABLE.fromRow({ ...EXPORT_SHIPMENT_TABLE.toRow(base), created_at: "" }).booking).toBeUndefined();
+    const row = EXPORT_SHIPMENT_TABLE.toRow({ ...base, booking: { ...EMPTY_BOOKING_DETAILS, forwarder: "X" } });
+    expect(row).toMatchObject({ forwarder: "X", haulier: "", transport_return_yard: "" });
+    expect(EXPORT_SHIPMENT_TABLE.fromRow({ ...row, created_at: "" }).transport).toEqual(EMPTY_TRANSPORT_INFO);
+  });
+  it("máy chủ trả timestamp có giây / khoảng trắng ⇒ yyyy-mm-ddThh:mm", () => {
+    const row = { ...EXPORT_SHIPMENT_TABLE.toRow({ ...base, booking: EMPTY_BOOKING_DETAILS }), doc_cutoff: "2026-11-03 10:00:00", created_at: "" };
+    expect(EXPORT_SHIPMENT_TABLE.fromRow(row).booking?.docCutoff).toBe("2026-11-03T10:00");
+  });
+});

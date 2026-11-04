@@ -32,9 +32,10 @@ import {
   type ExportData,
   type StepNo,
 } from "@/lib/exportPlanning";
-import { formatDateVN, formatMoney } from "@/lib/format";
+import { formatDateTimeVN, formatDateVN, formatMoney } from "@/lib/format";
+import { BOOKING_LABELS, TRANSPORT_LABELS, cutoffOverdue, hasTransport, localNowMinute } from "@/lib/exportBooking";
 import type { ExportContract, ExportFile, ExportItemState, ExportLoadingExtraStep, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
-import { Ban, Boxes, Camera, ClipboardCheck, ClipboardList, Download, FilePlus2, Pencil, Plus, RotateCcw, Send, Trash2, Wallet } from "lucide-react";
+import { Ban, Boxes, Camera, ClipboardCheck, ClipboardList, Download, FilePlus2, Pencil, Plus, RotateCcw, Send, Ship, Trash2, Truck, Wallet } from "lucide-react";
 import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
 import { ShipmentLineSummary } from "./ShipmentGoods";
 import { EXTRA_PHOTO_TEXT } from "./shipmentGoodsLogic";
@@ -42,6 +43,7 @@ import { loadingCountText } from "./shipmentGoodsLogic";
 import { FileList, StateTag, StepDot, StepStepper, type PreviewTarget } from "./parts";
 import { progressText, shipmentProgress, stepMissing } from "./progress";
 import type { LoadingUploadTarget, StepItemTarget } from "./ShipmentDialogs";
+import type { BookingTarget, TransportTarget } from "./BookingDialogs";
 import type { PaymentTarget } from "./RecordDialogs";
 import { ShipmentOrders } from "@/features/production-orders/ShipmentOrders";
 
@@ -67,6 +69,7 @@ function ChecklistRow({
   children,
   actions,
   tourMark,
+  wide,
 }: {
   label: string;
   /** Bỏ trống = hàng chỉ để xem (vd File booking — ba-spec 60 R3), không có thẻ trạng thái. */
@@ -76,6 +79,8 @@ function ChecklistRow({
   actions?: ReactNode;
   /** Hàng thuộc bước đang làm ⇒ thẻ trạng thái + nút là mốc "Trạng thái mục" / "Cập nhật mục" của hướng dẫn thao tác. */
   tourMark?: boolean;
+  /** Chi tiết là lưới nhiều ô (Booking, Thông tin xe) ⇒ trải hết bề ngang, nằm dưới tên + nút. */
+  wide?: boolean;
 }) {
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 border-t border-border py-3 first:border-t-0 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] sm:items-start sm:gap-4">
@@ -89,9 +94,9 @@ function ChecklistRow({
           </span>
         )}
       </div>
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-sm">{children}</div>
+      <div className={`grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-sm ${wide ? "sm:order-last sm:col-span-3" : ""}`}>{children}</div>
       {actions && (
-        <div data-tour={tourMark ? "step-update" : undefined} className="flex min-w-0 flex-wrap gap-2 sm:justify-end">
+        <div data-tour={tourMark ? "step-update" : undefined} className={`flex min-w-0 flex-wrap gap-2 sm:justify-end ${wide ? "sm:col-start-3" : ""}`}>
           {actions}
         </div>
       )}
@@ -137,6 +142,9 @@ export function ShipmentPanel({
   onPreview,
   onRemoveFile,
   bookingFilesEnabled,
+  bookingDetailsEnabled,
+  onBooking,
+  onTransport,
   goodsEnabled,
   extraPhotosEnabled,
   onEditLines,
@@ -163,6 +171,10 @@ export function ShipmentPanel({
   onRemoveFile: (f: ExportFile) => void;
   /** Máy chủ đã chạy 0094 + có kho file ⇒ đính được file booking (ba-spec 60 R6). */
   bookingFilesEnabled: boolean;
+  /** Máy chủ đã chạy 0101 ⇒ khối Booking (12 trường) + Thông tin xe vận chuyển thay hàng File booking (ba-spec 71). */
+  bookingDetailsEnabled: boolean;
+  onBooking: (t: BookingTarget) => void;
+  onTransport: (t: TransportTarget) => void;
   /** Máy chủ đã chạy 0096 ⇒ có khối Hàng của chuyến, Số thực đóng, Tải invoice (ba-spec 63). */
   goodsEnabled: boolean;
   /** Máy chủ đã chạy 0097 ⇒ đính ảnh kèm số lượng thực đóng + hàng "Hình ảnh bao bì + cân gross". */
@@ -249,7 +261,7 @@ export function ShipmentPanel({
   };
 
   /** File booking của chuyến (ba-spec 60 NV2, NV3): chỉ để xem, không trạng thái, bản mới nhất đầu. */
-  const bookingRow = () => {
+  const bookingFilesRow = () => {
     const files = bookingFilesOf(data, shipment.id);
     return (
       <ChecklistRow
@@ -276,6 +288,106 @@ export function ShipmentPanel({
           </>
         ) : (
           <span className="text-muted-foreground">Chưa có file booking{shipment.bookingNo ? ` (số booking ${shipment.bookingNo})` : ""}.</span>
+        )}
+      </ChecklistRow>
+    );
+  };
+
+  /**
+   * Khối Booking (ba-spec 71 R1): 12 trường theo thứ tự chủ dự án, số booking + đại lý từ Ghi chuyến; file booking ở
+   * dưới (người xem được Xuất khẩu). Không trạng thái (R7). Người đóng hàng xem được, không sửa (R9).
+   */
+  const bookingRow = () => {
+    const b = shipment.booking;
+    const files = can.view ? bookingFilesOf(data, shipment.id) : [];
+    const now = localNowMinute();
+    const cutoff = (v: string | undefined) =>
+      v ? (
+        <span className="flex flex-wrap items-center gap-1">
+          {formatDateTimeVN(v)}
+          {cutoffOverdue(v, now, shipment) && <Tag variant="warning">Đã qua hạn</Tag>}
+        </span>
+      ) : (
+        ""
+      );
+    const hasAny = !!(b && (b.placeOfReceipt || b.portOfLoading || b.placeOfDelivery || b.returnYard || b.docCutoff || b.vgmCutoff || b.cargoCutoff));
+    return (
+      <ChecklistRow
+        key="booking"
+        label="Booking"
+        wide
+        actions={
+          canWrite && (
+            <Button
+              size="sm"
+              variant={hasAny ? "edit" : "outline"}
+              onClick={() => onBooking({ shipment, files, label })}
+              title="Chọn file booking của hãng tàu — app đọc ra tàu, cảng, nơi hạ bãi, hạn cut-off; soát rồi lưu."
+            >
+              <Ship className="mr-1 h-4 w-4" aria-hidden />
+              Cập nhật booking
+            </Button>
+          )
+        }
+      >
+        <dl data-tour="shipment-booking" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-3">
+          <Fact label={BOOKING_LABELS.bookingNo} value={shipment.bookingNo} />
+          <Fact label={BOOKING_LABELS.forwarder} value={b?.forwarder} />
+          <Fact label={BOOKING_LABELS.vesselVoyage} value={shipment.vesselVoyage} />
+          <Fact label={BOOKING_LABELS.placeOfReceipt} value={b?.placeOfReceipt} />
+          <Fact label={BOOKING_LABELS.portOfLoading} value={b?.portOfLoading} />
+          <Fact label={BOOKING_LABELS.portOfDischarge} value={shipment.portOfDischarge} />
+          <Fact label={BOOKING_LABELS.placeOfDelivery} value={b?.placeOfDelivery} />
+          <Fact label={BOOKING_LABELS.kind} value={shipmentKindLabel(shipment.kind)} />
+          <Fact label={BOOKING_LABELS.returnYard} value={b?.returnYard} />
+          <Fact label={BOOKING_LABELS.docCutoff} value={cutoff(b?.docCutoff)} />
+          <Fact label={BOOKING_LABELS.vgmCutoff} value={cutoff(b?.vgmCutoff)} />
+          <Fact label={BOOKING_LABELS.cargoCutoff} value={cutoff(b?.cargoCutoff)} />
+        </dl>
+        {can.view &&
+          (files.length ? (
+            <div className="grid gap-1 border-t border-border pt-2">
+              <span className="text-muted-foreground">File booking · {files.length} file — bản mới nhất ở đầu</span>
+              <FileList files={files} onPreview={onPreview} caption={`${label} · File booking`} onRemove={can.update && !isCancelled ? onRemoveFile : undefined} />
+            </div>
+          ) : (
+            <span className="text-muted-foreground">Chưa có file booking.</span>
+          ))}
+      </ChecklistRow>
+    );
+  };
+
+  /** Thông tin xe vận chuyển (ba-spec 71 NV4): 4 ô bắt buộc khi lưu, không trạng thái (R7). */
+  const transportRow = () => {
+    const t = shipment.transport;
+    const done = hasTransport(t);
+    const driver = t ? [t.driverName, t.driverPhone, t.driverIdNo && `CCCD ${t.driverIdNo}`, t.truckPlate].filter(Boolean).join(" · ") : "";
+    return (
+      <ChecklistRow
+        key="transport"
+        label="Thông tin xe vận chuyển"
+        wide
+        actions={
+          canWrite && (
+            <Button size="sm" variant={done ? "edit" : "outline"} onClick={() => onTransport({ shipment, label })} title="Ghi công ty vận chuyển, tài xế, nơi lấy container rỗng, nơi đóng, nơi hạ bãi.">
+              <Truck className="mr-1 h-4 w-4" aria-hidden />
+              {done ? "Sửa thông tin xe" : "Ghi thông tin xe"}
+            </Button>
+          )
+        }
+      >
+        {done && t ? (
+          <dl data-tour="shipment-transport" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-3">
+            <Fact label={TRANSPORT_LABELS.haulier} value={t.haulier} />
+            <Fact label="Tài xế · SĐT · CCCD · biển số" value={driver} />
+            <Fact label={TRANSPORT_LABELS.emptyPickupPlace} value={t.emptyPickupPlace} />
+            <Fact label={TRANSPORT_LABELS.stuffingPlace} value={t.stuffingPlace} />
+            <Fact label={TRANSPORT_LABELS.returnYard} value={t.returnYard} />
+          </dl>
+        ) : (
+          <span data-tour="shipment-transport" className="text-muted-foreground">
+            Chưa ghi thông tin xe — không bắt buộc để xong bước, ghi khi đã thuê xe.
+          </span>
         )}
       </ChecklistRow>
     );
@@ -501,7 +613,8 @@ export function ShipmentPanel({
       <StepBlock n={4} state={progress.steps[4]} summary={summaryOf(4)} isCurrent={progress.next === 4}>
         {/* Thứ tự theo trình tự đóng cont thật (chị Vi 2026-11-03): booking → lệnh xuất → số cont / seal →
             số lượng thực đóng → sơ đồ → hình ảnh → tờ khai. */}
-        {can.view && bookingRow()}
+        {bookingDetailsEnabled ? bookingRow() : can.view && bookingFilesRow()}
+        {bookingDetailsEnabled && transportRow()}
         {singleRow("export-order", 4)}
         <ChecklistRow
           label={shipment.kind === "truck" ? "Biển số xe" : "Số cont + seal"}

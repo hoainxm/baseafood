@@ -5,6 +5,7 @@ covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/expor
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-03
+<!-- re-verified: 2026-11-03 (ba-spec 71) — bước 4: hàng File booking thành khối Booking 12 trường (đọc file booking) + hàng Thông tin xe vận chuyển; không trạng thái, không đổi 6 bước, không đổi quyền (người đóng hàng chỉ xem). -->
 <!-- re-verified: 2026-11-03 (ba-spec 69) — thêm Hạn hợp đồng (ô điều khoản, hồ sơ HĐ, bộ đọc file); không đổi trạng thái HĐ / chuyến, không đổi quyền. -->
 <!-- re-verified: 2026-11-03 (ba-spec 66 v1.2) — khối Đọc file hợp đồng (`ContractReadPanel.tsx`, tour) — đọc thêm .doc + bảng Excel nhúng + bảng PDF theo tọa độ; không đổi trạng thái, không đổi quyền. -->
 ttl_days: 90
@@ -72,7 +73,7 @@ Mỗi mục trong bước có một trong 4 nhãn: **Chưa làm** · **Đang là
 | 2 · Lệnh sản xuất | Lệnh sản xuất | Mục Lệnh sản xuất Xong / Không áp dụng (`subStepState`); lệnh lập ở trang Lệnh sản xuất | Nhân viên Kế hoạch |
 | 3 · Bao bì | Bao bì | Mục Bao bì Xong / Không áp dụng (`subStepState`) | Nhân viên Kế hoạch |
 | 4 · Đóng cont | Theo trình tự đóng thật (`LOADING_STEPS`): Lệnh xuất → Sơ đồ container → Hình ảnh đóng cont → Tờ khai | Cả 4 mục Xong / Không áp dụng **và** số container + seal hợp lệ (`containerIdentityOk`); mới có số cont / seal ⇒ Đang làm | Kế hoạch: lệnh xuất, tờ khai, số cont + seal, file booking. **Bộ phận đóng cont**: sơ đồ, ảnh |
-| 4 · (không chặn) | File booking · Số lượng thực đóng · Hình ảnh bao bì + cân gross | Không tính vào bước 4 | Kế hoạch (booking) · **Bộ phận đóng cont** (số thực đóng, ảnh) |
+| 4 · (không chặn) | Booking (12 trường + file booking, ba-spec [71](../app-map/71-export-booking-details.ba-spec.md)) · Thông tin xe vận chuyển · Số lượng thực đóng · Hình ảnh bao bì + cân gross | Không tính vào bước 4. Thông tin xe chỉ lưu khi đủ 4 ô bắt buộc (công ty vận chuyển, nơi lấy rỗng, nơi đóng, nơi hạ bãi) | Kế hoạch (booking, thông tin xe; bộ phận đóng cont chỉ xem) · **Bộ phận đóng cont** (số thực đóng, ảnh) |
 | 5 · Bộ chứng từ | Chứng từ (Commercial Invoice, Packing List, B/L, H/C, C/O…) | Mọi mục chứng từ của chuyến Xong / Không áp dụng | Bộ phận chứng từ (Kế hoạch) |
 | 6 · Gửi chứng từ · tiền về | Ghi đã gửi chứng từ, ghi tiền về | Có lần "đã gửi chứng từ" **và** tiền về ≥ giá trị chuyến; có ghi mà chưa đủ ⇒ Đang làm | Người có quyền `export-plans.payments` |
 

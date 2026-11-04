@@ -96,6 +96,8 @@ import type {
   ExportOptionListKind,
   GoodsType,
   ExportShipment,
+  ExportBookingDetails,
+  ExportTransportInfo,
   ExportStepItem,
   BatterType,
   DomesticSaleItem,
@@ -106,6 +108,7 @@ import type {
 import { rolesFromCsv, rolesToCsv } from "@/types";
 import { getProductBatterIds, sanitizeBatterKg } from "@/lib/batter";
 import { appendAuditEntries, type NewAuditEntry } from "@/lib/audit";
+import { EMPTY_BOOKING_DETAILS, EMPTY_TRANSPORT_INFO } from "@/lib/exportBooking";
 import {
   LEGACY_FIELDS,
   normalizeExportOrderStatus,
@@ -2375,6 +2378,9 @@ export const EXPORT_SHIPMENT_TABLE: TableMapping<ExportShipment> = {
     status: x.status,
     cancel_reason: x.cancelReason,
     note: x.note,
+    // mig 0101: chỉ gửi khi bản ghi có trường (máy chủ chưa có cột ⇒ không kẹt hàng chờ). Có một khối ⇒ gửi cả
+    // hai, khối thiếu = rỗng — các dòng cùng lượt upsert cùng bộ cột.
+    ...(x.booking || x.transport ? bookingDetailsRow(x.booking ?? EMPTY_BOOKING_DETAILS, x.transport ?? EMPTY_TRANSPORT_INFO) : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -2396,8 +2402,61 @@ export const EXPORT_SHIPMENT_TABLE: TableMapping<ExportShipment> = {
     cancelReason: s(r.cancel_reason),
     note: s(r.note),
     createdAt: s(r.created_at),
+    ...(r.forwarder !== undefined ? bookingDetailsOf(r) : {}),
   }),
 };
+
+/** Hạn booking: "yyyy-mm-ddThh:mm" ⇄ timestamp không múi giờ ("2026-11-03T10:00:00"). */
+const cutoffOrNull = (v: string) => (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v) ? `${v}:00` : null);
+const cutoffOf = (v: unknown) => s(v).replace(" ", "T").slice(0, 16);
+
+function bookingDetailsRow(b: ExportBookingDetails, t: ExportTransportInfo) {
+  return {
+    forwarder: b.forwarder,
+    place_of_receipt: b.placeOfReceipt,
+    port_of_loading: b.portOfLoading,
+    place_of_delivery: b.placeOfDelivery,
+    return_yard: b.returnYard,
+    empty_pickup_yard: b.emptyPickupYard,
+    doc_cutoff: cutoffOrNull(b.docCutoff),
+    vgm_cutoff: cutoffOrNull(b.vgmCutoff),
+    cargo_cutoff: cutoffOrNull(b.cargoCutoff),
+    haulier: t.haulier,
+    driver_name: t.driverName,
+    driver_phone: t.driverPhone,
+    driver_id_no: t.driverIdNo,
+    truck_plate: t.truckPlate,
+    empty_pickup_place: t.emptyPickupPlace,
+    stuffing_place: t.stuffingPlace,
+    transport_return_yard: t.returnYard,
+  };
+}
+
+function bookingDetailsOf(r: Record<string, unknown>): { booking: ExportBookingDetails; transport: ExportTransportInfo } {
+  return {
+    booking: {
+      forwarder: s(r.forwarder),
+      placeOfReceipt: s(r.place_of_receipt),
+      portOfLoading: s(r.port_of_loading),
+      placeOfDelivery: s(r.place_of_delivery),
+      returnYard: s(r.return_yard),
+      emptyPickupYard: s(r.empty_pickup_yard),
+      docCutoff: cutoffOf(r.doc_cutoff),
+      vgmCutoff: cutoffOf(r.vgm_cutoff),
+      cargoCutoff: cutoffOf(r.cargo_cutoff),
+    },
+    transport: {
+      haulier: s(r.haulier),
+      driverName: s(r.driver_name),
+      driverPhone: s(r.driver_phone),
+      driverIdNo: s(r.driver_id_no),
+      truckPlate: s(r.truck_plate),
+      emptyPickupPlace: s(r.empty_pickup_place),
+      stuffingPlace: s(r.stuffing_place),
+      returnYard: s(r.transport_return_yard),
+    },
+  };
+}
 
 export const EXPORT_STEP_ITEM_TABLE: TableMapping<ExportStepItem> = {
   table: "export_step_items",
@@ -2754,7 +2813,17 @@ export const EXPORT_DOCUMENT_KIND_TABLE: TableMapping<ExportDocumentKindRow> = {
   }),
 };
 
-const EXPORT_OPTION_KINDS: readonly ExportOptionListKind[] = ["loading-port", "discharge-port", "container-type", "currency", "bank-account"];
+const EXPORT_OPTION_KINDS: readonly ExportOptionListKind[] = [
+  "loading-port",
+  "discharge-port",
+  "container-type",
+  "currency",
+  "bank-account",
+  "forwarder",
+  "haulier",
+  "container-yard",
+  "stuffing-place",
+];
 
 /** Danh sách chọn của Xuất khẩu (mig 0095, ba-spec 62) — cảng xếp · cảng đích · loại container · tiền tệ. */
 export const EXPORT_OPTION_TABLE: TableMapping<ExportOption> = {

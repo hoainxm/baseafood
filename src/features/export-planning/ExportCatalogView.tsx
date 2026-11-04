@@ -8,7 +8,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system";
 import { CatalogCrudFor } from "@/features/catalog/CatalogCrudFor";
 import { exportOptionListConfig, useCatalogConfigs } from "@/features/catalog/catalogConfig";
-import { EXPORT_OPTION_LISTS } from "@/lib/exportOptions";
+import { useExportBookingDetailsAvailable } from "@/lib/catalogRepo";
+import { BOOKING_OPTION_KINDS, EXPORT_OPTION_LISTS } from "@/lib/exportOptions";
 import type { ExportOptionListKind } from "@/types";
 
 export type ExportCatalogList = ExportOptionListKind | "document-kinds" | "goods-types";
@@ -25,16 +26,19 @@ export const normalizeExportCatalogList = (v: string | null): ExportCatalogList 
 
 export function ExportCatalogView({ list, onListChange }: { list: ExportCatalogList; onListChange: (v: ExportCatalogList) => void }) {
   const c = useCatalogConfigs();
+  // Máy chủ chưa chạy 0101 ⇒ 4 danh sách của booking / xe vận chuyển bị ràng buộc từ chối ⇒ ẩn (ba-spec 71 R10).
+  const bookingListsOk = useExportBookingDetailsAvailable();
+  const shown = (kind: ExportCatalogList) => bookingListsOk || !(BOOKING_OPTION_KINDS as readonly string[]).includes(kind);
   return (
     <Tabs value={list} onValueChange={(v) => onListChange(normalizeExportCatalogList(v))}>
       <TabsList data-tour="export-catalog-lists" className="w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto">
-        {EXPORT_CATALOG_LISTS.map((l) => (
+        {EXPORT_CATALOG_LISTS.filter((l) => shown(l.value)).map((l) => (
           <TabsTrigger key={l.value} value={l.value} title={l.hint}>
             {l.label}
           </TabsTrigger>
         ))}
       </TabsList>
-      {EXPORT_OPTION_LISTS.filter((l) => l.kind !== "bank-account").map((l) => (
+      {EXPORT_OPTION_LISTS.filter((l) => l.kind !== "bank-account" && shown(l.kind)).map((l) => (
         <TabsContent key={l.kind} value={l.kind} data-tour={`export-catalog-${l.kind}`} className="pt-4">
           <CatalogCrudFor cfg={exportOptionListConfig(c.exportOption, l.kind)} rowMarkKey={`export-options-${l.kind}`} resource="export-plans" />
         </TabsContent>

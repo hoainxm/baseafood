@@ -9,7 +9,8 @@
 import { useState } from "react";
 import { Button, Card, CardContent, EmptyState, Field, Input, Tag, addDays } from "@/design-system";
 import { filesOfStep, shipmentFilesOf, shipmentKindLabel } from "@/lib/exportPlanning";
-import { formatDateVN } from "@/lib/format";
+import { formatDateTimeVN, formatDateVN } from "@/lib/format";
+import { hasTransport } from "@/lib/exportBooking";
 import type { Customer, ExportContract, ExportFile, ExportShipment, ExportShipmentLine } from "@/types";
 import { Camera, ClipboardCheck, ClipboardList, Container } from "lucide-react";
 import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
@@ -97,6 +98,33 @@ export function LoadingView({
                       .join(" · ")}
                   </p>
                   {s.goodsSummary && <p className="text-sm">{s.goodsSummary}</p>}
+                  {/* ba-spec 71 R9: người đóng hàng xem booking + xe (không sửa); file booking vẫn ẩn. */}
+                  {s.booking && (s.vesselVoyage || s.booking.returnYard || s.booking.cargoCutoff) && (
+                    <p className="tnum text-sm">
+                      {[
+                        s.vesselVoyage && `Tàu ${s.vesselVoyage}`,
+                        s.booking.returnYard && `Hạ bãi ${s.booking.returnYard}`,
+                        s.booking.cargoCutoff && `Hạn hạ bãi ${formatDateTimeVN(s.booking.cargoCutoff)}`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
+                  {hasTransport(s.transport) && s.transport && (
+                    <p className="tnum text-sm">
+                      {[
+                        `Xe ${s.transport.haulier}`,
+                        s.transport.truckPlate,
+                        s.transport.driverName && `Tài xế ${s.transport.driverName}`,
+                        s.transport.driverPhone,
+                        `Lấy rỗng ${s.transport.emptyPickupPlace}`,
+                        `Đóng ${s.transport.stuffingPlace}`,
+                        `Hạ bãi ${s.transport.returnYard}`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-1">
                     <Tag variant={photos.length ? "done" : "muted"}>{photos.length} ảnh</Tag>
                     <Tag variant={plans.length ? "done" : "muted"}>{plans.length ? "Có sơ đồ" : "Chưa có sơ đồ"}</Tag>

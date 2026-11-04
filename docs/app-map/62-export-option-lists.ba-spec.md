@@ -9,6 +9,8 @@ status: v1 ĐÃ BUILD 2026-11-02 — chốt Q1…Q7 (§8). Mig `0095_export_opti
 
 > **Mục đích:** oracle HÀNH VI. Không mô tả giao diện (việc của [42](42-export-planning-ui.design-spec.md)). Bổ sung [41](41-export-planning.ba-spec.md) NV2 (lập HĐ), NV7 (ghi chuyến), §0b (Loại chứng từ — nơi quản lý đổi).
 
+> **2026-11-03 (mig 0101, ba-spec [71](71-export-booking-details.ba-spec.md)):** thêm 4 danh sách cho khối Booking + Thông tin xe vận chuyển: **Đại lý** (`forwarder`), **Công ty vận chuyển** (`haulier`), **Bãi container** (`container-yard` — nơi hạ bãi, lấy rỗng), **Nơi đóng container** (`stuffing-place`). Không có danh sách khởi tạo. Máy chủ chưa chạy 0101 ⇒ 4 danh sách ẩn ở tab Danh mục, ô chọn không hiện. Nơi nhận hàng + Cảng đi dùng `loading-port`; Nơi giao hàng dùng `discharge-port`. Chữ đọc từ file booking khớp mục không dấu / phần đầu tên (`matchOptionLoose`).
+
 > **2026-11-02 (mig 0096, ba-spec [63](63-export-invoice-from-app.ba-spec.md)):** thêm danh sách thứ năm **Tài khoản ngân hàng** (`bank-account`): `name` = tên ngắn để chọn, `note` = khối in dưới "Please make TT to:" (nhiều dòng — ô Ghi chú của danh mục thành ô nhiều dòng cho mọi danh sách). Máy chủ chưa chạy 0096 ⇒ không đưa tài khoản vào bảng (ghi danh sách khác sẽ upsert cả bảng, dòng `bank-account` bị check 0095 chặn ⇒ kẹt hàng chờ). Bảng có mục mà chưa có tài khoản ⇒ bù 3 tài khoản khởi tạo.
 
 ## 1. Vấn đề & JTBD

@@ -5,6 +5,7 @@
 // ============================================================
 // HĐ / chuyến LƯU CHỮ của tùy chọn (Q5) ⇒ xóa / đổi tên tùy chọn không đụng sổ đã ghi. Giá trị cũ gõ tay
 // không khớp mục nào vẫn hiện, đánh dấu "ngoài danh sách" (Q6).
+import { stripAccents } from "@/lib/username";
 import type { ExportOption, ExportOptionListKind } from "@/types";
 
 export interface ExportOptionListMeta {
@@ -53,7 +54,39 @@ export const EXPORT_OPTION_LISTS: readonly ExportOptionListMeta[] = [
     description: "Tài khoản thụ hưởng in dưới \"Please make TT to:\" trên invoice. Tên để chọn; Ghi chú là khối in (mỗi dòng một dòng: Bank name, Account number, SWIFT CODE, Beneficiary, địa chỉ).",
     example: "VD: MSB Vũng Tàu · 08001370022669",
   },
+  // mig 0101 (ba-spec 71 R11) — ô của khối Booking / Thông tin xe vận chuyển.
+  {
+    kind: "forwarder",
+    title: "Đại lý",
+    entityName: "đại lý",
+    description: "Đại lý (forwarder) đặt booking với hãng tàu — chọn ở ô Đại lý khi ghi chuyến.",
+    example: "VD: Da Phương Shipping Services",
+  },
+  {
+    kind: "haulier",
+    title: "Công ty vận chuyển",
+    entityName: "công ty vận chuyển",
+    description: "Công ty xe kéo container — ô Tên công ty vận chuyển của Thông tin xe.",
+    example: "VD: Vận tải Tân Cảng",
+  },
+  {
+    kind: "container-yard",
+    title: "Bãi container",
+    entityName: "bãi container",
+    description: "Bãi / cảng lấy container rỗng và hạ bãi — dùng cho Nơi hạ bãi của booking, Địa điểm lấy container rỗng, Địa điểm hạ bãi.",
+    example: "VD: ICD Tây Nam",
+  },
+  {
+    kind: "stuffing-place",
+    title: "Nơi đóng container",
+    entityName: "nơi đóng container",
+    description: "Kho / xưởng đóng hàng vào container — ô Địa điểm đóng container của Thông tin xe.",
+    example: "VD: Xưởng BSF1 Bà Rịa",
+  },
 ];
+
+/** Danh sách thêm ở 0101 — máy chủ chưa chạy ⇒ ràng buộc `list_kind` từ chối, không ghi / không hiện ở tab Danh mục. */
+export const BOOKING_OPTION_KINDS: readonly ExportOptionListKind[] = ["forwarder", "haulier", "container-yard", "stuffing-place"];
 
 export const exportOptionListMeta = (kind: ExportOptionListKind): ExportOptionListMeta =>
   EXPORT_OPTION_LISTS.find((l) => l.kind === kind) ?? EXPORT_OPTION_LISTS[0];
@@ -189,4 +222,23 @@ export function matchExportOption(value: string, rows: readonly ExportOption[], 
   const k = optionKey(value);
   if (!k) return value;
   return rows.find((r) => r.listKind === kind && optionKey(r.name) === k)?.name ?? value;
+}
+
+const fold = (v: string) => stripAccents(v).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+/** Phần tên trước dấu phẩy / gạch chéo / ngoặc: "TOKYO, TOKYO" ⇒ "tokyo"; "TCTT (TAN CANG …" ⇒ "tctt". */
+const head = (v: string) => fold(v.split(/[,/(]/)[0] ?? "");
+
+/**
+ * Chữ đọc từ file (booking hãng tàu, viết hoa không dấu) ⇒ mục trong danh sách (ba-spec 71 R3): khớp không dấu,
+ * không phân hoa thường; không thì khớp phần đầu tên khi CHỈ MỘT mục có phần đầu đó. Không khớp ⇒ giữ chữ file.
+ */
+export function matchOptionLoose(text: string, rows: readonly ExportOption[], kind: ExportOptionListKind): string {
+  const k = fold(text);
+  if (!k) return text.trim();
+  const list = rows.filter((r) => r.listKind === kind);
+  const exact = list.find((r) => fold(r.name) === k);
+  if (exact) return exact.name;
+  const h = head(text);
+  const byHead = h ? list.filter((r) => head(r.name) === h) : [];
+  return byHead.length === 1 ? byHead[0].name : text.trim();
 }

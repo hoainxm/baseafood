@@ -670,8 +670,8 @@ export function ShipmentPanel({
       </StepBlock>
 
       <StepBlock n={4} state={progress.steps[4]} summary={summaryOf(4)} isCurrent={progress.next === 4}>
-        {/* Thứ tự theo trình tự đóng cont thật (chị Vi 2026-11-03): booking → lệnh xuất → số cont / seal →
-            số lượng thực đóng → sơ đồ → hình ảnh → tờ khai. */}
+        {/* Thứ tự theo trình tự đóng cont thật (chị Vi 2026-11-03, SI chị Thảo 2026-11-04): booking → thông tin xe →
+            lệnh xuất → số cont / seal → SI → số lượng thực đóng → sơ đồ → hình ảnh → tờ khai. */}
         {bookingDetailsEnabled ? bookingRow() : can.view && bookingFilesRow()}
         {bookingDetailsEnabled && transportRow()}
         {singleRow(
@@ -716,11 +716,12 @@ export function ShipmentPanel({
           {/* Ảnh cont / seal (ba-spec 72 R8): mới nhất đầu, không đổi điều kiện Xong. */}
           {siEnabled && containerPhotos.length > 0 && <FileList files={containerPhotos} onPreview={onPreview} caption={`${label} · Ảnh cont / seal`} onRemove={can.update && !isCancelled ? onRemoveFile : undefined} />}
         </ChecklistRow>
+        {/* SI ngay sau số cont + seal (chị Thảo 2026-11-04: làm SI khi đã có cont / seal). */}
+        {siEnabled && siRow()}
         {goodsEnabled && loadingCountRow()}
         {extraPhotosEnabled && packageWeightRow()}
         {uploadRow("loading-plan")}
         {uploadRow("loading-photos")}
-        {siEnabled && siRow()}
         {singleRow("customs-declaration", 4)}
       </StepBlock>
 

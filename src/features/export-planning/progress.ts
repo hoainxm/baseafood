@@ -79,10 +79,10 @@ export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string
       // Cùng trình tự với khối Đóng cont: lệnh xuất → số cont + seal → sơ đồ → hình ảnh → tờ khai.
       const out = LOADING_STEPS.filter((st) => !settled(subStepState(d, s.id, st))).map((st) => SUB_STEP_LABELS[st].toLowerCase());
       if (!containerIdentityOk(s)) out.splice(out[0] === SUB_STEP_LABELS["export-order"].toLowerCase() ? 1 : 0, 0, s.kind === "truck" ? "biển số xe" : "số cont + seal");
-      // SI đứng trước tờ khai (ba-spec 72 R10).
+      // SI ngay sau số cont + seal (ba-spec 72 R10 v1.2) — cùng thứ tự với khối Đóng cont.
       if (d.shippingInstructionEnabled && !settled(shippingInstructionState(d, s))) {
-        const at = out.indexOf(SUB_STEP_LABELS["customs-declaration"].toLowerCase());
-        out.splice(at < 0 ? out.length : at, 0, "SI");
+        const after = [s.kind === "truck" ? "biển số xe" : "số cont + seal", SUB_STEP_LABELS["export-order"].toLowerCase()].map((l) => out.indexOf(l)).find((i) => i >= 0);
+        out.splice(after == null ? 0 : after + 1, 0, "SI");
       }
       return out;
     }

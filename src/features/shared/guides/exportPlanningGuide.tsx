@@ -186,7 +186,7 @@ export const exportPlanningGuide: PageGuide = {
             <b>Ảnh cont / seal</b>: đính ở hàng Số cont + seal (người đóng hàng cũng đính được). Không bắt buộc.
           </li>
           <li>
-            <b>SI</b>: mục bắt buộc của chuyến cont lạnh, đứng trước Tờ khai. Lập SI tự điền ô theo booking, cont / seal, hàng của chuyến; ô của
+            <b>SI</b>: mục bắt buộc của chuyến cont lạnh, ngay sau Số cont + seal. Lập SI tự điền ô theo booking, cont / seal, hàng của chuyến; ô của
             khách (consignee, notify, loại B/L, cước) nhớ theo SI lần trước. Xuất Excel là Xong. Xe tải, đóng ghép, chuyến xong trước khi có SI:
             Không áp dụng.
           </li>

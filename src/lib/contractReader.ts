@@ -74,6 +74,8 @@ export interface ReadContract {
   sellerName: string;
   buyerName: string;
   partnerName: string;
+  /** Địa chỉ của đối tác — dòng "Add / Address / Địa chỉ" ngay dưới tên bên (Phòng KH 2026-11-04). */
+  partnerAddress: string;
   partnerSide: "seller" | "buyer" | "";
   orderRef: string;
   incoterm: string;
@@ -586,20 +588,33 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
   // Hai bên (R3).
   let sellerName = "";
   let buyerName = "";
+  let sellerAddress = "";
+  let buyerAddress = "";
+  // Bên đang đọc (dòng địa chỉ ngay sau tên bên thuộc về bên đó; gặp Tel / Fax / bên khác thì thôi).
+  let side: "seller" | "buyer" | "" = "";
   for (const t of outside) {
     const m = t.match(/^(?:the\s*)?(seller|buyer|bên bán|bên mua)\b\s*(?:\([^)]*\))?\s*[:：]\s*(.+)$/i);
-    if (!m) continue;
-    const isSeller = /seller|bán/i.test(m[1]);
-    if (isSeller && !sellerName) sellerName = clean(m[2]);
-    if (!isSeller && !buyerName) buyerName = clean(m[2]);
+    if (m) {
+      const isSeller = /seller|bán/i.test(m[1]);
+      side = isSeller ? "seller" : "buyer";
+      if (isSeller && !sellerName) sellerName = clean(m[2]);
+      if (!isSeller && !buyerName) buyerName = clean(m[2]);
+      continue;
+    }
+    const addr = side ? t.match(/^(?:add(?:ress)?|địa\s*chỉ)\.?\s*[:：]?\s*(.+)$/i) : null;
+    if (addr && side === "seller" && !sellerAddress) sellerAddress = clean(addr[1]);
+    else if (addr && side === "buyer" && !buyerAddress) buyerAddress = clean(addr[1]);
+    else if (!addr) side = "";
   }
   let partnerName = "";
   let partnerSide: ReadContract["partnerSide"] = "";
   const wantSide = role === "export" ? "buyer" : "seller";
   const wanted = role === "export" ? buyerName : sellerName;
   const other = role === "export" ? sellerName : buyerName;
+  let partnerAddress = "";
   if (wanted && !isOurs(wanted)) {
     partnerName = wanted;
+    partnerAddress = role === "export" ? buyerAddress : sellerAddress;
     partnerSide = wantSide;
   } else if (wanted && isOurs(wanted) && other && !isOurs(other)) {
     warnings.push(
@@ -748,6 +763,7 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
       sellerName,
       buyerName,
       partnerName,
+      partnerAddress,
       partnerSide,
       orderRef,
       incoterm: (INCOTERMS as readonly string[]).includes(incoterm) ? incoterm : "",
@@ -898,6 +914,8 @@ function pairLines<F>(fileLines: readonly ReadContractLine[], formLines: readonl
 /** Giá trị form HĐ xuất mà bộ đọc điền được. */
 export interface ExportContractFillValues {
   customerId: string;
+  /** Địa chỉ khách đang hiện ở form (form rỗng ⇒ địa chỉ trong danh mục khách). */
+  customerAddress?: string;
   contractNo: string;
   signedOn: string;
   orderRef: string;
@@ -949,6 +967,7 @@ export function fillExportContract(values: ExportContractFillValues, read: ReadC
       else if (candidates.length) a.notes.push(`Khách "${read.partnerName}" khớp ${candidates.length} khách trong danh mục (${candidates.map((c) => c.name).join(", ")}) — chọn tay.`);
       else a.notes.push(`Khách "${read.partnerName}" chưa có trong danh mục khách hàng — thêm ở ô Khách hàng.`);
     }
+    if (read.partnerAddress && !ctx.customerLocked) v.customerAddress = a.put("customerAddress", "Địa chỉ khách hàng", v.customerAddress ?? "", read.partnerAddress);
     v.contractNo = a.put("contractNo", "Số hợp đồng", v.contractNo, read.contractNo);
     v.signedOn = a.put("signedOn", "Ngày ký", v.signedOn, read.signedOn, { baseline: ctx.mode === "create" ? ctx.baseline.signedOn : undefined, show: showDate });
     v.orderRef = a.put("orderRef", "Số PO của khách", v.orderRef, read.orderRef);

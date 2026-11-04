@@ -66,6 +66,7 @@ import {
   shipmentContractIds,
   shipmentContractLines,
   lineContractOf,
+  type AttachmentCandidate,
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
 import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportShipmentLine, type ExportStepItem } from "@/types";
@@ -554,6 +555,23 @@ export default function ExportPlanningScreen() {
     notify.saved(`Đã đính ${rows.length} file ${r0?.step === "booking" ? "booking" : "đóng cont"}`, undoTracked(r0?.contractId ?? "", r0?.shipmentId ?? "", what, () => store.saveFiles(prev)));
     setLoadingTarget(null);
     return true;
+  };
+
+  /** File đã có tính là loại hồ sơ còn thiếu: file đính loại "khác" ⇒ đổi loại; file của bản HĐ ⇒ thêm dòng hồ sơ cùng file. */
+  const applyAsAttachment = (c: ExportContract, kind: ExportContractAttachmentKind, cand: AttachmentCandidate) => {
+    const prev = d.files;
+    const label = CONTRACT_ATTACHMENT_LABELS[kind];
+    const next =
+      cand.source === "attachment"
+        ? prev.map((f) => (f.id === cand.fileId ? { ...f, attachmentKind: kind, caption: label } : f))
+        : [
+            ...prev,
+            { id: newId(), contractId: c.id, shipmentId: "", stepItemId: "", step: "contract" as const, attachmentKind: kind, path: cand.path, fileName: cand.fileName, layerNo: null, caption: label, uploadedBy: recordedBy, createdAt: new Date().toISOString() },
+          ];
+    if (!store.saveFiles(next)) return;
+    const what = `Dùng file ${cand.fileName} (${cand.where}) làm ${label}`;
+    track(c.id, "", "attach", what);
+    notify.saved(`Đã tính "${cand.fileName}" là ${label}`, undoTracked(c.id, "", what, () => store.saveFiles(prev)));
   };
 
   const removeFile = (f: ExportFile) => {
@@ -1148,6 +1166,7 @@ export default function ExportPlanningScreen() {
             })
           }
           onClearDeferral={(kind) => doClearDeferral(contract, kind)}
+          onUseAsAttachment={(kind, c) => applyAsAttachment(contract, kind, c)}
           onFinalReview={() => {
             const eff = effectiveRevision(d, contract.id);
             const g = finalReviewGate(d, contract.id, opts);

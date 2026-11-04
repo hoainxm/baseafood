@@ -5,6 +5,7 @@ covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/expor
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-04
+<!-- re-verified: 2026-11-04 (form HĐ) — nút Dùng file làm Hợp đồng đã ký; địa chỉ khách đọc từ file; kg tự tính khi sửa số lượng / kg mỗi thùng; chọn tay mặt hàng không bị gợi ý đè; Chép dòng ẩn ở dòng trống (trừ dòng 1). -->
 <!-- re-verified: 2026-11-04 (KAISEI 04-26-KMP) — đơn giá 0 vì bản sửa HĐ cấp id dòng mới ⇒ bản sửa giữ id + tự nối hàng của chuyến cũ; cảnh báo invoice ghi đích danh; Packing list gross theo SI, mục PL tự điền số + ngày theo invoice. -->
 <!-- re-verified: 2026-11-04 (ảnh cont / seal bắt buộc) — hàng Số cont + seal Xong khi có số VÀ ≥ 1 ảnh (ba-spec 72 R8 v1.7); chuyến cũ đã đóng xong / đóng ghép / chưa chạy 0103 không bắt. -->
 <!-- re-verified: 2026-11-04 (Lệnh xuất ⇄ LSX) — bảng hàng Lệnh xuất theo từng HĐ + số lượng theo chuyến; chuyến gộp gắn / lập LSX của mọi HĐ trên chuyến (ba-spec 72 R2b, R3b; 48 LS3). -->
@@ -50,6 +51,8 @@ stateDiagram-v2
 | Đã hủy | HĐ bỏ, chuyến không còn tính | — | Nhân viên Kế hoạch | |
 
 Hồ sơ đính kèm **Bổ sung sau** (ba-spec 58): cho chạy tiếp nhưng vẫn nhắc ở Việc của tôi tới khi có file.
+
+Hồ sơ chỉ tính theo **loại** (`missingAttachmentKinds`). File ký đính dạng Phụ lục / file kèm, hoặc nằm ở file của bản HĐ ⇒ hàng Thiếu có nút **Dùng "…" làm Hợp đồng đã ký** (`attachmentCandidates`): file đính ⇒ đổi loại; file của bản ⇒ thêm dòng hồ sơ cùng file (có Hoàn tác). Form HĐ: đọc file điền cả địa chỉ khách (dòng Add dưới THE BUYER); sửa số lượng / kg mỗi thùng ⇒ kg tịnh về tự tính; chọn tay mặt hàng thì gợi ý không đè.
 
 **Đọc file hợp đồng** (ba-spec [66](../app-map/66-contract-file-autofill.ba-spec.md)): ở hộp Lập HĐ / Sửa / Ghi bản sửa, chọn file Word (.docx) hoặc PDF có chữ ⇒ app điền sẵn ô **còn trống** (khách, số, ngày ký, điều khoản, dòng hàng); ô khác file chỉ liệt kê để chọn; phụ lục của HĐ khác thì không điền gì tới khi xác nhận; bản sửa nối dòng theo size, không tự xóa dòng. Không tự lưu, không tự thêm danh mục, không đổi trạng thái HĐ (`fillExportContract`, `lib/contractReader.ts`).
 

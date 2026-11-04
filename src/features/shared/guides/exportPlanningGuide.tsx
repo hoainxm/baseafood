@@ -46,7 +46,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Đính kèm hồ sơ",
     needs: ["export-plans", "update"],
     actors: KH,
-    text: "Ở hồ sơ hợp đồng chọn Đính kèm hồ sơ: hợp đồng đã ký, thêm L/C nếu thanh toán L/C. Chưa có thì chọn Chưa có — bổ sung sau, ghi lý do: làm tiếp được, duyệt cuối vẫn cần đủ file.",
+    text: "Ở hồ sơ hợp đồng chọn Đính kèm hồ sơ: hợp đồng đã ký, thêm L/C nếu thanh toán L/C. File ký đã đính nhầm loại hoặc nằm ở file của bản hợp đồng thì chọn Dùng … làm Hợp đồng đã ký; chưa có thì chọn Chưa có — bổ sung sau, ghi lý do.",
     done: "Không còn loại hồ sơ bắt buộc nào Thiếu (Có file hoặc Bổ sung sau)",
     result: { label: CONTRACT_STATE_LABELS.shipping, tone: "source" },
   },

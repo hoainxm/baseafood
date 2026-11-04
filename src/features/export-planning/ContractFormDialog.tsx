@@ -252,6 +252,7 @@ export function ContractFormDialog({
    * Ô chọn mặt hàng của một dòng (R23 v6): mục khớp tên của khách / tên mặc định đứng đầu; dòng phụ =
    * mã · tên của khách (chưa có thì tên mặc định) ⇒ gõ tên tiếng Anh tìm được.
    */
+  const pickedLines = useRef(new Set<string>());
   const productOptionsFor = (l: Pick<ExportContractLine, "description" | "size">, customerId: string): ComboboxOption[] =>
     rankProductsForLine(l.description, products, customerId, { size: l.size, names: customerNames }).map((m) => ({
       value: m.id,
@@ -269,8 +270,12 @@ export function ContractFormDialog({
   /** Rời ô tên tiếng Anh: dòng chưa nối mà tên đã từng nối ở HĐ trước ⇒ điền sẵn mặt hàng đó. */
   /** Gợi ý mặt hàng khi rời ô Tên hàng / Size: dòng chưa nối, hoặc nối do app gợi ý (gõ size sau ⇒ gợi ý lại cho đúng size). */
   const suggestFor = (lineId: string) => {
+    // Dòng người dùng đã tự chọn mặt hàng ⇒ không gợi ý đè (chị Thảo 2026-11-04: chọn 1.8-2.2 cứ về 1,2-1,8 —
+    // cờ "app gợi ý" bị đặt lại do thứ tự cập nhật, rời ô Size là gợi ý lại theo size).
+    if (pickedLines.current.has(lineId)) return;
     setForm((f) => {
-      if (!f) return f;
+      // Hàm cập nhật chạy trễ (lúc vẽ lại) — người dùng có thể đã chọn mặt hàng ngay sau khi rời ô.
+      if (!f || pickedLines.current.has(lineId)) return f;
       const l = f.lines.find((x) => x.id === lineId);
       if (!l || !l.description.trim()) return f;
       const auto = suggestedLines.has(lineId);
@@ -361,6 +366,8 @@ export function ContractFormDialog({
   formRef.current = form;
   const fillValues = (f: ContractForm): ExportContractFillValues => ({
     customerId: f.customerId,
+    // Địa chỉ đang hiện ở form: đã sửa ⇒ số đã sửa; chưa ⇒ địa chỉ trong danh mục khách (đọc file điền khi trống).
+    customerAddress: f.customerAddress ?? customers.find((c) => c.id === f.customerId)?.address ?? "",
     contractNo: f.contractNo,
     signedOn: f.signedOn,
     orderRef: f.orderRef,
@@ -771,20 +778,23 @@ export function ContractFormDialog({
                       <span className="tnum min-w-0 flex-1 basis-40 text-sm text-muted-foreground">
                         {formatNumber(lineKg(l))} kg{canSeePrice ? ` · ${formatMoney(lineAmount(l))} ${currency}` : ""}
                       </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        data-tour={i === 0 ? "export-line-copy" : undefined}
-                        onClick={() => {
-                          const copy = copyContractLine(l, newId());
-                          setForm((f) => (f ? { ...f, lines: insertCopiedLine(f.lines, l.id, copy) } : f));
-                          if (openLines.has(l.id)) setOpenLines((s) => new Set(s).add(copy.id));
-                        }}
-                        title={`Chép dòng ${i + 1} thành dòng mới ngay dưới: giữ mọi thông tin, để trống Size để gõ size khác.`}
-                      >
-                        <Copy className="mr-1 h-4 w-4" aria-hidden />
-                        Chép dòng
-                      </Button>
+                      {/* Dòng trống thì chép ra dòng trống — dòng 2 trở đi chỉ hiện khi đã có tên / size / số (Phòng KH 2026-11-04 bấm ở dòng trống); dòng 1 giữ cho tour. */}
+                      {(i === 0 || l.description.trim() || l.quantity != null || l.size.trim()) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-tour={i === 0 ? "export-line-copy" : undefined}
+                          onClick={() => {
+                            const copy = copyContractLine(l, newId());
+                            setForm((f) => (f ? { ...f, lines: insertCopiedLine(f.lines, l.id, copy) } : f));
+                            if (openLines.has(l.id)) setOpenLines((s) => new Set(s).add(copy.id));
+                          }}
+                          title={`Chép dòng ${i + 1} thành dòng mới ngay dưới: giữ mọi thông tin, để trống Size để gõ size khác.`}
+                        >
+                          <Copy className="mr-1 h-4 w-4" aria-hidden />
+                          Chép dòng
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="danger"
@@ -815,6 +825,8 @@ export function ContractFormDialog({
                           wrapValue
                           value={l.productId ?? ""}
                           onChange={(v) => {
+                            if (v) pickedLines.current.add(l.id);
+                            else pickedLines.current.delete(l.id);
                             // R23: tên hàng còn trống ⇒ điền tên thương mại của mặt hàng vừa chọn.
                             // R23 v6: ô tên · size · quy cách · mã HS đang trống ⇒ theo tên của khách (chưa có ⇒ tên mặc định).
                             setLine(l.id, {
@@ -878,8 +890,9 @@ export function ContractFormDialog({
                         columns={2}
                       />
                       {l.unitKind === "bundle" && <NumberField label="Thùng / kiện" unit="thùng" value={l.cartonsPerUnit} onChange={(v) => setLine(l.id, { cartonsPerUnit: v ?? 1 })} />}
-                      <NumberField label="Số lượng" unit={l.unitKind === "bundle" ? "kiện" : "thùng"} value={l.quantity} onChange={(v) => setLine(l.id, { quantity: v })} />
-                      <NumberField label="Kg tịnh / thùng" value={l.netKgPerCarton} onChange={(v) => setLine(l.id, { netKgPerCarton: v })} />
+                      {/* Sửa số lượng hoặc kg / thùng ⇒ kg tịnh về tự tính (chị Thảo 2026-11-04: kg gõ tay / đọc nhầm không nhảy theo). */}
+                      <NumberField label="Số lượng" unit={l.unitKind === "bundle" ? "kiện" : "thùng"} value={l.quantity} onChange={(v) => setLine(l.id, { quantity: v, ...(v != null && l.netKgPerCarton ? { kg: null } : {}) })} />
+                      <NumberField label="Kg tịnh / thùng" value={l.netKgPerCarton} onChange={(v) => setLine(l.id, { netKgPerCarton: v, ...(v != null && l.quantity != null ? { kg: null } : {}) })} />
                       <NumberField
                         label={l.kg != null ? "Kg tịnh (gõ tay)" : "Kg tịnh (tự tính)"}
                         value={l.kg ?? auto}

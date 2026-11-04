@@ -26,7 +26,9 @@ import {
   finalReviewGate,
   finalReviewsOf,
   missingAttachmentKinds,
+  attachmentCandidates,
   attachmentStatus,
+  type AttachmentCandidate,
   blockingAttachmentKinds,
   ATTACHMENT_STATUS_LABELS,
   requiredAttachmentKinds,
@@ -122,6 +124,7 @@ export function ContractDossier({
   onRemoveAttachment,
   deferralsAvailable,
   onDeferAttachment,
+  onUseAsAttachment,
   onClearDeferral,
   onFinalReview,
   onReopen,
@@ -160,6 +163,8 @@ export function ContractDossier({
   deferralsAvailable: boolean;
   /** Ghi "bổ sung sau" (mở hộp lý do) cho một loại hồ sơ bắt buộc còn thiếu. */
   onDeferAttachment: (kind: ExportContractAttachmentKind) => void;
+  /** File đã có (đính loại "khác" / file của bản HĐ) tính là loại hồ sơ còn thiếu (Phòng KH 2026-11-04). */
+  onUseAsAttachment: (kind: ExportContractAttachmentKind, candidate: AttachmentCandidate) => void;
   /** Bỏ dấu "bổ sung sau" ⇒ loại về Thiếu (có Hoàn tác). */
   onClearDeferral: (kind: ExportContractAttachmentKind) => void;
   /** Mở hộp duyệt cuối — đồng ý thì đóng HĐ (thay "Chốt HĐ" cũ). */
@@ -565,6 +570,18 @@ export function ContractDossier({
                       ? `${CONTRACT_ATTACHMENT_LABELS[k]} bổ sung sau — ${def.reason} (${[def.by, formatDateTimeVN(def.at)].filter(Boolean).join(" · ")})`
                       : `Chưa có ${CONTRACT_ATTACHMENT_LABELS[k]}.`}
                   </span>
+                  {can.update && isOpen &&
+                    attachmentCandidates(data, contract.id, k).map((c) => (
+                      <Button
+                        key={c.path}
+                        size="sm"
+                        className="h-auto min-h-8 max-w-full whitespace-normal"
+                        onClick={() => onUseAsAttachment(k, c)}
+                        title={`File "${c.fileName}" (${c.where}) chính là ${CONTRACT_ATTACHMENT_LABELS[k]}? Bấm để tính là ${CONTRACT_ATTACHMENT_LABELS[k]} — không phải đính lại.`}
+                      >
+                        Dùng "{c.fileName}" làm {CONTRACT_ATTACHMENT_LABELS[k]}
+                      </Button>
+                    ))}
                   {can.update && isOpen && deferralsAvailable && !deferred && (
                     <Button size="sm" variant="outline" onClick={() => onDeferAttachment(k)} title={`Chưa có ${CONTRACT_ATTACHMENT_LABELS[k]}: ghi lý do để ghi chuyến tiếp; duyệt cuối vẫn cần đủ file.`}>
                       Chưa có — bổ sung sau

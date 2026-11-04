@@ -236,6 +236,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         body:
           "Chặng Đính kèm của hợp đồng. Thẻ đầu khối ghi từng loại hồ sơ bắt buộc: Hợp đồng đã ký (luôn có), L/C (khi thanh toán bằng L/C), mỗi loại ở một trong ba tình trạng: Có file · Bổ sung sau · Thiếu.\n" +
           "Chưa có hợp đồng ký hoặc L/C chưa về: chọn Chưa có — bổ sung sau, ghi lý do. Hợp đồng ghi chuyến và làm các bước tiếp được ngay; bước 1 của chuyến ghi chờ HĐ ký / chờ L/C. Duyệt cuối, đóng hợp đồng vẫn cần đủ file. Đính file đúng loại thì dấu tự gỡ; Bỏ ghi bổ sung sau thì loại về Thiếu.\n" +
+          "Hợp đồng ký đã nằm ở file của bản hợp đồng, hoặc lỡ đính dạng Phụ lục / file kèm: hàng Thiếu hiện nút Dùng \"tên file\" làm Hợp đồng đã ký — chọn nút đó là được tính, không phải đính lại.\n" +
           "Nhân viên Kế hoạch chọn Đính kèm file, chọn loại hồ sơ rồi chọn một hay nhiều file. Proforma invoice và hồ sơ khác đính được nhưng không bắt buộc; chọn Hồ sơ khác thì phải ghi Tên hồ sơ.\n" +
           "Không còn loại nào Thiếu (đã có file hoặc ghi bổ sung sau) thì hợp đồng chuyển Đang ghi chuyến và nút Ghi chuyến mới hiện. Gỡ file nhầm bằng nút thùng rác, có Hoàn tác.",
       }),

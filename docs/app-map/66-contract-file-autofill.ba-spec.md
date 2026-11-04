@@ -2,7 +2,7 @@
 
 > Load khi: xây hoặc sửa việc đọc file hợp đồng / phụ lục để điền form **Lập hợp đồng**, **Ghi bản sửa** (Xuất khẩu, [41](41-export-planning.ba-spec.md)) và **Lập / Sửa hợp đồng nhập** (Nhập khẩu, [45](45-import-planning.ba-spec.md)); bộ đọc `.docx` / PDF có chữ; luật "chỉ điền ô trống".
 covers: src/lib/contractReader.ts, src/lib/contractFileReader.ts, src/lib/legacyWordText.ts, src/features/export-planning/ContractReadPanel.tsx, src/features/export-planning/ContractFormDialog.tsx, src/features/import-planning/ImportDialogs.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-04
 <!-- updated: 2026-11-03 (ba-spec 69 R5) — bộ đọc thêm Hạn hợp đồng từ câu "binding / valid … to / until <ngày>" (bỏ "late", "latest") ⇒ `terms.contractValidUntil`, chỉ điền ô trống. -->
 <!-- updated: 2026-11-03 (v1.2, thêm 4 file thật) — Word cũ **.doc đọc được** (17-26-NEWPOINT.doc; dùng chung bộ đọc .doc của khung xem file, ba-spec 61); **bảng Excel nhúng** trong .doc / .docx đọc đúng phần hợp đồng hiển thị (vùng `oleSize`, bỏ dòng ẩn — bảng nhúng NEWPOINT có 31 dòng, hiện 7); **bảng của PDF xuất từ Word ghép lại theo tọa độ** (13-MAT-26.pdf: ô nhiều dòng, tiêu đề 3 tầng). R1, R2 sửa theo. -->
 <!-- updated: 2026-11-03 (v1.1, file thật) — 2 HĐ xuất (13-MAT-26, 17-26-NEWPOINT) là BẢN SCAN đã ký ⇒ không đọc; bố cục chép làm fixture. 2 HĐ nhập (MSA, KORNISH) là PDF có chữ ⇒ đọc được, dạng "nhãn : giá trị". R6 thêm tiêu đề bảng 2 tầng + dạng nhãn : giá trị; R3 "THESELLER" viết liền; R5 "BY LC" không dấu /, dung sai chỉ lấy chữ ngoài bảng, cảng đích từ "to Yokohama, Japan within …". A1 đóng; A2 còn chờ bản Word. -->
@@ -250,3 +250,4 @@ Fixture: chữ của `ANNEX 2 OF CONTRACT 01 HĐ 02.docx` chép từng ô vào t
 - 2026-11-03 — v1.1: thêm bố cục từ 4 file thật (xem dòng updated đầu file); 19 test.
 - 2026-11-03 — v1 ĐÃ BUILD. Thử trên file thật ANNEX 2: ra đủ AC-1…3, bắt dòng 2 ghi tiền sai 6.000 USD. Chứng từ khách yêu cầu để v2. AC-9 (c) đổi mẫu: tên bằng đúng được ưu tiên.
 - 2026-11-03 — v1 spec. Nguồn: đề nghị của Phòng Kế hoạch; chủ dự án chốt phạm vi (Xuất + Nhập · .docx / PDF có chữ · phụ lục dùng chung bộ đọc). Mẫu: ANNEX 2 của HĐ 01-26-HAT.
+- 2026-11-04: đọc **địa chỉ khách** (dòng Add / Address / Địa chỉ ngay dưới tên bên mua; HĐ nhập: bên bán) ⇒ ô Địa chỉ khách hàng (trống thì điền, khác thì hỏi). Form: sửa số lượng / kg mỗi thùng ⇒ kg tịnh về tự tính (kg đọc nhầm hoặc gõ tay không kẹt). Chọn tay mặt hàng ⇒ gợi ý theo tên / size không đè.

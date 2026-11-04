@@ -979,6 +979,34 @@ function hasLegacySignedContract(d: Pick<ExportData, "revisions" | "approvals">,
   });
 }
 
+/** File đã có trên HĐ có thể là `kind` mà đính khác loại: file đính loại "khác" · file của các bản HĐ (thường là bản ký). */
+export interface AttachmentCandidate {
+  source: "attachment" | "revision";
+  /** id file đính (source attachment) — đổi loại tại chỗ. */
+  fileId: string;
+  path: string;
+  fileName: string;
+  /** "Phụ lục / file kèm" · "File của bản 1"… — để người dùng nhận ra file. */
+  where: string;
+}
+
+/**
+ * Ứng viên cho loại hồ sơ còn thiếu (Phòng KH 2026-11-04: đính hợp đồng ký nhầm loại "Phụ lục / file kèm", hoặc đã
+ * đính ở file của bản HĐ ⇒ app vẫn báo Thiếu). Bỏ file đã đính đúng loại (cùng đường dẫn); bản HĐ cùng file ⇒ một lần.
+ */
+export function attachmentCandidates(d: Pick<ExportData, "files" | "revisions">, contractId: string, kind: ExportContractAttachmentKind): AttachmentCandidate[] {
+  const atts = contractAttachments(d, contractId);
+  const taken = new Set(atts.filter((f) => f.attachmentKind === kind).map((f) => f.path));
+  const out: AttachmentCandidate[] = [];
+  for (const f of atts)
+    if ((f.attachmentKind ?? "other") === "other" && !taken.has(f.path))
+      out.push({ source: "attachment", fileId: f.id, path: f.path, fileName: f.fileName, where: CONTRACT_ATTACHMENT_LABELS.other });
+  for (const r of revisionsOf(d, contractId).reverse())
+    if (r.filePath && !taken.has(r.filePath) && !out.some((x) => x.path === r.filePath))
+      out.push({ source: "revision", fileId: "", path: r.filePath, fileName: r.fileName || "File hợp đồng", where: `File của bản ${r.revisionNo}` });
+  return out;
+}
+
 /**
  * Loại hồ sơ bắt buộc CÒN THIẾU của bản hiệu lực. Chưa có bản hiệu lực ⇒ chưa tới bước này (rỗng).
  * Chạy không nối máy chủ ⇒ không tải được file ⇒ không bắt (như các bước khác).

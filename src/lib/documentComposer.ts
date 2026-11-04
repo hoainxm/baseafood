@@ -45,6 +45,8 @@ export interface DocumentField {
   /** R2 bước 2: chép từ lần xuất trước cùng khách + mặt hàng khi nguồn không có. */
   carryOver?: boolean;
   defaultValue?: DocumentFieldValue;
+  /** Bắt buộc theo ô khác (VD ô "ghi rõ" chỉ bắt buộc khi chọn "Có" — ba-spec 72 R5). */
+  requiredWhen?: (values: DocumentValues) => boolean;
 }
 
 export interface DocumentTypeDef<TSource> {
@@ -210,7 +212,7 @@ export function validateComposed<T>(type: DocumentTypeDef<T>, values: DocumentVa
         const req = (f.columns ?? []).filter((c) => c.required);
         return (f.required && rows.length === 0) || rows.some((r) => req.some((c) => String(r[c.key] ?? "").trim() === ""));
       }
-      return !!f.required && !hasValue(v);
+      return (!!f.required || !!f.requiredWhen?.(values)) && !hasValue(v);
     })
     .map((f) => f.key);
 }

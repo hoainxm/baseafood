@@ -18,6 +18,7 @@ import {
   useExportStepItems,
   useProductionOrderShipments,
   useProductionOrders,
+  useExportShippingInstructionAvailable,
 } from "@/lib/catalogRepo";
 import type { ExportData } from "@/lib/exportPlanning";
 import { issuedShipmentIds } from "@/lib/productionOrder";
@@ -45,9 +46,11 @@ export function useExportData() {
   const [orderLinks] = useProductionOrderShipments();
   const issuedOrderShipmentIds = useMemo(() => issuedShipmentIds(productionOrders, orderLinks), [productionOrders, orderLinks]);
 
+  // ba-spec 72: máy chủ đã chạy 0103 ⇒ mục SI bắt buộc ở bước 4.
+  const shippingInstructionEnabled = useExportShippingInstructionAvailable();
   const data: ExportData = useMemo(
-    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines }),
-    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines],
+    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines, shippingInstructionEnabled }),
+    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines, shippingInstructionEnabled],
   );
 
   return {

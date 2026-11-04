@@ -251,6 +251,8 @@ export interface ExportData {
   issuedOrderShipmentIds?: ReadonlySet<string>;
   /** Hàng của chuyến (mig 0096, ba-spec 63). Bỏ trống ⇒ chuyến chưa có dòng hàng chi tiết. */
   shipmentLines?: readonly ExportShipmentLine[];
+  /** Máy chủ đã chạy 0103 (ba-spec 72) ⇒ mục SI là mục bắt buộc của bước 4. Bỏ trống ⇒ chưa có mục SI. */
+  shippingInstructionEnabled?: boolean;
 }
 
 export const EMPTY_EXPORT_DATA: ExportData = {
@@ -861,6 +863,28 @@ export function canMarkNotApplicable(_item: ExportStepItem, reason: string): { o
 
 /* ---------- Trạng thái bước ---------- */
 
+/** Chuyến tạo trước ngày này mà đã xong bước 4 cũ / có B/L ⇒ mục SI "Không áp dụng" (ba-spec 72 R14). */
+export const SHIPPING_INSTRUCTION_SINCE = "2026-11-05";
+const SI_KINDS: ReadonlySet<ExportShipment["kind"]> = new Set(["20RF", "40RF", "40HC-RF"]);
+
+/**
+ * Mục SI của bước 4 (ba-spec 72 R10, R13, R14): Xong khi có file SI; xe tải / đóng ghép ⇒ Không áp dụng; chuyến cũ
+ * (tạo trước `SHIPPING_INSTRUCTION_SINCE`) đã xong 4 mục cũ + số cont / seal, hoặc đã có B/L Xong ⇒ Không áp dụng.
+ */
+export function shippingInstructionState(
+  d: Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds">,
+  shipment: ExportShipment,
+): ExportItemState {
+  if (!SI_KINDS.has(shipment.kind)) return "not-applicable";
+  if (shipmentFilesOf(d, shipment.id, "shipping-instruction").length) return "done";
+  if (shipment.createdAt && shipment.createdAt < SHIPPING_INSTRUCTION_SINCE) {
+    const oldDone = LOADING_STEPS.every((st) => settled(subStepState(d, shipment.id, st))) && containerIdentityOk(shipment);
+    const blDone = documentItems(d, shipment.id).some((i) => i.docKind === "bill-of-lading" && itemState(d, i) === "done");
+    if (oldDone || blDone) return "not-applicable";
+  }
+  return "not-started";
+}
+
 /** Cont + seal đã điền (xe tải: biển số; đóng ghép: không cần). */
 export function containerIdentityOk(s: Pick<ExportShipment, "kind" | "containerNo" | "sealNo">): boolean {
   if (s.kind === "consolidated") return true;
@@ -1014,6 +1038,7 @@ export function stepState(d: ExportData, shipment: ExportShipment, step: StepNo,
       return subStepState(d, shipment.id, "packaging");
     case 4: {
       const subs = LOADING_STEPS.map((s) => subStepState(d, shipment.id, s));
+      if (d.shippingInstructionEnabled) subs.push(shippingInstructionState(d, shipment));
       const agg = aggregate(subs);
       if (agg === "done" || agg === "not-applicable") return containerIdentityOk(shipment) ? "done" : "in-progress";
       return agg === "not-started" && (shipment.containerNo.trim() || shipment.sealNo.trim()) ? "in-progress" : agg;

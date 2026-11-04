@@ -29,13 +29,14 @@ import {
   sharedSource,
   stepItem,
   subStepState,
+  shippingInstructionState,
   type ExportData,
   type StepNo,
 } from "@/lib/exportPlanning";
 import { formatDateTimeVN, formatDateVN, formatMoney } from "@/lib/format";
 import { BOOKING_LABELS, TRANSPORT_LABELS, cutoffOverdue, hasTransport, localNowMinute } from "@/lib/exportBooking";
 import type { ExportContract, ExportFile, ExportItemState, ExportLoadingExtraStep, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
-import { Ban, Boxes, Camera, ClipboardCheck, ClipboardList, Download, FilePlus2, Pencil, Plus, RotateCcw, Send, Ship, Trash2, Truck, Wallet } from "lucide-react";
+import { Ban, Boxes, Camera, ClipboardCheck, ClipboardList, Download, FilePlus2, FileSpreadsheet, FileText, Pencil, Plus, RotateCcw, Send, Ship, Trash2, Truck, Wallet } from "lucide-react";
 import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
 import { ShipmentLineSummary } from "./ShipmentGoods";
 import { EXTRA_PHOTO_TEXT } from "./shipmentGoodsLogic";
@@ -145,6 +146,9 @@ export function ShipmentPanel({
   bookingDetailsEnabled,
   onBooking,
   onTransport,
+  siEnabled,
+  onComposeExportOrder,
+  onShippingInstruction,
   goodsEnabled,
   extraPhotosEnabled,
   onEditLines,
@@ -175,6 +179,11 @@ export function ShipmentPanel({
   bookingDetailsEnabled: boolean;
   onBooking: (t: BookingTarget) => void;
   onTransport: (t: TransportTarget) => void;
+  /** Máy chủ đã chạy 0103 ⇒ hàng SI + ảnh cont / seal (ba-spec 72). */
+  siEnabled: boolean;
+  /** Mở bộ soạn Lệnh xuất hàng (ba-spec 72 NV1). */
+  onComposeExportOrder: () => void;
+  onShippingInstruction: () => void;
   /** Máy chủ đã chạy 0096 ⇒ có khối Hàng của chuyến, Số thực đóng, Tải invoice (ba-spec 63). */
   goodsEnabled: boolean;
   /** Máy chủ đã chạy 0097 ⇒ đính ảnh kèm số lượng thực đóng + hàng "Hình ảnh bao bì + cân gross". */
@@ -242,7 +251,7 @@ export function ShipmentPanel({
   /** Hàng của một mục đơn (bước 2, 3, 4c, 4d). */
   /** Bước n là bước đang làm ⇒ nút của hàng là mốc "Cập nhật một mục" (hướng dẫn từng bước). */
   const isTourStep = (n: StepNo) => progress.next === n;
-  const singleRow = (step: ExportStep, n: StepNo) => {
+  const singleRow = (step: ExportStep, n: StepNo, extra?: ReactNode) => {
     const it = stepItem(data, shipment.id, step);
     const files = it ? filesOfItem(data, it.id) : [];
     return (
@@ -253,7 +262,16 @@ export function ShipmentPanel({
         state={subStepState(data, shipment.id, step)}
         extraTag={it?.sharedFromId ? <Tag variant="source">Dùng chung</Tag> : undefined}
         tourMark={isTourStep(n)}
-        actions={updateButton(() => openStep(step), `Cập nhật ${SUB_STEP_LABELS[step].toLowerCase()}: trạng thái, số, file.`)}
+        actions={
+          extra ? (
+            <>
+              {extra}
+              {updateButton(() => openStep(step), `Cập nhật ${SUB_STEP_LABELS[step].toLowerCase()}: trạng thái, số, file.`)}
+            </>
+          ) : (
+            updateButton(() => openStep(step), `Cập nhật ${SUB_STEP_LABELS[step].toLowerCase()}: trạng thái, số, file.`)
+          )
+        }
       >
         {itemDetail(it, files, `${label} · ${SUB_STEP_LABELS[step]}`)}
       </ChecklistRow>
@@ -387,6 +405,47 @@ export function ShipmentPanel({
         ) : (
           <span data-tour="shipment-transport" className="text-muted-foreground">
             Chưa ghi thông tin xe — không bắt buộc để xong bước, ghi khi đã thuê xe.
+          </span>
+        )}
+      </ChecklistRow>
+    );
+  };
+
+  const containerPhotos = shipmentFilesOf(data, shipment.id, "container-seal-photos")
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  /** Mục SI (ba-spec 72 R10–R14): Xong khi có file SI; xe tải / đóng ghép / chuyến cũ ⇒ Không áp dụng. */
+  const siRow = () => {
+    const st = shippingInstructionState(data, shipment);
+    const files = shipmentFilesOf(data, shipment.id, "shipping-instruction")
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return (
+      <ChecklistRow
+        key="shipping-instruction"
+        label="SI"
+        state={st}
+        tourMark={isTourStep(4)}
+        actions={
+          canWrite &&
+          st !== "not-applicable" && (
+            <Button size="sm" variant={files.length ? "edit" : "default"} onClick={onShippingInstruction} title="Lập Shipping Instruction gửi hãng tàu: ô lấy từ booking, cont / seal, hàng của chuyến; xuất Excel theo mẫu SI FORM là mục Xong.">
+              <FileSpreadsheet className="mr-1 h-4 w-4" aria-hidden />
+              {files.length ? "Sửa SI" : "Lập SI"}
+            </Button>
+          )
+        }
+      >
+        {files.length ? (
+          <FileList files={files} onPreview={onPreview} caption={`${label} · SI`} onRemove={can.update && !isCancelled ? onRemoveFile : undefined} />
+        ) : (
+          <span className="text-muted-foreground">
+            {st === "not-applicable"
+              ? shipment.kind === "truck" || shipment.kind === "consolidated"
+                ? "Không áp dụng — chuyến xe tải / đóng ghép không có SI."
+                : "Không áp dụng — chuyến xong trước khi có mục SI."
+              : "Chưa lập SI — lập sau khi có số cont / seal, gửi hãng tàu để ra B/L."}
           </span>
         )}
       </ChecklistRow>
@@ -615,17 +674,37 @@ export function ShipmentPanel({
             số lượng thực đóng → sơ đồ → hình ảnh → tờ khai. */}
         {bookingDetailsEnabled ? bookingRow() : can.view && bookingFilesRow()}
         {bookingDetailsEnabled && transportRow()}
-        {singleRow("export-order", 4)}
+        {singleRow(
+          "export-order",
+          4,
+          canWrite && (
+            <Button size="sm" onClick={onComposeExportOrder} title="Lập Lệnh xuất hàng mẫu QTI-KH-01-07: hàng lấy từ Lệnh sản xuất, giao hàng lấy từ booking; xuất Word là mục Xong.">
+              <FileText className="mr-1 h-4 w-4" aria-hidden />
+              Lập lệnh xuất
+            </Button>
+          ),
+        )}
         <ChecklistRow
           label={shipment.kind === "truck" ? "Biển số xe" : "Số cont + seal"}
           state={shipment.kind === "consolidated" ? "not-applicable" : containerIdentityOk(shipment) ? "done" : "not-started"}
           tourMark={isTourStep(4)}
           actions={
-            canWrite && shipment.kind !== "consolidated" && (
-              <Button size="sm" variant="edit" onClick={onEdit} title="Điền số container và seal (nhìn ảnh seal / cửa cont).">
-                <Pencil className="mr-1 h-4 w-4" aria-hidden />
-                Sửa số cont
-              </Button>
+            !isCancelled &&
+            shipment.kind !== "consolidated" && (
+              <>
+                {siEnabled && filesAvailable && (can.update || can.loadingCreate) && (
+                  <Button size="sm" variant="outline" onClick={() => onUploadLoading({ shipment, contractId: contract.id, step: "container-seal-photos", label })} title="Chụp / chọn ảnh số container và seal (không bắt buộc).">
+                    <Camera className="mr-1 h-4 w-4" aria-hidden />
+                    Ảnh cont / seal
+                  </Button>
+                )}
+                {canWrite && (
+                  <Button size="sm" variant="edit" onClick={onEdit} title="Điền số container và seal (nhìn ảnh seal / cửa cont).">
+                    <Pencil className="mr-1 h-4 w-4" aria-hidden />
+                    Sửa số cont
+                  </Button>
+                )}
+              </>
             )
           }
         >
@@ -634,11 +713,14 @@ export function ShipmentPanel({
               ? <span className="text-muted-foreground">Không cần — hàng đóng ghép chung cont của chuyến khác</span>
               : [shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ") || <span className="text-muted-foreground">Chưa điền</span>}
           </span>
+          {/* Ảnh cont / seal (ba-spec 72 R8): mới nhất đầu, không đổi điều kiện Xong. */}
+          {siEnabled && containerPhotos.length > 0 && <FileList files={containerPhotos} onPreview={onPreview} caption={`${label} · Ảnh cont / seal`} onRemove={can.update && !isCancelled ? onRemoveFile : undefined} />}
         </ChecklistRow>
         {goodsEnabled && loadingCountRow()}
         {extraPhotosEnabled && packageWeightRow()}
         {uploadRow("loading-plan")}
         {uploadRow("loading-photos")}
+        {siEnabled && siRow()}
         {singleRow("customs-declaration", 4)}
       </StepBlock>
 

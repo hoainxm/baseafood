@@ -32,6 +32,7 @@ export function LoadingView({
   canCount,
   onCount,
   extraPhotosEnabled,
+  containerPhotosEnabled = false,
 }: {
   shipments: readonly ExportShipment[];
   contracts: readonly ExportContract[];
@@ -48,6 +49,8 @@ export function LoadingView({
   onCount: (s: ExportShipment) => void;
   /** Mig 0097 đã chạy ⇒ đính ảnh số lượng thực đóng + ảnh bao bì / cân gross. */
   extraPhotosEnabled: boolean;
+  /** Mig 0103 (ba-spec 72 R9): người đóng hàng đính ảnh cont / seal. */
+  containerPhotosEnabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const from = addDays(today, -7);
@@ -130,7 +133,7 @@ export function LoadingView({
                     <Tag variant={plans.length ? "done" : "muted"}>{plans.length ? "Có sơ đồ" : "Chưa có sơ đồ"}</Tag>
                   </div>
                 </div>
-                <FileList files={[...plans, ...photos]} onPreview={onPreview} caption={label} />
+                <FileList files={[...plans, ...photos, ...(containerPhotosEnabled ? shipmentFilesOf(data, s.id, "container-seal-photos") : [])]} onPreview={onPreview} caption={label} />
                 {(goodsOf(s).length > 0 || canCount) && (
                   <div className="grid min-w-0 gap-2 rounded-lg border border-border px-3 py-1">
                     {goodsOf(s).map((l) => (
@@ -144,6 +147,12 @@ export function LoadingView({
                       </Button>
                     )}
                   </div>
+                )}
+                {canUpload && containerPhotosEnabled && s.kind !== "consolidated" && (
+                  <Button variant="outline" className="h-auto min-h-9 whitespace-normal" onClick={() => onUpload({ shipment: s, contractId: s.contractId, step: "container-seal-photos", label })} title="Chụp số container, seal, cửa cont của chuyến này (không bắt buộc).">
+                    <Camera className="mr-2 h-4 w-4" aria-hidden />
+                    Ảnh cont / seal{shipmentFilesOf(data, s.id, "container-seal-photos").length ? ` (${shipmentFilesOf(data, s.id, "container-seal-photos").length})` : ""}
+                  </Button>
                 )}
                 {canUpload && extraPhotosEnabled && (
                   <div className="grid gap-2 sm:grid-cols-2">

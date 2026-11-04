@@ -226,6 +226,8 @@ export interface DemoOptions {
   exportPack?: ExportDemoPack | null;
   /** Máy chủ đã chạy 0101 ⇒ chuyến demo có booking + thông tin xe (ba-spec 71 R12). */
   bookingDetails?: boolean;
+  /** Máy chủ đã chạy 0103 ⇒ chuyến demo đã đóng có SI + ảnh cont / seal (ba-spec 72 R17). */
+  shippingInstruction?: boolean;
 }
 
 const WORKSHOPS: Workshop[] = ["Đông", "Cá", "Khô"];
@@ -737,6 +739,7 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     anonymize,
     priceFactor,
     bookingDetails: tc.bookingDetails,
+    shippingInstruction: tc.shippingInstruction,
   });
 
   const importDemo = buildImportDemo(tc.today, n.products);

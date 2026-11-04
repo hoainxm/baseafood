@@ -53,6 +53,8 @@ export interface ComposerSourceProps<T> {
   previousKey: { customerKey: string; productId: string };
   isSourceLive: (sourceId: string) => boolean;
   newDocument: (state: { values: DocumentValues; fieldSources: ComposedDocument["fieldSources"] }, meta: { id: string; by: string; at: string }) => ComposedDocument;
+  /** Xuất Word xong — nơi gọi lưu kèm file (VD Lệnh xuất ⇒ file của mục Lệnh xuất, ba-spec 72 R6). */
+  onExported?: (file: Uint8Array, fileName: string, values: DocumentValues) => void;
 }
 
 const nowIso = () => new Date().toISOString();
@@ -68,6 +70,7 @@ export function DocumentComposerView<T>({
   previousKey,
   isSourceLive,
   newDocument,
+  onExported,
   canWrite,
   isAdmin,
   by,
@@ -214,6 +217,7 @@ export function DocumentComposerView<T>({
     if (format === "docx") {
       downloadDocx(file, type.fileName(state.values));
       record();
+      onExported?.(file, type.fileName(state.values), state.values);
     } else setPrinting({ file, title: `${type.name} — ${sourceTitle}`, record });
   }
 

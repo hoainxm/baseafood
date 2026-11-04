@@ -260,7 +260,10 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         title: "Bước đang làm",
         body:
           "Bước có viền xanh là bước đầu tiên chưa xong. Đầu mỗi bước ghi \"Xong\", hoặc \"Còn thiếu\" kèm tên các mục chưa xong.\n" +
-          "Mỗi hàng trong bước là một mục cần làm. Ví dụ bước Đóng cont theo đúng trình tự đóng hàng: booking, thông tin xe vận chuyển, lệnh xuất, số cont và seal (số container 11 ký tự: 4 chữ cái + 7 chữ số), số lượng thực đóng (đính ảnh tờ đếm), hình ảnh bao bì + cân gross, sơ đồ container, hình ảnh đóng cont, tờ khai. Hai mục ảnh thêm có ảnh là Xong và không bắt buộc cho bước Đóng cont.",
+          "Mỗi hàng trong bước là một mục cần làm. Ví dụ bước Đóng cont theo đúng trình tự đóng hàng: booking, thông tin xe vận chuyển, lệnh xuất, số cont và seal (số container 11 ký tự: 4 chữ cái + 7 chữ số), số lượng thực đóng (đính ảnh tờ đếm), hình ảnh bao bì + cân gross, sơ đồ container, hình ảnh đóng cont, SI, tờ khai. Hai mục ảnh thêm có ảnh là Xong và không bắt buộc cho bước Đóng cont.\n" +
+          "Lệnh xuất: chọn Lập lệnh xuất để soạn Lệnh xuất hàng mẫu QTI-KH-01-07. Tên hàng, MSL, ngày sản xuất, ngày hết hạn lấy từ Lệnh sản xuất đã phát hành gắn chuyến (chưa có thì từ Hàng của chuyến); size, HS code lấy từ hợp đồng; cut-off, cảng hạ, ETD, ETA lấy từ booking. Bạn ghi số lệnh, số thùng / kg, chọn phân xưởng nhận và Có / Không cho các lưu ý (chọn Có thì phải ghi rõ). Xuất Word là mục Lệnh xuất Xong; xuất lại thêm bản mới.\n" +
+          "Ảnh cont / seal ở hàng Số cont + seal: Kế hoạch và người đóng hàng đều đính được; không bắt buộc, hàng vẫn Xong khi có số cont và seal.\n" +
+          "SI (Shipping Instruction): chọn Lập SI sau khi có số cont / seal. Ô theo booking, cont / seal, hàng của chuyến tự điền; consignee, notify party, loại B/L, cước nhớ theo SI gần nhất của cùng khách; gross tính sẵn từ kg cả bì × số kiện, CBM gõ tay. Xuất Excel là mục SI Xong. Chuyến xe tải, đóng ghép, hoặc chuyến đã xong trước khi có mục SI thì SI Không áp dụng.",
       }),
       dossier({
         id: "item-status",

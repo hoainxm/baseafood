@@ -6,7 +6,10 @@
 // ============================================================
 import { PRODUCTION_ORDER_FORM, productionOrderForm } from "./productionOrderForm";
 import { buildProductionOrderTemplate } from "./productionOrderTemplate";
+import { EXPORT_ORDER_FORM, exportOrderForm } from "./exportOrderForm";
+import { buildExportOrderTemplate } from "./exportOrderTemplate";
 
 export const BUILTIN_TEMPLATES: Record<string, { name: string; fileName: string; build: () => Uint8Array }> = {
   [PRODUCTION_ORDER_FORM]: { name: productionOrderForm.name, fileName: "Khuon-goc-LSX-QTI-KH-01-04.docx", build: buildProductionOrderTemplate },
+  [EXPORT_ORDER_FORM]: { name: exportOrderForm.name, fileName: "Khuon-goc-LXH-QTI-KH-01-07.docx", build: buildExportOrderTemplate },
 };

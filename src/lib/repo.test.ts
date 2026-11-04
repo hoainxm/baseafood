@@ -299,7 +299,7 @@ describe("Xuất khẩu — file booking + hàng của chuyến qua vòng toRow 
     expect(EXPORT_FILE_TABLE.fromRow({ ...EXPORT_FILE_TABLE.toRow({ ...file, step: "contract", attachmentKind: "lc" }), created_at: "" }).step).toBe("contract");
     expect(EXPORT_FILE_TABLE.fromRow({ ...row, step: "lạ" }).step).toBe("document");
     // Mig 0097: ảnh kèm số lượng thực đóng + ảnh bao bì / cân gross — file của chuyến, đọc lại giữ loại.
-    for (const step of ["loading-count-photos", "package-weight-photos"] as const)
+    for (const step of ["loading-count-photos", "package-weight-photos", "shipping-instruction", "container-seal-photos"] as const)
       expect(EXPORT_FILE_TABLE.fromRow({ ...EXPORT_FILE_TABLE.toRow({ ...file, step }), created_at: "" }).step).toBe(step);
   });
 

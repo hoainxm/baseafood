@@ -2167,7 +2167,15 @@ const PAYMENT_METHOD_VALUES = new Set(["ttr", "lc", "other"]);
 const SHIPMENT_KIND_VALUES = new Set(["20RF", "40RF", "40HC-RF", "truck", "consolidated"]);
 const STEP_VALUES = new Set(["production-order", "packaging", "loading-plan", "loading-photos", "customs-declaration", "export-order", "document"]);
 /** Bước chỉ có ở `export_files` (không có mục bước): hồ sơ cấp HĐ (0079) · file booking của chuyến (0094). */
-const FILE_ONLY_STEPS: ReadonlySet<string> = new Set(["contract", "booking", "loading-count-photos", "package-weight-photos"]);
+const FILE_ONLY_STEPS: ReadonlySet<string> = new Set([
+  "contract",
+  "booking",
+  "loading-count-photos",
+  "package-weight-photos",
+  // mig 0103 (ba-spec 72)
+  "shipping-instruction",
+  "container-seal-photos",
+]);
 const ITEM_STATE_VALUES = new Set(["not-started", "in-progress", "done", "not-applicable"]);
 const DECISION_VALUES = new Set(["approved", "needs-revision", "rejected"]);
 const ATTACHMENT_KIND_VALUES = new Set(["signed-contract", "lc", "proforma", "other"]);

@@ -132,6 +132,10 @@ describe("buildExportTour", () => {
       "Trễ hạn",
       "Chờ booking",
       "Dùng chung",
+      // ba-spec 72 AC-13.
+      "Lập lệnh xuất",
+      "Ảnh cont / seal",
+      "Lập SI",
     ];
     expect(labels.filter((l) => !text.includes(l))).toEqual([]);
   });

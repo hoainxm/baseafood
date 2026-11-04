@@ -136,6 +136,8 @@ export interface ExportDemoOptions {
   priceFactor?: number;
   /** Máy chủ đã chạy 0101 ⇒ chuyến demo có booking + thông tin xe (chưa chạy mà gửi cột ⇒ máy chủ từ chối cả lượt). */
   bookingDetails?: boolean;
+  /** Máy chủ đã chạy 0103 ⇒ chuyến đã đóng có file SI + ảnh cont / seal giữ chỗ (ba-spec 72 R17). */
+  shippingInstruction?: boolean;
 }
 
 /** Ca 1 khi KHÔNG có gói: số tự đặt (không phải số của khách). */
@@ -233,7 +235,7 @@ function demoBooking181(T: (days: number) => string): Pick<ExportShipment, "book
  * Lượt duyệt bản trong bộ demo là lịch sử kiểu CŨ (BGĐ ký giấy) — từ 2026-10-29 không còn bước duyệt HĐ.
  */
 export function buildExportDemo(customers: readonly Customer[], today: string, options: ExportDemoOptions = {}): ExportDemoSet {
-  const { products = [], pack = null, originalNames = [], anonymize = false, priceFactor = 1, bookingDetails = false } = options;
+  const { products = [], pack = null, originalNames = [], anonymize = false, priceFactor = 1, bookingDetails = false, shippingInstruction = false } = options;
   const out = {
     contracts: [] as ExportContract[],
     revisions: [] as ExportContractRevision[],
@@ -390,6 +392,11 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
     // File booking của chuyến (ba-spec 60, mig 0094) — giữ chỗ, chuyến đã đóng cont thì có booking.
     out.files.push({ id: id("booking"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "booking", path: placeholder(`booking-${s.id}.pdf`), fileName: `Booking ${s.bookingNo || s.id}.pdf`, layerNo: null, caption: "", uploadedBy: "Demo", createdAt: at(today) });
     out.files.push({ id: id("file"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "loading-plan", path: plan?.path ?? placeholder(`so-do-${s.id}.xls`), fileName: plan?.name ?? "Sơ đồ container.xls", layerNo: null, caption: "", uploadedBy: "Thủ kho demo", createdAt: at(today) });
+    // ba-spec 72 R17: chuyến cont lạnh đã đóng có SI (mục bắt buộc — thiếu thì bước 4 tụt) + 1 ảnh cont / seal.
+    if (shippingInstruction && s.kind !== "truck" && s.kind !== "consolidated") {
+      out.files.push({ id: id("si"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "shipping-instruction", path: placeholder(`si-${s.id}.xlsx`), fileName: `SI-${s.bookingNo || s.id}.xlsx`, layerNo: null, caption: "Lập trong app", uploadedBy: "Demo", createdAt: at(today) });
+      out.files.push({ id: id("seal"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "container-seal-photos", path: placeholder(`seal-${s.id}.jpg`), fileName: "Seal + số cont.jpg", layerNo: null, caption: "", uploadedBy: "Thủ kho demo", createdAt: at(today) });
+    }
     const list = realPhotos.length ? realPhotos : Array.from({ length: photos }, (_, k) => ({ key: "", name: `Lớp ${k + 1}.jpg`, path: placeholder(`lop-${k + 1}.jpg`) }));
     list.forEach((f, k) =>
       out.files.push({ id: id("anh"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "loading-photos", path: f.path, fileName: f.name, layerNo: k + 1, caption: "", uploadedBy: "Thủ kho demo", createdAt: at(today) }),

@@ -177,6 +177,19 @@ export const exportPlanningGuide: PageGuide = {
             điểm hạ bãi. Tài xế, số điện thoại, số CCCD, biển số xe không bắt buộc. Người đóng hàng xem được, không sửa.
           </li>
           <li>Hai hàng Booking và Thông tin xe không có trạng thái — không làm bước nào tự xong.</li>
+          <li>
+            <b>Lập lệnh xuất</b> (hàng Lệnh xuất): soạn Lệnh xuất hàng mẫu QTI-KH-01-07. Hàng, MSL, ngày sản xuất, hạn dùng lấy từ Lệnh sản xuất
+            đã phát hành; size, HS code từ hợp đồng; cut-off, ETD, ETA từ booking. Ghi số lệnh, số thùng / kg, phân xưởng nhận, các lưu ý Có /
+            Không (Có thì ghi rõ). Xuất Word là mục Lệnh xuất Xong.
+          </li>
+          <li>
+            <b>Ảnh cont / seal</b>: đính ở hàng Số cont + seal (người đóng hàng cũng đính được). Không bắt buộc.
+          </li>
+          <li>
+            <b>SI</b>: mục bắt buộc của chuyến cont lạnh, đứng trước Tờ khai. Lập SI tự điền ô theo booking, cont / seal, hàng của chuyến; ô của
+            khách (consignee, notify, loại B/L, cước) nhớ theo SI lần trước. Xuất Excel là Xong. Xe tải, đóng ghép, chuyến xong trước khi có SI:
+            Không áp dụng.
+          </li>
         </GuideList>
       </GuideSection>
       <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">

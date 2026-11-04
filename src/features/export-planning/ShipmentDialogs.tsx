@@ -877,12 +877,19 @@ export function StepItemDialog({
 /* ---------- Đính ảnh / sơ đồ đóng cont (NV9 — người đóng hàng, điện thoại) ---------- */
 
 
+/** Ảnh cont / seal (mig 0103, ba-spec 72 R8) — cùng khuôn với 2 loại ảnh thêm của bước 4. */
+const CONTAINER_PHOTO_TEXT = {
+  title: "Ảnh cont / seal",
+  description: "Chụp số container, seal, cửa cont để đối chiếu số cont / seal. Không bắt buộc; chọn nhiều ảnh một lần được.",
+  captionHint: "VD: seal SL001, cửa cont",
+};
+
 export interface LoadingUploadTarget {
   shipment: ExportShipment;
   contractId: string;
   /** "booking" = file booking của chuyến (ba-spec 60) — không gắn mục bước, không làm bước nào tự xong. */
   /** "loading-count-photos" · "package-weight-photos" (mig 0097) = ảnh thêm của bước 4 — file của chuyến, không làm bước nào tự xong. */
-  step: Extract<ExportStep, "loading-plan" | "loading-photos"> | "booking" | ExportLoadingExtraStep;
+  step: Extract<ExportStep, "loading-plan" | "loading-photos"> | "booking" | ExportLoadingExtraStep | "container-seal-photos";
   label: string;
 }
 
@@ -928,7 +935,12 @@ export function LoadingUploadDialog({
   const tgt = target ?? form?.tg ?? null;
   const isPhotos = tgt?.step === "loading-photos";
   const isBooking = tgt?.step === "booking";
-  const extra = tgt && (tgt.step === "loading-count-photos" || tgt.step === "package-weight-photos") ? EXTRA_PHOTO_TEXT[tgt.step] : null;
+  const extra =
+    tgt && (tgt.step === "loading-count-photos" || tgt.step === "package-weight-photos")
+      ? EXTRA_PHOTO_TEXT[tgt.step]
+      : tgt?.step === "container-seal-photos"
+        ? CONTAINER_PHOTO_TEXT
+        : null;
   const isImage = isPhotos || !!extra;
 
   const save = async () => {

@@ -420,6 +420,21 @@ export function useExportBookingDetailsAvailable(): boolean {
   }, []);
   return ok;
 }
+/**
+ * Mig 0103 đã chạy (ba-spec 72) ⇒ có mục SI ở bước 4 + ảnh cont / seal (view `export_file_steps` có loại mới).
+ * Chưa chạy ⇒ ẩn hai phần này, SI không bắt buộc. Không nối máy chủ ⇒ true.
+ */
+export function useExportShippingInstructionAvailable(): boolean {
+  const [ok, setOk] = useState<boolean>(!isServerConnected);
+  useEffect(() => {
+    let alive = true;
+    void serverHasValue("export_file_steps", "step", "shipping-instruction").then((v) => alive && setOk(v));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return ok;
+}
 /** Mig 0097 đã chạy ⇒ đính được ảnh kèm số lượng thực đóng + ảnh bao bì / cân gross (view có loại mới). */
 export function useExportLoadingExtraPhotosAvailable(): boolean {
   const [ok, setOk] = useState<boolean>(!isServerConnected);

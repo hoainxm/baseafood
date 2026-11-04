@@ -58,6 +58,8 @@ import {
   shipmentMonth,
   termsOf,
   workingRevision,
+  blankItem,
+  stepItem,
   contractChangeSummary,
   addableContracts,
   shipmentContractIds,
@@ -105,6 +107,9 @@ import {
   type InvoiceNameExtract,
 } from "./ShipmentDialogs";
 import { BookingDialog, TransportDialog, type BookingTarget, type TransportTarget } from "./BookingDialogs";
+import { ExportOrderComposer } from "./ExportOrderComposer";
+import { ShippingInstructionDialog, type ShippingInstructionTarget } from "./ShippingInstructionDialog";
+import { attachGeneratedFile } from "./generatedFiles";
 import { useExportData } from "./useExportData";
 import { buildExportTour, pickTourContract } from "./exportTour";
 import { usePageTour } from "@/features/shared/PageTourProvider";
@@ -195,6 +200,8 @@ export default function ExportPlanningScreen() {
   const [itemTarget, setItemTarget] = useState<StepItemTarget | null>(null);
   const [loadingTarget, setLoadingTarget] = useState<LoadingUploadTarget | null>(null);
   const [bookingTarget, setBookingTarget] = useState<BookingTarget | null>(null);
+  const [siTarget, setSiTarget] = useState<ShippingInstructionTarget | null>(null);
+  const isAdmin = useCan("admin").view;
   const [transportTarget, setTransportTarget] = useState<TransportTarget | null>(null);
   const [linesTarget, setLinesTarget] = useState<ShipmentLinesTarget | null>(null);
   const [countTarget, setCountTarget] = useState<LoadingCountTarget | null>(null);
@@ -533,7 +540,9 @@ export default function ExportPlanningScreen() {
     const kindText =
       r0?.step === "booking"
         ? "booking"
-        : r0?.step === "loading-count-photos" || r0?.step === "package-weight-photos"
+        : r0?.step === "container-seal-photos"
+          ? "ảnh cont / seal"
+          : r0?.step === "loading-count-photos" || r0?.step === "package-weight-photos"
           ? EXTRA_PHOTO_TEXT[r0.step].title.toLowerCase()
           : (SUB_STEP_LABELS[r0?.step as ExportStepItem["step"]] ?? "đóng cont");
     const what = r0 ? `Đính ${rows.length} file ${kindText} cho chuyến ${shipName(d.shipments.find((x) => x.id === r0.shipmentId))}` : "";
@@ -713,6 +722,57 @@ export default function ExportPlanningScreen() {
       }),
     );
   };
+
+  /* ---------- Lệnh xuất hàng + SI (ba-spec 72) ---------- */
+
+  /** Dòng HĐ của mọi HĐ có hàng trên chuyến (chuyến gộp — ba-spec 70) — tra tên tiếng Anh, size, HS code. */
+  const contractLinesOfShipment = (s: ExportShipment) => {
+    const ids = new Set([s.contractId, ...(d.shipmentLines ?? []).filter((l) => l.shipmentId === s.id).map((l) => l.contractId)]);
+    return [...ids].flatMap((id) => workingRevision(d, id)?.lines ?? []);
+  };
+  const customerOf = (s: ExportShipment) => {
+    const c = customers.find((x) => x.id === d.contracts.find((k) => k.id === s.contractId)?.customerId);
+    return { name: c?.name ?? "", address: c?.address ?? "" };
+  };
+
+  /** R6: xuất Word Lệnh xuất ⇒ file lưu làm file mục Lệnh xuất (tạo mục nếu chưa có) ⇒ mục Xong. */
+  const saveExportOrderFile = async (s: ExportShipment, bytes: Uint8Array, fileName: string, orderNo: string) => {
+    const existing = stepItem(d, s.id, "export-order");
+    const item = existing ?? blankItem(s.id, "export-order", newId());
+    const r = await attachGeneratedFile({ bytes, fileName, contractId: s.contractId, shipmentId: s.id, stepItemId: item.id, step: "export-order", by: recordedBy, filesAvailable });
+    if ("error" in r) {
+      notify.error(`Đã tải file về máy nhưng chưa lưu vào mục Lệnh xuất: ${r.error}`);
+      return;
+    }
+    // Có file + đánh Xong (mục "Không áp dụng" giữ nguyên lựa chọn của người dùng).
+    saveItem({ ...item, state: item.state === "not-applicable" ? item.state : "done", number: orderNo || item.number, issuedOn: item.issuedOn || today }, [r.file], !existing);
+  };
+
+  /** R13: xuất SI ⇒ file lưu làm file mục SI ⇒ mục Xong. */
+  const saveShippingInstructionFile = async (s: ExportShipment, bytes: Uint8Array, fileName: string): Promise<boolean> => {
+    const r = await attachGeneratedFile({ bytes, fileName, contractId: s.contractId, shipmentId: s.id, stepItemId: "", step: "shipping-instruction", by: recordedBy, filesAvailable });
+    if ("error" in r) {
+      notify.error(`Đã tải file SI về máy nhưng chưa lưu vào chuyến: ${r.error}`);
+      return false;
+    }
+    const prev = d.files;
+    if (!store.saveFiles([...prev, r.file])) return false;
+    const what = `Lập SI chuyến ${shipName(s)} — ${fileName}`;
+    track(s.contractId, s.id, "attach", what);
+    notify.saved("Đã lưu SI", undoTracked(s.contractId, s.id, what, () => store.saveFiles(prev)));
+    setSiTarget(null);
+    return true;
+  };
+
+  const openShippingInstruction = (s: ExportShipment) =>
+    setSiTarget({
+      shipment: s,
+      contractNo: d.contracts.find((c) => c.id === s.contractId)?.contractNo ?? "",
+      customer: customerOf(s),
+      contractLines: contractLinesOfShipment(s),
+      shipmentLines: d.shipmentLines ?? [],
+      label: goodsLabel(s),
+    });
 
   /** ba-spec 58: máy chủ đã chạy 0093 thì mới cho ghi "bổ sung sau" (chưa có cột ⇒ gửi lên kẹt hàng chờ). */
   const deferralsAvailable = useExportDeferralsAvailable();
@@ -911,6 +971,7 @@ export default function ExportPlanningScreen() {
           canCount={loadingCan.create}
           onCount={openLoadingCount}
           extraPhotosEnabled={extraPhotosAvailable}
+          containerPhotosEnabled={!!d.shippingInstructionEnabled}
         />
         <LoadingUploadDialog target={loadingTarget} recordedBy={recordedBy} onClose={() => setLoadingTarget(null)} onSave={saveLoadingFiles} />
         <LoadingCountDialog target={countTarget} recordedBy={recordedBy} onClose={() => setCountTarget(null)} onSave={saveLoadingCount} />
@@ -924,6 +985,24 @@ export default function ExportPlanningScreen() {
   }
 
   const currency = contract ? termsOf(d, contract.id).currency || "USD" : "USD";
+
+  // Trang soạn Lệnh xuất hàng của chuyến đang mở (ba-spec 72 NV1) — thay hồ sơ HĐ, Quay lại về chuyến.
+  if (params.get("compose") === "export-order" && contract && dossier?.selected) {
+    const s = dossier.selected;
+    return (
+      <ExportOrderComposer
+        data={d}
+        shipment={s}
+        contract={contract}
+        customerName={customerOf(s).name}
+        canWrite={can.update && s.status !== "cancelled"}
+        isAdmin={isAdmin}
+        by={recordedBy}
+        onBack={() => setParam({ compose: "" })}
+        onExported={(file, fileName, values) => void saveExportOrderFile(s, file, fileName, typeof values.orderNo === "string" ? values.orderNo : "")}
+      />
+    );
+  }
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -1124,6 +1203,9 @@ export default function ExportPlanningScreen() {
               bookingDetailsEnabled={bookingDetailsEnabled}
               onBooking={setBookingTarget}
               onTransport={setTransportTarget}
+              siEnabled={!!d.shippingInstructionEnabled}
+              onComposeExportOrder={() => dossier.selected && setParam({ compose: "export-order" })}
+              onShippingInstruction={() => dossier.selected && openShippingInstruction(dossier.selected)}
               goodsEnabled={store.shipmentLinesAvailable}
               extraPhotosEnabled={extraPhotosAvailable}
               onEditLines={() => dossier.selected && openShipmentLines(dossier.selected)}
@@ -1167,6 +1249,7 @@ export default function ExportPlanningScreen() {
       />
       <BookingDialog target={bookingTarget} recordedBy={recordedBy} filesEnabled={bookingFilesEnabled} onClose={() => setBookingTarget(null)} onSave={saveBooking} />
       <TransportDialog target={transportTarget} onClose={() => setTransportTarget(null)} onSave={saveTransport} />
+      <ShippingInstructionDialog target={siTarget} by={recordedBy} onClose={() => setSiTarget(null)} onExported={saveShippingInstructionFile} />
       <ScheduleDialog target={scheduleTarget} onClose={() => setScheduleTarget(null)} onSave={saveSchedule} />
       <StepItemDialog
         target={itemTarget}

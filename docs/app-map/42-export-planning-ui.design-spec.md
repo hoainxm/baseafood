@@ -3,6 +3,7 @@
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
 last_verified: 2026-11-04
+<!-- updated: 2026-11-04 (ba-spec 72) — bước 4: hàng Lệnh xuất có nút **Lập lệnh xuất** (mở trang bộ soạn `?compose=export-order`, Quay lại về chuyến); hàng Số cont + seal có nút **Ảnh cont / seal** + danh sách ảnh; hàng **SI** (trạng thái, nút Lập SI / Sửa SI, file SI) trước Tờ khai. Hộp `ShippingInstructionDialog`: khối "Theo booking và cont" chỉ xem · "Người gửi, người nhận" (nhớ theo khách) · "Hàng" (số kiện + gross từng dòng, CBM) · "Payment terms". Màn người đóng hàng: nút Ảnh cont / seal. -->
 <!-- updated: 2026-11-04 — §Bố cục Lịch xuất hàng viết lại theo code đang chạy (lịch hai cột ngày | chi tiết, thanh lọc một hàng tự xuống dòng, ChoiceGroup 15rem); bỏ đoạn cũ "mỗi khách một bảng, cột 30 · 16 · 17 · 29", "thanh lọc HAI hàng". Không đổi hành vi. -->
 <!-- updated: 2026-11-03 (2026-11-03 tên hàng) — phiếu HĐ phần 4: Tên hàng một hàng riêng (Textarea tự giãn); hàng dưới Mặt hàng (Combobox `wrapValue` — hiện đủ tên) · Size · Loại hàng · Quy cách (Textarea). -->
 <!-- updated: 2026-11-03 (ba-spec 69) — form HĐ mục 2: ô ngày **Hạn hợp đồng** ngay sau Hạn giao muộn nhất (hint = câu nhắc lệch hạn giao khi có); hồ sơ HĐ: dòng "Hạn hợp đồng" ở khối tóm tắt + khối điều khoản (ngày · Còn n ngày / Đã hết hạn · Chưa ghi). -->

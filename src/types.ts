@@ -1570,6 +1570,12 @@ export interface ExportStepItem {
  */
 export type ExportLoadingExtraStep = "loading-count-photos" | "package-weight-photos";
 
+/**
+ * File của chuyến thêm ở mig 0103 (ba-spec 72): file SI (mục "SI" của bước 4 — Xong khi có file) · ảnh cont / seal
+ * (hàng Số cont + seal, không làm hàng tự xong; người đóng hàng đính được).
+ */
+export type ExportShipmentFileStep = "shipping-instruction" | "container-seal-photos";
+
 /** Loại hồ sơ đính kèm cấp HĐ (bước Đính kèm, mig 0079). */
 export type ExportContractAttachmentKind = "signed-contract" | "lc" | "proforma" | "other";
 
@@ -1583,7 +1589,7 @@ export interface ExportFile {
   shipmentId: string;
   stepItemId: string;
   /** "contract" = hồ sơ cấp HĐ (0079); "booking" = file booking của chuyến (0094, ba-spec 60) — không gắn mục bước. */
-  step: ExportStep | "contract" | "booking" | ExportLoadingExtraStep;
+  step: ExportStep | "contract" | "booking" | ExportLoadingExtraStep | ExportShipmentFileStep;
   attachmentKind?: ExportContractAttachmentKind | "";
   path: string;
   fileName: string;

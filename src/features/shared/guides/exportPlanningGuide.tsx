@@ -187,8 +187,9 @@ export const exportPlanningGuide: PageGuide = {
           </li>
           <li>
             <b>SI</b>: mục bắt buộc của chuyến cont lạnh, ngay sau Số cont + seal. Lập SI tự điền ô theo booking, cont / seal, hàng của chuyến; ô của
-            khách (consignee, notify, loại B/L, cước) nhớ theo SI lần trước. Xuất Excel là Xong. Xe tải, đóng ghép, chuyến xong trước khi có SI:
-            Không áp dụng.
+            khách (consignee, notify, loại B/L, cước) nhớ theo SI lần trước. Xuất Excel là Xong. Xe tải, đóng ghép:
+            Không áp dụng. Chuyến tạo trước 05/11/2026 đã có B/L hoặc đã xong các mục đóng cont cũ cũng Không áp dụng (hàng SI ghi lý
+            do) nhưng vẫn lập SI được — lập xong là Xong.
           </li>
         </GuideList>
       </GuideSection>

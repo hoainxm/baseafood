@@ -30,6 +30,8 @@ import {
   stepItem,
   subStepState,
   shippingInstructionState,
+  shippingInstructionExemption,
+  SHIPPING_INSTRUCTION_SINCE,
   type ExportData,
   type StepNo,
 } from "@/lib/exportPlanning";
@@ -418,6 +420,7 @@ export function ShipmentPanel({
   /** Mục SI (ba-spec 72 R10–R14): Xong khi có file SI; xe tải / đóng ghép / chuyến cũ ⇒ Không áp dụng. */
   const siRow = () => {
     const st = shippingInstructionState(data, shipment);
+    const exemption = shippingInstructionExemption(data, shipment);
     const files = shipmentFilesOf(data, shipment.id, "shipping-instruction")
       .slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -428,9 +431,10 @@ export function ShipmentPanel({
         state={st}
         tourMark={isTourStep(4)}
         actions={
+          // Chuyến cũ được miễn vẫn lập SI được (lập rồi ⇒ Xong); chỉ xe tải / đóng ghép không có SI.
           canWrite &&
-          st !== "not-applicable" && (
-            <Button size="sm" variant={files.length ? "edit" : "default"} onClick={onShippingInstruction} title="Lập Shipping Instruction gửi hãng tàu: ô lấy từ booking, cont / seal, hàng của chuyến; xuất Excel theo mẫu SI FORM là mục Xong.">
+          exemption !== "kind" && (
+            <Button size="sm" variant={files.length ? "edit" : exemption ? "outline" : "default"} onClick={onShippingInstruction} title="Lập Shipping Instruction gửi hãng tàu: ô lấy từ booking, cont / seal, hàng của chuyến; xuất Excel theo mẫu SI FORM là mục Xong.">
               <FileSpreadsheet className="mr-1 h-4 w-4" aria-hidden />
               {files.length ? "Sửa SI" : "Lập SI"}
             </Button>
@@ -441,11 +445,13 @@ export function ShipmentPanel({
           <FileList files={files} onPreview={onPreview} caption={`${label} · SI`} onRemove={can.update && !isCancelled ? onRemoveFile : undefined} />
         ) : (
           <span className="text-muted-foreground">
-            {st === "not-applicable"
-              ? shipment.kind === "truck" || shipment.kind === "consolidated"
-                ? "Không áp dụng — chuyến xe tải / đóng ghép không có SI."
-                : "Không áp dụng — chuyến xong trước khi có mục SI."
-              : "Chưa lập SI — lập sau khi có số cont / seal, gửi hãng tàu để ra B/L."}
+            {exemption === "kind"
+              ? "Không áp dụng — chuyến xe tải / đóng ghép không có SI."
+              : exemption === "old-bl"
+                ? `Không áp dụng — chuyến tạo trước ${formatDateVN(SHIPPING_INSTRUCTION_SINCE)} đã có B/L. Vẫn lập SI được nếu cần; lập xong mục thành Xong.`
+                : exemption === "old-loading"
+                  ? `Không áp dụng — chuyến tạo trước ${formatDateVN(SHIPPING_INSTRUCTION_SINCE)} đã xong các mục đóng cont cũ và có số cont / seal. Vẫn lập SI được nếu cần; lập xong mục thành Xong.`
+                  : "Chưa lập SI — lập sau khi có số cont / seal, gửi hãng tàu để ra B/L."}
           </span>
         )}
       </ChecklistRow>

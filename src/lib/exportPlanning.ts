@@ -868,21 +868,34 @@ export const SHIPPING_INSTRUCTION_SINCE = "2026-11-05";
 const SI_KINDS: ReadonlySet<ExportShipment["kind"]> = new Set(["20RF", "40RF", "40HC-RF"]);
 
 /**
+ * Vì sao mục SI "Không áp dụng" (ba-spec 72 R10, R14) — null = SI là mục phải làm (hoặc đã có file):
+ * `kind` xe tải / đóng ghép · `old-bl` chuyến tạo trước `SHIPPING_INSTRUCTION_SINCE` đã có B/L Xong ·
+ * `old-loading` chuyến tạo trước mốc đã xong 4 mục cũ của bước 4 + số cont / seal. Chuyến cũ vẫn lập SI được.
+ */
+export type ShippingInstructionExemption = "kind" | "old-bl" | "old-loading";
+export function shippingInstructionExemption(
+  d: Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds">,
+  shipment: ExportShipment,
+): ShippingInstructionExemption | null {
+  if (!SI_KINDS.has(shipment.kind)) return "kind";
+  if (shipmentFilesOf(d, shipment.id, "shipping-instruction").length) return null;
+  if (!shipment.createdAt || shipment.createdAt >= SHIPPING_INSTRUCTION_SINCE) return null;
+  if (documentItems(d, shipment.id).some((i) => i.docKind === "bill-of-lading" && itemState(d, i) === "done")) return "old-bl";
+  if (LOADING_STEPS.every((st) => settled(subStepState(d, shipment.id, st))) && containerIdentityOk(shipment)) return "old-loading";
+  return null;
+}
+
+/**
  * Mục SI của bước 4 (ba-spec 72 R10, R13, R14): Xong khi có file SI; xe tải / đóng ghép ⇒ Không áp dụng; chuyến cũ
- * (tạo trước `SHIPPING_INSTRUCTION_SINCE`) đã xong 4 mục cũ + số cont / seal, hoặc đã có B/L Xong ⇒ Không áp dụng.
+ * (tạo trước `SHIPPING_INSTRUCTION_SINCE`) đã xong 4 mục cũ + số cont / seal, hoặc đã có B/L Xong ⇒ Không áp dụng
+ * cho tới khi lập SI (lập rồi ⇒ Xong).
  */
 export function shippingInstructionState(
   d: Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds">,
   shipment: ExportShipment,
 ): ExportItemState {
-  if (!SI_KINDS.has(shipment.kind)) return "not-applicable";
-  if (shipmentFilesOf(d, shipment.id, "shipping-instruction").length) return "done";
-  if (shipment.createdAt && shipment.createdAt < SHIPPING_INSTRUCTION_SINCE) {
-    const oldDone = LOADING_STEPS.every((st) => settled(subStepState(d, shipment.id, st))) && containerIdentityOk(shipment);
-    const blDone = documentItems(d, shipment.id).some((i) => i.docKind === "bill-of-lading" && itemState(d, i) === "done");
-    if (oldDone || blDone) return "not-applicable";
-  }
-  return "not-started";
+  if (shippingInstructionExemption(d, shipment)) return "not-applicable";
+  return shipmentFilesOf(d, shipment.id, "shipping-instruction").length ? "done" : "not-started";
 }
 
 /** Cont + seal đã điền (xe tải: biển số; đóng ghép: không cần). */

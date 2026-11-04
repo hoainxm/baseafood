@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ComposedDocument, ExportContractLine, ExportFile, ExportShipment, ExportShipmentLine, ExportStepItem } from "@/types";
-import { EMPTY_EXPORT_DATA, blankItem, shippingInstructionState, stepState, type ExportData } from "./exportPlanning";
+import { EMPTY_EXPORT_DATA, blankItem, shippingInstructionExemption, shippingInstructionState, stepState, type ExportData } from "./exportPlanning";
 import { initialSi, newSiDocument, previousSiOf, siGoodsRows, siLinked, siToValues, siTotals, splitVesselVoyage } from "./shippingInstruction";
 import { shippingInstructionBytes } from "./shippingInstructionExcel";
 
@@ -69,6 +69,20 @@ describe("mục SI của bước 4", () => {
     expect(stepState(old, old.shipments[0], 4)).toBe("done");
     const fresh = build("2026-11-10T00:00:00Z");
     expect(stepState(fresh, fresh.shipments[0], 4)).toBe("in-progress");
+    // Lý do hiện trên hàng SI; chuyến cũ vẫn lập SI được — có file ⇒ Xong.
+    expect(shippingInstructionExemption(old, old.shipments[0])).toBe("old-loading");
+    expect(shippingInstructionExemption(fresh, fresh.shipments[0])).toBeNull();
+    expect(shippingInstructionExemption(old, ship({ kind: "truck" }))).toBe("kind");
+    const withSi = { ...old, files: [...old.files, file("s1", "shipping-instruction")] };
+    expect(shippingInstructionState(withSi, withSi.shipments[0])).toBe("done");
+    // Có B/L Xong (chưa xong bước 4 cũ) ⇒ lý do B/L.
+    const blOnly: ExportData = {
+      ...EMPTY_EXPORT_DATA,
+      shipments: [ship({ createdAt: "2026-10-20T00:00:00Z" })],
+      items: [{ ...blankItem("s1", "document", "bl", "2026-10-21"), docKind: "bill-of-lading", state: "done" }],
+      shippingInstructionEnabled: true,
+    };
+    expect(shippingInstructionExemption(blOnly, blOnly.shipments[0])).toBe("old-bl");
     // Máy chủ chưa chạy 0103 ⇒ SI chưa là mục của bước 4.
     expect(stepState({ ...fresh, shippingInstructionEnabled: false }, fresh.shipments[0], 4)).toBe("done");
   });

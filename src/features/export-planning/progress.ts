@@ -17,6 +17,7 @@ import {
   attachmentStatus,
   blockingAttachmentKinds,
   containerIdentityOk,
+  containerSealState,
   contractStepState,
   documentItems,
   effectiveRevision,
@@ -61,6 +62,10 @@ export function shipmentProgress(d: ExportData, s: ExportShipment, opts: Evidenc
 }
 
 /** Những mục còn thiếu của MỘT bước (bước đã xong ⇒ rỗng). Câu chữ người dùng đọc. */
+/** Tên việc còn thiếu của hàng Số cont + seal: thiếu số ⇒ số; đủ số ⇒ ảnh (ba-spec 72 R8 v1.7). */
+const sealLabel = (s: ExportShipment) =>
+  s.kind === "truck" ? (containerIdentityOk(s) ? "ảnh biển số xe" : "biển số xe") : containerIdentityOk(s) ? "ảnh cont / seal" : "số cont + seal";
+
 export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string[] {
   switch (n) {
     case 1:
@@ -78,10 +83,12 @@ export function stepMissing(d: ExportData, s: ExportShipment, n: StepNo): string
     case 4: {
       // Cùng trình tự với khối Đóng cont: lệnh xuất → số cont + seal → sơ đồ → hình ảnh → tờ khai.
       const out = LOADING_STEPS.filter((st) => !settled(subStepState(d, s.id, st))).map((st) => SUB_STEP_LABELS[st].toLowerCase());
-      if (!containerIdentityOk(s)) out.splice(out[0] === SUB_STEP_LABELS["export-order"].toLowerCase() ? 1 : 0, 0, s.kind === "truck" ? "biển số xe" : "số cont + seal");
+      // Thiếu số ⇒ "số cont + seal"; đủ số mà còn thiếu ảnh bắt buộc (ba-spec 72 R8 v1.7) ⇒ "ảnh cont / seal".
+      if (!settled(containerSealState(d, s)))
+        out.splice(out[0] === SUB_STEP_LABELS["export-order"].toLowerCase() ? 1 : 0, 0, sealLabel(s));
       // SI ngay sau số cont + seal (ba-spec 72 R10 v1.2) — cùng thứ tự với khối Đóng cont.
       if (d.shippingInstructionEnabled && !settled(shippingInstructionState(d, s))) {
-        const after = [s.kind === "truck" ? "biển số xe" : "số cont + seal", SUB_STEP_LABELS["export-order"].toLowerCase()].map((l) => out.indexOf(l)).find((i) => i >= 0);
+        const after = [sealLabel(s), SUB_STEP_LABELS["export-order"].toLowerCase()].map((l) => out.indexOf(l)).find((i) => i >= 0);
         out.splice(after == null ? 0 : after + 1, 0, "SI");
       }
       return out;

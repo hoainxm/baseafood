@@ -907,6 +907,31 @@ export function containerIdentityOk(s: Pick<ExportShipment, "kind" | "containerN
 
 const settled = (st: ExportItemState) => st === "done" || st === "not-applicable";
 
+/** Mốc bắt ảnh cont / seal (ba-spec 72 R8 v1.7, Phòng KH 2026-11-04) — chuyến tạo trước mốc đã đóng xong thì không bắt. */
+export const CONTAINER_SEAL_PHOTO_SINCE = "2026-11-05";
+
+type SealData = Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds" | "shippingInstructionEnabled">;
+
+/**
+ * Hàng Số cont + seal phải có ≥ 1 ảnh mới Xong (R8 v1.7). Không bắt: đóng ghép · máy chủ chưa chạy 0103 (chưa đính được
+ * ảnh) · chuyến tạo trước `CONTAINER_SEAL_PHOTO_SINCE` đã có B/L Xong hoặc đã xong 4 mục cũ của bước 4 + số cont / seal.
+ */
+export function containerSealPhotoRequired(d: SealData, s: ExportShipment): boolean {
+  if (s.kind === "consolidated" || !d.shippingInstructionEnabled) return false;
+  if (!s.createdAt || s.createdAt >= CONTAINER_SEAL_PHOTO_SINCE) return true;
+  if (documentItems(d, s.id).some((i) => i.docKind === "bill-of-lading" && itemState(d, i) === "done")) return false;
+  return !(LOADING_STEPS.every((st) => settled(subStepState(d, s.id, st))) && containerIdentityOk(s));
+}
+
+/** Hàng Số cont + seal (biển số xe): Xong khi đã điền số VÀ (đã đính ảnh hoặc không bắt ảnh). */
+export function containerSealState(d: SealData, s: ExportShipment): ExportItemState {
+  if (s.kind === "consolidated") return "not-applicable";
+  const filled = containerIdentityOk(s);
+  const photos = shipmentFilesOf(d, s.id, "container-seal-photos").length > 0;
+  if (filled && (photos || !containerSealPhotoRequired(d, s))) return "done";
+  return filled || photos || s.containerNo.trim() || s.sealNo.trim() ? "in-progress" : "not-started";
+}
+
 /** Trạng thái một mục con (bước 2, 3, 4a–4d). 4a / 4b tự xong khi có file (R10). */
 export function subStepState(
   d: Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds">,
@@ -1053,8 +1078,9 @@ export function stepState(d: ExportData, shipment: ExportShipment, step: StepNo,
       const subs = LOADING_STEPS.map((s) => subStepState(d, shipment.id, s));
       if (d.shippingInstructionEnabled) subs.push(shippingInstructionState(d, shipment));
       const agg = aggregate(subs);
-      if (agg === "done" || agg === "not-applicable") return containerIdentityOk(shipment) ? "done" : "in-progress";
-      return agg === "not-started" && (shipment.containerNo.trim() || shipment.sealNo.trim()) ? "in-progress" : agg;
+      const seal = containerSealState(d, shipment);
+      if (agg === "done" || agg === "not-applicable") return settled(seal) ? "done" : "in-progress";
+      return agg === "not-started" && (seal === "in-progress" || seal === "done") ? "in-progress" : agg;
     }
     case 5:
       return aggregate(documentItems(d, shipment.id).map((i) => itemState(d, i)));

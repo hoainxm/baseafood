@@ -14,7 +14,8 @@ import {
   STEP_TITLES,
   SUB_STEP_LABELS,
   blankItem,
-  containerIdentityOk,
+  containerSealPhotoRequired,
+  containerSealState,
   documentItems,
   filesOfItem,
   effectiveRevision,
@@ -416,6 +417,7 @@ export function ShipmentPanel({
   const containerPhotos = shipmentFilesOf(data, shipment.id, "container-seal-photos")
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const sealPhotoRequired = containerSealPhotoRequired(data, shipment);
 
   /** Mục SI (ba-spec 72 R10–R14): Xong khi có file SI; xe tải / đóng ghép / chuyến cũ ⇒ Không áp dụng. */
   const siRow = () => {
@@ -692,14 +694,19 @@ export function ShipmentPanel({
         )}
         <ChecklistRow
           label={shipment.kind === "truck" ? "Biển số xe" : "Số cont + seal"}
-          state={shipment.kind === "consolidated" ? "not-applicable" : containerIdentityOk(shipment) ? "done" : "not-started"}
+          state={containerSealState(data, shipment)}
           tourMark={isTourStep(4)}
           actions={
             !isCancelled &&
             shipment.kind !== "consolidated" && (
               <>
                 {siEnabled && filesAvailable && (can.update || can.loadingCreate) && (
-                  <Button size="sm" variant="outline" onClick={() => onUploadLoading({ shipment, contractId: contract.id, step: "container-seal-photos", label })} title="Chụp / chọn ảnh số container và seal (không bắt buộc).">
+                  <Button
+                    size="sm"
+                    variant={sealPhotoRequired && !containerPhotos.length ? "default" : "outline"}
+                    onClick={() => onUploadLoading({ shipment, contractId: contract.id, step: "container-seal-photos", label })}
+                    title={sealPhotoRequired ? "Chụp / chọn ảnh số container và seal — bắt buộc: có ảnh và đã điền số thì mục này mới Xong." : "Chụp / chọn ảnh số container và seal (chuyến cũ đã đóng xong — không bắt buộc)."}
+                  >
                     <Camera className="mr-1 h-4 w-4" aria-hidden />
                     Ảnh cont / seal
                   </Button>
@@ -719,7 +726,8 @@ export function ShipmentPanel({
               ? <span className="text-muted-foreground">Không cần — hàng đóng ghép chung cont của chuyến khác</span>
               : [shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ") || <span className="text-muted-foreground">Chưa điền</span>}
           </span>
-          {/* Ảnh cont / seal (ba-spec 72 R8): mới nhất đầu, không đổi điều kiện Xong. */}
+          {/* Ảnh cont / seal (ba-spec 72 R8 v1.7): bắt buộc mới Xong (trừ chuyến cũ đã đóng xong); mới nhất đầu. */}
+          {sealPhotoRequired && !containerPhotos.length && <span className="block text-sm text-muted-foreground">Chưa có ảnh cont / seal — đính ảnh thì mục này mới Xong.</span>}
           {siEnabled && containerPhotos.length > 0 && <FileList files={containerPhotos} onPreview={onPreview} caption={`${label} · Ảnh cont / seal`} onRemove={can.update && !isCancelled ? onRemoveFile : undefined} />}
         </ChecklistRow>
         {/* SI ngay sau số cont + seal (chị Thảo 2026-11-04: làm SI khi đã có cont / seal). */}

@@ -149,7 +149,7 @@ export function LoadingView({
                   </div>
                 )}
                 {canUpload && containerPhotosEnabled && s.kind !== "consolidated" && (
-                  <Button variant="outline" className="h-auto min-h-9 whitespace-normal" onClick={() => onUpload({ shipment: s, contractId: s.contractId, step: "container-seal-photos", label })} title="Chụp số container, seal, cửa cont của chuyến này (không bắt buộc).">
+                  <Button variant="outline" className="h-auto min-h-9 whitespace-normal" onClick={() => onUpload({ shipment: s, contractId: s.contractId, step: "container-seal-photos", label })} title="Chụp số container, seal, cửa cont của chuyến này — bắt buộc: Phòng Kế hoạch điền số và có ảnh thì mục Số cont + seal mới Xong.">
                     <Camera className="mr-2 h-4 w-4" aria-hidden />
                     Ảnh cont / seal{shipmentFilesOf(data, s.id, "container-seal-photos").length ? ` (${shipmentFilesOf(data, s.id, "container-seal-photos").length})` : ""}
                   </Button>

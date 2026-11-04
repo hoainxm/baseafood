@@ -106,7 +106,7 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 
 | # | Rule | Edge case |
 |---|---|---|
-| R8 | Ảnh = `export_files.step = container-seal-photos`, gắn chuyến, nhiều ảnh, mới nhất đầu. KHÔNG đổi điều kiện Xong của hàng Số cont + seal (`containerIdentityOk`). | chuyến đóng ghép ⇒ không có chỗ đính |
+| R8 | Ảnh = `export_files.step = container-seal-photos`, gắn chuyến, nhiều ảnh, mới nhất đầu. **v1.7 (2026-11-04, Phòng KH): hàng Số cont + seal (xe tải: biển số) Xong khi đã điền số VÀ có ≥ 1 ảnh** (`containerSealState`); thiếu ảnh ⇒ Đang làm, danh sách thiếu ghi "ảnh cont / seal". Không bắt ảnh: đóng ghép · máy chủ chưa chạy 0103 · chuyến tạo trước 05/11/2026 đã có B/L Xong hoặc đã xong 4 mục cũ + số (như R14 của SI) | chuyến cũ đang đóng dở ⇒ vẫn bắt ảnh |
 | R9 | Quyền: `export-plans` tạo / sửa **và** `export-plans.loading` thêm (đổi RLS `export_files` 🔴, như 0097); người đóng hàng thấy ảnh cont / seal ở màn của mình. | — |
 
 ### Shipping Instruction (NV3)
@@ -127,7 +127,7 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 | Khu vực | Mục | Nội dung phải nói | Nguồn |
 |---|---|---|---|
 | Bước 4 · Lệnh xuất | lập trong app | ô tự điền lấy từ đâu (LSX, HĐ, booking), ô phải gõ, xuất file = Xong, xuất lại thêm bản mới, bản ký tay đính thêm | R1–R7 |
-| Bước 4 · Số cont + seal | ảnh | ai đính, không bắt buộc, Xong vẫn theo số cont + seal | R8, R9 |
+| Bước 4 · Số cont + seal | ảnh | ai đính; bắt buộc ≥ 1 ảnh + số mới Xong; khi nào không bắt | R8, R9 |
 | Bước 4 · SI | trạng thái | Chưa làm / Xong (có file) / Không áp dụng (xe tải, đóng ghép, chuyến cũ); ô nhớ theo khách; gross tính sẵn, CBM gõ tay | R10–R14 |
 
 ## 10. Acceptance Criteria
@@ -162,11 +162,11 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 - **Then** file mở được, có "LỆNH XUẤT HÀNG", "QTI-KH-01-07", 2 dòng hàng + Tổng cộng, Doc cut-off = "03/11/2026 10:00"
 - **Assert** số thẻ chưa thay trong file `== 0` · số dòng bảng hàng `== 3`
 
-### AC-6 — Ảnh cont / seal không đổi Xong · NV2 · Test: unit
-- **Given** chuyến có số cont + seal hợp lệ, 0 ảnh; rồi thêm 1 ảnh `container-seal-photos`
-- **When** tính hàng Số cont + seal và bước 4
-- **Then** như nhau trước / sau
-- **Assert** `stepState(…, 4)` trước == sau
+### AC-6 — Ảnh cont / seal bắt buộc mới Xong · NV2 · Test: unit
+- **Given** chuyến 20RF tạo 10/11/2026, máy chủ đã chạy 0103, có số cont + seal, 0 ảnh; rồi thêm 1 ảnh `container-seal-photos`
+- **When** tính hàng Số cont + seal
+- **Then** trước: Đang làm, thiếu "ảnh cont / seal"; sau: Xong. Đóng ghép ⇒ Không áp dụng; chưa chạy 0103 hoặc chuyến cũ đã đóng xong ⇒ Xong không cần ảnh
+- **Assert** `containerSealState` trước `== "in-progress"` · sau `== "done"` · `stepMissing(…, 4)` chứa `"ảnh cont / seal"` trước, không chứa sau
 
 ### AC-7 — Người đóng hàng đính ảnh cont / seal · NV2 · Test: manual (RLS máy chủ)
 - **Given** tài khoản chỉ có `export-plans.loading`
@@ -225,3 +225,4 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 - v1.3 (2026-11-04): người dùng hỏi vì sao chuyến báo "Không áp dụng — chuyến xong trước khi có mục SI" (mốc 05/11 ⇒ mọi chuyến hiện có là "cũ", nút Lập SI bị ẩn) ⇒ R14: chuyến cũ được miễn vẫn lập SI được, hàng SI ghi rõ lý do.
 - v1.4 (2026-11-04): Consignee chỉ có tên vì khách chưa có địa chỉ ⇒ form Lập / Sửa HĐ thêm ô **Địa chỉ khách hàng** (hiện khi đã chọn khách), lưu vào `Customer.address` của danh mục — R12 lấy tên + địa chỉ từ đó.
 - v1.5 (2026-11-04): chị Thảo: ô Số của Lệnh xuất ghi định dạng "STT/tháng-năm, VD 01/10-26" ngay ở nhãn. Chị Vi: sửa tên hàng ở HĐ mà SI không đổi ⇒ R11: mỗi lần mở SI, dòng hàng dựng lại — tên tiếng Anh + HS theo dòng HĐ HIỆN TẠI (dòng Hàng của chuyến chỉ dùng khi không nối dòng HĐ); số kiện / gross đã gõ giữ theo dòng HĐ (`mergeSavedGoods`).
+- v1.7 (2026-11-04): Phòng KH: "chỗ số cont / seal phải đính kèm lên mới xong bước này" ⇒ R8 + AC-6 đổi: ảnh cont / seal bắt buộc (đóng ghép, chưa chạy 0103, chuyến cũ đã đóng xong thì không); demo có ảnh giữ chỗ cho cả chuyến xe tải.

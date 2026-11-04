@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ComposedDocument, ExportContractLine, ExportFile, ExportShipment, ExportShipmentLine, ExportStepItem } from "@/types";
-import { EMPTY_EXPORT_DATA, blankItem, shippingInstructionExemption, shippingInstructionState, stepState, type ExportData } from "./exportPlanning";
+import { EMPTY_EXPORT_DATA, blankItem, containerSealPhotoRequired, containerSealState, shippingInstructionExemption, shippingInstructionState, stepState, type ExportData } from "./exportPlanning";
+import { stepMissing } from "@/features/export-planning/progress";
 import { initialSi, newSiDocument, previousSiOf, siGoodsRows, siLinked, siToValues, siTotals, splitVesselVoyage } from "./shippingInstruction";
 import { shippingInstructionBytes } from "./shippingInstructionExcel";
 
@@ -162,12 +163,41 @@ describe("AC-12: file Excel đúng mẫu", () => {
   });
 });
 
-describe("AC-6: ảnh cont / seal không đổi Xong", () => {
-  it("bước 4 trước / sau khi thêm ảnh như nhau", () => {
-    const d: ExportData = { ...EMPTY_EXPORT_DATA, shipments: [ship()], shippingInstructionEnabled: true };
-    const before = stepState(d, ship(), 4);
-    const after = stepState({ ...d, files: [file("s1", "container-seal-photos")] }, ship(), 4);
-    expect(after).toBe(before);
+describe("AC-6 (R8 v1.7): ảnh cont / seal bắt buộc mới Xong", () => {
+  const d: ExportData = { ...EMPTY_EXPORT_DATA, shipments: [ship()], shippingInstructionEnabled: true };
+  const photo = file("s1", "container-seal-photos");
+
+  it("đủ số cont + seal, 0 ảnh ⇒ đang làm; thêm 1 ảnh ⇒ Xong", () => {
+    expect(containerSealState(d, ship())).toBe("in-progress");
+    expect(containerSealState({ ...d, files: [photo] }, ship())).toBe("done");
+  });
+
+  it("có ảnh mà chưa điền số ⇒ đang làm (số vẫn bắt buộc)", () => {
+    expect(containerSealState({ ...d, files: [photo] }, ship({ containerNo: "", sealNo: "" }))).toBe("in-progress");
+    expect(containerSealState(d, ship({ containerNo: "", sealNo: "" }))).toBe("not-started");
+  });
+
+  it("thiếu ảnh ⇒ bước 4 không Xong dù mọi mục khác xong; danh sách thiếu ghi ảnh cont / seal", () => {
+    const st = (dd: ExportData) => stepState(dd, ship(), 4);
+    expect(st(d)).not.toBe("done");
+    expect(stepMissing(d, ship(), 4)).toContain("ảnh cont / seal");
+    expect(stepMissing({ ...d, files: [photo] }, ship(), 4)).not.toContain("ảnh cont / seal");
+  });
+
+  it("không bắt ảnh: đóng ghép · máy chủ chưa chạy 0103 · chuyến cũ đã đóng xong", () => {
+    expect(containerSealState(d, ship({ kind: "consolidated" }))).toBe("not-applicable");
+    expect(containerSealState({ ...d, shippingInstructionEnabled: false }, ship())).toBe("done");
+    const old = ship({ createdAt: "2026-10-20T00:00:00Z" });
+    const items = [doneItem("s1", "export-order"), doneItem("s1", "customs-declaration")];
+    const loaded: ExportData = {
+      ...d,
+      items,
+      files: [file("s1", "export-order", items[0].id), file("s1", "customs-declaration", items[1].id), file("s1", "loading-plan"), file("s1", "loading-photos")],
+    };
+    expect(containerSealPhotoRequired(loaded, old)).toBe(false);
+    expect(containerSealState(loaded, old)).toBe("done");
+    // Chuyến cũ chưa đóng xong ⇒ vẫn bắt ảnh.
+    expect(containerSealPhotoRequired(d, old)).toBe(true);
   });
 });
 

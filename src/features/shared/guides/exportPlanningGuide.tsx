@@ -183,7 +183,7 @@ export const exportPlanningGuide: PageGuide = {
             Không (Có thì ghi rõ). Xuất Word là mục Lệnh xuất Xong.
           </li>
           <li>
-            <b>Ảnh cont / seal</b>: đính ở hàng Số cont + seal (người đóng hàng cũng đính được). Không bắt buộc.
+            <b>Ảnh cont / seal</b>: đính ở hàng Số cont + seal (người đóng hàng cũng đính được). Bắt buộc: có số cont, seal và ít nhất 1 ảnh thì hàng mới Xong (đóng ghép không cần).
           </li>
           <li>
             <b>SI</b>: mục bắt buộc của chuyến cont lạnh, ngay sau Số cont + seal. Lập SI tự điền ô theo booking, cont / seal, hàng của chuyến; ô của

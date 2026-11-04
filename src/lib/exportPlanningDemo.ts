@@ -392,11 +392,12 @@ export function buildExportDemo(customers: readonly Customer[], today: string, o
     // File booking của chuyến (ba-spec 60, mig 0094) — giữ chỗ, chuyến đã đóng cont thì có booking.
     out.files.push({ id: id("booking"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "booking", path: placeholder(`booking-${s.id}.pdf`), fileName: `Booking ${s.bookingNo || s.id}.pdf`, layerNo: null, caption: "", uploadedBy: "Demo", createdAt: at(today) });
     out.files.push({ id: id("file"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "loading-plan", path: plan?.path ?? placeholder(`so-do-${s.id}.xls`), fileName: plan?.name ?? "Sơ đồ container.xls", layerNo: null, caption: "", uploadedBy: "Thủ kho demo", createdAt: at(today) });
-    // ba-spec 72 R17: chuyến cont lạnh đã đóng có SI (mục bắt buộc — thiếu thì bước 4 tụt) + 1 ảnh cont / seal.
-    if (shippingInstruction && s.kind !== "truck" && s.kind !== "consolidated") {
+    // ba-spec 72 R17: chuyến cont lạnh đã đóng có SI (mục bắt buộc — thiếu thì bước 4 tụt). Ảnh cont / seal (biển số
+    // xe) bắt buộc mọi chuyến trừ đóng ghép (R8 v1.7) ⇒ 1 ảnh giữ chỗ.
+    if (shippingInstruction && s.kind !== "truck" && s.kind !== "consolidated")
       out.files.push({ id: id("si"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "shipping-instruction", path: placeholder(`si-${s.id}.xlsx`), fileName: `SI-${s.bookingNo || s.id}.xlsx`, layerNo: null, caption: "Lập trong app", uploadedBy: "Demo", createdAt: at(today) });
-      out.files.push({ id: id("seal"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "container-seal-photos", path: placeholder(`seal-${s.id}.jpg`), fileName: "Seal + số cont.jpg", layerNo: null, caption: "", uploadedBy: "Thủ kho demo", createdAt: at(today) });
-    }
+    if (shippingInstruction && s.kind !== "consolidated")
+      out.files.push({ id: id("seal"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "container-seal-photos", path: placeholder(`seal-${s.id}.jpg`), fileName: s.kind === "truck" ? "Biển số xe.jpg" : "Seal + số cont.jpg", layerNo: null, caption: "", uploadedBy: "Thủ kho demo", createdAt: at(today) });
     const list = realPhotos.length ? realPhotos : Array.from({ length: photos }, (_, k) => ({ key: "", name: `Lớp ${k + 1}.jpg`, path: placeholder(`lop-${k + 1}.jpg`) }));
     list.forEach((f, k) =>
       out.files.push({ id: id("anh"), contractId: c.id, shipmentId: s.id, stepItemId: "", step: "loading-photos", path: f.path, fileName: f.name, layerNo: k + 1, caption: "", uploadedBy: "Thủ kho demo", createdAt: at(today) }),

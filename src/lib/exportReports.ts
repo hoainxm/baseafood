@@ -14,7 +14,6 @@ import {
   deferredAttachmentKinds,
   contractClosure,
   contractCoverage,
-  contractStepState,
   contractTotals,
   effectiveDeadline,
   effectiveRevision,
@@ -22,6 +21,7 @@ import {
   isShipmentLate,
   monthLabel,
   shipmentActuals,
+  shipmentContractIds,
   shipmentDeliveryDate,
   shipmentInPeriod,
   shipmentPaymentSummary,
@@ -291,13 +291,14 @@ export function buildExportReport(
   const stuck: StepCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   for (const s of ships) {
     for (const n of [1, 2, 3, 4, 5] as const) {
-      const st = n === 1 ? contractStepState(d, s.contractId, evidence) : stepState(d, s, n, evidence);
+      const st = stepState(d, s, n, evidence);
       if (!settled(st)) stuck[n] += 1;
     }
   }
 
   /* --- HĐ cần chú ý --- */
-  const shipContractIds = new Set(ships.map((s) => s.contractId));
+  // Chuyến gộp nhiều HĐ (ba-spec 70): mọi HĐ có hàng trên chuyến đều "có chuyến trong kỳ".
+  const shipContractIds = new Set(ships.flatMap((s) => shipmentContractIds(d, s)));
   const attention: AttentionRow[] = [];
   for (const c of d.contracts) {
     if (!keep(c.id)) continue;

@@ -138,13 +138,15 @@ export const isDraftLoadingLine = (l: Pick<ExportShipmentLine, "id">) => l.id.st
 export function loadingCountRows(
   lines: readonly ExportShipmentLine[],
   contractLines: readonly ExportContractLine[],
-  ctx: { shipmentId: string; contractId: string },
+  ctx: { shipmentId: string; contractId: string; /** Chuyến gộp nhiều HĐ: id dòng HĐ → id HĐ (ba-spec 70). Thiếu ⇒ HĐ của chuyến. */ lineContract?: Readonly<Record<string, string>> },
 ): ExportShipmentLine[] {
   const had = new Set(lines.map((l) => l.contractLineId));
   let order = Math.max(0, ...lines.map((l) => l.sortOrder));
   const extra = contractLines
     .filter((cl) => !had.has(cl.id))
-    .map((cl) => shipmentLineFromContract(cl, { id: `${DRAFT_LINE_PREFIX}${cl.id}`, shipmentId: ctx.shipmentId, contractId: ctx.contractId, sortOrder: (order += 1) }));
+    .map((cl) =>
+      shipmentLineFromContract(cl, { id: `${DRAFT_LINE_PREFIX}${cl.id}`, shipmentId: ctx.shipmentId, contractId: ctx.lineContract?.[cl.id] ?? ctx.contractId, sortOrder: (order += 1) }),
+    );
   return [...lines, ...extra];
 }
 

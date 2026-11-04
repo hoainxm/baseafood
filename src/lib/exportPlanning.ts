@@ -251,6 +251,8 @@ export interface ExportData {
   issuedOrderShipmentIds?: ReadonlySet<string>;
   /** Hàng của chuyến (mig 0096, ba-spec 63). Bỏ trống ⇒ chuyến chưa có dòng hàng chi tiết. */
   shipmentLines?: readonly ExportShipmentLine[];
+  /** Máy chủ đã chạy 0103 (ba-spec 72) ⇒ mục SI là mục bắt buộc của bước 4. Bỏ trống ⇒ chưa có mục SI. */
+  shippingInstructionEnabled?: boolean;
 }
 
 export const EMPTY_EXPORT_DATA: ExportData = {
@@ -861,6 +863,28 @@ export function canMarkNotApplicable(_item: ExportStepItem, reason: string): { o
 
 /* ---------- Trạng thái bước ---------- */
 
+/** Chuyến tạo trước ngày này mà đã xong bước 4 cũ / có B/L ⇒ mục SI "Không áp dụng" (ba-spec 72 R14). */
+export const SHIPPING_INSTRUCTION_SINCE = "2026-11-05";
+const SI_KINDS: ReadonlySet<ExportShipment["kind"]> = new Set(["20RF", "40RF", "40HC-RF"]);
+
+/**
+ * Mục SI của bước 4 (ba-spec 72 R10, R13, R14): Xong khi có file SI; xe tải / đóng ghép ⇒ Không áp dụng; chuyến cũ
+ * (tạo trước `SHIPPING_INSTRUCTION_SINCE`) đã xong 4 mục cũ + số cont / seal, hoặc đã có B/L Xong ⇒ Không áp dụng.
+ */
+export function shippingInstructionState(
+  d: Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds">,
+  shipment: ExportShipment,
+): ExportItemState {
+  if (!SI_KINDS.has(shipment.kind)) return "not-applicable";
+  if (shipmentFilesOf(d, shipment.id, "shipping-instruction").length) return "done";
+  if (shipment.createdAt && shipment.createdAt < SHIPPING_INSTRUCTION_SINCE) {
+    const oldDone = LOADING_STEPS.every((st) => settled(subStepState(d, shipment.id, st))) && containerIdentityOk(shipment);
+    const blDone = documentItems(d, shipment.id).some((i) => i.docKind === "bill-of-lading" && itemState(d, i) === "done");
+    if (oldDone || blDone) return "not-applicable";
+  }
+  return "not-started";
+}
+
 /** Cont + seal đã điền (xe tải: biển số; đóng ghép: không cần). */
 export function containerIdentityOk(s: Pick<ExportShipment, "kind" | "containerNo" | "sealNo">): boolean {
   if (s.kind === "consolidated") return true;
@@ -1006,13 +1030,15 @@ export function contractStepState(d: ExportData, contractId: string, opts: Evide
 export function stepState(d: ExportData, shipment: ExportShipment, step: StepNo, opts: EvidenceOptions = WITH_FILES): ExportItemState {
   switch (step) {
     case 1:
-      return contractStepState(d, shipment.contractId, opts);
+      // Chuyến gộp: bước Hợp đồng xong khi MỌI HĐ của chuyến đủ hồ sơ (ba-spec 70 R5).
+      return aggregate(shipmentContractIds(d, shipment).map((id) => contractStepState(d, id, opts)));
     case 2:
       return subStepState(d, shipment.id, "production-order");
     case 3:
       return subStepState(d, shipment.id, "packaging");
     case 4: {
       const subs = LOADING_STEPS.map((s) => subStepState(d, shipment.id, s));
+      if (d.shippingInstructionEnabled) subs.push(shippingInstructionState(d, shipment));
       const agg = aggregate(subs);
       if (agg === "done" || agg === "not-applicable") return containerIdentityOk(shipment) ? "done" : "in-progress";
       return agg === "not-started" && (shipment.containerNo.trim() || shipment.sealNo.trim()) ? "in-progress" : agg;
@@ -1054,20 +1080,139 @@ export function shipmentActuals(d: Pick<ExportData, "items">, shipmentId: string
     );
 }
 
-export function openShipmentsOf(d: Pick<ExportData, "shipments">, contractId: string): ExportShipment[] {
+/* ---------- ba-spec 70: một chuyến chở hàng của nhiều HĐ cùng khách ---------- */
+
+type LineData = Pick<ExportData, "shipmentLines">;
+const lineContractsCache = new WeakMap<readonly ExportShipmentLine[], Map<string, Set<string>>>();
+const NO_LINE_CONTRACTS = new Map<string, Set<string>>();
+
+/** id chuyến → HĐ của các dòng hàng (dòng không ghi HĐ bỏ qua). Nhớ theo mảng dòng để vòng lặp báo cáo không lọc lại. */
+function lineContractsByShipment(lines: readonly ExportShipmentLine[] | undefined): Map<string, Set<string>> {
+  if (!lines?.length) return NO_LINE_CONTRACTS;
+  let m = lineContractsCache.get(lines);
+  if (m) return m;
+  m = new Map();
+  for (const l of lines) {
+    if (!l.contractId) continue;
+    let set = m.get(l.shipmentId);
+    if (!set) m.set(l.shipmentId, (set = new Set()));
+    set.add(l.contractId);
+  }
+  lineContractsCache.set(lines, m);
+  return m;
+}
+
+/** HĐ của chuyến (R1): HĐ chính của chuyến đứng đầu, rồi HĐ của các dòng hàng. Chuyến cũ chưa có dòng ⇒ chỉ HĐ chính (R2). */
+export function shipmentContractIds(d: LineData, s: Pick<ExportShipment, "id" | "contractId">): string[] {
+  const ids = [s.contractId];
+  for (const id of lineContractsByShipment(d.shipmentLines).get(s.id) ?? []) if (!ids.includes(id)) ids.push(id);
+  return ids;
+}
+
+export const isMultiContractShipment = (d: LineData, s: Pick<ExportShipment, "id" | "contractId">) => shipmentContractIds(d, s).length > 1;
+
+/** Chuyến có hàng của HĐ: là HĐ chính của chuyến hoặc có ≥ 1 dòng thuộc HĐ. */
+export function carriesContract(d: LineData, s: Pick<ExportShipment, "id" | "contractId">, contractId: string): boolean {
+  return s.contractId === contractId || !!lineContractsByShipment(d.shipmentLines).get(s.id)?.has(contractId);
+}
+
+/** Chuyến còn mở có hàng của HĐ (kể cả chuyến gộp mà HĐ chỉ là một phần — R6), cũ trước. */
+export function openShipmentsOf(d: Pick<ExportData, "shipments" | "shipmentLines">, contractId: string): ExportShipment[] {
   return d.shipments
-    .filter((s) => s.contractId === contractId && s.status === "open")
+    .filter((s) => s.status === "open" && carriesContract(d, s, contractId))
     .sort((a, b) => (a.loadingDate || a.etd || a.planMonth).localeCompare(b.loadingDate || b.etd || b.planMonth) || a.createdAt.localeCompare(b.createdAt));
 }
 
-export function contractActuals(d: Pick<ExportData, "items" | "shipments">, contractId: string): Actuals {
-  return openShipmentsOf(d, contractId).reduce<Actuals>(
-    (t, s) => {
-      const a = shipmentActuals(d, s.id);
-      return { cartons: t.cartons + a.cartons, kg: round2(t.kg + a.kg), amount: round2(t.amount + a.amount) };
-    },
-    { cartons: 0, kg: 0, amount: 0 },
+const ZERO_ACTUALS: Actuals = { cartons: 0, kg: 0, amount: 0 };
+const linePerUnitKg = (l: Pick<ExportShipmentLine, "unitKind" | "cartonsPerUnit" | "netKgPerCarton">) =>
+  l.netKgPerCarton == null ? null : (l.unitKind === "bundle" ? l.cartonsPerUnit || 1 : 1) * l.netKgPerCarton;
+
+/**
+ * Phần của MỘT HĐ trong chuyến (R3). Chuyến chỉ một HĐ ⇒ cả chuyến theo Commercial Invoice (41 R7, như cũ). Chuyến gộp ⇒
+ * cộng từ dòng hàng của HĐ: kiện = thực đóng ?? kế hoạch, kg = kiện × kg/kiện, tiền = kg × đơn giá (sửa ở phần lập invoice
+ * ⇒ số đó, không ⇒ đơn giá dòng HĐ đang dùng). Invoice gộp không tách được theo HĐ nên không dùng ở đây.
+ */
+export function shipmentContractActuals(d: Pick<ExportData, "items" | "shipmentLines" | "revisions" | "approvals">, s: ExportShipment, contractId: string): Actuals {
+  if (!isMultiContractShipment(d, s)) return s.contractId === contractId ? shipmentActuals(d, s.id) : ZERO_ACTUALS;
+  const comp = d.items.find((i) => i.shipmentId === s.id && i.step === "document" && i.docKind === "commercial-invoice" && !i.sharedFromId)?.invoiceComposition;
+  const prices = new Map((workingRevision(d, contractId)?.lines ?? []).map((l) => [l.id, l.unitPrice]));
+  return (d.shipmentLines ?? [])
+    .filter((l) => l.shipmentId === s.id && (l.contractId || s.contractId) === contractId)
+    .reduce<Actuals>((t, l) => {
+      const units = l.loadedUnits ?? l.plannedUnits;
+      const per = linePerUnitKg(l);
+      if (units == null) return t;
+      const kg = per == null ? 0 : units * per;
+      const own = comp?.unitPrices[l.id];
+      const price = typeof own === "number" && Number.isFinite(own) ? own : (prices.get(l.contractLineId) ?? null);
+      const cartons = units * (l.unitKind === "bundle" ? l.cartonsPerUnit || 1 : 1);
+      return { cartons: t.cartons + cartons, kg: round2(t.kg + kg), amount: round2(t.amount + (price == null ? 0 : kg * price)) };
+    }, ZERO_ACTUALS);
+}
+
+export function contractActuals(d: Pick<ExportData, "items" | "shipments" | "shipmentLines" | "revisions" | "approvals">, contractId: string): Actuals {
+  return openShipmentsOf(d, contractId).reduce<Actuals>((t, s) => {
+    const a = shipmentContractActuals(d, s, contractId);
+    return { cartons: t.cartons + a.cartons, kg: round2(t.kg + a.kg), amount: round2(t.amount + a.amount) };
+  }, ZERO_ACTUALS);
+}
+
+export type AddContractGate = { ok: true } | { ok: false; reason: "customer-mismatch" | "same-contract" | "not-open" | "no-revision" | "attachments-missing"; missing: ExportContractAttachmentKind[] };
+
+/**
+ * Thêm hàng của HĐ khác vào chuyến (R1, R4): HĐ phải cùng khách với HĐ chính của chuyến và qua cổng ghi chuyến
+ * (`shipmentGate`: còn mở, có bản hiệu lực, không còn hồ sơ bắt buộc "Thiếu").
+ */
+export function addContractGate(d: ExportData, s: Pick<ExportShipment, "contractId">, contractId: string, opts: EvidenceOptions = WITH_FILES): AddContractGate {
+  if (contractId === s.contractId) return { ok: false, reason: "same-contract", missing: [] };
+  const main = d.contracts.find((c) => c.id === s.contractId);
+  const other = d.contracts.find((c) => c.id === contractId);
+  if (!main || !other || main.customerId !== other.customerId) return { ok: false, reason: "customer-mismatch", missing: [] };
+  const g = shipmentGate(d, contractId, opts);
+  return g.ok ? { ok: true } : { ok: false, reason: g.reason, missing: g.missing };
+}
+
+/** Kg kế hoạch của HĐ trên chuyến: chuyến một HĐ ⇒ kg kế hoạch của chuyến; chuyến gộp ⇒ Σ kiện kế hoạch × kg/kiện của dòng HĐ. */
+export function shipmentContractPlannedKg(d: LineData, s: ExportShipment, contractId: string): number {
+  if (!isMultiContractShipment(d, s)) return s.contractId === contractId ? numOr0(s.plannedKg) : 0;
+  return round2(
+    (d.shipmentLines ?? [])
+      .filter((l) => l.shipmentId === s.id && (l.contractId || s.contractId) === contractId)
+      .reduce((t, l) => t + numOr0(l.plannedUnits) * numOr0(linePerUnitKg(l)), 0),
   );
+}
+
+/** Dòng HĐ (bản đang dùng) của mọi HĐ trên chuyến — tra đơn giá, nối dòng invoice. Id dòng HĐ không trùng giữa các HĐ. */
+export function shipmentContractLines(d: Pick<ExportData, "shipmentLines" | "revisions" | "approvals">, s: Pick<ExportShipment, "id" | "contractId">): ExportContractLine[] {
+  return shipmentContractIds(d, s).flatMap((id) => workingRevision(d, id)?.lines ?? []);
+}
+
+/**
+ * Dòng chuyến để in chứng từ (Q3 ba-spec 70: một bộ cho chuyến, mỗi dòng ghi số HĐ gốc): chuyến gộp ⇒ tên hàng thêm
+ * "(Contract No. …)"; chuyến một HĐ ⇒ giữ nguyên.
+ */
+export function linesWithContractNo(d: Pick<ExportData, "shipmentLines" | "contracts">, s: Pick<ExportShipment, "id" | "contractId">, lines: readonly ExportShipmentLine[]): ExportShipmentLine[] {
+  if (!isMultiContractShipment(d, s)) return [...lines];
+  const noOf = new Map(d.contracts.map((c) => [c.id, c.contractNo.trim()]));
+  return lines.map((l) => {
+    const no = noOf.get(l.contractId || s.contractId);
+    return no ? { ...l, description: `${l.description} (Contract No. ${no})` } : l;
+  });
+}
+
+/** id dòng HĐ → id HĐ, cho mọi HĐ trên chuyến — dòng đóng cont tự tạo ghi đúng HĐ (ba-spec 70 R9). */
+export function lineContractOf(d: Pick<ExportData, "shipmentLines" | "revisions" | "approvals">, s: Pick<ExportShipment, "id" | "contractId">): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const id of shipmentContractIds(d, s)) for (const l of workingRevision(d, id)?.lines ?? []) out[l.id] = id;
+  return out;
+}
+
+/** HĐ khác của cùng khách thêm hàng vào chuyến được — cho hộp Hàng của chuyến. Đã có trong chuyến thì bỏ. */
+export function addableContracts(d: ExportData, s: ExportShipment, opts: EvidenceOptions = WITH_FILES): ExportContract[] {
+  const inShip = new Set(shipmentContractIds(d, s));
+  return d.contracts
+    .filter((c) => !inShip.has(c.id) && addContractGate(d, s, c.id, opts).ok)
+    .sort((a, b) => a.contractNo.localeCompare(b.contractNo, "vi"));
 }
 
 export function shipmentPaymentSummary(d: Pick<ExportData, "payments" | "items">, shipment: Pick<ExportShipment, "id">): { received: number; expected: number; documentsSentOn: string } {
@@ -1082,10 +1227,22 @@ export function shipmentPaymentSummary(d: Pick<ExportData, "payments" | "items">
 
 /** Tiền về của cả HĐ (cọc cấp HĐ + các chuyến) so với tổng tiền thực xuất. */
 export function contractPaymentSummary(d: ExportData, contractId: string): { received: number; expected: number } {
-  const shipIds = new Set(d.shipments.filter((s) => s.contractId === contractId).map((s) => s.id));
+  // Tiền về ghi theo chuyến; chuyến gộp ⇒ phần của HĐ = tiền về × tiền dòng của HĐ ÷ tiền cả chuyến (ba-spec 70 NL7).
+  const share = new Map<string, number>();
+  for (const s of d.shipments) {
+    if (!carriesContract(d, s, contractId)) continue;
+    if (!isMultiContractShipment(d, s)) share.set(s.id, 1);
+    else {
+      const all = shipmentContractIds(d, s).reduce((t, id) => t + shipmentContractActuals(d, s, id).amount, 0);
+      share.set(s.id, all > 0 ? shipmentContractActuals(d, s, contractId).amount / all : 0);
+    }
+  }
   const received = d.payments
-    .filter((p) => p.kind === "payment" && (p.contractId === contractId || shipIds.has(p.shipmentId)))
-    .reduce((t, p) => t + numOr0(p.amount), 0);
+    .filter((p) => p.kind === "payment")
+    .reduce((t, p) => {
+      if (p.shipmentId) return t + numOr0(p.amount) * (share.get(p.shipmentId) ?? 0);
+      return p.contractId === contractId ? t + numOr0(p.amount) : t;
+    }, 0);
   return { received: round2(received), expected: contractActuals(d, contractId).amount };
 }
 
@@ -1101,16 +1258,22 @@ export function shipmentDeliveryDate(d: Pick<ExportData, "items" | "shipments">,
   return shipment.etd;
 }
 
+/** Hạn giao của chuyến: chuyến gộp ⇒ hạn SỚM nhất trong các HĐ của chuyến (trễ với HĐ nào là chuyến trễ — ba-spec 70 R7). */
+export function shipmentDeadline(d: ExportData, shipment: ExportShipment): string {
+  const deadlines = shipmentContractIds(d, shipment).map((id) => effectiveDeadline(d, id)).filter(Boolean).sort();
+  return deadlines[0] ?? "";
+}
+
 export function isShipmentLate(d: ExportData, shipment: ExportShipment): boolean {
   const ref = shipmentDeliveryDate(d, shipment);
-  const deadline = effectiveDeadline(d, shipment.contractId);
+  const deadline = shipmentDeadline(d, shipment);
   return !!ref && !!deadline && ref > deadline;
 }
 
 /** Trễ bao nhiêu ngày (R15) + hai ngày so — để thẻ "Trễ hạn giao n ngày" nói một nghĩa ở mọi chỗ. */
 export function shipmentLateInfo(d: ExportData, shipment: ExportShipment): { late: boolean; days: number; deadline: string; deliveredOn: string } {
   const deliveredOn = shipmentDeliveryDate(d, shipment);
-  const deadline = effectiveDeadline(d, shipment.contractId);
+  const deadline = shipmentDeadline(d, shipment);
   const late = !!deliveredOn && !!deadline && deliveredOn > deadline;
   const days = late ? Math.round((Date.parse(deliveredOn) - Date.parse(deadline)) / 86400000) : 0;
   return { late, days, deadline, deliveredOn };
@@ -1131,7 +1294,7 @@ export function contractCoverage(d: ExportData, contractId: string): Coverage {
   const tol = numOr0(rev.terms.tolerancePct) / 100;
   const target = contractTotals(rev.lines).kg * (1 - tol);
   const ships = openShipmentsOf(d, contractId);
-  const planned = ships.reduce((t, s) => t + numOr0(s.plannedKg), 0);
+  const planned = ships.reduce((t, s) => t + shipmentContractPlannedKg(d, s, contractId), 0);
   const missingKg = Math.max(0, round2(target - planned));
   const missingContainers = Math.max(0, numOr0(rev.terms.containerCount) - ships.filter((s) => isContainerKind(s.kind)).length);
   return { missingKg, missingContainers, covered: missingKg < EPS && missingContainers === 0 };
@@ -1196,7 +1359,7 @@ export type CustomerChangeGate = { ok: true } | { ok: false; shipment: ExportShi
 
 export function customerChangeGate(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): CustomerChangeGate {
   const loaded = d.shipments.find((s) => {
-    if (s.contractId !== contractId || s.status === "cancelled") return false;
+    if (s.status === "cancelled" || !carriesContract(d, s, contractId)) return false;
     const st = stepState(d, s, 4, opts);
     return st === "done" || st === "not-applicable";
   });
@@ -1349,7 +1512,7 @@ export function isBlankShipment(d: Pick<ExportData, "files" | "items">, s: Expor
 
 /** R35 sửa theo R41: mọi chuyến của HĐ đều còn trống ⇒ "Sửa hợp đồng" vẫn sửa thẳng bản đang dùng. */
 export function canEditContractDirectly(d: ExportData, contractId: string): boolean {
-  return d.shipments.filter((s) => s.contractId === contractId).every((s) => isBlankShipment(d, s));
+  return d.shipments.filter((s) => carriesContract(d, s, contractId)).every((s) => isBlankShipment(d, s));
 }
 
 /** Các lượt duyệt cuối của HĐ, cũ trước. */
@@ -1389,7 +1552,7 @@ export const isShipmentLoaded = (s: Pick<ExportShipment, "containerNo">) => !!s.
 
 export function canDeleteContract(d: ExportData, contractId: string): { ok: boolean; reason?: string } {
   // R41: chuyến còn trống (lịch chưa làm gì) không chặn xóa — xóa HĐ xóa luôn các chuyến đó.
-  if (d.shipments.some((s) => s.contractId === contractId && !isBlankShipment(d, s))) return { ok: false, reason: "has-shipments" };
+  if (d.shipments.some((s) => carriesContract(d, s, contractId) && !isBlankShipment(d, s))) return { ok: false, reason: "has-shipments" };
   const revIds = new Set(revisionsOf(d, contractId).map((r) => r.id));
   if (d.approvals.some((a) => revIds.has(a.revisionId) && a.decision === "approved")) return { ok: false, reason: "was-approved" };
   return { ok: true };

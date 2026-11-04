@@ -7,6 +7,7 @@ guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-04
 <!-- re-verified: 2026-11-04 — chỉ sửa chữ: title tab Lịch xuất hàng + lời tour bước "tabs" nói "xếp theo ngày xuất" (ba-spec 57 v2) thay "gom theo khách"; không đổi trạng thái, không đổi quyền. -->
 <!-- re-verified: 2026-11-03 (ba-spec 71) — bước 4: hàng File booking thành khối Booking 12 trường (đọc file booking) + hàng Thông tin xe vận chuyển; không trạng thái, không đổi 6 bước, không đổi quyền (người đóng hàng chỉ xem). -->
+<!-- re-verified: 2026-11-03 (ba-spec 70 đợt 1) — chuyến gộp nhiều HĐ cùng khách (§2b); không đổi trạng thái HĐ / 6 bước, luật đóng cont cho dòng HĐ phụ ở mig 0102. -->
 <!-- re-verified: 2026-11-03 (ba-spec 69) — thêm Hạn hợp đồng (ô điều khoản, hồ sơ HĐ, bộ đọc file); không đổi trạng thái HĐ / chuyến, không đổi quyền. -->
 <!-- re-verified: 2026-11-03 (ba-spec 66 v1.2) — khối Đọc file hợp đồng (`ContractReadPanel.tsx`, tour) — đọc thêm .doc + bảng Excel nhúng + bảng PDF theo tọa độ; không đổi trạng thái, không đổi quyền. -->
 ttl_days: 90
@@ -77,6 +78,27 @@ Mỗi mục trong bước có một trong 4 nhãn: **Chưa làm** · **Đang là
 | 4 · (không chặn) | Booking (12 trường + file booking, ba-spec [71](../app-map/71-export-booking-details.ba-spec.md)) · Thông tin xe vận chuyển · Số lượng thực đóng · Hình ảnh bao bì + cân gross | Không tính vào bước 4. Thông tin xe chỉ lưu khi đủ 4 ô bắt buộc (công ty vận chuyển, nơi lấy rỗng, nơi đóng, nơi hạ bãi) | Kế hoạch (booking, thông tin xe; bộ phận đóng cont chỉ xem) · **Bộ phận đóng cont** (số thực đóng, ảnh) |
 | 5 · Bộ chứng từ | Chứng từ (Commercial Invoice, Packing List, B/L, H/C, C/O…) | Mọi mục chứng từ của chuyến Xong / Không áp dụng | Bộ phận chứng từ (Kế hoạch) |
 | 6 · Gửi chứng từ · tiền về | Ghi đã gửi chứng từ, ghi tiền về | Có lần "đã gửi chứng từ" **và** tiền về ≥ giá trị chuyến; có ghi mà chưa đủ ⇒ Đang làm | Người có quyền `export-plans.payments` |
+
+## 2b. Một chuyến chở hàng của nhiều HĐ cùng khách (ba-spec [70](../app-map/70-call-off-schedule-multi-contract.ba-spec.md))
+
+Khách như DAIREI ký nhiều HĐ song song (mỗi HĐ một mã hàng, lượng cả năm, giao từng phần), mỗi tháng một cont gộp hàng của các HĐ.
+
+| Việc | Luật | Code |
+|---|---|---|
+| Thêm hàng của HĐ khác vào chuyến | HĐ cùng khách với HĐ chính của chuyến, còn mở, có bản hiệu lực, không còn hồ sơ bắt buộc **Thiếu** | `addContractGate` · `addableContracts` |
+| HĐ của chuyến | HĐ chính + HĐ của từng dòng hàng; chuyến cũ chưa có dòng ⇒ chỉ HĐ chính | `shipmentContractIds` |
+| Đã giao của HĐ trên chuyến gộp | Cộng từ dòng của HĐ: kiện (thực đóng, chưa có thì kế hoạch) × kg/kiện; tiền = kg × đơn giá (invoice sửa ⇒ số đó). Chuyến một HĐ ⇒ theo Commercial Invoice như cũ | `shipmentContractActuals` · `contractActuals` |
+| HĐ xong | Mọi chuyến **có hàng của HĐ** đã khép + đã giao trong dung sai (lượng và tiền). Không xét từng tháng | `contractClosure` |
+| Bước 1 của chuyến gộp | Xong khi mọi HĐ của chuyến đủ hồ sơ | `stepState(…, 1)` |
+| Hạn giao, trễ | Hạn sớm nhất trong các HĐ của chuyến | `shipmentDeadline` |
+| Tiền về | Ghi theo chuyến; phần của HĐ = tiền về × tiền dòng của HĐ ÷ tiền cả chuyến | `contractPaymentSummary` |
+| Chứng từ | Một bộ cho chuyến; mỗi dòng in kèm "(Contract No. …)" của HĐ gốc | `linesWithContractNo` |
+| Hồ sơ HĐ phụ | Mục **Đi chung chuyến của hợp đồng khác**: chỉ xem, các bước theo dõi ở hồ sơ HĐ chính | `carriesContract` |
+| Khóa đổi khách, xóa HĐ | Tính cả chuyến gộp có hàng của HĐ | `customerChangeGate` · `canDeleteContract` |
+
+Bộ phận đóng cont ghi số thực đóng cho dòng của HĐ phụ đã có trên chuyến (cùng khách) — mig `0102` (CHƯA chạy DB thật; trước khi chạy, máy chủ từ chối dòng mới của HĐ phụ do đóng cont tạo). Đóng cont không tự đưa HĐ mới vào chuyến.
+
+Chưa làm (ba-spec 70): khung giao ETA từ – tới (NL8), lịch gọi hàng của khách (đợt 2).
 
 ## 3. Số lượng thực đóng → invoice (ba-spec 63 R11, mig 0098)
 

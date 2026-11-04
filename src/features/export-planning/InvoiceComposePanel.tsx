@@ -23,7 +23,7 @@ import {
 } from "@/lib/exportInvoice";
 import { companySellerOf } from "@/lib/companyProfile";
 import { useCompanyProfileStore } from "@/lib/catalogRepo";
-import { termsOf, workingRevision, type ExportData } from "@/lib/exportPlanning";
+import { shipmentContractLines, termsOf, type ExportData } from "@/lib/exportPlanning";
 import type { Customer, ExportContract, ExportShipment, ExportStepItem, InvoiceComposition } from "@/types";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { useExportOptionPicker } from "./exportOptionPicker";
@@ -50,7 +50,7 @@ export function InvoiceComposePanel({
   const setComp = (patch: Partial<InvoiceComposition>) => onPatchItem({ invoiceComposition: { ...comp, ...patch } });
   const terms = termsOf(data, contract.id);
   const currency = terms.currency || "USD";
-  const contractLines = workingRevision(data, contract.id)?.lines ?? [];
+  const contractLines = shipmentContractLines(data, shipment);
   const lines = shipmentLinesOf(data.shipmentLines ?? [], shipment.id);
   const banks = bankAccountsOf(picker.options);
   const bank = banks.find((b) => b.id === comp.bankOptionId) ?? banks[0];

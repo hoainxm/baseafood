@@ -12,9 +12,9 @@ import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import { applyLoadingCounts, isDraftLoadingLine, lineNetKg, loadingCountRows, netKgPerUnit } from "@/lib/exportInvoice";
-import { linesFromDraft, type LineDraft, type ShipmentLinesTarget } from "./shipmentGoodsLogic";
+import { draftRowsOf, groupLines, linesFromDraft, type ContractLineGroup, type LineDraft, type ShipmentLinesTarget } from "./shipmentGoodsLogic";
 import type { ExportContractLine, ExportShipment, ExportShipmentLine } from "@/types";
-import { Boxes, ClipboardCheck, Save } from "lucide-react";
+import { Boxes, ClipboardCheck, Plus, Save } from "lucide-react";
 
 export type { ShipmentLinesTarget } from "./shipmentGoodsLogic";
 
@@ -49,26 +49,14 @@ export function ShipmentLineSummary({ line }: { line: ExportShipmentLine }) {
 interface LinesForm {
   key: string;
   tg: ShipmentLinesTarget;
+  /** HĐ đang có dòng trong hộp — thêm HĐ khác ⇒ thêm nhóm (ba-spec 70). */
+  groups: ContractLineGroup[];
   rows: LineDraft[];
   initial: string;
 }
 const linesSnap = (rows: readonly LineDraft[]) => JSON.stringify(rows);
 
-function draftRows(tg: ShipmentLinesTarget): LineDraft[] {
-  return tg.contractLines.map((cl) => {
-    const own = tg.lines.find((l) => l.contractLineId === cl.id);
-    return {
-      contractLineId: cl.id,
-      lineId: own?.id ?? "",
-      description: own?.description ?? cl.description,
-      size: own?.size ?? cl.size,
-      packing: own?.packing ?? cl.packing,
-      plannedUnits: own?.plannedUnits ?? null,
-      grossKgPerUnit: own?.grossKgPerUnit ?? null,
-      expiry: own?.expiry ?? "",
-    };
-  });
-}
+const draftRows = (tg: ShipmentLinesTarget): LineDraft[] => tg.groups.flatMap((g) => draftRowsOf(g, tg.lines));
 
 export function ShipmentLinesDialog({
   target,
@@ -87,7 +75,7 @@ export function ShipmentLinesDialog({
   useEffect(() => {
     if (!target) return;
     const rows = draftRows(target);
-    const fresh: LinesForm = { key: target.shipment.id, tg: target, rows, initial: linesSnap(rows) };
+    const fresh: LinesForm = { key: target.shipment.id, tg: target, groups: [...target.groups], rows, initial: linesSnap(rows) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
     setErrors([]);
@@ -96,6 +84,10 @@ export function ShipmentLinesDialog({
 
   const tg = target ?? form?.tg ?? null;
   const setRow = (i: number, patch: Partial<LineDraft>) => setForm((f) => (f ? { ...f, rows: f.rows.map((r, k) => (k === i ? { ...r, ...patch } : r)) } : f));
+  const addGroup = (g: ContractLineGroup) =>
+    setForm((f) => (f && !f.groups.some((x) => x.contractId === g.contractId) ? { ...f, groups: [...f.groups, g], rows: [...f.rows, ...draftRowsOf(g, f.tg.lines)] } : f));
+  const allLines = form ? groupLines(form.groups) : [];
+  const multi = (form?.groups.length ?? 0) > 1;
 
   const save = () => {
     if (!form || !tg) return;
@@ -123,7 +115,7 @@ export function ShipmentLinesDialog({
         onClose();
       }}
       title="Hàng của chuyến"
-      description={tg ? `${tg.label} — ghi số kiện đóng vào chuyến này cho từng dòng hàng của hợp đồng. Để trống = không đóng dòng đó.` : ""}
+      description={tg ? `${tg.label} — ghi số kiện đóng vào chuyến này cho từng dòng hàng của hợp đồng. Để trống = không đóng dòng đó. Cont chở hàng của nhiều hợp đồng cùng khách ⇒ thêm hàng của hợp đồng khác.` : ""}
       icon={Boxes}
       size="xl"
       footer={
@@ -150,13 +142,18 @@ export function ShipmentLinesDialog({
           <ErrorSummary errors={errors} />
           {!form.rows.length && <p className="rounded-lg bg-warning-surface px-4 py-2 text-sm">Hợp đồng chưa có dòng hàng — thêm dòng hàng ở hồ sơ hợp đồng trước.</p>}
           {form.rows.map((r, i) => {
-            const cl = tg.contractLines.find((c) => c.id === r.contractLineId);
+            const cl = allLines.find((c) => c.id === r.contractLineId);
             if (!cl) return null;
+            const group = form.groups.find((g) => g.contractId === r.contractId);
+            const firstOfGroup = form.rows.findIndex((x) => x.contractId === r.contractId) === i;
             const unit = cl.unitKind === "bundle" ? "bó" : "thùng";
             const other = tg.otherShipmentUnits[cl.id] ?? 0;
             const left = cl.quantity != null ? cl.quantity - other - (r.plannedUnits ?? 0) : null;
             return (
               <section key={r.contractLineId} className="grid min-w-0 gap-3 rounded-lg border border-border p-3">
+                {multi && firstOfGroup && group && (
+                  <p className="text-sm font-semibold text-primary break-words">Hợp đồng {group.contractNo || "(chưa có số)"}</p>
+                )}
                 <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
                   <p className="min-w-0 font-medium break-words">
                     {i + 1}. {[cl.description, cl.size].filter(Boolean).join(" · ")}
@@ -188,6 +185,21 @@ export function ShipmentLinesDialog({
               </section>
             );
           })}
+          {tg.addable.some((g) => !form.groups.some((x) => x.contractId === g.contractId)) && (
+            <div className="grid gap-2 rounded-lg border border-dashed border-border p-3" data-tour="export-shipment-add-contract">
+              <p className="text-sm text-muted-foreground">Cont chở cả hàng của hợp đồng khác cùng khách? Thêm hàng của hợp đồng đó vào chuyến này — mỗi hợp đồng tự tính đã giao, còn phải giao.</p>
+              <div className="flex flex-wrap gap-2">
+                {tg.addable
+                  .filter((g) => !form.groups.some((x) => x.contractId === g.contractId))
+                  .map((g) => (
+                    <Button key={g.contractId} variant="outline" size="sm" onClick={() => addGroup(g)} title={`Thêm các dòng hàng của hợp đồng ${g.contractNo} vào chuyến này`}>
+                      <Plus className="mr-1 h-4 w-4" aria-hidden />
+                      Hàng của HĐ {g.contractNo || "(chưa có số)"}
+                    </Button>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </FormDialog>
@@ -202,6 +214,8 @@ export interface LoadingCountTarget {
   lines: readonly ExportShipmentLine[];
   /** Dòng hàng của bản HĐ đang dùng — dòng chưa có trong chuyến hiện thành dòng TẠM để đóng cont tự điền. */
   contractLines: readonly ExportContractLine[];
+  /** Chuyến gộp nhiều HĐ: id dòng HĐ → id HĐ (ba-spec 70). */
+  lineContract?: Readonly<Record<string, string>>;
 }
 
 interface CountForm {
@@ -229,7 +243,7 @@ export function LoadingCountDialog({
 
   useEffect(() => {
     if (!target) return;
-    const rows = loadingCountRows(target.lines, target.contractLines, { shipmentId: target.shipment.id, contractId: target.shipment.contractId });
+    const rows = loadingCountRows(target.lines, target.contractLines, { shipmentId: target.shipment.id, contractId: target.shipment.contractId, lineContract: target.lineContract });
     const counts = Object.fromEntries(rows.map((l) => [l.id, l.loadedUnits]));
     const fresh: CountForm = { key: target.shipment.id, tg: target, rows, counts, initial: JSON.stringify(counts) };
     const kept = draft.takeKept();

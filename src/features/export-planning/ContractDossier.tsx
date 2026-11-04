@@ -54,6 +54,9 @@ import {
   revisionsOf,
   shipmentKindLabel,
   workingRevision,
+  carriesContract,
+  shipmentContractActuals,
+  shipmentMonth,
   type ExportData,
 } from "@/lib/exportPlanning";
 import { formatDateVN, formatMoney, formatDateTimeVN, todayISO } from "@/lib/format";
@@ -194,6 +197,8 @@ export function ContractDossier({
   const revisions = revisionsOf(data, contract.id);
   const extensions = data.extensions.filter((e) => e.contractId === contract.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const shipments = data.shipments.filter((s) => s.contractId === contract.id).sort((a, b) => (a.loadingDate || a.etd || a.planMonth).localeCompare(b.loadingDate || b.etd || b.planMonth));
+  // Chuyến gộp của HĐ khác có hàng của HĐ này (ba-spec 70): chỉ xem, các bước theo dõi ở hồ sơ HĐ chính của chuyến.
+  const carried = data.shipments.filter((s) => s.contractId !== contract.id && s.status === "open" && carriesContract(data, s, contract.id));
   const isOpen = contract.status === "open";
   const currency = terms?.currency || "USD";
   const pay = contractPaymentSummary(data, contract.id);
@@ -603,6 +608,24 @@ export function ContractDossier({
           {shipments.map((s) => (
             <ShipmentRow key={s.id} data={data} shipment={s} selected={s.id === selectedShipmentId} onSelect={() => onSelectShipment(s.id)} filesAvailable={filesAvailable} />
           ))}
+        </section>
+      )}
+
+      {carried.length > 0 && (
+        <section data-tour="export-carried-shipments" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 rounded-lg border border-dashed border-border p-3">
+          <h3 className="font-semibold">Đi chung chuyến của hợp đồng khác</h3>
+          <p className="text-sm text-muted-foreground">Cont chở hàng của nhiều hợp đồng cùng khách. Phần của hợp đồng này đã tính vào đã giao, còn phải giao; các bước của chuyến theo dõi ở hồ sơ hợp đồng chính của chuyến.</p>
+          {carried.map((s) => {
+            const main = data.contracts.find((c) => c.id === s.contractId);
+            const a = shipmentContractActuals(data, s, contract.id);
+            return (
+              <p key={s.id} className="tnum border-t border-border pt-2 text-sm break-words">
+                <span className="font-medium">{[s.lotCode && `Lô ${s.lotCode}`, shipmentKindLabel(s.kind), s.containerNo].filter(Boolean).join(" · ") || "Chuyến chưa có mã lô"}</span>
+                {` · HĐ chính ${main?.contractNo || "(chưa có số)"} · tháng ${shipmentMonth(s).slice(5)}/${shipmentMonth(s).slice(0, 4)} · phần của HĐ này ${formatNumber(a.kg)} kg`}
+                {can.viewPrice ? ` · ${formatMoney(a.amount)} ${currency}` : ""}
+              </p>
+            );
+          })}
         </section>
       )}
 

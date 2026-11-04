@@ -59,6 +59,10 @@ import {
   termsOf,
   workingRevision,
   contractChangeSummary,
+  addableContracts,
+  shipmentContractIds,
+  shipmentContractLines,
+  lineContractOf,
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
 import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportShipmentLine, type ExportStepItem } from "@/types";
@@ -470,14 +474,18 @@ export default function ExportPlanningScreen() {
   const goodsLabel = (s: ExportShipment) => [s.lotCode && `Lô ${s.lotCode}`, shipmentKindLabel(s.kind), s.containerNo].filter(Boolean).join(" · ") || "Chuyến chưa có mã lô";
 
   const openShipmentLines = (s: ExportShipment) => {
+    // Σ kiện các chuyến KHÁC theo id dòng HĐ — kể cả chuyến gộp của HĐ chính khác (ba-spec 70: id dòng HĐ không trùng giữa các HĐ).
     const other: Record<string, number> = {};
     for (const l of d.shipmentLines ?? []) {
       if (l.shipmentId === s.id) continue;
       const sh = d.shipments.find((x) => x.id === l.shipmentId);
-      if (!sh || sh.status === "cancelled" || sh.contractId !== s.contractId) continue;
+      if (!sh || sh.status === "cancelled") continue;
       other[l.contractLineId] = (other[l.contractLineId] ?? 0) + (lineUnits(l) ?? 0);
     }
-    setLinesTarget({ shipment: s, label: goodsLabel(s), contractLines: workingRevision(d, s.contractId)?.lines ?? [], lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), otherShipmentUnits: other });
+    const group = (c: ExportContract | undefined, id: string) => ({ contractId: id, contractNo: c?.contractNo ?? "", lines: workingRevision(d, id)?.lines ?? [] });
+    const groups = shipmentContractIds(d, s).map((id) => group(d.contracts.find((c) => c.id === id), id));
+    const addable = addableContracts(d, s, opts).map((c) => group(c, c.id));
+    setLinesTarget({ shipment: s, label: goodsLabel(s), groups, addable, lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), otherShipmentUnits: other });
   };
 
   const saveShipmentLines = (s: ExportShipment, lines: ExportShipmentLine[]): boolean => {
@@ -491,7 +499,7 @@ export default function ExportPlanningScreen() {
   };
 
   const openLoadingCount = (s: ExportShipment) =>
-    setCountTarget({ shipment: s, label: goodsLabel(s), lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), contractLines: workingRevision(d, s.contractId)?.lines ?? [] });
+    setCountTarget({ shipment: s, label: goodsLabel(s), lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), contractLines: shipmentContractLines(d, s), lineContract: lineContractOf(d, s) });
 
   /** Đóng cont điền số thực đóng: cập nhật dòng đã có, thêm dòng mới lấy từ dòng HĐ (mig 0098). */
   const saveLoadingCount = (s: ExportShipment, lines: ExportShipmentLine[]): boolean => {

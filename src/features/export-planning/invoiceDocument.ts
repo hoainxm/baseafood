@@ -5,7 +5,7 @@
 // ============================================================
 import { notify } from "@/design-system";
 import { EMPTY_COMPOSITION, bankAccountsOf, bankBlockLines, buildInvoiceDocument, defaultTradeTerms, invoiceUnitPrice, shipmentLinesOf } from "@/lib/exportInvoice";
-import { documentItems, termsOf, workingRevision, type ExportData } from "@/lib/exportPlanning";
+import { documentItems, linesWithContractNo, shipmentContractLines, termsOf, type ExportData } from "@/lib/exportPlanning";
 import { fetchCompanyLogoBytes } from "@/lib/companyAssets";
 import type { CompanySeller } from "@/lib/companyProfile";
 import type { Customer, ExportContract, ExportShipment, ExportStepItem } from "@/types";
@@ -14,8 +14,9 @@ import type { Customer, ExportContract, ExportShipment, ExportStepItem } from "@
 export function invoiceDocumentFor(data: ExportData, shipment: ExportShipment, contract: ExportContract, customer: Customer | undefined, item: ExportStepItem | undefined, bankOptions: Parameters<typeof bankAccountsOf>[0], seller?: CompanySeller) {
   const comp = item?.invoiceComposition ?? EMPTY_COMPOSITION;
   const terms = termsOf(data, contract.id);
-  const contractLines = workingRevision(data, contract.id)?.lines ?? [];
-  const lines = shipmentLinesOf(data.shipmentLines ?? [], shipment.id);
+  // Chuyến gộp nhiều HĐ (ba-spec 70): giá theo dòng của đúng HĐ, tên hàng ghi kèm số HĐ gốc.
+  const contractLines = shipmentContractLines(data, shipment);
+  const lines = linesWithContractNo(data, shipment, shipmentLinesOf(data.shipmentLines ?? [], shipment.id));
   const banks = bankAccountsOf(bankOptions);
   const bank = banks.find((b) => b.id === comp.bankOptionId) ?? banks[0];
   const pod = shipment.portOfDischarge || terms.portOfDischarge;

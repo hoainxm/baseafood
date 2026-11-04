@@ -51,11 +51,13 @@ import {
   validateScheduleRows,
 } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
-import { useComposedDocuments } from "@/lib/catalogRepo";
+import { useCompanyProfileStore, useComposedDocuments } from "@/lib/catalogRepo";
+import { companySellerOf } from "@/lib/companyProfile";
+import { invoiceDocumentFor, packingListPdfFile } from "./invoiceDocument";
 import { SHIPPING_INSTRUCTION_DOC, siFromValues, siTotals } from "@/lib/shippingInstruction";
 import { invoiceNameLines } from "@/lib/invoiceReader";
 import type { Customer, CustomerProductName, ExportContractLine, ExportLoadingExtraStep, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem, Product } from "@/types";
-import { CalendarPlus, Camera, ClipboardList, Container, Plus, Save, Trash2 } from "lucide-react";
+import { CalendarPlus, Camera, ClipboardList, Container, FileText, Plus, Save, Trash2 } from "lucide-react";
 import { FileList, FilePicker, type PreviewTarget } from "./parts";
 import { InvoiceReadPanel, type InvoiceReadState } from "./InvoiceReadPanel";
 import { InvoiceComposePanel } from "./InvoiceComposePanel";
@@ -641,6 +643,27 @@ export function StepItemDialog({
   const isInvoice = item?.docKind === "commercial-invoice";
   const isBl = item?.docKind === "bill-of-lading";
   const isPackingList = item?.docKind === "packing-list";
+  const company = useCompanyProfileStore();
+  const bankPicker = useExportOptionPicker();
+  /** Tạo PDF Packing list theo invoice rồi đưa vào ô file (lưu khi chọn Lưu) — Phòng KH 2026-11-04. */
+  const makePackingListFile = async () => {
+    if (!item || !tgt) return;
+    const ship = data.shipments.find((x) => x.id === item.shipmentId);
+    const contract = data.contracts.find((c) => c.id === (ship?.contractId ?? tgt.contractId));
+    const ci = documentItems(data, item.shipmentId).find((x) => x.docKind === "commercial-invoice");
+    if (!ship || !contract || !ci) return;
+    setBusy(true);
+    try {
+      const si = composedDocs.find((x) => x.docType === SHIPPING_INSTRUCTION_DOC && x.sourceId === ship.id) ?? null;
+      const doc = invoiceDocumentFor(data, ship, contract, customers.find((c) => c.id === contract.customerId), ci, bankPicker.options, companySellerOf(company.profile), si);
+      setFiles([await packingListPdfFile(doc, ci.number, company.profile.logoPath)]);
+      if (item.state === "not-started") set("state", "done");
+    } catch (e) {
+      notify.error(`Không tạo được file Packing list: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
   const [composedDocs] = useComposedDocuments();
   const packingRef = useMemo(() => {
     if (!isPackingList || !item) return null;
@@ -854,6 +877,20 @@ export function StepItemDialog({
                 <div className="grid gap-3">
                   {savedFiles.length > 0 && (
                     <FileList files={savedFiles} onPreview={onPreview} caption={title} onRemove={onRemoveFile} />
+                  )}
+                  {isPackingList && packingRef && hasExportStorage && !files.length && (
+                    <div className="grid gap-1">
+                      <Button
+                        className="h-auto min-h-9 max-w-full justify-self-start whitespace-normal"
+                        onClick={() => void makePackingListFile()}
+                        disabled={busy}
+                        title="Tạo file PDF Packing list từ Hàng của chuyến + Commercial Invoice (gross theo SI) rồi đính vào mục này; chọn Xong rồi Lưu."
+                      >
+                        <FileText className="mr-2 h-4 w-4" aria-hidden />
+                        {busy ? "Đang tạo file…" : "Tạo file Packing list từ invoice"}
+                      </Button>
+                      <span className="text-sm text-muted-foreground">Hoặc chọn file Packing list đã có ở dưới.</span>
+                    </div>
                   )}
                   {hasExportStorage ? (
                     <FilePicker files={files} onChange={setFiles} />

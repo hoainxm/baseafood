@@ -245,6 +245,8 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
     let totalAmount: number | null = null;
     let i = bodyStart;
     let prev: ReadContractLine | null = null;
+    // Tên hàng chung của các spec bên dưới (hàng chỉ có tên, không số — HĐ Peacock).
+    let title = "";
     for (; i < rows.length; i++) {
       const r = rows[i].map(clean);
       const first = r.find(Boolean) ?? "";
@@ -257,6 +259,16 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
         break;
       }
       if (r.filter(Boolean).length < 2) {
+        // Mô tả tiếp của spec phía trên ⇒ ghép vào dòng đó (như Chép dòng), không coi là hết bảng.
+        if (prev && SPEC_CONTINUATION.test(first)) {
+          const d = specificationDetails(first);
+          prev.pieceLength ||= d.pieceLength;
+          prev.partRatio ||= d.partRatio;
+          prev.piecesPerKg ||= d.piecesPerKg;
+          prev.size ||= d.size;
+          prev.note = [prev.note, first].filter(Boolean).join(" ");
+          continue;
+        }
         if (lines.length) break;
         continue;
       }
@@ -286,7 +298,20 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
         description = texts.find((t) => t !== size && t !== packing && /[a-z]{3}/i.test(t)) ?? "";
       }
       if (kg != null) kg *= qtyFactor;
-      if (kg == null && price == null && cartons == null && !size) continue;
+      // "Tên hàng Specification 1: …" ⇒ tên hàng + chữ spec; hàng chỉ có tên (không số) ⇒ nhớ làm tên chung.
+      const split = splitSpecification(description);
+      if (split.spec || SPEC_START.test(description)) {
+        if (split.title) title = split.title;
+        description = title || split.title;
+      }
+      if (kg == null && price == null && cartons == null && !size) {
+        if (description && !split.spec) title = description;
+        continue;
+      }
+      const spec = split.spec ? specificationDetails(split.spec) : null;
+      if (!size && spec?.size) size = spec.size;
+      // Ô gộp dọc (Packing chung cho mọi spec) chỉ có ở hàng đầu ⇒ chép từ dòng trên.
+      if (!packing && prev && title && prev.description === description) packing = prev.packing;
       const ratio = cell("ratio") || prev?.partRatio || "";
       if (!description && prev && cols.includes("description")) description = prev.description;
       // Không có cột Size: lấy "size 1.3 – 1.8 cm" trong tên hàng (tên giữ nguyên như trên HĐ).
@@ -306,11 +331,11 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
         kg,
         unitPrice: pricePerCarton ? null : price,
         amount,
-        piecesPerKg: cell("pcsPerKg"),
-        pieceLength: cell("length"),
-        partRatio: ratio,
+        piecesPerKg: cell("pcsPerKg") || spec?.piecesPerKg || "",
+        pieceLength: cell("length") || spec?.pieceLength || "",
+        partRatio: cell("ratio") || spec?.partRatio || ratio,
         hsCode: cell("hs"),
-        note: extras.join(" · "),
+        note: [extras.join(" · "), split.spec].filter(Boolean).join(" · "),
       };
       lines.push(line);
       prev = line;
@@ -319,6 +344,30 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
     return { start: h, end: i, lines, totalKg, totalAmount, warnings, headerText: headers.filter(Boolean).join(" ") };
   }
   return null;
+}
+
+/* ---------- HĐ ghi tên hàng một lần rồi liệt kê "Specification 1, 2…" (Peacock 02-26-PC, 2026-11-04) ---------- */
+
+const SPEC_START = /\b(?:specification|spec\.?|quy\s*cách)\s*\d*\s*[:：]/i;
+/** Hàng chỉ một ô là mô tả tiếp của spec phía trên ("- Length: max 3.5 cm.") — không phải hết bảng. */
+const SPEC_CONTINUATION = /^\s*[-–•*]|^(?:size|length|ratio|pcs|bacteria|e\.?\s*coli|coliform|salmonella|tpc|chiều dài|tỉ lệ|số miếng)\b/i;
+
+/** Tách "Frozen Blanched cut Octopus Specification 1: - Size …" ⇒ tên hàng + chữ của spec. */
+export function splitSpecification(text: string): { title: string; spec: string } {
+  const m = SPEC_START.exec(text);
+  if (!m) return { title: text, spec: "" };
+  return { title: clean(text.slice(0, m.index)), spec: clean(text.slice(m.index + m[0].length)) };
+}
+
+/** Size · số miếng / kg · chiều dài · tỉ lệ trong chữ của spec ("- Size 1.3 – 1.4 gr (700-750 pcs/kg) - Length: max 3.5 cm."). */
+export function specificationDetails(spec: string): { size: string; piecesPerKg: string; pieceLength: string; partRatio: string } {
+  const part = (re: RegExp) => clean(spec.match(re)?.[1]).replace(/[.;,]$/, "");
+  return {
+    size: part(/\bsize\s*:?\s*([\d.,]+\s*[-–~]\s*[\d.,]+\s*(?:grs?|gr|g|cm|kg)?\b\.?)/i),
+    piecesPerKg: part(/([\d.,]+\s*[-–~]\s*[\d.,]+)\s*(?:pcs|pieces|pc)\s*\/\s*kg/i),
+    pieceLength: part(/\blength\s*:?\s*(.+?)(?=\s+[-–]\s|\s*\bratio\b|$)/i),
+    partRatio: part(/\bratio\b[^:]*:\s*(.+?)(?=\s+[-–]\s|\s*\bbacteria\b|$)/i),
+  };
 }
 
 /* ---------- Bảng của PDF xuất từ Word: ghép lại theo tọa độ ---------- */

@@ -104,3 +104,15 @@ function saveBlob(blob: Blob, fileName: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/**
+ * File PDF chỉ gồm Packing list (+ Expiry date list khi có) của bộ chứng từ — đính thẳng vào mục Packing List
+ * (Phòng KH 2026-11-04: file Packing list nằm chung trong file tải ở mục Commercial Invoice, khó tìm).
+ */
+export async function packingListPdfFile(doc: ReturnType<typeof buildInvoiceDocument>, invoiceNo: string, logoPath = ""): Promise<File> {
+  const { invoicePdfBytes } = await import("@/lib/exportInvoicePdf");
+  const only = { ...doc, sheets: doc.sheets.filter((s) => s.name !== "INVOICE") };
+  const bytes = await invoicePdfBytes(only, await logoBytes(logoPath));
+  const name = `PACKING LIST ${invoiceNo.trim() || "chuyen"}`.replace(/[\\/:*?"<>|]+/g, ".") + ".pdf";
+  return new File([bytes as BlobPart], name, { type: "application/pdf" });
+}

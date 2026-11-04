@@ -152,3 +152,4 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 - 2026-11-03 — R10 + AC-10: tải bản Word (chủ dự án).
 - 2026-11-03 — R11 + AC-11, R4/R5 sửa: bộ phận đóng cont tự điền số thực đóng không chờ Phòng KH; mig 0098 mở cho U4 thêm dòng lấy từ dòng HĐ (chủ dự án đồng ý, 🔴 đổi luật quyền).
 - 2026-11-04: R11 (đơn giá theo bản HĐ đang dùng, nối dòng của bản cũ; cảnh báo đích danh) + R12 (Packing list gross theo SI, mục PL tự điền theo invoice). Test `contractLineRevisions.test.ts`.
+- 2026-11-04 (b): mục Packing List có nút Tạo file Packing list từ invoice ⇒ PDF chỉ gồm Packing list (+ Expiry date list), gross theo SI, đưa vào ô file của mục (Phòng KH: file nằm chung trong file invoice, khó tìm). Test `packingListFile.test.ts`.

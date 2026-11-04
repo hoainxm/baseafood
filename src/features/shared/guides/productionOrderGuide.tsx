@@ -37,7 +37,7 @@ export const ORDER_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Lập lệnh",
     needs: ["production-orders", "create"],
     actors: ["planning"],
-    text: "Chọn hợp đồng xuất, chọn dòng hàng và gõ số thùng: kg tự tính. Ghi số lệnh, mã số lô, các ngày sản xuất, ngày giao.",
+    text: "Chọn hợp đồng xuất, chọn dòng hàng và gõ số thùng: kg tịnh tự tính. Ghi số lệnh, mã số lô, các ngày sản xuất, ngày giao.",
     done: "Lưu xong, không cần ai duyệt",
     result: { label: ORDER_STATUS_LABELS.draft, tone: "pending" },
   },

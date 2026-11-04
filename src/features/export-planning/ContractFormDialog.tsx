@@ -861,7 +861,7 @@ export function ContractFormDialog({
                       <NumberField label="Số lượng" unit={l.unitKind === "bundle" ? "kiện" : "thùng"} value={l.quantity} onChange={(v) => setLine(l.id, { quantity: v })} />
                       <NumberField label="Kg tịnh / thùng" value={l.netKgPerCarton} onChange={(v) => setLine(l.id, { netKgPerCarton: v })} />
                       <NumberField
-                        label={l.kg != null ? "Kg (gõ tay)" : "Kg (tự tính)"}
+                        label={l.kg != null ? "Kg tịnh (gõ tay)" : "Kg tịnh (tự tính)"}
                         value={l.kg ?? auto}
                         onChange={(v) => setLine(l.id, { kg: v != null && auto != null && Math.abs(v - auto) < 0.005 ? null : v })}
                       />

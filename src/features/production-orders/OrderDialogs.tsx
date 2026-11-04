@@ -347,9 +347,9 @@ export function OrderFormDialog({
                   <Combobox label={`Dòng hàng ${i + 1}`} required value={lf.contractLineId} onChange={(v) => setLine(lf.id, { contractLineId: v })} options={lineOptions} />
                   <NumberField label={cl?.unitKind === "bundle" ? "Số kiện" : "Số thùng"} required value={lf.units} onChange={(v) => setLine(lf.id, { units: v })} />
                   {cl && cl.netKgPerCarton == null ? (
-                    <NumberField label="Kg" required unit="kg" value={lf.kg} onChange={(v) => setLine(lf.id, { kg: v })} hint="Hợp đồng chưa có kg tịnh mỗi thùng — gõ kg" />
+                    <NumberField label="Kg tịnh" required unit="kg" value={lf.kg} onChange={(v) => setLine(lf.id, { kg: v })} hint="Hợp đồng chưa có kg tịnh mỗi thùng — gõ kg" />
                   ) : (
-                    <Field label="Kg (tự tính)">
+                    <Field label="Kg tịnh (tự tính)">
                       <p className="tnum py-2">{auto == null ? "—" : `${formatNumber(auto)} kg`}</p>
                     </Field>
                   )}

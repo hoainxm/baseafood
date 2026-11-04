@@ -4,7 +4,8 @@
 covers: src/features/production-orders/*, src/lib/productionOrder.ts, src/lib/productionOrderReports.ts, src/lib/documentComposer.ts, src/lib/documentTypes/productionOrder*.ts
 tours: src/features/production-orders/productionOrderTour.ts
 guides: src/features/shared/guides/productionOrderGuide.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-04
+<!-- re-verified: 2026-11-04 — nhãn "Kg (tự tính)" của dòng lệnh đổi thành "Kg tịnh (tự tính)" (ô gõ tay: "Kg tịnh") cho khỏi nhầm với kg cả bì; không đổi luật, không đổi quyền. -->
 ttl_days: 90
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ).

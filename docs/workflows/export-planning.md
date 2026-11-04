@@ -5,6 +5,8 @@ covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/expor
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-04
+<!-- re-verified: 2026-11-04 — tab Hợp đồng thêm cột Hạn hợp đồng (ngày + Còn n ngày / Đã hết hạn, sắp xếp theo ngày) — chị Thảo; chỉ hiển thị, không đổi luật. -->
+<!-- re-verified: 2026-11-04 — nhãn "Kg (tự tính)" / "Kg (gõ tay)" của dòng hàng HĐ đổi thành "Kg tịnh (…)" (= số thùng × kg tịnh mỗi thùng, không phải gross); không đổi luật. -->
 <!-- re-verified: 2026-11-04 — chỉ sửa chữ: title tab Lịch xuất hàng + lời tour bước "tabs" nói "xếp theo ngày xuất" (ba-spec 57 v2) thay "gom theo khách"; không đổi trạng thái, không đổi quyền. -->
 <!-- re-verified: 2026-11-04 (ba-spec 72) — bước 4: Lệnh xuất lập trong app (bộ soạn, xuất Word = Xong), mục SI bắt buộc ngay sau Số cont + seal (chuyến cont lạnh; cũ / xe tải / đóng ghép Không áp dụng), ảnh cont / seal (người đóng hàng đính được — đổi RLS export_files 0103). -->
 <!-- re-verified: 2026-11-03 (ba-spec 71) — bước 4: hàng File booking thành khối Booking 12 trường (đọc file booking) + hàng Thông tin xe vận chuyển; không trạng thái, không đổi 6 bước, không đổi quyền (người đóng hàng chỉ xem). -->

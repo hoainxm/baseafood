@@ -21,6 +21,7 @@ import {
   type ExportData,
 } from "@/lib/exportPlanning";
 import { formatDateVN, formatMoney } from "@/lib/format";
+import { validityLabel, validityState } from "@/lib/contractValidity";
 import { ALL, matchesSearch, matchesValue } from "@/lib/recordFilters";
 import type { Customer, ExportContract } from "@/types";
 import { Eye } from "lucide-react";
@@ -86,6 +87,26 @@ export function ContractListView({
         </span>
       ),
       getSortValue: (c) => effectiveDeadline(data, c.id),
+    },
+    {
+      // Hạn hợp đồng (ba-spec 69 R4, chị Thảo 2026-11-04: thêm vào danh sách HĐ) — ngày + "Còn n ngày" / "Đã hết hạn".
+      key: "validity",
+      // "Hạn HĐ" cho cột hẹp — đủ tên ở hồ sơ HĐ; bảng không tràn ngang ở 1366 px.
+      header: "Hạn HĐ",
+      render: (c) => {
+        const until = workingRevision(data, c.id)?.terms.contractValidUntil;
+        if (!until) return <span className="text-muted-foreground" title="Chưa ghi hạn hợp đồng">—</span>;
+        const st = stateOf(c);
+        const v = validityState(until, today, st !== "closed" && st !== "cancelled");
+        return (
+          <span className="tnum grid justify-items-start gap-0.5">
+            <span>{formatDateVN(until)}</span>
+            {v.kind !== "none" && v.kind !== "ok" && <Tag variant={v.kind === "expired" ? "error" : "warning"}>{validityLabel(v)}</Tag>}
+          </span>
+        );
+      },
+      getSortValue: (c) => workingRevision(data, c.id)?.terms.contractValidUntil || null,
+      sortKind: "date",
     },
     {
       key: "size",

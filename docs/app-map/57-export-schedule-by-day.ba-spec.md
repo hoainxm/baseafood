@@ -2,7 +2,7 @@
 
 > Load khi: sửa tab **Lịch xuất hàng** của `/planning-export` — cách xếp chuyến trong kỳ, số khách / chuyến mỗi ngày, mở chi tiết một ngày, khối chuyến chưa có ngày.
 covers: src/features/export-planning/MonthView.tsx, src/lib/exportDaySchedule.ts
-last_verified: 2026-11-02
+last_verified: 2026-11-04
 ttl_days: 90
 status: v1 ĐÃ BUILD 2026-11-02 — `lib/exportDaySchedule.ts` (`buildDaySchedule`, `defaultOpenDay`, 8 test AC-1…AC-7), `MonthView.tsx` danh sách ngày mở / thu; AC-8 thử tay trên sandbox (bấm ngày → Mở ⇒ URL có contract + shipment); tour + hộp "?" (AC-9). Sửa phần Output "chuyến gom theo khách" của Flow NV11 ở [41](41-export-planning.ba-spec.md); mọi luật khác của NV11 (kỳ xem, lọc khách, tra cứu, 4 thẻ số, Excel, HĐ chưa ghi đủ chuyến) giữ nguyên.
 
@@ -51,7 +51,7 @@ N/A — không cross. Tab chỉ đọc; xử lý chuyến vẫn ở hồ sơ HĐ
 - **Input:** chuyến của ngày đó.
 - **Steps:** gom theo khách (tên khách tăng dần) → mỗi chuyến hiện đủ thông tin như bảng cũ (lô, loại, HĐ, hàng, kg kế hoạch · thực xuất, tiến độ 6 bước, bước tiếp, Trễ / Chờ booking).
 - **Output:** chi tiết ngày; chọn một chuyến ⇒ mở hồ sơ HĐ đúng chuyến (như nút Mở hiện có). Chọn ngày khác ⇒ chi tiết đổi theo (không thu / mở).
-- **End:** vào hồ sơ chuyến, hoặc thu lại.
+- **End:** vào hồ sơ chuyến, hoặc chọn ngày khác.
 
 ### Flow NV3 — Chưa có ngày · owner U1
 - **Input:** chuyến của kỳ KHÔNG có ngày đóng cont lẫn ETD (chỉ có tháng kế hoạch) + HĐ chưa ghi đủ chuyến (41 NV11 / NV12).
@@ -104,7 +104,7 @@ N/A — không cross. Tab chỉ đọc; xử lý chuyến vẫn ở hồ sơ HĐ
 |---|---|---|---|
 | Danh sách ngày | cách xếp | theo ngày xuất = ngày đóng cont, chưa có thì ETD; chỉ ngày có chuyến | R1, R2 |
 | Mục ngày | con số | "n khách · m chuyến"; dấu "n trễ" · "n còn thiếu" | R3, R7 |
-| Chi tiết ngày | cách mở | chọn ngày để xem chuyến gom theo khách, chọn lại để thu; Mở ⇒ hồ sơ HĐ | NV2 |
+| Chi tiết ngày | cách mở | luôn có một ngày đang chọn (ngày có chuyến gần nhất từ hôm nay); chọn ngày khác ⇒ chi tiết đổi theo, chuyến gom theo khách; điện thoại: chạm ngày ⇒ chi tiết, Quay lại ⇒ danh sách; Mở ⇒ hồ sơ HĐ | NV2, R9 |
 | Chuyến chưa có ngày | vì sao ở đây | chuyến mới có tháng kế hoạch, chưa có ngày đóng / ETD; ghi ngày thì tự vào danh sách | R1 |
 
 ## 10. Acceptance Criteria
@@ -165,10 +165,11 @@ N/A — không cross. Tab chỉ đọc; xử lý chuyến vẫn ở hồ sơ HĐ
 
 ## 11. Assumptions / Open
 
-- **Assumptions:** (a) mục ngày hiện thêm tên các khách (theo bản xem trước chủ dự án chọn); (b) R9 ngày mở sẵn; (c) chọn ngày khác thì ngày đang mở vẫn mở (mở nhiều ngày cùng lúc được); (d) điện thoại / iPad dùng cùng danh sách (không có lưới nên không phải đổi hình); (e) tô màu dòng giữ theo chuyến, khóa `export-plan:<kỳ>:<ngày>`.
+- **Assumptions:** (a) mục ngày hiện thêm tên các khách (theo bản xem trước chủ dự án chọn); (b) R9 ngày mở sẵn; (c) ~~chọn ngày khác thì ngày đang mở vẫn mở~~ — bỏ ở v2: mỗi lúc chỉ một ngày đang chọn (R9); (d) điện thoại (< md) một cột: danh sách ngày → chi tiết → Quay lại; iPad ngang trở lên hai cột; (e) tô màu dòng giữ theo chuyến, khóa `export-plan:<kỳ>:<ngày>`.
 - **Open (RED):** không có.
 
 ## History
 
+- v2.1 (2026-11-04): dọn chữ còn sót của bản thu / mở v1 (§9b "chọn lại để thu", End của NV2, Assumption c / d) cho khớp v2. Không đổi luật.
 - v2 (2026-11-02): chủ dự án thấy thu / mở chưa trực quan ⇒ chọn phương án A (hai cột ngày | chi tiết, điện thoại danh sách → chi tiết). Sửa NV2, R9, AC-7; mục Chưa có ngày vào cuối danh sách.
 - v1 (2026-11-02): khởi tạo — chủ dự án chốt: danh sách theo ngày · bấm ngày mở chi tiết gom theo khách · mỗi ngày số khách + số chuyến · chuyến chưa có ngày + HĐ chưa đủ chuyến ở khối riêng.

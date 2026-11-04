@@ -925,7 +925,7 @@ export default function ExportPlanningScreen() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Tabs value={view} onValueChange={(v) => setParam({ view: v === "contracts" || v === "reports" || v === "catalog" ? v : "", list: "" }, true)}>
               <TabsList data-tour="export-tabs" className="grid w-full grid-cols-2 items-stretch group-data-horizontal/tabs:h-auto sm:inline-flex sm:w-fit sm:max-w-full sm:flex-wrap">
-                <TabsTrigger value="month" className={TAB_TRIGGER} title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày đóng cont, gom theo khách.">
+                <TabsTrigger value="month" className={TAB_TRIGGER} title="Lịch xuất hàng: chuyến theo tháng / tuần / khoảng ngày, xếp theo ngày xuất (đóng cont, chưa có thì ETD) — chọn một ngày để xem chuyến gom theo khách.">
                   <CalendarDays className="mr-2 h-4 w-4" aria-hidden />
                   Lịch xuất hàng
                 </TabsTrigger>

@@ -5,6 +5,8 @@ covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/expor
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-04
+<!-- re-verified: 2026-11-04 — SI mở lại lấy tên hàng + HS theo HĐ hiện tại (giữ số kiện / gross đã gõ); ô Số của Lệnh xuất ghi định dạng STT/tháng-năm; không đổi luật Xong, không đổi quyền. -->
+<!-- re-verified: 2026-11-04 — form Lập / Sửa HĐ thêm ô Địa chỉ khách hàng (lưu vào danh mục khách, Consignee của SI) — chị Thảo; không đổi luật, không đổi quyền. -->
 <!-- re-verified: 2026-11-04 — tab Hợp đồng thêm cột Hạn hợp đồng (ngày + Còn n ngày / Đã hết hạn, sắp xếp theo ngày) — chị Thảo; chỉ hiển thị, không đổi luật. -->
 <!-- re-verified: 2026-11-04 — nhãn "Kg (tự tính)" / "Kg (gõ tay)" của dòng hàng HĐ đổi thành "Kg tịnh (…)" (= số thùng × kg tịnh mỗi thùng, không phải gross); không đổi luật. -->
 <!-- re-verified: 2026-11-04 — chỉ sửa chữ: title tab Lịch xuất hàng + lời tour bước "tabs" nói "xếp theo ngày xuất" (ba-spec 57 v2) thay "gom theo khách"; không đổi trạng thái, không đổi quyền. -->

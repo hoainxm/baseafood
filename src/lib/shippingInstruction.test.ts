@@ -183,3 +183,17 @@ describe("AC-4: xuất file Lệnh xuất ⇒ mục Xong", () => {
     expect(subStepState(withFile, "s1", "export-order")).toBe("done");
   });
 });
+
+describe("SI mở lại theo hợp đồng hiện tại (v1.5)", () => {
+  it("sửa tên hàng ở HĐ ⇒ SI đã lưu lấy tên mới, giữ số kiện / gross đã gõ", () => {
+    const line = { id: "l1", shipmentId: "s1", contractId: "c1", sortOrder: 1, contractLineId: "cl1", description: "OCTOPUS SAI TÊN", grossKgPerUnit: null, plannedUnits: 100, loadedUnits: null } as ExportShipmentLine;
+    const oldCl = [{ id: "cl1", hsCode: "0307.52", description: "OCTOPUS SAI TÊN" }] as ExportContractLine[];
+    const first = initialSi({ saved: null, previous: null, customer: { name: "K" }, goods: siGoodsRows("s1", [line], oldCl).rows, today: "2026-11-04" });
+    const savedValues = siToValues({ ...first, goods: first.goods.map((g) => ({ ...g, grossKg: 1234 })) });
+    const saved = newSiDocument({ id: "s1", lotCode: "" }, "", "K", savedValues, { id: "d", by: "a", at: "2026-11-04T00:00:00Z" });
+    const newCl = [{ id: "cl1", hsCode: "0307.59", description: "FROZEN OCTOPUS" }] as ExportContractLine[];
+    const again = initialSi({ saved, previous: null, customer: { name: "K" }, goods: siGoodsRows("s1", [line], newCl).rows, today: "2026-11-05" });
+    expect(again.goods[0]).toMatchObject({ description: "FROZEN OCTOPUS", hsCode: "0307.59", packages: 100, grossKg: 1234 });
+    expect(again.date).toBe("2026-11-04");
+  });
+});

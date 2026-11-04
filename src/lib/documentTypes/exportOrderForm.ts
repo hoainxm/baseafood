@@ -108,7 +108,8 @@ const yesNo = (key: string, label: string, group: string): DocumentField[] => [
 
 /** Ô Lệnh xuất theo thứ tự mẫu QTI-KH-01-07 (R1–R5). */
 export const EXPORT_ORDER_FIELDS: readonly DocumentField[] = [
-  { key: "orderNo", label: "Số", group: G.head, kind: "text", required: true, carryOver: false },
+  // Định dạng số lệnh (chị Thảo 2026-11-04): STT/tháng-năm — lệnh số 01 tháng 10/2026 ghi "01/10-26".
+  { key: "orderNo", label: "Số (STT/tháng-năm, VD 01/10-26)", group: G.head, kind: "text", required: true, carryOver: false },
   { key: "orderDate", label: "Ngày lệnh", group: G.head, kind: "date", required: true, mapped: true },
   { key: "toDong", label: "Phân xưởng Đông", group: G.head, kind: "check", defaultValue: false, carryOver: true },
   { key: "toCa", label: "Phân xưởng Cá", group: G.head, kind: "check", defaultValue: false, carryOver: true },

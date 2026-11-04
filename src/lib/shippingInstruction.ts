@@ -15,6 +15,8 @@ export const PAYMENT_TERMS = ["PREPAID", "COLLECT", "3rd COUNTRY"] as const;
 
 /** Một dòng hàng của SI (dòng 33–36 của mẫu): số kiện + gross sửa được. */
 export interface SiGoodsRow {
+  /** Dòng HĐ của dòng hàng — khóa giữ số kiện / gross đã sửa khi dựng lại dòng (R11, v1.5). "" = dòng thêm tay. */
+  contractLineId?: string;
   description: string;
   hsCode: string;
   packages: number | null;
@@ -129,7 +131,9 @@ export function siGoodsRows(
       const packages = l.loadedUnits ?? l.plannedUnits;
       const gross = packages != null && l.grossKgPerUnit != null ? Math.round(packages * l.grossKgPerUnit * 100) / 100 : null;
       if (gross == null) warnings.push(`Dòng ${i + 1} (${l.description || "chưa có tên"}): thiếu kg cả bì hoặc số kiện — gõ gross tay.`);
-      return { description: l.description || byId.get(l.contractLineId)?.description || "", hsCode: byId.get(l.contractLineId)?.hsCode ?? "", packages, grossKg: gross };
+      // Tên + HS lấy theo dòng HĐ HIỆN TẠI (mẫu SI: "link từ hợp đồng") — sửa tên ở HĐ thì SI theo (v1.5).
+      const cl = byId.get(l.contractLineId);
+      return { contractLineId: l.contractLineId, description: cl?.description?.trim() || l.description, hsCode: cl?.hsCode ?? "", packages, grossKg: gross };
     });
   return { rows, warnings };
 }
@@ -164,14 +168,14 @@ const numOrNull = (v: unknown) => (typeof v === "number" ? v : typeof v === "str
 
 export function siFromValues(v: DocumentValues): SiForm {
   const goods = Array.isArray(v.goods)
-    ? v.goods.map((r) => ({ description: str(r.description), hsCode: str(r.hsCode), packages: numOrNull(r.packages), grossKg: numOrNull(r.grossKg) }))
+    ? v.goods.map((r) => ({ contractLineId: str(r.contractLineId), description: str(r.description), hsCode: str(r.hsCode), packages: numOrNull(r.packages), grossKg: numOrNull(r.grossKg) }))
     : [];
   const carry = Object.fromEntries(SI_CARRY_KEYS.map((k) => [k, str(v[k]) || EMPTY_SI_CUSTOMER[k]])) as unknown as SiCustomerFields;
   return { ...carry, date: str(v.date), cbm: str(v.cbm), goods };
 }
 
 export function siToValues(f: SiForm): DocumentValues {
-  const goods: DocumentRow[] = f.goods.map((r) => ({ ...r }));
+  const goods: DocumentRow[] = f.goods.map((r) => ({ ...r, contractLineId: r.contractLineId ?? "" }));
   return { ...Object.fromEntries(SI_CARRY_KEYS.map((k) => [k, f[k]])), date: f.date, cbm: f.cbm, goods };
 }
 
@@ -186,12 +190,27 @@ export function initialSi(input: {
   goods: SiGoodsRow[];
   today: string;
 }): SiForm {
-  if (input.saved) return siFromValues(input.saved.values);
+  if (input.saved) {
+    // Đã lưu: ô của khách + CBM giữ nguyên; dòng hàng dựng lại từ chuyến (tên + HS theo HĐ hiện tại), số kiện /
+    // gross đã gõ ở lần trước giữ lại theo dòng HĐ (bản lưu cũ không có khóa ⇒ theo thứ tự dòng).
+    const saved = siFromValues(input.saved.values);
+    return { ...saved, goods: mergeSavedGoods(input.goods, saved.goods) };
+  }
   const prev = input.previous ? siFromValues(input.previous.values) : null;
   const carry: SiCustomerFields = prev
     ? Object.fromEntries(SI_CARRY_KEYS.map((k) => [k, prev[k]])) as unknown as SiCustomerFields
     : { ...EMPTY_SI_CUSTOMER, consignee: [input.customer.name, input.customer.address ?? ""].map((x) => x.trim()).filter(Boolean).join("\n") };
   return { ...carry, date: input.today, cbm: "", goods: input.goods };
+}
+
+/** Dòng mới dựng từ chuyến + số kiện / gross đã lưu (khớp theo dòng HĐ, không có khóa thì theo thứ tự). */
+export function mergeSavedGoods(fresh: readonly SiGoodsRow[], saved: readonly SiGoodsRow[]): SiGoodsRow[] {
+  if (!fresh.length) return [...saved];
+  const keyed = saved.some((s) => s.contractLineId);
+  return fresh.map((r, i) => {
+    const old = keyed ? saved.find((s) => s.contractLineId && s.contractLineId === r.contractLineId) : saved[i];
+    return old ? { ...r, packages: old.packages, grossKg: old.grossKg } : r;
+  });
 }
 
 /** Tổng số kiện / gross của các dòng (dòng TOTAL của mẫu). */

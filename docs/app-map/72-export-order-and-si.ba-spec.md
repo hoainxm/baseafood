@@ -223,3 +223,5 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 - v1.1 (2026-11-04): ĐÃ BUILD — xem status + "Đã khác đặc tả lúc build".
 - v1.2 (2026-11-04): chị Thảo góp ý "chỗ SI là sau bước có cont / seal" ⇒ hàng SI chuyển lên ngay sau Số cont + seal (R10). Migration 0101–0103 người dùng báo đã chạy DB thật.
 - v1.3 (2026-11-04): người dùng hỏi vì sao chuyến báo "Không áp dụng — chuyến xong trước khi có mục SI" (mốc 05/11 ⇒ mọi chuyến hiện có là "cũ", nút Lập SI bị ẩn) ⇒ R14: chuyến cũ được miễn vẫn lập SI được, hàng SI ghi rõ lý do.
+- v1.4 (2026-11-04): Consignee chỉ có tên vì khách chưa có địa chỉ ⇒ form Lập / Sửa HĐ thêm ô **Địa chỉ khách hàng** (hiện khi đã chọn khách), lưu vào `Customer.address` của danh mục — R12 lấy tên + địa chỉ từ đó.
+- v1.5 (2026-11-04): chị Thảo: ô Số của Lệnh xuất ghi định dạng "STT/tháng-năm, VD 01/10-26" ngay ở nhãn. Chị Vi: sửa tên hàng ở HĐ mà SI không đổi ⇒ R11: mỗi lần mở SI, dòng hàng dựng lại — tên tiếng Anh + HS theo dòng HĐ HIỆN TẠI (dòng Hàng của chuyến chỉ dùng khi không nối dòng HĐ); số kiện / gross đã gõ giữ theo dòng HĐ (`mergeSavedGoods`).

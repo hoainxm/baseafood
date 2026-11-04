@@ -37,7 +37,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Lập hợp đồng",
     needs: ["export-plans", "create"],
     actors: KH,
-    text: "Chọn Lập hợp đồng, nhập đúng như bản giấy: khách, dòng hàng, giá, điều kiện giao, hạn giao, hạn hợp đồng (ngày hết hiệu lực, không bắt buộc; hiện ở cột Hạn HĐ của tab Hợp đồng kèm Còn n ngày / Đã hết hạn). Có file Word (.docx, .doc) hoặc PDF có chữ thì chọn ở Đọc file hợp đồng: app điền sẵn ô còn trống, ô khác file liệt kê để chọn, không tự lưu, phụ lục đọc được khi Ghi bản sửa; bản scan không đọc, đính làm bằng chứng.",
+    text: "Chọn Lập hợp đồng, nhập đúng như bản giấy: khách (kèm địa chỉ — dùng làm Consignee của SI), dòng hàng, giá, điều kiện giao, hạn giao, hạn hợp đồng (ngày hết hiệu lực, không bắt buộc; hiện ở cột Hạn HĐ của tab Hợp đồng kèm Còn n ngày / Đã hết hạn). Có file Word (.docx, .doc) hoặc PDF có chữ thì chọn ở Đọc file hợp đồng: app điền sẵn ô còn trống, ô khác file liệt kê để chọn, không tự lưu, phụ lục đọc được khi Ghi bản sửa; bản scan không đọc, đính làm bằng chứng.",
     done: "Lưu xong, không cần ai duyệt",
     result: { label: CONTRACT_STATE_LABELS.attaching, tone: "warning" },
   },
@@ -179,7 +179,7 @@ export const exportPlanningGuide: PageGuide = {
           <li>Hai hàng Booking và Thông tin xe không có trạng thái — không làm bước nào tự xong.</li>
           <li>
             <b>Lập lệnh xuất</b> (hàng Lệnh xuất): soạn Lệnh xuất hàng mẫu QTI-KH-01-07. Hàng, MSL, ngày sản xuất, hạn dùng lấy từ Lệnh sản xuất
-            đã phát hành; size, HS code từ hợp đồng; cut-off, ETD, ETA từ booking. Ghi số lệnh, số thùng / kg, phân xưởng nhận, các lưu ý Có /
+            đã phát hành; size, HS code từ hợp đồng; cut-off, ETD, ETA từ booking. Ghi số lệnh (STT/tháng-năm, VD 01/10-26), số thùng / kg, phân xưởng nhận, các lưu ý Có /
             Không (Có thì ghi rõ). Xuất Word là mục Lệnh xuất Xong.
           </li>
           <li>

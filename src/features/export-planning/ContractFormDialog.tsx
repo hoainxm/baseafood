@@ -79,6 +79,8 @@ interface ContractForm {
   revisionId: string;
   revisionNo: number;
   customerId: string;
+  /** Địa chỉ khách vừa gõ ở form — lưu vào danh mục khách khi lưu HĐ (Consignee của SI). `undefined` = chưa sửa. */
+  customerAddress?: string;
   contractNo: string;
   signedOn: string;
   orderRef: string;
@@ -99,7 +101,7 @@ interface ContractForm {
 }
 
 const snapshot = (f: ContractForm) =>
-  JSON.stringify([f.customerId, f.contractNo, f.signedOn, f.orderRef, f.note, f.revisedOn, f.changeSummary, f.terms, f.lines, f.schedule]);
+  JSON.stringify([f.customerId, f.customerAddress ?? null, f.contractNo, f.signedOn, f.orderRef, f.note, f.revisedOn, f.changeSummary, f.terms, f.lines, f.schedule]);
 
 const NEW_SCHEDULE = { enabled: true, edited: false, rows: [] as ScheduleRowForm[] };
 
@@ -335,6 +337,8 @@ export function ContractFormDialog({
         ? {
             ...f,
             customerId: id,
+            // Địa chỉ thuộc khách ⇒ đổi khách thì hiện lại địa chỉ của khách mới trong danh mục.
+            customerAddress: undefined,
             terms: {
               ...f.terms,
               portOfDischarge: f.terms.portOfDischarge || c?.defaultPort || "",
@@ -467,6 +471,12 @@ export function ContractFormDialog({
       if (!ok) {
         void removeExportFiles(done);
         return;
+      }
+      // Địa chỉ khách (Consignee của SI — ba-spec 72 R12) lưu vào danh mục khách, không lưu riêng theo HĐ.
+      const cust = customers.find((c) => c.id === form.customerId);
+      const address = form.customerAddress?.trim();
+      if (cust && address !== undefined && address !== (cust.address ?? "").trim()) {
+        setCustomers(customers.map((c) => (c.id === cust.id ? { ...c, address } : c)));
       }
       draft.done();
     } catch (e) {
@@ -607,6 +617,15 @@ export function ContractFormDialog({
                 <Input value={form.orderRef} onChange={(e) => set("orderRef", e.target.value)} />
               </Field>
             </div>
+            {form.customerId && (
+              <Field label="Địa chỉ khách hàng" hint="Lưu vào danh mục khách — dùng làm Consignee khi lập SI. Mỗi dòng một hàng.">
+                <Textarea
+                  rows={2}
+                  value={form.customerAddress ?? customers.find((c) => c.id === form.customerId)?.address ?? ""}
+                  onChange={(e) => set("customerAddress", e.target.value)}
+                />
+              </Field>
+            )}
             {form.mode !== "create" && (
               <div className="grid gap-4 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
                 <DateField label="Ngày của bản này" value={form.revisedOn} onChange={(v) => set("revisedOn", v)} />

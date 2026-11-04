@@ -173,7 +173,7 @@ export function applyLoadingCounts(
 
 /* ---------- Lập invoice ---------- */
 
-export const EMPTY_COMPOSITION: InvoiceComposition = { bankOptionId: "", unitPrices: {}, tradeTerms: "", originNote: DEFAULT_ORIGIN_NOTE, specialNotes: "" };
+export const EMPTY_COMPOSITION: InvoiceComposition = { bankOptionId: "", unitPrices: {}, tradeTerms: "", originNote: DEFAULT_ORIGIN_NOTE, specialNotes: "", blNo: "" };
 
 /** Đơn giá của dòng chuyến: sửa ở phần lập invoice ⇒ số đó; không ⇒ đơn giá dòng HĐ đã chọn. */
 export function invoiceUnitPrice(

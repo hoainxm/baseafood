@@ -24,7 +24,7 @@ import {
 import { companySellerOf } from "@/lib/companyProfile";
 import { useCompanyProfileStore, useComposedDocuments } from "@/lib/catalogRepo";
 import { SHIPPING_INSTRUCTION_DOC } from "@/lib/shippingInstruction";
-import { shipmentContractLines, termsOf, type ExportData } from "@/lib/exportPlanning";
+import { documentItems, shipmentContractLines, termsOf, type ExportData } from "@/lib/exportPlanning";
 import type { Customer, ExportContract, ExportShipment, ExportStepItem, InvoiceComposition } from "@/types";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { useExportOptionPicker } from "./exportOptionPicker";
@@ -75,6 +75,7 @@ export function InvoiceComposePanel({
   const totalsDiffer =
     item.cartons !== doc.totals.units || item.netKg !== doc.totals.netKg || item.amount !== doc.totals.amount;
   const pod = shipment.portOfDischarge || terms.portOfDischarge;
+  const blFromItem = documentItems(data, shipment.id).find((d) => d.docKind === "bill-of-lading")?.number.trim() ?? "";
 
   if (!lines.length) {
     return (
@@ -122,6 +123,9 @@ export function InvoiceComposePanel({
         />
         <Field label="Điều kiện giao (Trade Terms)" hint={`Trống ⇒ "${defaultTradeTerms(terms.incoterm, pod) || "theo HĐ"}".`}>
           <Input value={comp.tradeTerms} onChange={(e) => setComp({ tradeTerms: e.target.value })} />
+        </Field>
+        <Field label="Số B/L (in trên invoice)" hint={blFromItem ? `Trống ⇒ "${blFromItem}" theo mục Bill of Lading.` : "Trống ⇒ để trống trên invoice (mục Bill of Lading chưa ghi số)."}>
+          <Input value={comp.blNo ?? ""} onChange={(e) => setComp({ blNo: e.target.value })} />
         </Field>
       </div>
       {bank && <p className="rounded-lg bg-muted px-4 py-2 text-sm whitespace-pre-line">{bankBlockLines(bank).join("\n")}</p>}

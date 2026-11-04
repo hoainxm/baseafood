@@ -40,7 +40,8 @@ export function invoiceDocumentFor(
     issuedOn: item?.issuedOn || new Date().toISOString().slice(0, 10),
     customer: { name: customer?.name ?? "", address: customer?.address ?? "" },
     shipment,
-    blNo: bl?.number ?? "",
+    // Số B/L gõ ở phần lập invoice; trống ⇒ số ở mục Bill of Lading.
+    blNo: comp.blNo?.trim() || bl?.number || "",
     portOfLoading: terms.portOfLoading,
     portOfDischarge: pod,
     currency: terms.currency || "USD",

@@ -33,3 +33,25 @@ describe("file Packing list riêng cho mục Packing List", () => {
     expect(pages[0]).toMatch(/7,300/);
   });
 });
+
+describe("Số B/L trên invoice tự gõ (Phòng KH 2026-11-04)", () => {
+  const base = async () => {
+    const { EMPTY_EXPORT_DATA, blankItem } = await import("@/lib/exportPlanning");
+    const { invoiceDocumentFor } = await import("./invoiceDocument");
+    const shipment = { id: "s", contractId: "c", portOfDischarge: "", loadingDate: "", etd: "", vesselVoyage: "", containerNo: "", sealNo: "" } as unknown as import("@/types").ExportShipment;
+    const contract = { id: "c", contractNo: "04-26-KMP", customerId: "k" } as unknown as import("@/types").ExportContract;
+    const bl = { ...blankItem("s", "document", "bl", "2026-11-04"), docKind: "bill-of-lading" as const, number: "ONEYSGN111" };
+    const ci = (blNo: string) => ({ ...blankItem("s", "document", "ci", "2026-11-04"), docKind: "commercial-invoice" as const, number: "275/26", invoiceComposition: { bankOptionId: "", unitPrices: {}, tradeTerms: "", originNote: "", specialNotes: "", blNo } });
+    const blCell = (blNo: string) => {
+      const d = { ...EMPTY_EXPORT_DATA, contracts: [contract], shipments: [shipment], items: [bl, ci(blNo)], shipmentLines: [] };
+      const doc = invoiceDocumentFor(d, shipment, contract, undefined, ci(blNo), []);
+      return doc.sheets[0].rows.flatMap((r) => r.cells).find((c) => typeof c === "string" && /ONEY/.test(c));
+    };
+    return blCell;
+  };
+  it("gõ số ⇒ in số đó; trống ⇒ số ở mục Bill of Lading", async () => {
+    const blCell = await base();
+    expect(blCell("ONEYSGN999")).toContain("ONEYSGN999");
+    expect(blCell("")).toContain("ONEYSGN111");
+  });
+});

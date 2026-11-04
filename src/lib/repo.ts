@@ -2521,7 +2521,7 @@ function invoiceCompositionFromRow(v: Record<string, unknown>): InvoiceCompositi
   if (v.unitPrices && typeof v.unitPrices === "object") {
     for (const [k, n] of Object.entries(v.unitPrices as Record<string, unknown>)) if (typeof n === "number" && Number.isFinite(n)) prices[k] = n;
   }
-  return { bankOptionId: s(v.bankOptionId), unitPrices: prices, tradeTerms: s(v.tradeTerms), originNote: s(v.originNote), specialNotes: s(v.specialNotes) };
+  return { bankOptionId: s(v.bankOptionId), unitPrices: prices, tradeTerms: s(v.tradeTerms), originNote: s(v.originNote), specialNotes: s(v.specialNotes), ...(s(v.blNo) ? { blNo: s(v.blNo) } : {}) };
 }
 
 /** Hàng của chuyến xuất (mig 0096, ba-spec 63) — không có giá; kho điền `loaded_units`. Liên kết mềm ⇒ refColumns. */

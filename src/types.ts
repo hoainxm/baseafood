@@ -1524,6 +1524,8 @@ export interface InvoiceComposition {
   originNote: string;
   /** Thông tin riêng khách yêu cầu — mỗi dòng một hàng in, ô cách nhau bằng Tab (dán từ Excel) hoặc "|". */
   specialNotes: string;
+  /** Số B/L in trên invoice (Phòng KH 2026-11-04: tự gõ). Trống ⇒ số ở mục Bill of Lading của chuyến. */
+  blNo?: string;
 }
 
 /** Bước / mục của chuyến (bước 2 → 5). Bước 1 theo hợp đồng, bước 6 = tiền về (bảng riêng). */

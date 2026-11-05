@@ -147,7 +147,7 @@ describe("ô Lệnh xuất", () => {
   });
 
   it("phân xưởng nhận", () => {
-    expect(workshopLine({ toDong: true, toCa: true, toKho: false })).toBe("PHÂN XƯỞNG ĐÔNG, CÁ");
+    expect(workshopLine({ workshopFrozen: true, workshopFish: true, workshopDried: false })).toBe("PHÂN XƯỞNG ĐÔNG, CÁ");
     expect(workshopLine({})).toBe("PHÂN XƯỞNG ……");
   });
 
@@ -157,7 +157,7 @@ describe("ô Lệnh xuất", () => {
     const values = {
       ...prefill(exportOrderForm, { ...src, rows: [...src.rows, { ...src.rows[0], productName: "B", cartons: 5, kg: 50 }] }, null).values,
       orderNo: "LXH 02.01",
-      toDong: true,
+      workshopFrozen: true,
       samples: "Có",
       samplesNote: "2 thùng",
     };

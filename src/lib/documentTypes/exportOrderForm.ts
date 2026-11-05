@@ -187,9 +187,10 @@ export const EXPORT_ORDER_FIELDS: readonly DocumentField[] = [
   // Định dạng số lệnh (chị Thảo 2026-11-04): STT/tháng-năm — lệnh số 01 tháng 10/2026 ghi "01/10-26".
   { key: "orderNo", label: "Số (STT/tháng-năm, VD 01/10-26)", group: G.head, kind: "text", required: true, carryOver: false },
   { key: "orderDate", label: "Ngày lệnh", group: G.head, kind: "date", required: true, mapped: true },
-  { key: "toDong", label: "Phân xưởng Đông", group: G.head, kind: "check", defaultValue: false, carryOver: true },
-  { key: "toCa", label: "Phân xưởng Cá", group: G.head, kind: "check", defaultValue: false, carryOver: true },
-  { key: "toKho", label: "Phân xưởng Khô", group: G.head, kind: "check", defaultValue: false, carryOver: true },
+  // Khóa tiếng Anh (quy tắc 8; trước 2026-11-05 là toDong / toCa / toKho — DB thật chỉ 1 lệnh đã lưu, cả 3 ô false).
+  { key: "workshopFrozen", label: "Phân xưởng Đông", group: G.head, kind: "check", defaultValue: false, carryOver: true },
+  { key: "workshopFish", label: "Phân xưởng Cá", group: G.head, kind: "check", defaultValue: false, carryOver: true },
+  { key: "workshopDried", label: "Phân xưởng Khô", group: G.head, kind: "check", defaultValue: false, carryOver: true },
   {
     key: "lines",
     label: "Bảng hàng",
@@ -252,7 +253,7 @@ const answer = (values: DocumentValues, key: string) => (values[key] === "Có" ?
 
 /** "PHÂN XƯỞNG ĐÔNG, CÁ" — chưa chọn xưởng nào ⇒ "PHÂN XƯỞNG ……" (R1). */
 export function workshopLine(values: DocumentValues): string {
-  const ws = [values.toDong === true && "ĐÔNG", values.toCa === true && "CÁ", values.toKho === true && "KHÔ"].filter(Boolean);
+  const ws = [values.workshopFrozen === true && "ĐÔNG", values.workshopFish === true && "CÁ", values.workshopDried === true && "KHÔ"].filter(Boolean);
   return `PHÂN XƯỞNG ${ws.length ? ws.join(", ") : "……"}`;
 }
 

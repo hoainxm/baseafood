@@ -123,3 +123,23 @@ describe("Cảng đích và thời gian chần / luộc (Phòng KH 2026-11-04)",
     expect(contractLineSpec({ size: "2-4 gr", packing: "", cookTime: "60 giây" })).toBe("Size 2-4 gr · Chần / luộc 60 giây");
   });
 });
+
+describe("Kg tịnh theo đơn vị đếm (Phòng KH 2026-11-05: chọn Kiện, 5.000 kiện mà kg nhảy theo thùng)", () => {
+  it("đếm theo kiện: gõ kg / kiện ⇒ lưu kg / thùng; tổng thùng + kg đúng", async () => {
+    const { lineCartons, lineKg, netKgFromUnit, unitNetKg, withCartonsPerUnit } = await import("./exportPlanning");
+    const base = { id: "l", description: "FROZEN OCTOPUS", hsCode: "", size: "", packing: "", unitKind: "bundle" as const, cartonsPerUnit: 2, netKgPerCarton: null, quantity: 5000, kg: null, unitPrice: 9.65, microSpec: "" };
+    const l = { ...base, netKgPerCarton: netKgFromUnit(base, 10) };
+    expect(l.netKgPerCarton).toBe(5);
+    expect(unitNetKg(l)).toBe(10);
+    expect(lineCartons(l)).toBe(10000);
+    expect(lineKg(l)).toBe(50000);
+    // Đổi thùng / kiện giữ kg của một kiện ⇒ kg không nhảy.
+    const one = { ...l, ...withCartonsPerUnit(l, 1) };
+    expect([one.cartonsPerUnit, one.netKgPerCarton, lineKg(one)]).toEqual([1, 10, 50000]);
+    // Thùng: kg / thùng như cũ.
+    const carton = { ...base, unitKind: "carton" as const, cartonsPerUnit: 1, netKgPerCarton: 12, quantity: 834 };
+    expect(unitNetKg(carton)).toBe(12);
+    expect(netKgFromUnit(carton, 12)).toBe(12);
+    expect(lineKg(carton)).toBe(10008);
+  });
+});

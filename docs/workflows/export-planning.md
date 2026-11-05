@@ -5,6 +5,7 @@ covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/expor
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-05
+<!-- re-verified: 2026-11-05 — dòng HĐ đếm theo kiện: ô Kg tịnh / kiện, Thùng / kiện ghi rõ một kiện, tổng thùng hiện dưới Số lượng; luật không đổi. -->
 <!-- re-verified: 2026-11-05 — bộ đọc file HĐ đọc được PDF DAIREI BD-007 (bảng tiêu đề 3 tầng, hàng tính bó, Reference Number, hạn ETA; ba-spec 66 History); không đổi luật. -->
 <!-- re-verified: 2026-11-05 — nhãn trạng thái shipping "Đang giao hàng" (chặng Giao hàng), vạch chặng đang ở màu chính + dòng tiến độ; luật không đổi. -->
 <!-- re-verified: 2026-11-05 — bộ đọc booking đọc được mẫu Evergreen (ba-spec 71 History); không đổi luật. -->

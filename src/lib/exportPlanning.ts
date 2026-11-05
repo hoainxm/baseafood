@@ -309,6 +309,30 @@ export function lineCartons(l: ExportContractLine): number {
   return l.unitKind === "bundle" ? q * Math.max(1, numOr0(l.cartonsPerUnit) || 1) : q;
 }
 
+/*
+ * Kg tịnh theo ĐƠN VỊ ĐẾM của dòng (Phòng KH 2026-11-05): đếm theo kiện thì gõ kg của MỘT kiện, không phải của một
+ * thùng. Dữ liệu vẫn giữ kg / thùng (`netKgPerCarton` — invoice, packing list, Hàng của chuyến dùng) ⇒ đổi qua lại ở đây.
+ */
+const perUnitCartons = (l: Pick<ExportContractLine, "unitKind" | "cartonsPerUnit">) => (l.unitKind === "bundle" ? Math.max(1, numOr0(l.cartonsPerUnit) || 1) : 1);
+const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
+
+/** Kg tịnh của MỘT đơn vị đếm: thùng ⇒ kg / thùng; kiện ⇒ kg / thùng × thùng / kiện. */
+export function unitNetKg(l: Pick<ExportContractLine, "unitKind" | "cartonsPerUnit" | "netKgPerCarton">): number | null {
+  return l.netKgPerCarton == null ? null : round6(l.netKgPerCarton * perUnitCartons(l));
+}
+
+/** Gõ kg tịnh của một đơn vị đếm ⇒ kg / thùng lưu lại. */
+export function netKgFromUnit(l: Pick<ExportContractLine, "unitKind" | "cartonsPerUnit">, unitKg: number | null): number | null {
+  return unitKg == null ? null : round6(unitKg / perUnitCartons(l));
+}
+
+/** Đổi số thùng / kiện mà GIỮ kg của một kiện (kg / thùng tính lại). */
+export function withCartonsPerUnit<L extends Pick<ExportContractLine, "unitKind" | "cartonsPerUnit" | "netKgPerCarton">>(l: L, cartonsPerUnit: number): Pick<L, "cartonsPerUnit" | "netKgPerCarton"> {
+  const cpu = Math.max(1, Math.round(cartonsPerUnit) || 1);
+  const unitKg = unitNetKg(l);
+  return { cartonsPerUnit: cpu, netKgPerCarton: unitKg == null ? l.netKgPerCarton : round6(unitKg / (l.unitKind === "bundle" ? cpu : 1)) } as Pick<L, "cartonsPerUnit" | "netKgPerCarton">;
+}
+
 /** kg tự tính = số thùng × kg tịnh/thùng (null khi chưa đủ số). */
 /**
  * Chép một dòng hàng HĐ (chủ dự án 2026-10-30: "mọi thông tin như cũ, chỉ khác mỗi size" — khỏi gõ lại).

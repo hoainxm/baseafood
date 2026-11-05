@@ -40,6 +40,10 @@ import {
   customerChangeGate,
   emptyTerms,
   lineAmount,
+  lineCartons,
+  netKgFromUnit,
+  unitNetKg,
+  withCartonsPerUnit,
   lineKg,
   rankProductsForLine,
   suggestProductId,
@@ -900,17 +904,43 @@ export function ContractFormDialog({
                         label="Đếm theo"
                         hideRequiredMark
                         value={l.unitKind}
-                        onChange={(v) => setLine(l.id, { unitKind: v === "bundle" ? "bundle" : "carton", cartonsPerUnit: v === "bundle" ? Math.max(2, l.cartonsPerUnit) : 1 })}
+                        // Đổi đơn vị đếm GIỮ kg / thùng đã có (kg / kiện tự tính); kiện mới mặc định 1 thùng / kiện (Phòng KH 2026-11-05).
+                        onChange={(v) => setLine(l.id, { unitKind: v === "bundle" ? "bundle" : "carton", cartonsPerUnit: v === "bundle" ? Math.max(1, l.cartonsPerUnit) : 1 })}
                         options={[
                           { value: "carton", label: "Thùng" },
                           { value: "bundle", label: "Kiện" },
                         ]}
                         columns={2}
                       />
-                      {l.unitKind === "bundle" && <NumberField label="Thùng / kiện" unit="thùng" value={l.cartonsPerUnit} onChange={(v) => setLine(l.id, { cartonsPerUnit: v ?? 1 })} />}
-                      {/* Sửa số lượng hoặc kg / thùng ⇒ kg tịnh về tự tính (chị Thảo 2026-11-04: kg gõ tay / đọc nhầm không nhảy theo). */}
-                      <NumberField label="Số lượng" unit={l.unitKind === "bundle" ? "kiện" : "thùng"} value={l.quantity} onChange={(v) => setLine(l.id, { quantity: v, ...(v != null && l.netKgPerCarton ? { kg: null } : {}) })} />
-                      <NumberField label="Kg tịnh / thùng" value={l.netKgPerCarton} onChange={(v) => setLine(l.id, { netKgPerCarton: v, ...(v != null && l.quantity != null ? { kg: null } : {}) })} />
+                      {/* Đếm theo kiện: "Thùng / kiện" là số thùng trong MỘT kiện (lỗi 2026-11-05: gõ tổng 10.000 thùng vào đây). */}
+                      {l.unitKind === "bundle" && (
+                        <NumberField
+                          label="Thùng / kiện"
+                          unit="thùng"
+                          hint={
+                            (l.cartonsPerUnit ?? 1) > 50
+                              ? `⚠ Số thùng trong MỘT kiện — ${formatNumber(l.cartonsPerUnit)} thùng / kiện có đúng không? Tổng số thùng app tự tính.`
+                              : "Số thùng trong MỘT kiện (không phải tổng)."
+                          }
+                          value={l.cartonsPerUnit}
+                          onChange={(v) => setLine(l.id, { ...withCartonsPerUnit(l, v ?? 1), ...(l.quantity != null && l.netKgPerCarton != null ? { kg: null } : {}) })}
+                        />
+                      )}
+                      {/* Sửa số lượng hoặc kg tịnh ⇒ kg tịnh về tự tính (chị Thảo 2026-11-04: kg gõ tay / đọc nhầm không nhảy theo). */}
+                      <NumberField
+                        label="Số lượng"
+                        unit={l.unitKind === "bundle" ? "kiện" : "thùng"}
+                        hint={l.unitKind === "bundle" && l.quantity != null ? `= ${formatNumber(lineCartons(l))} thùng` : undefined}
+                        value={l.quantity}
+                        onChange={(v) => setLine(l.id, { quantity: v, ...(v != null && l.netKgPerCarton ? { kg: null } : {}) })}
+                      />
+                      {/* Kg tịnh theo đơn vị đếm: thùng ⇒ kg / thùng; kiện ⇒ kg / kiện (Phòng KH 2026-11-05). Lưu vẫn là kg / thùng. */}
+                      <NumberField
+                        label={l.unitKind === "bundle" ? "Kg tịnh / kiện" : "Kg tịnh / thùng"}
+                        unit="kg"
+                        value={unitNetKg(l)}
+                        onChange={(v) => setLine(l.id, { netKgPerCarton: netKgFromUnit(l, v), ...(v != null && l.quantity != null ? { kg: null } : {}) })}
+                      />
                       <NumberField
                         label={l.kg != null ? "Kg tịnh (gõ tay)" : "Kg tịnh (tự tính)"}
                         value={l.kg ?? auto}

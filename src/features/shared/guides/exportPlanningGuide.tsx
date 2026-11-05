@@ -37,7 +37,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Lập hợp đồng",
     needs: ["export-plans", "create"],
     actors: KH,
-    text: "Chọn Lập hợp đồng, nhập đúng như bản giấy: khách (kèm địa chỉ — invoice, packing list ghi theo khách), Người nhận hàng và Notify (tên + địa chỉ — SI và vận đơn ghi theo đây; trống thì lấy khách), dòng hàng, giá, điều kiện giao, hạn giao, hạn hợp đồng (ngày hết hiệu lực, không bắt buộc; hiện ở cột Hạn HĐ của tab Hợp đồng kèm Còn n ngày / Đã hết hạn). Có file Word (.docx, .doc) hoặc PDF có chữ thì chọn ở Đọc file hợp đồng: app điền sẵn ô còn trống, ô khác file liệt kê để chọn, không tự lưu, phụ lục đọc được khi Ghi bản sửa; bản scan không đọc, đính làm bằng chứng.",
+    text: "Chọn Lập hợp đồng, nhập đúng như bản giấy: khách (kèm địa chỉ — invoice, packing list ghi theo khách), Người nhận hàng và Notify (tên + địa chỉ — SI và vận đơn ghi theo đây; trống thì lấy khách), dòng hàng (đếm theo kiện thì ghi Thùng / kiện là số thùng trong một kiện, Kg tịnh / kiện là kg của một kiện — app tự tính tổng), giá, điều kiện giao, hạn giao, hạn hợp đồng (ngày hết hiệu lực, không bắt buộc; hiện ở cột Hạn HĐ của tab Hợp đồng kèm Còn n ngày / Đã hết hạn). Có file Word (.docx, .doc) hoặc PDF có chữ thì chọn ở Đọc file hợp đồng: app điền sẵn ô còn trống, ô khác file liệt kê để chọn, không tự lưu, phụ lục đọc được khi Ghi bản sửa; bản scan không đọc, đính làm bằng chứng.",
     done: "Lưu xong, không cần ai duyệt",
     result: { label: CONTRACT_STATE_LABELS.attaching, tone: "warning" },
   },

@@ -141,6 +141,7 @@ export function ShipmentPanel({
   onRestore,
   onDelete,
   onMerge,
+  onConsolidate,
   onOpenItem,
   onUploadLoading,
   onPayment,
@@ -174,6 +175,8 @@ export function ShipmentPanel({
   onDelete: () => void;
   /** Gộp chuyến này vào chuyến khác làm cont thêm (ba-spec 73 R13) — có chuyến gộp được mới truyền. */
   onMerge?: () => void;
+  /** Chuyến Đóng ghép: đưa vào cont của chuyến khác (một cont nhiều HĐ, 2026-11-05) — có chuyến cont nhận được mới truyền. */
+  onConsolidate?: () => void;
   onOpenItem: (t: StepItemTarget) => void;
   onUploadLoading: (t: LoadingUploadTarget) => void;
   onPayment: (t: PaymentTarget) => void;
@@ -606,6 +609,12 @@ export function ShipmentPanel({
                   Hủy chuyến
                 </Button>
               )}
+              {can.update && onConsolidate && (
+                <Button size="sm" variant="default" onClick={onConsolidate} title="Hàng đóng chung cont với hợp đồng khác: chọn chuyến cont — hàng của chuyến này thành dòng hàng của hợp đồng này trên chuyến cont, số cont / seal và chứng từ làm ở đó.">
+                  <Container className="mr-1 h-4 w-4" aria-hidden />
+                  Đưa vào cont
+                </Button>
+              )}
               {can.update && onMerge && (
                 <Button size="sm" variant="outline" onClick={onMerge} title="Booking ra một lần nhiều cont: đưa chuyến này thành cont thêm của chuyến khác cùng hợp đồng (chuyến này chưa có file, chưa bước nào xong).">
                   <Container className="mr-1 h-4 w-4" aria-hidden />
@@ -767,7 +776,7 @@ export function ShipmentPanel({
           ) : (
           <span className="tnum">
             {shipment.kind === "consolidated"
-              ? <span className="text-muted-foreground">Không cần — hàng đóng ghép chung cont của chuyến khác</span>
+              ? <span className="text-muted-foreground">Không cần ở đây — hàng đóng chung cont của chuyến khác: chọn Đưa vào cont để ghi số cont / seal ở chuyến cont</span>
               : [shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ") || <span className="text-muted-foreground">Chưa điền</span>}
           </span>
           )}

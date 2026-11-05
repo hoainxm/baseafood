@@ -147,7 +147,7 @@ export function buildImportTour(ctx: ImportTourContext): PageTour {
         optional: true,
         title: "Kiểm mẫu của kho",
         body:
-          "Kho gửi báo cáo kiểm mẫu (Excel) thì chọn Nạp báo cáo kiểm mẫu. App đọc file, chọn sẵn các cột của lần nhập này theo nhà xuất khẩu và ngày về kho, gợi ý dòng hàng theo size. Kiểm lại rồi lưu.\n" +
+          "Kho gửi báo cáo kiểm mẫu (Excel) thì chọn Nạp báo cáo kiểm mẫu. App đọc file, chọn sẵn các cột của lần nhập này theo nhà xuất khẩu và ngày về kho, gợi ý dòng hàng theo size. Ô Ngày báo cáo mở lịch: gõ ngày (VD 05/11/26) rồi Enter, hoặc chọn Tháng / Năm trên đầu lịch. Kiểm lại rồi lưu.\n" +
           "Ảnh chụp báo cáo chỉ đính kèm, số gõ tay. App chỉ lưu số như báo cáo, không tính lại và không đổi trạng thái lô; số tự mâu thuẫn (tổng % khác 100, định mức lệch) thì có ô vàng cảnh báo, vẫn lưu được.",
       }),
     );

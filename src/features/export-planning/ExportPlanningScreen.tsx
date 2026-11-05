@@ -13,6 +13,7 @@ import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsT
 import { useCustomerProductNameStore, useCustomers, useExportBookingDetailsAvailable, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportLoadingExtraPhotosAvailable, useExportOptionStore,
   useCompanyProfileStore, useComposedDocuments, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { lineUnits, shipmentLinesOf } from "@/lib/exportInvoice";
+import { consolidateGate, consolidateInto, consolidateTargets } from "@/lib/exportConsolidate";
 import { containerLabel, extraContainersOf, isMultiContainer, shipmentContainerSummary, shipmentContainers } from "@/lib/exportContainers";
 import { companySellerOf } from "@/lib/companyProfile";
 import { SHIPPING_INSTRUCTION_DOC } from "@/lib/shippingInstruction";
@@ -430,7 +431,45 @@ export default function ExportPlanningScreen() {
   const mergeCandidates = (from: ExportShipment) => d.shipments.filter((s) => mergeShipmentGate(d, s, from).ok);
   const openMerge = (from: ExportShipment) =>
     setMergeTarget({ from, fromLabel: `Chuyến ${shipName(from)}`, candidates: mergeCandidates(from).map((s) => ({ shipment: s, label: `${goodsLabel(s)}${s.loadingDate ? ` · đóng ${formatDateVN(s.loadingDate)}` : ""}` })) });
+  /* Một cont nhiều HĐ (2026-11-05): chuyến Đóng ghép ⇒ đưa vào cont của chuyến khác cùng khách. */
+  const openConsolidate = (from: ExportShipment) =>
+    setMergeTarget({
+      mode: "consolidate",
+      from,
+      fromLabel: `Chuyến Đóng ghép ${shipName(from)}`,
+      candidates: consolidateTargets(d, from, opts).map((s) => ({
+        shipment: s,
+        label: [`HĐ ${d.contracts.find((c) => c.id === s.contractId)?.contractNo ?? ""}`, goodsLabel(s), s.loadingDate && `đóng ${formatDateVN(s.loadingDate)}`, s.bookingNo && `booking ${s.bookingNo}`].filter(Boolean).join(" · "),
+      })),
+    });
+  const confirmConsolidate = (into: ExportShipment) => {
+    const from = mergeTarget?.from;
+    if (!from || !consolidateGate(d, from, into, opts).ok) {
+      notify.error("Không đưa vào cont được — chuyến Đóng ghép đã có file hoặc bước đã xong, hoặc chuyến cont khác khách / hợp đồng chưa đủ hồ sơ.");
+      return;
+    }
+    const prev = { shipments: d.shipments, items: d.items, lines: d.shipmentLines ?? [] };
+    const out = consolidateInto(d, from, into, newId);
+    if (!store.saveShipmentLines(out.shipmentLines)) return;
+    store.saveItems(out.items);
+    store.saveShipments(out.shipments);
+    const fromNo = d.contracts.find((c) => c.id === from.contractId)?.contractNo ?? "";
+    const what = `Đưa chuyến Đóng ghép ${shipName(from)} (HĐ ${fromNo}) vào cont của chuyến ${shipName(into)}`;
+    track(from.contractId, into.id, "update", what);
+    if (into.contractId !== from.contractId) track(into.contractId, into.id, "update", what);
+    notify.saved(
+      out.notices.length ? `Đã đưa vào cont — ${out.notices.join(" ")}` : "Đã đưa vào cont",
+      undoTracked(into.contractId, into.id, what, () => {
+        store.saveShipments(prev.shipments);
+        store.saveItems(prev.items);
+        store.saveShipmentLines(prev.lines);
+      }),
+    );
+    setMergeTarget(null);
+    setParam({ contract: into.contractId, shipment: into.id }, true);
+  };
   const confirmMerge = (into: ExportShipment) => {
+    if (mergeTarget?.mode === "consolidate") return confirmConsolidate(into);
     const from = mergeTarget?.from;
     if (!from || !mergeShipmentGate(d, into, from).ok) {
       notify.error("Không gộp được — chuyến đã có file hoặc bước đã xong, hoặc khác booking / hợp đồng.");
@@ -1306,6 +1345,12 @@ export default function ExportPlanningScreen() {
               onRestore={() => dossier.selected && doRestoreShipment(dossier.selected)}
               onDelete={() => dossier.selected && setDeletingShipment(dossier.selected)}
               onMerge={dossier.selected && store.containersAvailable && mergeCandidates(dossier.selected).length ? () => dossier.selected && openMerge(dossier.selected) : undefined}
+              onConsolidate={
+                // Luôn hiện ở chuyến Đóng ghép còn mở — chưa có chuyến cont nhận được thì hộp nói cần ghi chuyến cont trước.
+                dossier.selected?.kind === "consolidated" && dossier.selected.status === "open" && store.shipmentLinesAvailable
+                  ? () => dossier.selected && openConsolidate(dossier.selected)
+                  : undefined
+              }
               onOpenItem={setItemTarget}
               onUploadLoading={setLoadingTarget}
               bookingFilesEnabled={bookingFilesEnabled}

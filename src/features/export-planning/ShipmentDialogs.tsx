@@ -1205,6 +1205,8 @@ export function LoadingUploadDialog({
 /* ---------- Gộp chuyến thành cont thêm (ba-spec 73 NV6, R13) ---------- */
 
 export interface MergeShipmentTarget {
+  /** "container" = gộp làm cont thêm (ba-spec 73 R13) · "consolidate" = đưa chuyến Đóng ghép vào cont của chuyến khác (một cont nhiều HĐ). */
+  mode?: "container" | "consolidate";
   from: ExportShipment;
   fromLabel: string;
   /** Chuyến nhận (cùng HĐ, gộp được) — nhãn để chọn. */
@@ -1220,25 +1222,41 @@ export function MergeShipmentDialog({ target, onClose, onConfirm }: { target: Me
     <FormDialog
       open={!!target}
       onOpenChange={(o) => !o && onClose()}
-      title="Gộp làm cont thêm"
-      description={target ? `${target.fromLabel} thành một cont của chuyến khác cùng hợp đồng: loại, số, seal, ngày đóng và hàng của chuyến này chuyển sang; chuyến này không còn. Hoàn tác được ngay sau khi gộp.` : ""}
+      title={target?.mode === "consolidate" ? "Đưa vào cont của chuyến khác" : "Gộp làm cont thêm"}
+      description={
+        !target
+          ? ""
+          : target.mode === "consolidate"
+            ? `${target.fromLabel} đóng chung cont với chuyến được chọn: hàng của chuyến này thành dòng hàng của hợp đồng này trên chuyến cont (mỗi hợp đồng vẫn tự tính đã giao), số cont / seal và bộ chứng từ làm ở chuyến cont; chuyến Đóng ghép không còn. Hoàn tác được ngay sau khi đưa.`
+            : `${target.fromLabel} thành một cont của chuyến khác cùng hợp đồng: loại, số, seal, ngày đóng và hàng của chuyến này chuyển sang; chuyến này không còn. Hoàn tác được ngay sau khi gộp.`
+      }
       icon={Container}
       footer={
         <>
           <Button variant="outline" onClick={onClose}>
             Hủy
           </Button>
-          <Button onClick={() => chosen && onConfirm(chosen.shipment)} title="Gộp chuyến này vào chuyến đã chọn làm cont thêm.">
+          <Button
+            onClick={() => (chosen ? onConfirm(chosen.shipment) : onClose())}
+            title={target?.mode === "consolidate" ? "Đưa hàng của chuyến Đóng ghép này vào cont của chuyến đã chọn." : "Gộp chuyến này vào chuyến đã chọn làm cont thêm."}
+          >
             <Container className="mr-2 h-4 w-4" aria-hidden />
-            Gộp
+            {target?.mode === "consolidate" ? "Đưa vào cont" : "Gộp"}
           </Button>
         </>
       }
     >
-      {target && (
+      {target && !target.candidates.length && (
+        <p className="rounded-lg bg-warning-surface px-4 py-3 text-sm">
+          Chưa có chuyến cont nào nhận được: cần chuyến 20RF / 40RF / 40HC-RF còn mở, cùng khách, hợp đồng đủ hồ sơ. Ghi chuyến cont ở
+          một hợp đồng (VD hợp đồng có nhiều hàng nhất trong cont) rồi quay lại chọn Đưa vào cont. Chuyến Đóng ghép đã có file hoặc bước đã
+          xong thì không đưa được.
+        </p>
+      )}
+      {target && target.candidates.length > 0 && (
         <div className="grid gap-3 py-2">
           <ChoiceGroup
-            label="Gộp vào chuyến"
+            label={target.mode === "consolidate" ? "Đóng chung cont với chuyến" : "Gộp vào chuyến"}
             required
             value={pick}
             onChange={setPick}

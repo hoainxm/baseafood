@@ -1,10 +1,13 @@
 # Xuất khẩu — sơ đồ workflow
 
 > Load khi: review / kiểm lại trang Xuất khẩu (`/planning-export`), trước khi sửa luật hợp đồng, chuyến, đóng cont, chứng từ. Bản đọc nhanh — luật đầy đủ ở ba-spec [41](../app-map/41-export-planning.ba-spec.md) · [62](../app-map/62-export-option-lists.ba-spec.md) · [63](../app-map/63-export-invoice-from-app.ba-spec.md) · [58](../app-map/58-contract-attachment-deferral.ba-spec.md).
-covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/exportInvoice*.ts, src/lib/exportOptions.ts, src/lib/exportFiles*.ts, src/lib/exportContainers.ts
+covers: src/features/export-planning/*, src/lib/exportConsolidate.ts, src/lib/exportPlanning.ts, src/lib/exportInvoice*.ts, src/lib/exportOptions.ts, src/lib/exportFiles*.ts, src/lib/exportContainers.ts
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-05
+<!-- re-verified: 2026-11-05 — SI: ô Gross mỗi kiện, Tổng gross tự nhân với số kiện; luật không đổi. -->
+<!-- re-verified: 2026-11-05 — chuyến Đóng ghép có nút Đưa vào cont (một cont nhiều HĐ, §2b): hàng sang chuyến cont thành dòng của HĐ đó. -->
+<!-- re-verified: 2026-11-05 — thẻ Còn … chưa ghi chuyến ghi kèm đã ghi / tối thiểu kg (HĐ, dung sai) và đã ghi / số cont; luật không đổi. -->
 <!-- re-verified: 2026-11-05 — dòng HĐ đếm theo kiện: ô Kg tịnh / kiện, Thùng / kiện ghi rõ một kiện, tổng thùng hiện dưới Số lượng; luật không đổi. -->
 <!-- re-verified: 2026-11-05 — bộ đọc file HĐ đọc được PDF DAIREI BD-007 (bảng tiêu đề 3 tầng, hàng tính bó, Reference Number, hạn ETA; ba-spec 66 History); không đổi luật. -->
 <!-- re-verified: 2026-11-05 — nhãn trạng thái shipping "Đang giao hàng" (chặng Giao hàng), vạch chặng đang ở màu chính + dòng tiến độ; luật không đổi. -->
@@ -115,6 +118,7 @@ Khách như DAIREI ký nhiều HĐ song song (mỗi HĐ một mã hàng, lượn
 | Hồ sơ HĐ phụ | Mục **Đi chung chuyến của hợp đồng khác**: chỉ xem, các bước theo dõi ở hồ sơ HĐ chính | `carriesContract` |
 | Khóa đổi khách, xóa HĐ | Tính cả chuyến gộp có hàng của HĐ | `customerChangeGate` · `canDeleteContract` |
 | Lệnh sản xuất của chuyến gộp | Gắn / lập được lệnh của mọi HĐ có hàng trên chuyến (mỗi HĐ một nút **Lập lệnh sản xuất · HĐ …**). Bước 2 Xong khi chuyến gắn ≥ 1 lệnh đã phát hành (luật cũ) | `ShipmentOrders` · `openShipmentsOf` |
+| Đưa chuyến Đóng ghép vào cont (2026-11-05) | Chuyến **Đóng ghép** còn mở, chưa file / chưa bước Xong ⇒ **Đưa vào cont** của chuyến cont lạnh còn mở, cùng khách (HĐ khác qua cổng thêm HĐ). Hàng thành dòng của HĐ đó trên chuyến cont (chưa có dòng ⇒ dựng từ kg: HĐ một dòng ⇒ số kiện = kg ÷ kg/kiện; nhiều dòng ⇒ dòng trống + nhắc); chuyến cont chưa có dòng ⇒ dựng dòng HĐ chính từ kg của nó; kg kế hoạch cộng dồn; chuyến Đóng ghép bỏ, một Hoàn tác. Gợi ý: cùng booking → cùng ngày đóng → ngày gần | `consolidateGate` · `consolidateTargets` · `consolidateInto` |
 | Bảng hàng của Lệnh xuất | Xét từng HĐ: HĐ có lệnh sản xuất đã phát hành gắn chuyến ⇒ tên hàng, MSL, ngày SX, hạn theo lệnh; HĐ chưa có lệnh ⇒ theo Hàng của chuyến. Số thùng + kg theo Hàng của chuyến (thực đóng, chưa có thì kế hoạch); chuyến chưa nhập Hàng của chuyến ⇒ số cả lệnh + cảnh báo (ba-spec [72](../app-map/72-export-order-and-si.ba-spec.md) R2b, R3b) | `buildExportOrderLines` |
 
 Bộ phận đóng cont ghi số thực đóng cho dòng của HĐ phụ đã có trên chuyến (cùng khách) — mig `0102` (đã chạy DB thật). Đóng cont không tự đưa HĐ mới vào chuyến.

@@ -23,6 +23,7 @@ import {
   siGoodsRows,
   siLinked,
   siPartiesFromContract,
+  siRowWith,
   siToValues,
   siTotals,
   siWarnings,
@@ -93,8 +94,9 @@ export function ShippingInstructionDialog({
   const linked = target ? siLinked(target.shipment, profile, target.containers ? { containers: target.containers, lines: target.shipmentLines } : undefined) : null;
   const f = value?.form;
   const set = <K extends keyof SiForm>(k: K, v: SiForm[K]) => setValue((d) => (d ? { ...d, form: { ...d.form, [k]: v } } : d));
-  const setGoods = (i: number, k: "packages" | "grossKg", v: number | null) =>
-    setValue((d) => (d ? { ...d, form: { ...d.form, goods: d.form.goods.map((g, j) => (j === i ? { ...g, [k]: v } : g)) } } : d));
+  // Đổi số kiện / gross mỗi kiện ⇒ tổng gross tự nhân; gõ tổng ⇒ gross mỗi kiện tự chia (Phòng KH 2026-11-05).
+  const setGoods = (i: number, k: "packages" | "grossPerUnit" | "grossKg", v: number | null) =>
+    setValue((d) => (d ? { ...d, form: { ...d.form, goods: d.form.goods.map((g, j) => (j === i ? siRowWith(g, { [k]: v }) : g)) } } : d));
   const warnings =
     linked && f
       ? [...siWarnings(linked, f), ...f.goods.flatMap((g, i) => (g.grossKg == null ? [`Dòng ${i + 1} (${g.description || "chưa có tên"}): chưa có gross — gõ tay.`] : []))]
@@ -259,16 +261,17 @@ export function ShippingInstructionDialog({
               <ChoiceGroup label="Phát hành B/L" value={f.blRelease} onChange={(v) => set("blRelease", v)} options={opts(BL_RELEASES)} columns={3} />
             </div>
           </FormSection>
-          <FormSection title="Hàng" hint="Số kiện theo thực đóng (chưa có thì kế hoạch); gross = kg cả bì × số kiện, sửa được.">
+          <FormSection title="Hàng" hint="Số kiện theo thực đóng (chưa có thì kế hoạch). Gõ gross mỗi thùng / kiện ⇒ tổng gross tự nhân với số kiện.">
             <div data-tour="si-goods" className="grid gap-3">
               {f.goods.map((g, i) => (
-                <div key={i} className="grid gap-2 border-b border-border pb-3 sm:grid-cols-[minmax(0,1fr)_9rem_9rem]">
+                <div key={i} className="grid gap-2 border-b border-border pb-3 sm:grid-cols-[minmax(0,1fr)_8.5rem_8.5rem_9.5rem]">
                   <p className="min-w-0 text-sm">
                     <span className="font-medium">{g.description || "—"}</span>
                     {g.hsCode && <span className="text-muted-foreground"> · HS {g.hsCode}</span>}
                   </p>
                   <NumberField label="Số kiện" unit="kiện" value={g.packages} onChange={(v) => setGoods(i, "packages", v)} />
-                  <NumberField label="Gross" value={g.grossKg} onChange={(v) => setGoods(i, "grossKg", v)} />
+                  <NumberField label="Gross mỗi kiện" unit="kg" value={g.grossPerUnit ?? null} onChange={(v) => setGoods(i, "grossPerUnit", v)} />
+                  <NumberField label="Tổng gross" unit="kg" value={g.grossKg} onChange={(v) => setGoods(i, "grossKg", v)} />
                 </div>
               ))}
               <p className="flex flex-wrap items-center gap-2 text-sm tnum">

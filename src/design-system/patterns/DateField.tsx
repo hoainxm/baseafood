@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { calendarYearRange, parseTypedDate } from "./dateInput";
 import { cn } from "@/lib/utils";
 import { CalendarDays, X } from "lucide-react";
 import { InfoTip } from "./InfoTip";
@@ -130,21 +132,41 @@ function CalendarButton({
 }) {
   const [open, setOpen] = React.useState(false);
   const d = isoToDate(value);
+  const today = todayIso();
+  // Tháng đang xem của lịch — điều khiển để gõ ngày / chọn tháng-năm là lịch nhảy tới đó (2026-11-05).
+  const [month, setMonth] = React.useState<Date | undefined>(d);
+  const [typed, setTyped] = React.useState("");
+  const typedId = React.useId();
+  const typedIso = parseTypedDate(typed, today);
+  const outOfRange = !!typedIso && ((!!min && typedIso < min) || (!!max && typedIso > max));
+  const years = calendarYearRange(today, value, min, max);
 
   const setDate = (iso: string) => {
     onChange(iso);
     setOpen(false);
   };
+  const applyTyped = () => {
+    if (typedIso && !outOfRange) setDate(typedIso);
+  };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) {
+          setMonth(d);
+          setTyped("");
+        }
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           id={id}
           data-slot="date-trigger"
           variant="outline"
           aria-required={required ? true : undefined}
-          title="Mở lịch để chọn ngày. Có sẵn lối tắt Hôm nay / Hôm qua ở đầu lịch."
+          title="Mở lịch: gõ ngày (VD 31/12/2027) rồi Enter, hoặc chọn nhanh Tháng / Năm trên lịch, hoặc Hôm nay / Hôm qua."
           className="h-10 w-full justify-start px-3 text-sm font-medium"
         >
           <CalendarDays className="shrink-0 text-muted-foreground" />
@@ -153,24 +175,67 @@ function CalendarButton({
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto gap-0 p-0" align="start">
+      <PopoverContent className="w-auto max-w-[calc(100vw-1rem)] gap-0 p-0" align="start">
+        {/* Gõ ngày (Phòng KH 2026-11-05: ngày ở năm sau phải bấm qua từng tháng) — ngày trước, tháng sau. */}
+        <div className="grid gap-1.5 border-b border-border p-3">
+          <Label htmlFor={typedId}>Gõ ngày</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id={typedId}
+              autoFocus
+              inputMode="numeric"
+              value={typed}
+              onChange={(e) => {
+                setTyped(e.target.value);
+                const iso = parseTypedDate(e.target.value, today);
+                if (iso) setMonth(isoToDate(iso));
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyTyped();
+                }
+              }}
+              className="h-10 w-40"
+              aria-describedby={`${typedId}-hint`}
+            />
+            <Button size="sm" onClick={applyTyped} title="Lấy ngày vừa gõ (phím Enter cũng được).">
+              Chọn
+            </Button>
+          </div>
+          <p id={`${typedId}-hint`} className={cn("text-sm", typed && (!typedIso || outOfRange) ? "text-destructive" : "text-muted-foreground")}>
+            {!typed
+              ? "VD 31/12/2027 · 31/12/27 · 311227 · 31/12 (năm nay)"
+              : !typedIso
+                ? "Chưa đọc được ngày — gõ ngày/tháng/năm"
+                : outOfRange
+                  ? `${formatWeekdayDate(typedIso)} nằm ngoài khoảng cho phép`
+                  : `${formatWeekdayDate(typedIso)} — Enter để chọn`}
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2 border-b border-border p-3">
-          <Button variant="secondary" size="sm" onClick={() => setDate(todayIso())} title="Điền ngay ngày hôm nay, khỏi dò trên lịch.">
+          <Button variant="secondary" size="sm" onClick={() => setDate(today)} title="Điền ngay ngày hôm nay, khỏi dò trên lịch.">
             Hôm nay
           </Button>
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setDate(addDays(todayIso(), -1))}
+            onClick={() => setDate(addDays(today, -1))}
             title="Điền ngay ngày hôm qua — hay dùng khi ghi bù sổ của ngày trước."
           >
             Hôm qua
           </Button>
         </div>
+        {/* Ô chọn Tháng + Năm trên đầu lịch: nhảy tới tháng xa trong một lần chọn, không bấm ‹ › từng tháng. */}
         <Calendar
           mode="single"
+          captionLayout="dropdown"
+          startMonth={new Date(years.from, 0)}
+          endMonth={new Date(years.to, 11)}
+          formatters={{ formatMonthDropdown: (m) => `Tháng ${m.getMonth() + 1}` }}
+          month={month}
+          onMonthChange={setMonth}
           selected={d}
-          defaultMonth={d}
           disabled={[
             ...(min ? [{ before: isoToDate(min)! }] : []),
             ...(max ? [{ after: isoToDate(max)! }] : []),
@@ -178,7 +243,6 @@ function CalendarButton({
           onSelect={(x) => {
             if (x) setDate(dateToIso(x));
           }}
-          autoFocus
         />
       </PopoverContent>
     </Popover>
@@ -188,9 +252,10 @@ function CalendarButton({
 /**
  * DateField — chọn MỘT ngày bằng lịch.
  *
- * Không dùng <input type="date"> vì trên desktop phải gõ dd/mm/yyyy bằng tay,
- * ô lịch nhỏ, định dạng phụ thuộc locale máy → người lớn tuổi gõ nhầm
- * ngày/tháng. Ở đây bấm nút to → lịch ô 48px → chạm ngày là xong.
+ * Không dùng <input type="date"> vì định dạng phụ thuộc locale máy → người lớn tuổi gõ nhầm ngày/tháng. Ở đây
+ * bấm nút to → mở lịch: GÕ ngày kiểu Việt Nam (ngày trước, tháng sau; "31/12/27", "311227", "31/12") rồi Enter,
+ * hoặc chọn nhanh Tháng / Năm ở đầu lịch, hoặc Hôm nay / Hôm qua, hoặc chạm ngày (2026-11-05: ngày năm sau phải
+ * bấm qua từng tháng).
  */
 export function DateField({
   label,
@@ -245,7 +310,7 @@ export function DateField({
             id={id}
             value={value}
             onChange={onChange}
-            placeholder="Bấm để chọn ngày"
+            placeholder="Chọn hoặc gõ ngày"
             required={required && !hideRequiredMark}
           />
         </div>

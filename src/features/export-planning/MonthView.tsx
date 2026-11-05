@@ -41,6 +41,7 @@ import {
   isLiveContractState,
   contractState,
   openShipmentsOf,
+  coverageText,
   type Period,
   STEP_NOS,
   stepState,
@@ -255,7 +256,8 @@ export function MonthView({
       render: (p) => (
         <div className="flex flex-wrap gap-1">
           {!p.hasShipments ? <Tag variant="warning">Chưa ghi chuyến</Tag> : (
-            <Tag variant="warning">
+            // Rê chuột xem vì sao thiếu: đã ghi / tối thiểu / HĐ / dung sai (2026-11-05).
+            <Tag variant="warning" title={coverageText(p.coverage)}>
               {[p.coverage.missingKg > 0 && `${formatNumber(p.coverage.missingKg)} kg`, p.coverage.missingContainers > 0 && `${p.coverage.missingContainers} cont`].filter(Boolean).join(" / ")} chưa ghi chuyến
             </Tag>
           )}

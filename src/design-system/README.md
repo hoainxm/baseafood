@@ -568,7 +568,7 @@ theo màu**, không tự viết class màu lên nút.
 | Chọn 1 trong ≤ 6 | `ChoiceGroup` (nút to) |
 | Chọn 1 trong danh mục dài / cần tạo mới | `Combobox` |
 | Chọn trong danh mục **và cho sửa bản ghi danh mục ngay tại chỗ** | `Combobox` + `onEditItem` (bút chì trên từng mục; máy có chuột: hiện khi rê/trỏ phím, cảm ứng: luôn hiện) + `canEdit` (chỉ mục có trong danh mục). Màn nghiệp vụ KHÔNG tự viết hộp: dùng `useQuickCatalogEdit` (`features/catalog/QuickCatalogEdit.tsx`) — hộp là `CatalogEditDialog`, chung với `CatalogCrud`. Không gắn ở ô LỌC. **Bắt buộc ở mọi ô nhập liệu dùng danh mục, đi cùng `onCreate`** — xem mục "Ô chọn danh mục" ngay dưới bảng. |
-| Chọn ngày | `DateField` |
+| Chọn ngày | `DateField` (`DateRangeField` cho khoảng). Mở lịch là con trỏ ở ô **Gõ ngày**: ngày trước tháng sau — `31/12/2027` · `31/12/27` · `311227` · `31/12` (năm nay) · ISO — Enter là xong (`parseTypedDate`, `dateInput.ts`); đầu lịch có ô chọn **Tháng / Năm** (±15 năm quanh hôm nay, tự mở rộng theo ngày đang chọn / `min` / `max`); nút Hôm nay / Hôm qua. **Cấm `<input type="date">`** ở form (trừ ô sửa thẳng trong lưới) — từ 2026-11-05, Phòng KH: "ngày năm 2027 phải bấm từng tháng". |
 | Chọn khoảng ngày | `DateRangeField` (hai ô riêng Từ / Đến) |
 | Danh sách bản ghi | `RecordTable` — truyền `getSortValue` cho cột để bấm tiêu đề sắp xếp, truyền `getSearchText` để hiện ô tìm |
 | Nhập nhiều ô số một lúc (lưới ngày) | `EditableGrid` — cột tổng luôn `kind: "computed"` |

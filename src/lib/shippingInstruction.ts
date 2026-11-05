@@ -21,7 +21,26 @@ export interface SiGoodsRow {
   description: string;
   hsCode: string;
   packages: number | null;
+  /** Gross MỖI kiện (thùng / bó) — Phòng KH 2026-11-05: gõ gross một thùng, tổng tự nhân. Bản lưu cũ không có ⇒ tổng ÷ kiện. */
+  grossPerUnit?: number | null;
   grossKg: number | null;
+}
+
+const round2g = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Sửa một dòng hàng SI: đổi số kiện hoặc gross / kiện ⇒ tổng gross = kiện × gross / kiện; gõ thẳng tổng gross ⇒ gross /
+ * kiện = tổng ÷ kiện (hai ô luôn khớp nhau).
+ */
+export function siRowWith(row: SiGoodsRow, patch: Partial<Pick<SiGoodsRow, "packages" | "grossPerUnit" | "grossKg">>): SiGoodsRow {
+  const next = { ...row, ...patch };
+  if ("grossKg" in patch) {
+    next.grossPerUnit = next.grossKg != null && next.packages ? round2g(next.grossKg / next.packages) : (next.grossPerUnit ?? null);
+    return next;
+  }
+  if (next.packages != null && next.grossPerUnit != null) next.grossKg = round2g(next.packages * next.grossPerUnit);
+  else if ("grossPerUnit" in patch && next.grossPerUnit == null) next.grossKg = null;
+  return next;
 }
 
 /** Ô người dùng điền / chọn — nhớ theo SI gần nhất của cùng khách (R12). */
@@ -168,7 +187,7 @@ export function siGoodsRows(
       if (gross == null) warnings.push(`Dòng ${i + 1} (${l.description || "chưa có tên"}): thiếu kg cả bì hoặc số kiện — gõ gross tay.`);
       // Tên + HS lấy theo dòng HĐ HIỆN TẠI (mẫu SI: "link từ hợp đồng") — sửa tên ở HĐ thì SI theo (v1.5).
       const cl = byId.get(l.contractLineId);
-      return { contractLineId: l.contractLineId, description: cl?.description?.trim() || l.description, hsCode: cl?.hsCode ?? "", packages, grossKg: gross };
+      return { contractLineId: l.contractLineId, description: cl?.description?.trim() || l.description, hsCode: cl?.hsCode ?? "", packages, grossPerUnit: l.grossKgPerUnit ?? null, grossKg: gross };
     });
   return { rows, warnings };
 }
@@ -203,7 +222,13 @@ const numOrNull = (v: unknown) => (typeof v === "number" ? v : typeof v === "str
 
 export function siFromValues(v: DocumentValues): SiForm {
   const goods = Array.isArray(v.goods)
-    ? v.goods.map((r) => ({ contractLineId: str(r.contractLineId), description: str(r.description), hsCode: str(r.hsCode), packages: numOrNull(r.packages), grossKg: numOrNull(r.grossKg) }))
+    ? v.goods.map((r) => {
+        const packages = numOrNull(r.packages);
+        const grossKg = numOrNull(r.grossKg);
+        // Bản lưu trước 2026-11-05 chưa có gross / kiện ⇒ suy từ tổng ÷ số kiện.
+        const grossPerUnit = numOrNull(r.grossPerUnit) ?? (grossKg != null && packages ? round2g(grossKg / packages) : null);
+        return { contractLineId: str(r.contractLineId), description: str(r.description), hsCode: str(r.hsCode), packages, grossPerUnit, grossKg };
+      })
     : [];
   const carry = Object.fromEntries(SI_CARRY_KEYS.map((k) => [k, str(v[k]) || EMPTY_SI_CUSTOMER[k]])) as unknown as SiCustomerFields;
   return { ...carry, date: str(v.date), cbm: str(v.cbm), goods };
@@ -273,7 +298,7 @@ export function mergeSavedGoods(fresh: readonly SiGoodsRow[], saved: readonly Si
   const keyed = saved.some((s) => s.contractLineId);
   return fresh.map((r, i) => {
     const old = keyed ? saved.find((s) => s.contractLineId && s.contractLineId === r.contractLineId) : saved[i];
-    return old ? { ...r, packages: old.packages, grossKg: old.grossKg } : r;
+    return old ? { ...r, packages: old.packages, grossPerUnit: old.grossPerUnit ?? r.grossPerUnit ?? null, grossKg: old.grossKg } : r;
   });
 }
 

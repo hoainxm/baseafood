@@ -149,7 +149,7 @@ export const importPlanningGuide: PageGuide = {
       <GuideSection title="Kiểm mẫu của kho">
         <GuideList>
           <li>
-            Kho gửi báo cáo kiểm mẫu thì vào lần nhập, chọn <b>Nạp báo cáo kiểm mẫu</b>. File Excel được đọc tự động: app chọn sẵn các cột của invoice này theo nhà xuất khẩu và ngày về kho, gợi ý dòng hàng theo size.
+            Kho gửi báo cáo kiểm mẫu thì vào lần nhập, chọn <b>Nạp báo cáo kiểm mẫu</b>. File Excel được đọc tự động: app chọn sẵn các cột của invoice này theo nhà xuất khẩu và ngày về kho, gợi ý dòng hàng theo size. Ô <b>Ngày báo cáo</b>: gõ ngày (VD 05/11/26) rồi Enter, hoặc chọn Tháng / Năm trên lịch.
           </li>
           <li>Ảnh chụp báo cáo chỉ đính kèm, số gõ tay. Ô không đọc được để trống và tô vàng để soát.</li>
           <li>

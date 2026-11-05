@@ -565,7 +565,7 @@ describe("NV12 · khép kín (AC-19…AC-23)", () => {
       approvals: [approval("r0", "c1", "approved")],
       shipments: [shipment("s1", "c1", { plannedKg: 15000 })],
     });
-    expect(contractCoverage(d, "c1")).toEqual({ missingKg: 2100, missingContainers: 0, covered: false });
+    expect(contractCoverage(d, "c1")).toMatchObject({ missingKg: 2100, missingContainers: 0, covered: false, plannedKg: 15000, minKg: 17100 });
     expect(contractClosure(d, "c1").reason).not.toBe("out-of-tolerance");
   });
 });

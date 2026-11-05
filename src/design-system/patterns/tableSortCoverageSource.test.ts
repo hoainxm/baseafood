@@ -44,7 +44,8 @@ function listTsx(dir: string): string[] {
 const HAS_OWN_TABLE = /<table[\s>]|<Table[\s>]/;
 const USES_SORT = /useTableSort\(/;
 
-describe("quy tắc 19 — bảng nghiệp vụ sắp được theo cột", () => {
+// Quét mã nguồn cả src/ — chạy chung cả bộ test thì có lúc quá 5 s mặc định (hỏng ngẫu nhiên 2026-11-05) ⇒ cho 30 s.
+describe("quy tắc 19 — bảng nghiệp vụ sắp được theo cột", { timeout: 30_000 }, () => {
   const files = listTsx(join(ROOT, "features")).map((p) => ({ rel: relative(ROOT, p), src: readFileSync(p, "utf8") }));
   const ownTables = files.filter((f) => HAS_OWN_TABLE.test(f.src));
 

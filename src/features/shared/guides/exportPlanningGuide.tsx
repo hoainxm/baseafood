@@ -56,7 +56,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     needs: ["export-plans", "create"],
     actors: KH,
     text: "Chọn Ghi chuyến cho từng booking, xe tải hoặc lô đóng ghép: số lượng, booking (đính kèm file booking được), số cont, ETD. Booking nhiều cont (VD 1X20RF & 1X40RF) thì một chuyến, thêm cont 2, 3… ở khối Cont thêm của Sửa chuyến.",
-    done: "Mọi dòng hàng đã có chuyến (còn thiếu thì hiện thẻ Còn … chưa ghi chuyến). Ghi đủ chuyến thì thanh chặng ghi Đã ghi đủ chuyến · k/n chuyến xong; chặng Giao hàng chỉ xong khi mọi chuyến xong đủ bước và đã giao đủ hàng",
+    done: "Mọi dòng hàng đã có chuyến (còn thiếu thì hiện thẻ Còn … chưa ghi chuyến, kèm đã ghi / tối thiểu kg — tối thiểu = kg hợp đồng trừ dung sai). Ghi đủ chuyến thì thanh chặng ghi Đã ghi đủ chuyến · k/n chuyến xong; chặng Giao hàng chỉ xong khi mọi chuyến xong đủ bước và đã giao đủ hàng",
   },
   {
     id: "steps",
@@ -186,6 +186,11 @@ export const exportPlanningGuide: PageGuide = {
             <b>Ảnh cont / seal</b>: đính ở hàng Số cont + seal (người đóng hàng cũng đính được). Bắt buộc: có số cont, seal và ít nhất 1 ảnh thì hàng mới Xong (đóng ghép không cần).
           </li>
           <li>
+            <b>Một cont nhiều hợp đồng</b>: ghi một chuyến cont ở một hợp đồng, thêm <b>Hàng của HĐ …</b> cho hợp đồng khác. Lỡ ghi
+            thành chuyến <b>Đóng ghép</b> riêng từng hợp đồng thì ở chuyến Đóng ghép chọn <b>Đưa vào cont</b> rồi chọn chuyến cont cùng
+            khách: hàng thành dòng của hợp đồng đó trên chuyến cont, kg từng hợp đồng giữ nguyên, chuyến Đóng ghép bỏ đi (Hoàn tác được).
+          </li>
+          <li>
             <b>Chuyến nhiều cont</b> (một booking, VD 40HC-RF + 20RF): cont 1 là Loại chuyến + Số container của chuyến, cont 2, 3… thêm ở
             khối <b>Cont thêm</b> khi Sửa chuyến; Cập nhật booking đọc được nhiều cont thì hỏi có thêm cont không. Trong Nhập hàng của chuyến
             mỗi dòng chọn <b>Đi cont</b>, dòng đi hai cont thì <b>Chia sang cont khác</b>; bộ phận đóng cont thấy hàng theo từng cont và không
@@ -196,7 +201,7 @@ export const exportPlanningGuide: PageGuide = {
           </li>
           <li>
             <b>SI</b>: mục bắt buộc của chuyến cont lạnh, ngay sau Số cont + seal. Lập SI tự điền ô theo booking, cont / seal, hàng của chuyến; ô của
-            khách (loại B/L, cước…) nhớ theo SI lần trước; Consignee và Notify lấy theo Người nhận hàng / Notify của hợp đồng, sửa tay được, nút
+            khách (loại B/L, cước…) nhớ theo SI lần trước; mỗi dòng hàng gõ <b>Gross mỗi kiện</b> thì <b>Tổng gross</b> tự nhân với số kiện; Consignee và Notify lấy theo Người nhận hàng / Notify của hợp đồng, sửa tay được, nút
             Lấy theo hợp đồng điền lại. Hãng tàu ra vận đơn theo SI. Xuất Excel là Xong. Xe tải, đóng ghép:
             Không áp dụng. Chuyến tạo trước 05/11/2026 đã có B/L hoặc đã xong các mục đóng cont cũ cũng Không áp dụng (hàng SI ghi lý
             do) nhưng vẫn lập SI được — lập xong là Xong.

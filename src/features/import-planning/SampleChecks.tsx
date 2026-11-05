@@ -16,6 +16,7 @@ import {
   Field,
   FormDialog,
   HorizontalScroll,
+  DateField,
   Input,
   NumberField,
   Tag,
@@ -445,9 +446,8 @@ export function SampleCheckDialog({
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Ngày báo cáo">
-              <Input type="date" value={form.reportDate} onChange={(e) => setForm((f) => (f ? { ...f, reportDate: e.target.value } : f))} />
-            </Field>
+            {/* Ô ngày chung của hệ thống (gõ ngày / chọn nhanh tháng-năm) thay <input type="date"> — 2026-11-05. */}
+            <DateField label="Ngày báo cáo" value={form.reportDate} onChange={(v) => setForm((f) => (f ? { ...f, reportDate: v } : f))} />
             {form.mode === "import" && existing.length > 0 && (
               <ChoiceGroup
                 label={`Lần nhập này đã có ${existing.length} mẫu`}

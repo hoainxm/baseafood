@@ -4,7 +4,8 @@
 covers: src/features/import-planning/*, src/lib/importPlanning.ts, src/lib/importPlanningDemo.ts, src/lib/importReports.ts, src/lib/importSample*.ts, src/lib/importFileStorage.ts
 tours: src/features/import-planning/importTour.ts
 guides: src/features/shared/guides/importPlanningGuide.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-05
+<!-- re-verified: 2026-11-05 — ô Ngày báo cáo (Kiểm mẫu) dùng DateField chung (gõ ngày / chọn nhanh tháng-năm) thay <input type="date">; không đổi luật. -->
 <!-- re-verified: 2026-11-03 (ba-spec 69 v2) — HĐ nhập thêm Hạn hợp đồng (ô form, hồ sơ, bộ đọc file; mig 0100); không đổi trạng thái HĐ / lần nhập, không đổi quyền. -->
 <!-- re-verified: 2026-11-03 (ba-spec 66 v1.2) — tour Lập hợp đồng nhập — đọc thêm .doc; dạng nhãn : giá trị của HĐ NCC Ấn Độ; không đổi trạng thái, không đổi quyền. -->
 ttl_days: 90

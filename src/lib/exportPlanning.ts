@@ -1456,6 +1456,30 @@ export interface Coverage {
   missingKg: number;
   missingContainers: number;
   covered: boolean;
+  /** Để thẻ cảnh báo nói rõ vì sao thiếu (Phòng KH 2026-11-05, HĐ BD-008/26): đã ghi / tối thiểu / HĐ / dung sai. */
+  plannedKg?: number;
+  minKg?: number;
+  contractKg?: number;
+  tolerancePct?: number;
+  plannedContainers?: number;
+  contractContainers?: number;
+}
+
+const localeNumber = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 2 });
+
+/**
+ * Câu thẻ "chưa ghi chuyến" kèm lý do: "Còn 4.700 kg chưa ghi chuyến · đã ghi 49.300 / tối thiểu 54.000 kg (HĐ 60.000 kg,
+ * dung sai 10 %)"; thiếu cont thêm "· đã ghi 1 / 2 cont". Đủ ⇒ "".
+ */
+export function coverageText(c: Coverage): string {
+  if (c.covered) return "";
+  const head = `Còn ${[c.missingKg > 0 && `${localeNumber(c.missingKg)} kg`, c.missingContainers > 0 && `${c.missingContainers} cont`].filter(Boolean).join(" / ")} chưa ghi chuyến`;
+  const kg =
+    c.missingKg > 0 && c.minKg != null && c.plannedKg != null
+      ? `đã ghi ${localeNumber(c.plannedKg)} / tối thiểu ${localeNumber(c.minKg)} kg${c.contractKg != null ? ` (HĐ ${localeNumber(c.contractKg)} kg${c.tolerancePct ? `, dung sai ${localeNumber(c.tolerancePct)} %` : ""})` : ""}`
+      : "";
+  const cont = c.missingContainers > 0 && c.contractContainers != null ? `đã ghi ${c.plannedContainers ?? 0} / ${c.contractContainers} cont` : "";
+  return [head, kg, cont].filter(Boolean).join(" · ");
 }
 
 /** HĐ đã lên đủ chuyến chưa: Σ kg kế hoạch ≥ kg × (1 − dung sai) và số chuyến cont ≥ số cont trên HĐ. */
@@ -1468,8 +1492,19 @@ export function contractCoverage(d: ExportData, contractId: string): Coverage {
   const planned = ships.reduce((t, s) => t + shipmentContractPlannedKg(d, s, contractId), 0);
   const missingKg = Math.max(0, round2(target - planned));
   // ba-spec 73 R10: đếm CONT của các chuyến (chuyến nhiều cont đếm đủ), không đếm số chuyến.
-  const missingContainers = Math.max(0, numOr0(rev.terms.containerCount) - ships.reduce((t, s) => t + containerCountOf(d, s), 0));
-  return { missingKg, missingContainers, covered: missingKg < EPS && missingContainers === 0 };
+  const plannedContainers = ships.reduce((t, s) => t + containerCountOf(d, s), 0);
+  const missingContainers = Math.max(0, numOr0(rev.terms.containerCount) - plannedContainers);
+  return {
+    missingKg,
+    missingContainers,
+    covered: missingKg < EPS && missingContainers === 0,
+    plannedKg: round2(planned),
+    minKg: round2(target),
+    contractKg: contractTotals(rev.lines).kg,
+    tolerancePct: numOr0(rev.terms.tolerancePct),
+    plannedContainers,
+    contractContainers: numOr0(rev.terms.containerCount),
+  };
 }
 
 export interface Closure {
@@ -1525,10 +1560,7 @@ export function contractState(d: ExportData, contractId: string, opts: EvidenceO
 export function shippingProgressText(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): string {
   if (contractState(d, contractId, opts) !== "shipping") return "";
   const cov = contractCoverage(d, contractId);
-  if (!cov.covered) {
-    const parts = [cov.missingKg > 0 && `${cov.missingKg.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} kg`, cov.missingContainers > 0 && `${cov.missingContainers} cont`].filter(Boolean);
-    return `Còn ${parts.join(" / ")} chưa ghi chuyến`;
-  }
+  if (!cov.covered) return coverageText({ ...cov, minKg: undefined, contractContainers: undefined }); // câu ngắn dưới thanh chặng — chi tiết ở thẻ
   const ships = openShipmentsOf(d, contractId);
   const done = ships.filter((s) => isShipmentClosed(d, s, opts)).length;
   if (ships.length && done === ships.length) return "Mọi chuyến đã xong · số đã giao lệch dung sai, xem thẻ Ngoài dung sai";

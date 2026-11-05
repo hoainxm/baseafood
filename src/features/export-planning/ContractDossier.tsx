@@ -34,6 +34,7 @@ import {
   requiredAttachmentKinds,
   canEditContractDirectly,
   shippingProgressText,
+  coverageText,
   scheduleGate,
   shipmentGate,
   shipmentGateText,
@@ -435,13 +436,8 @@ export function ContractDossier({
             {isOpen && lastFinal?.decision === "needs-revision" && <Tag variant="warning">Duyệt cuối trả về: {lastFinal.reason}</Tag>}
             {isOverdue && <Tag variant="error">Quá hạn giao {formatDateVN(deadline)}</Tag>}
             {isOpen && unmapped > 0 && <Tag variant="warning">{unmapped} dòng hàng chưa nối danh mục</Tag>}
-            {isOpen && !coverage.covered && (
-              <Tag variant="warning">
-                Còn {coverage.missingKg > 0 ? `${formatNumber(coverage.missingKg)} kg` : ""}
-                {coverage.missingKg > 0 && coverage.missingContainers > 0 ? " / " : ""}
-                {coverage.missingContainers > 0 ? `${coverage.missingContainers} cont` : ""} chưa ghi chuyến
-              </Tag>
-            )}
+            {/* Ghi rõ vì sao thiếu (Phòng KH 2026-11-05, BD-008/26 "ghi đủ lượng rồi sao vẫn báo"): đã ghi / tối thiểu / HĐ / dung sai. */}
+            {isOpen && !coverage.covered && <Tag variant="warning">{coverageText(coverage)}</Tag>}
             {isOpen && closure.reason === "out-of-tolerance" && (
               <Tag variant="error">
                 Ngoài dung sai: kg {deviationText(closure.kgDeviationPct)}

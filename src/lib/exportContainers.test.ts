@@ -338,3 +338,17 @@ describe("ba-spec 73 — chuyến nhiều cont", () => {
     expect(shippingProgressText(both, "c1")).toBe("Đã ghi đủ chuyến · 0/1 chuyến xong");
   });
 });
+
+describe("thẻ chưa ghi chuyến ghi rõ lý do (Phòng KH 2026-11-05, HĐ BD-008/26)", () => {
+  it("6.000 kiện × 2 × 5 kg, dung sai 10 %, 12 chuyến 49.300 kg ⇒ nói đã ghi / tối thiểu / HĐ", async () => {
+    const { coverageText } = await import("./exportPlanning");
+    const L = { ...cline("bd8", "FROZEN OCTOPUS KARAAGE IQF", 6000), unitKind: "bundle" as const, cartonsPerUnit: 2, netKgPerCarton: 5 };
+    const kgs = [2900, 3000, 7000, 3000, 5300, 3000, 4300, 2000, 7000, 3000, 5800, 3000];
+    const ships = kgs.map((kg, i) => ship(`b${i}`, { kind: "consolidated", plannedKg: kg, containerNo: "", sealNo: "" }));
+    const d = base({ revisions: [revision("c1", [L], { containerCount: null })], shipments: ships });
+    const cov = contractCoverage(d, "c1");
+    expect([cov.missingKg, cov.plannedKg, cov.minKg, cov.contractKg]).toEqual([4700, 49300, 54000, 60000]);
+    expect(coverageText(cov)).toBe("Còn 4.700 kg chưa ghi chuyến · đã ghi 49.300 / tối thiểu 54.000 kg (HĐ 60.000 kg, dung sai 10 %)");
+    expect(coverageText({ ...cov, missingKg: 0, missingContainers: 1, plannedContainers: 1, contractContainers: 2 })).toBe("Còn 1 cont chưa ghi chuyến · đã ghi 1 / 2 cont");
+  });
+});

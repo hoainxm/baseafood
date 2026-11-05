@@ -227,3 +227,20 @@ describe("SI mở lại theo hợp đồng hiện tại (v1.5)", () => {
     expect(again.date).toBe("2026-11-04");
   });
 });
+
+describe("SI: gross mỗi kiện, tổng gross tự nhân (Phòng KH 2026-11-05)", () => {
+  it("đổi gross mỗi kiện / số kiện ⇒ tổng = kiện × gross; gõ tổng ⇒ gross mỗi kiện tự chia", async () => {
+    const { siRowWith } = await import("./shippingInstruction");
+    const row = { contractLineId: "l1", description: "FROZEN INDIAN MACKEREL WHOLE ROUND", hsCode: "", packages: 1500, grossPerUnit: null, grossKg: null };
+    const a = siRowWith(row, { grossPerUnit: 10.8 });
+    expect(a.grossKg).toBe(16200);
+    expect(siRowWith(a, { packages: 1400 }).grossKg).toBe(15120);
+    expect(siRowWith(a, { grossKg: 15000 }).grossPerUnit).toBe(10);
+    expect(siRowWith(a, { grossPerUnit: null }).grossKg).toBeNull();
+  });
+  it("bản lưu cũ chưa có gross mỗi kiện ⇒ suy từ tổng ÷ kiện", async () => {
+    const { siFromValues } = await import("./shippingInstruction");
+    const f = siFromValues({ goods: [{ description: "X", hsCode: "", packages: 700, grossKg: 7000 }] } as never);
+    expect(f.goods[0].grossPerUnit).toBe(10);
+  });
+});

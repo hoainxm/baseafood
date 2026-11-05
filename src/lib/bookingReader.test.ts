@@ -97,3 +97,39 @@ describe("file không phải booking (AC-4)", () => {
     expect(r.found).toHaveLength(0);
   });
 });
+
+describe("parseBookingRows — booking Evergreen (2026-11-05: file 235602205715 không đọc được)", () => {
+  // Hàng chữ trích từ PDF Evergreen: ":" dính vào giá trị, ngày yyyy/mm/dd + AM/PM, nhãn có đuôi, loại cont ở bảng QTY/TYPE.
+  const rows = [
+    ["BOOKING NO", ":235602205715", "APPLICATION NO.:26102208494310"],
+    ["VESSEL/VOYAGE", ":EVER", "OATH", "0585-109S"],
+    ["CARRIER", ":EVERGREEN LINE", "FROM", ": HO CHI MINH,SOCIALIST REPUBLIC OF VIETNAM"],
+    ["PORT OF RECEIPT", ":HO CHI MINH,", "Carbon Emission(kg): 125.6 kg"],
+    ["PORT OF LOADING", ":HO CHI MINH,"],
+    ["CUT OFF DATE /TIME:2026/11/03 03:00 AM"],
+    ["VGM CUT OFF via EDI/WEB/APP :2026/11/02 15:00"],
+    ["SI CUT OFF DATE :2026/11/03 11:59 PM"],
+    ["PORT OF DISCHARGE", ":PENANG,MALAYSIA"],
+    ["FINAL DESTINATION", ":PENANG,MALAYSIA"],
+    ["QTY/TYPE", "GWT+TARE WT(KGS) LIMIT GWT(EACH)", "IMO CLASS/UN NO/LQ/SUB RISK/MP"],
+    ["1", "/20' REEFER", "18,000.00 +2,980", "27,500", "(NON-HAZARDOUS)"],
+    ["EMPTY PICK UP AT:TAN CANG - MY THUY DEPOT"],
+    ["INLAND RETURN TO:INTERNATIONAL TRANSPORTATION AND TRADING J.P COMPANY (SP-ITC)"],
+  ];
+  it("đọc số booking, tàu, cảng, 3 mốc cut-off, bãi rỗng / hạ bãi, loại cont", () => {
+    const { read, found } = parseBookingRows(rows);
+    expect(read.bookingNo).toBe("235602205715");
+    expect(read.vesselVoyage).toBe("EVER OATH 0585-109S");
+    expect(read.placeOfReceipt).toBe("HO CHI MINH");
+    expect(read.portOfLoading).toBe("HO CHI MINH");
+    expect(read.portOfDischarge).toBe("PENANG,MALAYSIA");
+    expect(read.placeOfDelivery).toBe("PENANG,MALAYSIA");
+    expect(read.cargoCutoff).toBe("2026-11-03T03:00");
+    expect(read.vgmCutoff).toBe("2026-11-02T15:00");
+    expect(read.docCutoff).toBe("2026-11-03T23:59");
+    expect(read.emptyPickupYard).toBe("TAN CANG - MY THUY DEPOT");
+    expect(read.returnYard).toBe("INTERNATIONAL TRANSPORTATION AND TRADING J.P COMPANY (SP-ITC)");
+    expect(read.kind).toBe("20RF");
+    expect(found.length).toBeGreaterThanOrEqual(12);
+  });
+});

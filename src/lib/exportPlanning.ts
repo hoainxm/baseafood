@@ -181,13 +181,14 @@ export const ITEM_STATE_LABELS: Record<ExportItemState, string> = {
 
 /**
  * Quy trình hợp đồng (chủ dự án chốt 2026-10-29 — bỏ bước duyệt HĐ đầu, chỉ còn duyệt cuối):
- * Lập HĐ → Chờ đính kèm → (đủ hồ sơ) → Đang ghi chuyến → (xuất đủ trong dung sai) → Chờ duyệt cuối →
+ * Lập HĐ → Chờ đính kèm → (đủ hồ sơ) → Đang giao hàng → (xuất đủ trong dung sai) → Chờ duyệt cuối →
  * (Trưởng / Phó phòng KH duyệt cuối) → Đã đóng HĐ.
  */
 export type ContractState = "attaching" | "shipping" | "final-review" | "closed" | "cancelled";
 export const CONTRACT_STATE_LABELS: Record<ContractState, string> = {
   attaching: "Chờ đính kèm",
-  shipping: "Đang ghi chuyến",
+  // Trước 2026-11-05 là "Đang ghi chuyến" — người dùng tưởng ghi chuyến xong là xong chặng (HĐ 68/2025).
+  shipping: "Đang giao hàng",
   "final-review": "Chờ duyệt cuối",
   closed: "Đã đóng HĐ",
   cancelled: "Đã hủy",
@@ -203,7 +204,7 @@ export const isLiveContractState = (st: ContractState) => st !== "closed" && st 
 /** Các chặng của quy trình HĐ — thanh chặng ở hồ sơ HĐ, tour, hộp "?". */
 export const CONTRACT_FLOW_STAGES: readonly { state: Exclude<ContractState, "cancelled">; title: string; who: string; hint: string }[] = [
   { state: "attaching", title: "Đính kèm", who: "Nhân viên Kế hoạch", hint: "Lập HĐ xong là vào bước này. Đính kèm đủ hồ sơ bắt buộc: hợp đồng đã ký, L/C (nếu thanh toán L/C). Đủ hồ sơ mới ghi chuyến lẻ được; lịch xuất hàng (chuyến dự kiến) tạo được ngay." },
-  { state: "shipping", title: "Ghi chuyến", who: "Nhân viên Kế hoạch", hint: "Ghi từng chuyến (container) và theo dõi các bước lệnh SX → chứng từ, tới khi xuất đủ hợp đồng." },
+  { state: "shipping", title: "Giao hàng", who: "Nhân viên Kế hoạch", hint: "Ghi chuyến rồi làm từng chuyến qua Lệnh sản xuất, Bao bì, Đóng cont, Bộ chứng từ. Chặng này xong khi mọi chuyến xong đủ 5 bước và đã giao đủ hàng trong dung sai — ghi chuyến xong chưa phải là xong chặng." },
   { state: "final-review", title: "Duyệt cuối", who: "Trưởng / Phó phòng KH", hint: "Xuất đủ trong dung sai ⇒ Trưởng hoặc Phó phòng Kế hoạch xem lại hồ sơ, đồng ý thì đóng HĐ; chưa ổn thì trả về kèm lý do." },
   { state: "closed", title: "Đóng HĐ", who: "", hint: "Hợp đồng đã đóng. Mở lại được (Trưởng / Phó phòng) nếu cần sửa." },
 ];
@@ -1490,6 +1491,24 @@ export function contractState(d: ExportData, contractId: string, opts: EvidenceO
   // Chỉ loại "Thiếu" giữ HĐ ở Chờ đính kèm; "Bổ sung sau" cho đi tiếp (ba-spec 58 R4).
   if (!effectiveRevision(d, contractId) || blockingAttachmentKinds(d, contractId, opts).length) return "attaching";
   return contractClosure(d, contractId, opts).closed ? "final-review" : "shipping";
+}
+
+/**
+ * Dòng tiến độ dưới chặng Giao hàng (2026-11-05, HĐ 68/2025: ghi đủ chuyến mà người dùng tưởng còn lỗi):
+ * còn thiếu ⇒ "Còn … chưa ghi chuyến"; đủ ⇒ "Đã ghi đủ chuyến · k/n chuyến xong"; xong hết mà lệch ⇒ nói lệch dung sai.
+ * HĐ không ở chặng Giao hàng ⇒ "".
+ */
+export function shippingProgressText(d: ExportData, contractId: string, opts: EvidenceOptions = WITH_FILES): string {
+  if (contractState(d, contractId, opts) !== "shipping") return "";
+  const cov = contractCoverage(d, contractId);
+  if (!cov.covered) {
+    const parts = [cov.missingKg > 0 && `${cov.missingKg.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} kg`, cov.missingContainers > 0 && `${cov.missingContainers} cont`].filter(Boolean);
+    return `Còn ${parts.join(" / ")} chưa ghi chuyến`;
+  }
+  const ships = openShipmentsOf(d, contractId);
+  const done = ships.filter((s) => isShipmentClosed(d, s, opts)).length;
+  if (ships.length && done === ships.length) return "Mọi chuyến đã xong · số đã giao lệch dung sai, xem thẻ Ngoài dung sai";
+  return `Đã ghi đủ chuyến · ${done}/${ships.length} chuyến xong`;
 }
 
 /** Chặng hiện tại trên thanh quy trình (0 = Đính kèm … 3 = Đóng HĐ); HĐ hủy ⇒ -1. */

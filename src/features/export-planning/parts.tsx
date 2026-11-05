@@ -298,10 +298,11 @@ export function StepStepper({ steps, current, onSelect }: { steps: Record<StepNo
 }
 
 /**
- * Thanh chặng quy trình hợp đồng (2026-10-29): Đính kèm → Ghi chuyến → Duyệt cuối → Đóng HĐ.
- * Chặng xong tô xanh, chặng đang ở tô vàng; rê / chạm vào chặng xem ai làm, làm gì.
+ * Thanh chặng quy trình hợp đồng (2026-10-29): Đính kèm → Giao hàng → Duyệt cuối → Đóng HĐ.
+ * Chặng xong tô xanh lá, chặng đang ở tô màu chính (xanh dương) — từ 2026-11-05 không dùng màu cam nữa vì người dùng
+ * đọc thành lỗi (HĐ 68/2025); cam / đỏ chỉ cho thẻ cảnh báo. `detail`: một dòng tiến độ dưới chặng đang ở.
  */
-export function ContractFlowBar({ state }: { state: ContractState }) {
+export function ContractFlowBar({ state, detail }: { state: ContractState; detail?: string }) {
   const current = contractFlowIndex(state);
   if (current < 0) return null;
   const cur = CONTRACT_FLOW_STAGES[current];
@@ -312,7 +313,7 @@ export function ContractFlowBar({ state }: { state: ContractState }) {
           const isDone = i < current || state === "closed";
           // HĐ đã đóng: chặng cuối vẫn là "chặng đang ở" để còn nhãn (không chỉ dãy dấu tích).
           const isCurrent = i === current;
-          const tone = isDone ? "bg-success" : isCurrent ? "bg-warning" : "bg-border";
+          const tone = isDone ? "bg-success" : isCurrent ? "bg-primary" : "bg-border";
           const tip = `${i + 1}. ${st.title}${st.who ? ` — ${st.who}` : ""}: ${st.hint}`;
           return (
             <li key={st.state} className="flex min-w-0 flex-1 flex-col gap-2 sm:min-w-24">
@@ -328,6 +329,7 @@ export function ContractFlowBar({ state }: { state: ContractState }) {
                 <span className="hidden min-w-0 sm:inline">
                   {st.title}
                   {isCurrent && st.who ? <span className="block font-normal text-muted-foreground">{st.who}</span> : null}
+                  {isCurrent && detail ? <span className="block font-normal text-foreground">{detail}</span> : null}
                 </span>
               </span>
             </li>
@@ -339,6 +341,7 @@ export function ContractFlowBar({ state }: { state: ContractState }) {
           Chặng {current + 1}/{CONTRACT_FLOW_STAGES.length}: {cur.title}
         </span>
         {cur.who ? <span className="text-muted-foreground"> — {cur.who}</span> : null}
+        {detail ? <span className="block">{detail}</span> : null}
       </p>
     </div>
   );

@@ -36,16 +36,17 @@ const LABELS: readonly [BookingField, readonly string[]][] = [
   ["bookingNo", ["booking no", "booking number", "bkg no"]],
   ["forwarder", ["forwarder", "freight forwarder"]],
   ["vesselVoyage", ["trunk vessel", "vessel voyage", "vessel voy", "vessel"]],
-  ["placeOfReceipt", ["place of receipt"]],
+  ["placeOfReceipt", ["place of receipt", "port of receipt"]],
   ["portOfLoading", ["port of loading", "pol"]],
   ["portOfDischarge", ["port of discharging", "port of discharge", "pod"]],
   ["placeOfDelivery", ["place of delivery", "final destination"]],
   ["equipment", ["equipment type q ty", "equipment type qty", "equipment type", "container type"]],
-  ["returnYard", ["full return cy", "full return yard", "return cy"]],
-  ["emptyPickupYard", ["empty pick up cy", "empty pickup cy", "empty pick up yard"]],
+  ["returnYard", ["full return cy", "full return yard", "return cy", "inland return to"]],
+  ["emptyPickupYard", ["empty pick up cy", "empty pickup cy", "empty pick up yard", "empty pick up at"]],
   ["docCutoff", ["doc cut off", "si cut off", "documentation cut off"]],
   ["vgmCutoff", ["vgm cut off"]],
-  ["cargoCutoff", ["port cargo cut off", "cy cut off", "cargo cut off"]],
+  // Evergreen: "CUT OFF DATE /TIME" = hạn hạ hàng (cargo cut-off).
+  ["cargoCutoff", ["port cargo cut off", "cy cut off", "cargo cut off", "cut off date time", "cut off date"]],
 ];
 
 const DATE_FIELDS: readonly BookingField[] = ["docCutoff", "vgmCutoff", "cargoCutoff"];
@@ -59,6 +60,19 @@ const normLabel = (v: string) =>
 
 const LABEL_TO_FIELD = new Map<string, BookingField>();
 for (const [field, names] of LABELS) for (const n of names) if (!LABEL_TO_FIELD.has(n)) LABEL_TO_FIELD.set(n, field);
+const KNOWN_LABELS = [...LABEL_TO_FIELD.keys()].sort((a, b) => b.length - a.length);
+
+/**
+ * Nhãn ⇒ trường: khớp nguyên nhãn, không thì nhãn MỞ ĐẦU bằng một nhãn đã biết (dài nhất trước) — booking Evergreen
+ * ghi "VGM CUT OFF via EDI/WEB/APP", "SI CUT OFF DATE" (2026-11-05). Nhãn ngắn ≤ 3 ký tự (pol, pod) chỉ khớp nguyên.
+ */
+function fieldOfLabel(label: string): BookingField | undefined {
+  const n = normLabel(label);
+  const exact = LABEL_TO_FIELD.get(n);
+  if (exact) return exact;
+  const k = KNOWN_LABELS.find((x) => x.length > 3 && n.startsWith(`${x} `));
+  return k ? LABEL_TO_FIELD.get(k) : undefined;
+}
 
 /**
  * Một hàng chữ (đã tách ô) ⇒ các cặp nhãn / giá trị. Ô ":" đứng riêng ⇒ ô ngay trước là nhãn (lấy ra khỏi giá
@@ -72,10 +86,15 @@ export function labelPairs(cells: readonly string[]): [string, string][] {
     const c = raw.trim();
     if (!c) continue;
     const cur = pairs[pairs.length - 1];
-    if (c === ":") {
+    if (c === ":" || (c.startsWith(":") && c.length > 1)) {
+      // Ô ":" đứng riêng, hoặc ":giá trị" (Evergreen: "BOOKING NO" | ":235602205715") ⇒ ô ngay trước là nhãn.
       const label = cur?.value.length ? cur.value.pop()! : loose.pop();
       loose = [];
-      if (label) open(label);
+      if (label) {
+        open(label);
+        const rest = c.slice(1).trim();
+        if (rest) pairs[pairs.length - 1].value.push(rest);
+      }
       continue;
     }
     const m = c.match(/^(.*?[A-Za-z).])\s*:\s*(.*)$/);
@@ -97,15 +116,17 @@ const year = (y: string) => (y.length === 2 ? 2000 + Number(y) : Number(y));
 /** "03Nov26 10:00" · "03/11/2026 10:00" · "2026-11-03 10:00" ⇒ "2026-11-03T10:00"; chỉ có ngày ⇒ giờ 00:00; không đọc được ⇒ "". */
 export function parseBookingDateTime(text: string): string {
   const t = text.trim();
-  const time = t.match(/\b(\d{1,2}):(\d{2})\b/);
-  const hm = time && Number(time[1]) < 24 ? `${pad(Number(time[1]))}:${time[2]}` : "00:00";
+  const time = t.match(/\b(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)?\b/i);
+  // "03:00 AM" · "11:59 PM" (Evergreen) ⇒ giờ 24.
+  const hour = time ? (Number(time[1]) % 12) + (time[3]?.toUpperCase() === "PM" ? 12 : 0) : 0;
+  const hm = time && Number(time[1]) < 24 ? `${pad(time[3] ? hour : Number(time[1]))}:${time[2]}` : "00:00";
   let m = t.match(/\b(\d{1,2})[\s-]?([A-Za-z]{3})[a-z]*[\s-]?(\d{4}|\d{2})\b/);
   if (m) {
     const mon = MONTHS.indexOf(m[2].toLowerCase());
     if (mon >= 0) return `${year(m[3])}-${pad(mon + 1)}-${pad(Number(m[1]))}T${hm}`;
   }
-  m = t.match(/\b(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}T${hm}`;
+  m = t.match(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/);
+  if (m && Number(m[2]) <= 12) return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}T${hm}`;
   m = t.match(/\b(\d{1,2})[/.](\d{1,2})[/.](\d{4}|\d{2})\b/);
   if (m && Number(m[2]) <= 12) return `${year(m[3])}-${pad(Number(m[2]))}-${pad(Number(m[1]))}T${hm}`;
   return "";
@@ -166,12 +187,22 @@ export function parseBookingRows(rows: readonly (readonly string[])[]): { read: 
   const found = new Set<BookingField>();
   for (const row of rows) {
     for (const [label, value] of labelPairs(row)) {
-      const field = LABEL_TO_FIELD.get(normLabel(label));
+      const field = fieldOfLabel(label);
       if (!field || found.has(field) || field === "kind") continue;
-      const v = DATE_FIELDS.includes(field) ? parseBookingDateTime(value) : closeParen(value.replace(/\s*-\s*$/, "").trim());
+      const v = DATE_FIELDS.includes(field) ? parseBookingDateTime(value) : closeParen(value.replace(/\s*-\s*$/, "").replace(/\s*[,;]\s*$/, "").trim());
       if (!v) continue;
       read[field] = v as never;
       found.add(field);
+    }
+  }
+  // Evergreen: bảng QTY/TYPE — hàng "1" | "/20' REEFER" | … (số lượng, loại ở ô sau) ⇒ "1 x 20' REEFER", nhiều hàng nối " & ".
+  if (!read.equipment) {
+    const qtyType = rows
+      .map((r) => r.map((c) => String(c ?? "").trim()))
+      .flatMap((r) => r.flatMap((c, i) => (/^\d{1,2}$/.test(c) && /^\/?\s*(20|40|45)['’]?\s*(HC|HQ|HIGH CUBE)?\s*(REEFER|RF|RH|RQ)\b/i.test(r[i + 1] ?? "") ? [`${c} x ${r[i + 1].replace(/^\/\s*/, "")}`] : [])));
+    if (qtyType.length) {
+      read.equipment = qtyType.join(" & ");
+      found.add("equipment");
     }
   }
   if (read.equipment) {

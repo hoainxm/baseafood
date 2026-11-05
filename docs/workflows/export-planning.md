@@ -5,6 +5,9 @@ covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/expor
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-05
+<!-- re-verified: 2026-11-05 — bộ đọc file HĐ đọc được PDF DAIREI BD-007 (bảng tiêu đề 3 tầng, hàng tính bó, Reference Number, hạn ETA; ba-spec 66 History); không đổi luật. -->
+<!-- re-verified: 2026-11-05 — nhãn trạng thái shipping "Đang giao hàng" (chặng Giao hàng), vạch chặng đang ở màu chính + dòng tiến độ; luật không đổi. -->
+<!-- re-verified: 2026-11-05 — bộ đọc booking đọc được mẫu Evergreen (ba-spec 71 History); không đổi luật. -->
 <!-- re-verified: 2026-11-05 (Phòng KH) — HĐ có Người nhận hàng + Notify (tên + địa chỉ, JSON terms): SI mới lấy Consignee / Notify theo HĐ (trống ⇒ khách / SI lần trước), nút Lấy theo hợp đồng; invoice + packing list theo khách hàng, sửa tay Bên mua ở phần lập invoice. Sửa lỗi Hạn hợp đồng mất khi tải lại (parseTerms bỏ sót). -->
 <!-- re-verified: 2026-11-05 (ba-spec 73) — chuyến = một booking, có cont thêm (mig 0106): Số cont + seal Xong khi MỌI cont đủ số + seal + ảnh; độ phủ / báo cáo đếm cont; gộp chuyến thành cont thêm; người đóng hàng không đổi cont của dòng. -->
 <!-- re-verified: 2026-11-04 (form HĐ) — nút Dùng file làm Hợp đồng đã ký; địa chỉ khách đọc từ file; kg tự tính khi sửa số lượng / kg mỗi thùng; chọn tay mặt hàng không bị gợi ý đè; Chép dòng ẩn ở dòng trống (trừ dòng 1). -->
@@ -38,7 +41,7 @@ stateDiagram-v2
   attaching --> cancelled: Hủy
   shipping --> cancelled: Hủy
   state "Chờ đính kèm" as attaching
-  state "Đang ghi chuyến" as shipping
+  state "Đang giao hàng" as shipping
   state "Chờ duyệt cuối" as final_review
   state "Đã đóng HĐ" as closed
   state "Đã hủy" as cancelled
@@ -47,8 +50,8 @@ stateDiagram-v2
 | Trạng thái | Nghĩa | Sang bước sau khi | Ai làm | Code |
 |---|---|---|---|---|
 | Chờ đính kèm | HĐ vừa lập, thiếu hồ sơ bắt buộc | HĐ đã ký + L/C (nếu thanh toán L/C) mỗi loại **Có file** hoặc **Bổ sung sau** (không còn **Thiếu**). Lịch xuất dự kiến tạo được ngay | Nhân viên Kế hoạch | `contractState` · `ATTACHMENT_STATUS_LABELS` |
-| Đang ghi chuyến | Ghi từng chuyến (container), theo dõi 6 bước | Tổng kg đã xuất đủ trong dung sai | Nhân viên Kế hoạch | `contractClosure` |
-| Chờ duyệt cuối | Xuất đủ, chờ xem lại hồ sơ | Trưởng / Phó phòng KH chọn **Đồng ý — đóng hợp đồng**; hoặc **Trả về — sửa hồ sơ** (kèm lý do, quay lại Đang ghi chuyến) | Trưởng / Phó phòng KH | `FINAL_REVIEW_LABELS` |
+| Đang giao hàng | Ghi chuyến, làm từng chuyến qua 6 bước (trước 2026-11-05 tên là "Đang ghi chuyến"; chặng trên thanh: **Giao hàng**) | Mọi chuyến có hàng của HĐ đã khép **và** tổng đã giao trong dung sai — ghi đủ chuyến chưa phải là xong | Nhân viên Kế hoạch | `contractClosure` |
+| Chờ duyệt cuối | Xuất đủ, chờ xem lại hồ sơ | Trưởng / Phó phòng KH chọn **Đồng ý — đóng hợp đồng**; hoặc **Trả về — sửa hồ sơ** (kèm lý do, quay lại Đang giao hàng) | Trưởng / Phó phòng KH | `FINAL_REVIEW_LABELS` |
 | Đã đóng HĐ | Xong. Mở lại được nếu cần sửa | — | Trưởng / Phó phòng KH | `CONTRACT_STATE_LABELS` |
 | Đã hủy | HĐ bỏ, chuyến không còn tính | — | Nhân viên Kế hoạch | |
 
@@ -113,7 +116,7 @@ Khách như DAIREI ký nhiều HĐ song song (mỗi HĐ một mã hàng, lượn
 | Lệnh sản xuất của chuyến gộp | Gắn / lập được lệnh của mọi HĐ có hàng trên chuyến (mỗi HĐ một nút **Lập lệnh sản xuất · HĐ …**). Bước 2 Xong khi chuyến gắn ≥ 1 lệnh đã phát hành (luật cũ) | `ShipmentOrders` · `openShipmentsOf` |
 | Bảng hàng của Lệnh xuất | Xét từng HĐ: HĐ có lệnh sản xuất đã phát hành gắn chuyến ⇒ tên hàng, MSL, ngày SX, hạn theo lệnh; HĐ chưa có lệnh ⇒ theo Hàng của chuyến. Số thùng + kg theo Hàng của chuyến (thực đóng, chưa có thì kế hoạch); chuyến chưa nhập Hàng của chuyến ⇒ số cả lệnh + cảnh báo (ba-spec [72](../app-map/72-export-order-and-si.ba-spec.md) R2b, R3b) | `buildExportOrderLines` |
 
-Bộ phận đóng cont ghi số thực đóng cho dòng của HĐ phụ đã có trên chuyến (cùng khách) — mig `0102` (CHƯA chạy DB thật; trước khi chạy, máy chủ từ chối dòng mới của HĐ phụ do đóng cont tạo). Đóng cont không tự đưa HĐ mới vào chuyến.
+Bộ phận đóng cont ghi số thực đóng cho dòng của HĐ phụ đã có trên chuyến (cùng khách) — mig `0102` (đã chạy DB thật). Đóng cont không tự đưa HĐ mới vào chuyến.
 
 Chưa làm (ba-spec 70): khung giao ETA từ – tới (NL8), lịch gọi hàng của khách (đợt 2).
 

@@ -2,7 +2,7 @@
 
 > Load khi: chỉnh giao diện màn Xuất khẩu `/planning-export` (lịch xuất hàng theo tháng / tuần / khoảng ngày, danh sách HĐ, hồ sơ HĐ, chuyến, màn đóng hàng) hay form Lập hợp đồng, hộp Nối mặt hàng, hộp duyệt.
 covers: src/features/export-planning/**
-last_verified: 2026-11-04
+last_verified: 2026-11-05
 <!-- updated: 2026-11-04 (ba-spec 72) — bước 4: hàng Lệnh xuất có nút **Lập lệnh xuất** (mở trang bộ soạn `?compose=export-order`, Quay lại về chuyến); hàng Số cont + seal có nút **Ảnh cont / seal** + danh sách ảnh; hàng **SI** (trạng thái, nút Lập SI / Sửa SI, file SI) ngay dưới hàng Số cont + seal. Hộp `ShippingInstructionDialog`: khối "Theo booking và cont" chỉ xem · "Người gửi, người nhận" (nhớ theo khách) · "Hàng" (số kiện + gross từng dòng, CBM) · "Payment terms". Màn người đóng hàng: nút Ảnh cont / seal. -->
 <!-- updated: 2026-11-04 — §Bố cục Lịch xuất hàng viết lại theo code đang chạy (lịch hai cột ngày | chi tiết, thanh lọc một hàng tự xuống dòng, ChoiceGroup 15rem); bỏ đoạn cũ "mỗi khách một bảng, cột 30 · 16 · 17 · 29", "thanh lọc HAI hàng". Không đổi hành vi. -->
 <!-- updated: 2026-11-03 (2026-11-03 tên hàng) — phiếu HĐ phần 4: Tên hàng một hàng riêng (Textarea tự giãn); hàng dưới Mặt hàng (Combobox `wrapValue` — hiện đủ tên) · Size · Loại hàng · Quy cách (Textarea). -->
@@ -195,7 +195,7 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 
 ## v9 (2026-10-29) — bỏ bước duyệt HĐ (ba-spec 41 §0a) · THẮNG v8 ở các điểm dưới
 
-- **Thanh chặng** còn 4 mục: Đính kèm · Ghi chuyến · Duyệt cuối · Đóng HĐ (điện thoại "Chặng n/4").
+- **Thanh chặng** còn 4 mục: Đính kèm · Giao hàng (trước 2026-11-05: Ghi chuyến) · Duyệt cuối · Đóng HĐ (điện thoại "Chặng n/4").
 - **Nút chính**: Đính kèm hồ sơ (U1) → Ghi chuyến (U1) → Duyệt cuối (U6). Nút / hộp "Duyệt hợp đồng" (`ApprovalDialog`) **gỡ**. Thẻ chờ chỉ còn "Chờ Nhân viên Kế hoạch đính kèm hồ sơ" và "Chờ Trưởng / Phó phòng Kế hoạch duyệt cuối để đóng hợp đồng".
 - **Thao tác khác**: "Sửa hợp đồng" (`edit`, chỉ khi HĐ chưa có chuyến — sửa thẳng bản đang dùng) thay "Sửa bản chờ duyệt"; "Ghi bản sửa" luôn có (bản mới có hiệu lực ngay).
 - **Thẻ trạng thái HĐ** còn 5 nhãn (bỏ "Chờ duyệt"); bộ lọc danh sách HĐ bỏ "Chờ duyệt"; thẻ cảnh báo "Bản sửa chờ duyệt" bỏ.
@@ -226,3 +226,4 @@ Desktop: bảng + stepper ngang. Điện thoại (≤ md): `RecordTable` tự ra
 - v3 (2026-10-21): triage giao diện — tab điện thoại, cột thẳng hàng giữa bảng khách, thẻ số cùng khuôn, checklist cùng khuôn, bảng Hợp đồng gộp ngày ký vào hạn giao.
 - v2 (2026-10-20): theo góp ý chủ dự án sau audit — tab "Lịch xuất hàng" + kỳ xem tháng / tuần / ngày, nhãn Đủ hồ sơ / Đã xuất đủ / Đã chốt HĐ, cột + hộp Nối mặt hàng, người ký chọn từ tài khoản BGĐ, khối tiền cọc cấp HĐ, Khôi phục chuyến, tiền 2 số lẻ.
 - v1 (2026-10-20): khởi tạo khi chỉnh giao diện bản đầu cho trực quan — `progress.ts` (bước tiếp + còn thiếu, chỉ đọc lib), `StepBar` / `StepStepper` / `CollapsibleSection` ở `parts.tsx`, ShipmentPanel dạng checklist, hồ sơ 1 nút chính + menu, form 5 khối + tổng ở chân hộp.
+- v9.1 (2026-11-05): HĐ 68/2025 ghi đủ chuyến mà người dùng thấy vạch "đỏ" ở Ghi chuyến (vạch cam `bg-warning` của chặng đang ở) ⇒ chặng đổi tên **Giao hàng**, trạng thái "Đang giao hàng"; vạch chặng đang ở dùng `bg-primary`, cam / đỏ chỉ cho thẻ cảnh báo; dưới chặng đang ở có dòng tiến độ (`shippingProgressText`): Còn … chưa ghi chuyến · Đã ghi đủ chuyến · k/n chuyến xong.

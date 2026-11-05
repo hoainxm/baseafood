@@ -2,7 +2,7 @@
 
 > Load khi: sửa khối Booking (12 trường, đọc từ file booking của hãng tàu) hoặc khối Thông tin xe vận chuyển ở bước 4 Đóng cont của chuyến xuất; sửa ô Đại lý ở hộp Ghi / Sửa chuyến; sửa bộ đọc file booking (`lib/bookingReader.ts`).
 covers: src/lib/bookingReader.ts, src/lib/exportBooking.ts, src/features/export-planning/BookingDialogs.tsx, src/features/export-planning/ShipmentPanel.tsx, src/features/export-planning/ShipmentDialogs.tsx, supabase/migrations/0101_export_booking_details.sql
-last_verified: 2026-11-03
+last_verified: 2026-11-05
 ttl_days: 90
 status: v1 ĐÃ BUILD 2026-11-03 — mig `0101` (thêm 17 cột vào `export_shipments` + nới `export_options_list_kind_check` thêm 4 danh sách; ⏳ CHƯA chạy DB thật). Bộ đọc `bookingReader.ts` (test AC-1…AC-5), luật `exportBooking.ts` (AC-6…AC-8), ánh xạ `repo.ts` (AC-9). Thay [60](60-export-booking-file.ba-spec.md) NV2 "hàng File booking" bằng khối Booking (file vẫn giữ, xem ở trong khối). Kiểm 2026-11-03: PGlite chạy 0101 hai lần không lỗi, check `list_kind` vẫn chặn loại lạ; preview demo: đọc file ONE thật ra đủ 10 trường + đại lý (CAI MEP ⇒ "Cái Mép", TOKYO ⇒ "Tokyo, Japan"), lưu đúng; Thông tin xe báo đúng ô thiếu, thêm mục danh sách tại chỗ; 360px × 130% không tràn. AC-10 (RLS người đóng hàng) chờ kiểm tay sau khi chạy 0101.
 
@@ -193,3 +193,4 @@ Không có bước chờ duyệt: U4 chỉ đọc, không có việc phải làm
 ## History
 
 - v1 (2026-11-03): khởi tạo — chủ dự án chốt: Đại lý = forwarder ở Ghi chuyến · Thời hạn hạ bãi = Port Cargo Cut-off · thiếu thông tin xe không chặn tiến độ · người đóng hàng xem được, không sửa.
+- 2026-11-05: booking **Evergreen** (file 235602205715 Penang) báo "Không thấy nhãn booking nào" dù PDF có chữ — `labelPairs` không hiểu ô `:giá trị` (dấu hai chấm dính giá trị), ngày `yyyy/mm/dd hh:mm AM/PM`, nhãn có đuôi (`VGM CUT OFF via EDI/WEB/APP`, `SI CUT OFF DATE`, `CUT OFF DATE /TIME`), nhãn khác tên (`PORT OF RECEIPT`, `EMPTY PICK UP AT`, `INLAND RETURN TO`), loại cont ở bảng `QTY/TYPE`. Sửa: nhận các dạng trên (nhãn khớp nguyên hoặc mở đầu bằng nhãn đã biết), đọc đủ 12 ô (trừ Đại lý — Evergreen ghi ở dòng `TO:`, gõ tay). Test `bookingReader.test.ts`.

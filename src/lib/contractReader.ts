@@ -43,8 +43,10 @@ export interface ReadContractLine {
   size: string;
   packing: string;
   netKgPerCarton: number | null;
-  /** Số thùng — khi cột lượng tính theo thùng, hoặc kg chia hết cho kg tịnh / thùng. */
+  /** Số thùng — khi cột lượng tính theo thùng, hoặc kg chia hết cho kg tịnh / thùng. Hàng tính bó ⇒ số bó. */
   cartons: number | null;
+  /** Hàng tính theo BÓ ("1kg/bag x 5 Bags/Ctn x 2/B'DL" ⇒ 2 thùng / bó; `netKgPerCarton` là kg mỗi THÙNG). Thiếu ⇒ thùng. */
+  cartonsPerUnit?: number;
   kg: number | null;
   unitPrice: number | null;
   amount: number | null;
@@ -133,7 +135,7 @@ export function parseShipmentDeadline(text: string): { date: string; inferred: b
   for (const seg of body.split(/\bto\b|\buntil\b|\btill\b|\band\b|–|—/i).reverse()) {
     const exact = parseInvoiceDate(seg);
     if (exact) return { date: exact, inferred: false };
-    const monthYear = [...seg.matchAll(/\b([a-z]{3,9})\.?,?\s*(\d{4})\b/gi)].filter((m) => monthOf(m[1]) >= 0).pop();
+    const monthYear = [...seg.matchAll(/\b([a-z]{3,9})\.?,?\s*\/?\s*(\d{4})\b/gi)].filter((m) => monthOf(m[1]) >= 0).pop();
     const numeric = seg.match(/\b(\d{1,2})[/.-](\d{4})\b/);
     const [y, mo] = monthYear
       ? [Number(monthYear[2]), monthOf(monthYear[1]) + 1]
@@ -143,6 +145,24 @@ export function parseShipmentDeadline(text: string): { date: string; inferred: b
     if (y) return { date: `${y}-${pad(mo)}-${pad(lastDay(y, mo))}`, inferred: true };
   }
   return null;
+}
+
+/**
+ * Ô tên hàng PDF gộp cả tên lẫn ghi chú bên dưới: phần đầu VIẾT HOA (≥ 2 từ) rồi tới một từ viết thường kiểu câu
+ * ("New powder from Nisshin") ⇒ tách. Tên viết thường từ đầu ("Frozen iidako raw cut") giữ nguyên.
+ */
+export function splitNameNote(text: string): { name: string; note: string } {
+  const m = text.match(/^([^a-z]*[A-Z][^a-z]*?)\s+([A-Z][a-z]{2,}\b.*)$/);
+  // Phần sau phải giống câu (≥ 2 từ thường liền nhau: "New powder from …") — "FROZEN OCTOPUS Size 2-3" không tách.
+  if (!m || m[1].trim().split(/\s+/).length < 2 || !/\b[a-z]{2,}\s+[a-z]{2,}\b/.test(m[2])) return { name: text, note: "" };
+  return { name: m[1].trim(), note: m[2].trim() };
+}
+
+/** Số thùng mỗi bó từ quy cách: "1kg/bag x 5 Bags/Ctn x 2/B'DL" ⇒ 2 · "2 ctns/bundle" ⇒ 2; không phải hàng bó ⇒ 1. */
+export function bundleCartons(packing: string): number {
+  const t = packing.toLowerCase();
+  const m = t.match(/[x×*]\s*(\d+)\s*\/\s*(?:b['’]?dls?|bundles?|bó)\b/) ?? t.match(/(\d+)\s*(?:ctns?|cartons?|thùng)\s*\/\s*(?:b['’]?dls?|bundles?|bó)\b/);
+  return m ? Math.max(1, Number(m[1])) : 1;
 }
 
 /** Kg tịnh mỗi thùng từ quy cách (R6): "1kg/PE x 12/ctn" = 12 · "10kg/ctn" = 10 · "6 x 2kg" = 12 · "500g x 20" = 10. */
@@ -187,7 +207,8 @@ const COLUMN_RULES: readonly [Col, RegExp][] = [
   ["packing", /packing|packaging|quycách|đónggói/],
   ["price", /price|đơngiá/],
   ["amount", /amount|value|thànhtiền|trịgiá/],
-  ["cartons", /^(?!.*kg).*(ctns?|cartons?|sốthùng)/],
+  // "Quantity Bundles" (DAIREI BD-007): số bó, không phải kg.
+  ["cartons", /^(?!.*kg).*(ctns?|cartons?|sốthùng|bundles?|b['’]?dls?|sốbó)/],
   ["quantity", /quantity|q'?ty|weight|khốilượng|sốlượng|^kgs?$/],
   ["hs", /^hs|hscode|mãhs/],
   ["size", /size|^cỡ/],
@@ -321,7 +342,10 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
       if (!description && prev && cols.includes("description")) description = prev.description;
       // Không có cột Size: lấy "size 1.3 – 1.8 cm" trong tên hàng (tên giữ nguyên như trên HĐ).
       if (!size && !cols.includes("size")) size = clean(description.match(/\bsize\s*:?\s*([^,;(]+)/i)?.[1]);
-      const netKg = packingNetKg(packing);
+      // Hàng tính bó: cột lượng là "Bundles / B'DL" hoặc quy cách "… x 2/B'DL" ⇒ số bó + thùng / bó, kg mỗi THÙNG.
+      const perBundle = bundleCartons(packing);
+      const isBundle = perBundle > 1 && (/bundle|b['’]?dl|bó/i.test(headers[cols.indexOf("cartons")] ?? "") || cartons != null || kg != null);
+      const netKg = isBundle ? (packingNetKg(packing) ?? null) : packingNetKg(packing);
       if (cartons == null && kg != null && netKg) {
         const q = kg / netKg;
         if (Math.abs(q - Math.round(q)) < 1e-6) cartons = Math.round(q);
@@ -331,8 +355,9 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
         description,
         size,
         packing,
-        netKgPerCarton: netKg,
+        netKgPerCarton: isBundle && netKg ? round2(netKg / perBundle) : netKg,
         cartons,
+        ...(isBundle ? { cartonsPerUnit: perBundle } : {}),
         kg,
         unitPrice: pricePerCarton ? null : price,
         amount,
@@ -343,6 +368,12 @@ function findTable(rows: readonly (readonly string[])[]): Table | null {
         hsCode: cell("hs"),
         note: [extras.join(" · "), split.spec].filter(Boolean).join(" · "),
       };
+      // Tên IN HOA rồi tới chữ thường ("… (DAIREI BRAND-3192) New powder from Nisshin - 22-04WV") ⇒ phần sau là ghi chú.
+      const named = splitNameNote(line.description);
+      if (named.note) {
+        line.description = named.name;
+        line.note = [named.note, line.note].filter(Boolean).join(" · ");
+      }
       lines.push(line);
       prev = line;
     }
@@ -435,7 +466,9 @@ export function rowsFromPdfItems(items: readonly (PdfTextItem & { page?: number 
   for (let hs = 0; hs < lines.length; hs++) {
     if (lines[hs].cells.filter((c) => knownHeader(c.text)).length < 2) continue;
     const page = lines[hs].page;
-    const a0 = lines.findIndex((l, i) => i > hs && i <= hs + 8 && l.page === page && numericCells(l) >= 2 && !TOTAL_ROW.test(l.cells[0]?.text ?? ""));
+    // Dòng số đầu tiên: ≤ 16 dòng chữ dưới tiêu đề (BD-007 của DAIREI: tên hàng + size trải 7 dòng, tiêu đề 3 tầng ⇒ dòng
+    // số là dòng thứ 9; trước 2026-11-05 chỉ tìm 8 dòng nên bảng không ra).
+    const a0 = lines.findIndex((l, i) => i > hs && i <= hs + 16 && l.page === page && numericCells(l) >= 2 && !TOTAL_ROW.test(l.cells[0]?.text ?? ""));
     if (a0 < 0) continue;
     let top = hs;
     while (top > 0) {
@@ -702,11 +735,20 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
       }
     }
   }
+  const refNo = (t: string): RegExpMatchArray | null => {
+    const m = t.match(/^\s*(?:reference|ref\.?)\s*(?:no\.?|number|#)?\s*[:：]\s*([A-Z0-9][A-Z0-9./ –—-]*[A-Z0-9/])\s*(.*)$/i);
+    if (!m) return null;
+    const out = [...m] as unknown as RegExpMatchArray;
+    out[1] = m[1].replace(/\s*[–—-]\s*/g, "-").replace(/\s+/g, "");
+    return out;
+  };
   if (!contractNo) {
     for (const [i, t] of outside.entries()) {
       const m =
         t.match(/\b(?:sales\s+|purchase\s+)?contract\s*(?:no\.?|number|#)\s*[:：]?\s*([A-Z0-9][\w./-]*)\s*(.*)$/i) ??
         t.match(/\bsố\s*(?:hợp đồng|hđ)\s*[:：]?\s*(\S+)\s*(.*)$/i) ??
+        // DAIREI: "Reference Number: BD – 007/26" (gạch dài, có khoảng trắng) ⇒ "BD-007/26".
+        refNo(t) ??
         (i > 0 && /contract|hợp đồng/i.test(outside[i - 1]) ? t.match(/^no\.?\s*[:：]?\s*([A-Z0-9][\w./-]*)\s*(.*)$/i) : null);
       if (!m) continue;
       contractNo = m[1];
@@ -764,7 +806,8 @@ export function parseContractRows(rows: readonly (readonly string[])[], role: Co
   let latestShipmentDate = "";
   let latestShipmentInferred = false;
   for (const t of outside) {
-    if (!/time of (?:shipment|delivery)|shipment (?:time|date|period)|date of shipment|latest (?:date of )?shipment|delivery time|\bshipment\s*[:：]/i.test(t) || /\bannex\b/i.test(t)) continue;
+    // DAIREI: "Above quantity will be shipped out with ETA from October/2026 to September/2027".
+    if (!/time of (?:shipment|delivery)|shipment (?:time|date|period)|date of shipment|latest (?:date of )?shipment|delivery time|\bshipment\s*[:：]|\bshipped\b[^.]*\b(?:from|before|by|within|until)\b/i.test(t) || /\bannex\b/i.test(t)) continue;
     const d = parseShipmentDeadline(t);
     if (!d) continue;
     latestShipmentDate = d.date;
@@ -1085,8 +1128,9 @@ export function fillExportContract(values: ExportContractFillValues, read: ReadC
       hsCode: l.hsCode,
       size: l.size,
       packing: l.packing,
-      unitKind: "carton",
-      cartonsPerUnit: 1,
+      // Hàng tính bó (DAIREI): số lượng = số bó, kg mỗi thùng × thùng / bó.
+      unitKind: (l.cartonsPerUnit ?? 1) > 1 ? "bundle" : "carton",
+      cartonsPerUnit: Math.max(1, l.cartonsPerUnit ?? 1),
       netKgPerCarton: l.netKgPerCarton,
       quantity: l.cartons,
       kg: l.cartons != null && l.netKgPerCarton ? null : l.kg,

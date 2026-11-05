@@ -72,7 +72,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       title: "Giới thiệu trang Xuất khẩu",
       body:
         "Trang Xuất khẩu theo dõi từng hợp đồng xuất khẩu và từng chuyến hàng (một booking gồm một hay nhiều container, một xe tải hoặc một lô đóng ghép) cho tới khi đóng hợp đồng.\n" +
-        "Hợp đồng đi qua 3 chặng rồi đóng: Nhân viên Kế hoạch lập hợp đồng và đính kèm hồ sơ → ghi chuyến → Trưởng / Phó phòng Kế hoạch duyệt cuối rồi đóng hợp đồng. Không có bước duyệt hợp đồng lúc lập.\n" +
+        "Hợp đồng đi qua 3 chặng rồi đóng: Nhân viên Kế hoạch lập hợp đồng và đính kèm hồ sơ → giao hàng (ghi chuyến, làm từng chuyến tới bộ chứng từ) → Trưởng / Phó phòng Kế hoạch duyệt cuối rồi đóng hợp đồng. Không có bước duyệt hợp đồng lúc lập.\n" +
         "Mỗi chuyến đi qua 6 bước: 1 Hợp đồng · 2 Lệnh sản xuất · 3 Bao bì · 4 Đóng cont · 5 Bộ chứng từ · 6 Gửi chứng từ · tiền về.\n" +
         "Trong lúc xem hướng dẫn, các nút trên trang tạm khóa và dữ liệu không thay đổi. Chọn Tiếp theo (phím →) để sang bước sau, Quay lại (phím ←) để xem lại, Esc để thoát.",
     }),
@@ -172,7 +172,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
       id: "dossier-overview",
       title: "Hồ sơ hợp đồng",
       body:
-        "Khi đã có hợp đồng, chọn Mở để vào hồ sơ. Hồ sơ gồm: trạng thái hợp đồng (Chờ đính kèm, Đang ghi chuyến, Chờ duyệt cuối, Đã đóng HĐ, Đã hủy), việc tiếp theo (Đính kèm hồ sơ → Ghi chuyến → Duyệt cuối) và 6 bước của từng chuyến.\n" +
+        "Khi đã có hợp đồng, chọn Mở để vào hồ sơ. Hồ sơ gồm: trạng thái hợp đồng (Chờ đính kèm, Đang giao hàng, Chờ duyệt cuối, Đã đóng HĐ, Đã hủy), việc tiếp theo (Đính kèm hồ sơ → Ghi chuyến → Duyệt cuối) và 6 bước của từng chuyến.\n" +
         "Mỗi mục trong bước có trạng thái Chưa làm, Đang làm, Xong hoặc Không áp dụng. Mục chỉ được đánh dấu Xong khi đủ file và số chứng từ.",
     });
   } else {
@@ -191,7 +191,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         body:
           "Thẻ đầu tiên dưới số hợp đồng là trạng thái:\n" +
           "• Chờ đính kèm: vừa lập, hoặc còn thiếu hồ sơ bắt buộc (thẻ Thiếu ghi rõ loại). Chưa ghi chuyến lẻ được, nhưng tạo được lịch xuất hàng (chuyến dự kiến) khi hợp đồng chưa có chuyến nào.\n" +
-          "• Đang ghi chuyến: đủ hồ sơ, đang ghi và theo dõi các chuyến.\n" +
+          "• Đang giao hàng: đủ hồ sơ, đang ghi chuyến và làm từng chuyến tới bộ chứng từ. Ghi đủ chuyến rồi vẫn ở trạng thái này tới khi mọi chuyến xong đủ 5 bước và đã giao đủ hàng; thanh chặng ghi Đã ghi đủ chuyến · k/n chuyến xong.\n" +
           "• Chờ duyệt cuối: mọi chuyến đủ hồ sơ và số thực xuất nằm trong dung sai cả kg lẫn tiền (hệ thống tự tính), chờ Trưởng / Phó phòng xem lại.\n" +
           "• Đã đóng HĐ: đã duyệt cuối, hoặc đóng sớm kèm lý do.\n" +
           "• Đã hủy: kèm lý do hủy.\n" +
@@ -203,7 +203,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
         optional: true,
         title: "Thanh chặng của hợp đồng",
         body:
-          "Ba chặng theo thứ tự: Đính kèm · Ghi chuyến · Duyệt cuối, cuối cùng là Đóng HĐ. Chặng xong có dấu tích xanh, chặng đang ở tô vàng và ghi ai làm.\n" +
+          "Ba chặng theo thứ tự: Đính kèm · Giao hàng · Duyệt cuối, cuối cùng là Đóng HĐ. Chặng xong có dấu tích và vạch xanh lá, chặng đang ở có vạch xanh dương, ghi ai làm và tiến độ. Chặng Giao hàng ghi Còn … chưa ghi chuyến khi thiếu, ghi đủ thì Đã ghi đủ chuyến · k/n chuyến xong; chặng chỉ xong khi mọi chuyến xong đủ 5 bước và đã giao đủ trong dung sai. Màu cam, đỏ chỉ dùng cho thẻ cảnh báo.\n" +
           "Đính kèm, Ghi chuyến: Nhân viên Kế hoạch. Duyệt cuối: Trưởng phòng hoặc Phó phòng Kế hoạch. Rê chuột (hoặc chạm) vào một chặng để xem cần làm gì.",
       }),
       dossier({
@@ -238,7 +238,7 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           "Chưa có hợp đồng ký hoặc L/C chưa về: chọn Chưa có — bổ sung sau, ghi lý do. Hợp đồng ghi chuyến và làm các bước tiếp được ngay; bước 1 của chuyến ghi chờ HĐ ký / chờ L/C. Duyệt cuối, đóng hợp đồng vẫn cần đủ file. Đính file đúng loại thì dấu tự gỡ; Bỏ ghi bổ sung sau thì loại về Thiếu.\n" +
           "Hợp đồng ký đã nằm ở file của bản hợp đồng, hoặc lỡ đính dạng Phụ lục / file kèm: hàng Thiếu hiện nút Dùng \"tên file\" làm Hợp đồng đã ký — chọn nút đó là được tính, không phải đính lại.\n" +
           "Nhân viên Kế hoạch chọn Đính kèm file, chọn loại hồ sơ rồi chọn một hay nhiều file. Proforma invoice và hồ sơ khác đính được nhưng không bắt buộc; chọn Hồ sơ khác thì phải ghi Tên hồ sơ.\n" +
-          "Không còn loại nào Thiếu (đã có file hoặc ghi bổ sung sau) thì hợp đồng chuyển Đang ghi chuyến và nút Ghi chuyến mới hiện. Gỡ file nhầm bằng nút thùng rác, có Hoàn tác.",
+          "Không còn loại nào Thiếu (đã có file hoặc ghi bổ sung sau) thì hợp đồng chuyển Đang giao hàng và nút Ghi chuyến mới hiện. Gỡ file nhầm bằng nút thùng rác, có Hoàn tác.",
       }),
       dossier({
         id: "shipment-card",

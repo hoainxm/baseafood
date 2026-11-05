@@ -56,7 +56,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     needs: ["export-plans", "create"],
     actors: KH,
     text: "Chọn Ghi chuyến cho từng booking, xe tải hoặc lô đóng ghép: số lượng, booking (đính kèm file booking được), số cont, ETD. Booking nhiều cont (VD 1X20RF & 1X40RF) thì một chuyến, thêm cont 2, 3… ở khối Cont thêm của Sửa chuyến.",
-    done: "Mọi dòng hàng đã có chuyến (còn thiếu thì hiện thẻ Còn … chưa ghi chuyến)",
+    done: "Mọi dòng hàng đã có chuyến (còn thiếu thì hiện thẻ Còn … chưa ghi chuyến). Ghi đủ chuyến thì thanh chặng ghi Đã ghi đủ chuyến · k/n chuyến xong; chặng Giao hàng chỉ xong khi mọi chuyến xong đủ bước và đã giao đủ hàng",
   },
   {
     id: "steps",

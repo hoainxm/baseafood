@@ -33,6 +33,7 @@ import {
   ATTACHMENT_STATUS_LABELS,
   requiredAttachmentKinds,
   canEditContractDirectly,
+  shippingProgressText,
   scheduleGate,
   shipmentGate,
   shipmentGateText,
@@ -509,7 +510,7 @@ export function ContractDossier({
         </div>
       </div>
 
-      <ContractFlowBar state={state} />
+      <ContractFlowBar state={state} detail={shippingProgressText(data, contract.id, opts)} />
 
       {terms && totals && (
         <dl data-tour="dossier-summary" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm">

@@ -343,7 +343,7 @@ describe("v8 · quy trình duyệt → đính kèm → ghi chuyến → duyệt 
     expect(shipmentGate(rejected, "c1")).toMatchObject({ ok: false, reason: "no-revision" });
     expect(contractState(rejected, "c1")).toBe("attaching");
   });
-  it("AC-58: thanh toán L/C ⇒ bắt cả HĐ đã ký lẫn L/C; đủ thì Đang ghi chuyến + ghi chuyến được", () => {
+  it("AC-58: thanh toán L/C ⇒ bắt cả HĐ đã ký lẫn L/C; đủ thì Đang giao hàng + ghi chuyến được", () => {
     const r0 = revision("r0", "c1", 0, { terms: terms({ paymentMethod: "lc" }) });
     const base = data({ contracts: [contract("c1")], revisions: [r0], approvals: [approveNew("r0", "c1")], files: [attach("signed-contract")] });
     expect(missingAttachmentKinds(base, "c1")).toEqual(["lc"]);

@@ -11,6 +11,7 @@ import {
   contractCoverage,
   mergeShipmentGate,
   mergeShipmentInto,
+  shippingProgressText,
   validateExtraContainers,
   type ExportData,
 } from "./exportPlanning";
@@ -325,5 +326,15 @@ describe("ba-spec 73 — chuyến nhiều cont", () => {
     const { read } = parseBookingRows([["Equipment Type/Qty:", "1X20RF & 1X40RF"]]);
     expect(read.kind).toBe("40RF");
     expect(read.extraKinds).toEqual(["20RF"]);
+  });
+
+  it("dòng tiến độ chặng Giao hàng (HĐ 68/2025): thiếu ⇒ Còn … chưa ghi chuyến; đủ ⇒ Đã ghi đủ chuyến · k/n chuyến xong", () => {
+    const signed: ExportFile = { ...photo("", undefined), id: "hd", shipmentId: "", step: "contract", attachmentKind: "signed-contract" };
+    const s = ship("s1");
+    const lines = [sline("x1", s, L1, 1200), sline("x2", s, L2, 800)];
+    const one = base({ shipments: [{ ...s, plannedKg: 20000 }], shipmentLines: lines, files: [signed] });
+    expect(shippingProgressText(one, "c1")).toBe("Còn 1 cont chưa ghi chuyến");
+    const both = { ...one, shipmentContainers: [cont("k2", "s1")] };
+    expect(shippingProgressText(both, "c1")).toBe("Đã ghi đủ chuyến · 0/1 chuyến xong");
   });
 });

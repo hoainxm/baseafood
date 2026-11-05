@@ -39,8 +39,9 @@ import {
 import { formatDateTimeVN, formatDateVN, formatMoney } from "@/lib/format";
 import { BOOKING_LABELS, TRANSPORT_LABELS, cutoffOverdue, hasTransport, localNowMinute } from "@/lib/exportBooking";
 import type { ExportContract, ExportFile, ExportItemState, ExportLoadingExtraStep, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
-import { Ban, Boxes, Camera, ClipboardCheck, ClipboardList, Download, FilePlus2, FileSpreadsheet, FileText, Pencil, Plus, RotateCcw, Send, Ship, Trash2, Truck, Wallet } from "lucide-react";
+import { Ban, Boxes, Camera, Container, ClipboardCheck, ClipboardList, Download, FilePlus2, FileSpreadsheet, FileText, Pencil, Plus, RotateCcw, Send, Ship, Trash2, Truck, Wallet } from "lucide-react";
 import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
+import { containerLabel, filesOfContainer, isMultiContainer, shipmentContainerSummary, shipmentContainers } from "@/lib/exportContainers";
 import { ShipmentLineSummary } from "./ShipmentGoods";
 import { EXTRA_PHOTO_TEXT } from "./shipmentGoodsLogic";
 import { loadingCountText } from "./shipmentGoodsLogic";
@@ -139,6 +140,7 @@ export function ShipmentPanel({
   onCancel,
   onRestore,
   onDelete,
+  onMerge,
   onOpenItem,
   onUploadLoading,
   onPayment,
@@ -170,6 +172,8 @@ export function ShipmentPanel({
   /** Khôi phục chuyến đã hủy (HĐ còn mở) — XK-10. */
   onRestore: () => void;
   onDelete: () => void;
+  /** Gộp chuyến này vào chuyến khác làm cont thêm (ba-spec 73 R13) — có chuyến gộp được mới truyền. */
+  onMerge?: () => void;
   onOpenItem: (t: StepItemTarget) => void;
   onUploadLoading: (t: LoadingUploadTarget) => void;
   onPayment: (t: PaymentTarget) => void;
@@ -196,7 +200,7 @@ export function ShipmentPanel({
   onDownloadInvoice: (format: "xlsx" | "pdf" | "docx") => void;
 }) {
   const opts = { filesAvailable };
-  const label = [shipment.lotCode && `Lô ${shipment.lotCode}`, shipmentKindLabel(shipment.kind), shipment.containerNo].filter(Boolean).join(" · ");
+  const label = [shipment.lotCode && `Lô ${shipment.lotCode}`, isMultiContainer(data, shipment) ? shipmentContainerSummary(data, shipment) : shipmentKindLabel(shipment.kind), shipment.containerNo].filter(Boolean).join(" · ");
   const progress = shipmentProgress(data, shipment, opts);
   const lateInfo = shipmentLateInfo(data, shipment);
   const actuals = shipmentActuals(data, shipment.id);
@@ -418,6 +422,8 @@ export function ShipmentPanel({
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const sealPhotoRequired = containerSealPhotoRequired(data, shipment);
+  // ba-spec 73: mọi cont của chuyến (cont 1 trên chuyến + cont thêm); ≥ 2 cont ⇒ ảnh seal theo từng cont.
+  const conts = shipmentContainers(data, shipment);
 
   /** Mục SI (ba-spec 72 R10–R14): Xong khi có file SI; xe tải / đóng ghép / chuyến cũ ⇒ Không áp dụng. */
   const siRow = () => {
@@ -600,6 +606,12 @@ export function ShipmentPanel({
                   Hủy chuyến
                 </Button>
               )}
+              {can.update && onMerge && (
+                <Button size="sm" variant="outline" onClick={onMerge} title="Booking ra một lần nhiều cont: đưa chuyến này thành cont thêm của chuyến khác cùng hợp đồng (chuyến này chưa có file, chưa bước nào xong).">
+                  <Container className="mr-1 h-4 w-4" aria-hidden />
+                  Gộp làm cont thêm
+                </Button>
+              )}
               {can.delete && canDeleteShipment && (
                 <Button size="sm" variant="danger" onClick={onDelete} title="Xóa chuyến chưa có file, chưa bước nào xong (có Hoàn tác).">
                   <Trash2 className="mr-1 h-4 w-4" aria-hidden />
@@ -615,7 +627,13 @@ export function ShipmentPanel({
           <Fact label="Đóng cont" value={shipment.loadingDate ? formatDateVN(shipment.loadingDate) : ""} />
           <Fact label="ETD · ETA" value={[shipment.etd && formatDateVN(shipment.etd), shipment.eta && formatDateVN(shipment.eta)].filter(Boolean).join(" → ")} />
           <Fact label="Tàu / chuyến" value={shipment.vesselVoyage} />
-          <Fact label={shipment.kind === "truck" ? "Biển số" : "Cont · seal"} value={[shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ")} />
+          <Fact
+            label={shipment.kind === "truck" ? "Biển số" : conts.length > 1 ? `${conts.length} cont · seal` : "Cont · seal"}
+            value={conts
+              .map((c) => [conts.length > 1 ? c.kind : "", c.containerNo, c.sealNo].filter(Boolean).join(" · "))
+              .filter(Boolean)
+              .join(" | ")}
+          />
           <Fact label="Kg kế hoạch · thực xuất" value={`${formatNumber(shipment.plannedKg) || "—"}${actuals.kg ? ` · ${formatNumber(actuals.kg)}` : ""}`} />
         </dl>
         {!isCancelled && (
@@ -700,7 +718,7 @@ export function ShipmentPanel({
             !isCancelled &&
             shipment.kind !== "consolidated" && (
               <>
-                {siEnabled && filesAvailable && (can.update || can.loadingCreate) && (
+                {siEnabled && filesAvailable && (can.update || can.loadingCreate) && conts.length < 2 && (
                   <Button
                     size="sm"
                     variant={sealPhotoRequired && !containerPhotos.length ? "default" : "outline"}
@@ -721,13 +739,40 @@ export function ShipmentPanel({
             )
           }
         >
+          {conts.length > 1 ? (
+            // ba-spec 73 R6: mỗi cont một dòng — số · seal · ảnh của cont đó; Xong khi mọi cont đủ.
+            <span className="grid min-w-0 gap-1.5" data-tour="export-container-list">
+              {conts.map((c) => {
+                const own = filesOfContainer(containerPhotos, conts, c.id);
+                return (
+                  <span key={c.id || "first"} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                    <span className="tnum font-medium">{containerLabel(c)}</span>
+                    <span className="tnum">{c.sealNo ? `seal ${c.sealNo}` : <span className="text-muted-foreground">chưa có seal</span>}</span>
+                    <span className="text-muted-foreground">{own.length ? `${own.length} ảnh` : sealPhotoRequired ? "chưa có ảnh" : ""}</span>
+                    {siEnabled && filesAvailable && (can.update || can.loadingCreate) && !isCancelled && (
+                      <Button
+                        size="sm"
+                        variant={sealPhotoRequired && !own.length ? "default" : "outline"}
+                        onClick={() => onUploadLoading({ shipment, contractId: contract.id, step: "container-seal-photos", label: `${label} · ${containerLabel(c)}`, containerId: c.id })}
+                        title={`Chụp / chọn ảnh số cont và seal của ${containerLabel(c)}.`}
+                      >
+                        <Camera className="mr-1 h-4 w-4" aria-hidden />
+                        Ảnh cont {c.no}
+                      </Button>
+                    )}
+                  </span>
+                );
+              })}
+            </span>
+          ) : (
           <span className="tnum">
             {shipment.kind === "consolidated"
               ? <span className="text-muted-foreground">Không cần — hàng đóng ghép chung cont của chuyến khác</span>
               : [shipment.containerNo, shipment.sealNo].filter(Boolean).join(" · ") || <span className="text-muted-foreground">Chưa điền</span>}
           </span>
+          )}
           {/* Ảnh cont / seal (ba-spec 72 R8 v1.7): bắt buộc mới Xong (trừ chuyến cũ đã đóng xong); mới nhất đầu. */}
-          {sealPhotoRequired && !containerPhotos.length && <span className="block text-sm text-muted-foreground">Chưa có ảnh cont / seal — đính ảnh thì mục này mới Xong.</span>}
+          {sealPhotoRequired && !containerPhotos.length && conts.length < 2 && <span className="block text-sm text-muted-foreground">Chưa có ảnh cont / seal — đính ảnh thì mục này mới Xong.</span>}
           {siEnabled && containerPhotos.length > 0 && <FileList files={containerPhotos} onPreview={onPreview} caption={`${label} · Ảnh cont / seal`} onRemove={can.update && !isCancelled ? onRemoveFile : undefined} />}
         </ChecklistRow>
         {/* SI ngay sau số cont + seal (chị Thảo 2026-11-04: làm SI khi đã có cont / seal). */}

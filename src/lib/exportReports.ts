@@ -17,7 +17,6 @@ import {
   contractTotals,
   effectiveDeadline,
   effectiveRevision,
-  isContainerKind,
   isShipmentLate,
   monthLabel,
   shipmentActuals,
@@ -30,6 +29,7 @@ import {
   type EvidenceOptions,
   type ExportData,
 } from "./exportPlanning";
+import { containerCountOf } from "./exportContainers";
 import type { Customer, ExportContractAttachmentKind, ExportShipment } from "@/types";
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -169,7 +169,7 @@ function addShipment(f: ReportFigures, d: ExportData, s: ExportShipment): void {
   const a = shipmentActuals(d, s.id);
   const pay = shipmentPaymentSummary(d, s);
   f.shipments += 1;
-  if (isContainerKind(s.kind)) f.containers += 1;
+  f.containers += containerCountOf(d, s); // ba-spec 73 R10: chuyến nhiều cont đếm đủ cont
   f.plannedKg = round2(f.plannedKg + numOr0(s.plannedKg));
   f.actualKg = round2(f.actualKg + a.kg);
   f.actualAmount = round2(f.actualAmount + a.amount);

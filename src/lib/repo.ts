@@ -92,6 +92,8 @@ import type {
   ExportDocumentKindRow,
   ExportOption,
   ExportShipmentLine,
+  ExportShipmentContainer,
+  ExportParty,
   InvoiceComposition,
   ExportOptionListKind,
   GoodsType,
@@ -2165,6 +2167,7 @@ const jsonOf = (v: unknown): unknown => {
 };
 const PAYMENT_METHOD_VALUES = new Set(["ttr", "lc", "other"]);
 const SHIPMENT_KIND_VALUES = new Set(["20RF", "40RF", "40HC-RF", "truck", "consolidated"]);
+const CONTAINER_KIND_VALUES = new Set(["20RF", "40RF", "40HC-RF"]);
 const STEP_VALUES = new Set(["production-order", "packaging", "loading-plan", "loading-photos", "customs-declaration", "export-order", "document"]);
 /** Bước chỉ có ở `export_files` (không có mục bước): hồ sơ cấp HĐ (0079) · file booking của chuyến (0094). */
 const FILE_ONLY_STEPS: ReadonlySet<string> = new Set([
@@ -2200,7 +2203,20 @@ function parseTerms(v: unknown): ExportContractTerms {
     containerCount: numOrNull(t.containerCount),
     containerType: s(t.containerType),
     requiredDocuments: docs.map((d) => ({ kind: (s(d.kind) || "other") as ExportContractTerms["requiredDocuments"][number]["kind"], form: s(d.form), issuer: s(d.issuer) })),
+    // Trường tùy chọn trong JSON — thiếu dòng đọc thì tải lại trang mất giá trị đã lưu (lỗi 2026-11-05: Hạn hợp đồng).
+    ...(s(t.contractValidUntil) ? { contractValidUntil: s(t.contractValidUntil).slice(0, 10) } : {}),
+    ...(partyOf(t.consignee) ? { consignee: partyOf(t.consignee) } : {}),
+    ...(partyOf(t.notifyParty) ? { notifyParty: partyOf(t.notifyParty) } : {}),
   };
+}
+
+/** Bên trên chứng từ (Consignee / Notify) trong JSON terms — rỗng cả tên lẫn địa chỉ ⇒ không có. */
+function partyOf(v: unknown): ExportParty | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const p = v as Record<string, unknown>;
+  const name = s(p.name);
+  const address = s(p.address);
+  return name.trim() || address.trim() ? { name, address } : undefined;
 }
 
 function parseLines(v: unknown): ExportContractLine[] {
@@ -2522,7 +2538,16 @@ function invoiceCompositionFromRow(v: Record<string, unknown>): InvoiceCompositi
   if (v.unitPrices && typeof v.unitPrices === "object") {
     for (const [k, n] of Object.entries(v.unitPrices as Record<string, unknown>)) if (typeof n === "number" && Number.isFinite(n)) prices[k] = n;
   }
-  return { bankOptionId: s(v.bankOptionId), unitPrices: prices, tradeTerms: s(v.tradeTerms), originNote: s(v.originNote), specialNotes: s(v.specialNotes), ...(s(v.blNo) ? { blNo: s(v.blNo) } : {}) };
+  return {
+    bankOptionId: s(v.bankOptionId),
+    unitPrices: prices,
+    tradeTerms: s(v.tradeTerms),
+    originNote: s(v.originNote),
+    specialNotes: s(v.specialNotes),
+    ...(s(v.blNo) ? { blNo: s(v.blNo) } : {}),
+    ...(s(v.buyerName) ? { buyerName: s(v.buyerName) } : {}),
+    ...(s(v.buyerAddress) ? { buyerAddress: s(v.buyerAddress) } : {}),
+  };
 }
 
 /** Hàng của chuyến xuất (mig 0096, ba-spec 63) — không có giá; kho điền `loaded_units`. Liên kết mềm ⇒ refColumns. */
@@ -2551,6 +2576,8 @@ export const EXPORT_SHIPMENT_LINE_TABLE: TableMapping<ExportShipmentLine> = {
     loaded_at: x.loadedAt || null,
     expiry: x.expiry,
     note: x.note,
+    // mig 0106: chỉ gửi khi bản ghi có trường (máy chủ chưa có cột ⇒ không kẹt hàng chờ).
+    ...(x.containerId !== undefined ? { container_id: x.containerId || null } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -2572,6 +2599,36 @@ export const EXPORT_SHIPMENT_LINE_TABLE: TableMapping<ExportShipmentLine> = {
     loadedAt: s(r.loaded_at),
     expiry: s(r.expiry),
     note: s(r.note),
+    ...(r.container_id !== undefined ? { containerId: s(r.container_id) } : {}),
+  }),
+};
+
+/** Cont THÊM của chuyến xuất (mig 0106, ba-spec 73) — cont 1 nằm trên chuyến. Liên kết mềm ⇒ refColumns. */
+export const EXPORT_SHIPMENT_CONTAINER_TABLE: TableMapping<ExportShipmentContainer> = {
+  table: "export_shipment_containers",
+  localKey: "bsf.export-shipment-containers.v1",
+  getKey: theoId,
+  refColumns: ["shipment_id"],
+  toRow: (x) => ({
+    id: x.id,
+    shipment_id: x.shipmentId,
+    sort_order: Math.round(Number(x.sortOrder) || 0),
+    kind: x.kind,
+    container_no: x.containerNo,
+    seal_no: x.sealNo,
+    loading_date: dateOrNull(x.loadingDate),
+    note: x.note,
+  }),
+  fromRow: (r) => ({
+    id: s(r.id),
+    shipmentId: s(r.shipment_id),
+    sortOrder: Number(r.sort_order) || 0,
+    kind: (CONTAINER_KIND_VALUES.has(s(r.kind)) ? s(r.kind) : "20RF") as ExportShipmentContainer["kind"],
+    containerNo: s(r.container_no),
+    sealNo: s(r.seal_no),
+    loadingDate: s(r.loading_date).slice(0, 10),
+    note: s(r.note),
+    createdAt: s(r.created_at),
   }),
 };
 
@@ -2593,6 +2650,8 @@ export const EXPORT_FILE_TABLE: TableMapping<ExportFile> = {
     layer_no: x.layerNo,
     caption: x.caption,
     uploaded_by: x.uploadedBy,
+    // mig 0106: ảnh cont / seal gắn cont thêm — chỉ gửi khi có (máy chủ chưa có cột ⇒ không kẹt hàng chờ).
+    ...(x.containerId ? { container_id: x.containerId } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -2609,6 +2668,7 @@ export const EXPORT_FILE_TABLE: TableMapping<ExportFile> = {
     caption: s(r.caption),
     uploadedBy: s(r.uploaded_by),
     createdAt: s(r.created_at),
+    ...(s(r.container_id) ? { containerId: s(r.container_id) } : {}),
   }),
 };
 
@@ -3643,6 +3703,7 @@ export const TABLE_LABELS: Readonly<Record<string, string>> = {
   export_contract_approvals: "Kết quả duyệt cuối hợp đồng",
   export_deadline_extensions: "Gia hạn giao hàng",
   export_shipments: "Chuyến xuất khẩu",
+  export_shipment_containers: "Cont thêm của chuyến xuất khẩu",
   export_step_items: "Bước của chuyến xuất khẩu",
   export_files: "File hồ sơ xuất khẩu",
   export_payments: "Gửi chứng từ / tiền về",

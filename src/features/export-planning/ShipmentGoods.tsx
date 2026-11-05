@@ -7,13 +7,17 @@
 // hợp đồng (đã nối danh mục mặt hàng); kho đóng cont xong điền số thực đóng. Không có giá ở đây — người
 // đóng hàng mở được hộp Số thực đóng (R10 ba-spec 41).
 import { useEffect, useState } from "react";
-import { Button, ErrorSummary, Field, FormDialog, Input, NumberField, Tag, formatNumber, type FieldError } from "@/design-system";
+import { Button, ChoiceGroup, ErrorSummary, Field, FormDialog, InlineConfirmDelete, Input, NumberField, Tag, formatNumber, type FieldError } from "@/design-system";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import { applyLoadingCounts, isDraftLoadingLine, lineNetKg, loadingCountRows, netKgPerUnit } from "@/lib/exportInvoice";
-import { draftRowsOf, groupLines, linesFromDraft, type ContractLineGroup, type LineDraft, type ShipmentLinesTarget } from "./shipmentGoodsLogic";
+import { draftRowsOf, groupLines, linesFromDraft, splitRow, type ContractLineGroup, type LineDraft, type ShipmentLinesTarget } from "./shipmentGoodsLogic";
+import { containerLabel, linesByContainer, type ContainerView } from "@/lib/exportContainers";
 import type { ExportContractLine, ExportShipment, ExportShipmentLine } from "@/types";
+
+/** Nhóm duy nhất khi chuyến một cont — không hiện tiêu đề cont. */
+const ONE_CONT: ContainerView = { id: "", no: 1, kind: "40RF", containerNo: "", sealNo: "", loadingDate: "" };
 import { Boxes, ClipboardCheck, Plus, Save } from "lucide-react";
 
 export type { ShipmentLinesTarget } from "./shipmentGoodsLogic";
@@ -88,6 +92,12 @@ export function ShipmentLinesDialog({
     setForm((f) => (f && !f.groups.some((x) => x.contractId === g.contractId) ? { ...f, groups: [...f.groups, g], rows: [...f.rows, ...draftRowsOf(g, f.tg.lines)] } : f));
   const allLines = form ? groupLines(form.groups) : [];
   const multi = (form?.groups.length ?? 0) > 1;
+  // ba-spec 73: chuyến ≥ 2 cont ⇒ mỗi dòng chọn cont; dòng đi hai cont thì chia dòng.
+  const conts = tg?.containers ?? [];
+  const multiCont = conts.length > 1;
+  const contOptions = conts.map((c) => ({ value: c.id || "first", label: c.label }));
+  const split = (i: number) => setForm((f) => (f ? { ...f, rows: splitRow(f.rows, i, conts.map((c) => c.id)) } : f));
+  const removeRow = (i: number) => setForm((f) => (f ? { ...f, rows: f.rows.filter((_, k) => k !== i) } : f));
 
   const save = () => {
     if (!form || !tg) return;
@@ -148,9 +158,13 @@ export function ShipmentLinesDialog({
             const firstOfGroup = form.rows.findIndex((x) => x.contractId === r.contractId) === i;
             const unit = cl.unitKind === "bundle" ? "bó" : "thùng";
             const other = tg.otherShipmentUnits[cl.id] ?? 0;
-            const left = cl.quantity != null ? cl.quantity - other - (r.plannedUnits ?? 0) : null;
+            const sameLine = form.rows.filter((x) => x.contractLineId === r.contractLineId);
+            const here = sameLine.reduce((t, x) => t + (x.plannedUnits ?? 0), 0);
+            const left = cl.quantity != null ? cl.quantity - other - here : null;
+            // Bản chia (không phải hàng đầu của dòng HĐ) bỏ được; hàng đầu thì để trống số kiện như cũ.
+            const isSplit = sameLine.indexOf(r) > 0;
             return (
-              <section key={r.contractLineId} className="grid min-w-0 gap-3 rounded-lg border border-border p-3">
+              <section key={`${r.contractLineId}-${r.lineId || i}`} className="grid min-w-0 gap-3 rounded-lg border border-border p-3">
                 {multi && firstOfGroup && group && (
                   <p className="text-sm font-semibold text-primary break-words">Hợp đồng {group.contractNo || "(chưa có số)"}</p>
                 )}
@@ -164,6 +178,24 @@ export function ShipmentLinesDialog({
                     {left != null ? ` · còn ${formatNumber(left)}` : ""}
                   </p>
                 </div>
+                {multiCont && (
+                  <div className="flex min-w-0 flex-wrap items-end gap-2" data-tour="export-shipment-line-container">
+                    <div className="min-w-0 flex-1">
+                      <ChoiceGroup
+                        label="Đi cont"
+                        value={r.containerId || "first"}
+                        onChange={(v) => setRow(i, { containerId: v === "first" ? "" : v })}
+                        options={contOptions}
+                        columns={Math.min(3, contOptions.length) as 2 | 3}
+                      />
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => split(i)} title="Dòng hàng này đi cả cont khác: thêm một dòng cùng mặt hàng cho cont khác, chia số kiện.">
+                      <Plus className="mr-1 h-4 w-4" aria-hidden />
+                      Chia sang cont khác
+                    </Button>
+                    {isSplit && <InlineConfirmDelete recordDescription={`${cl.description} (bản chia)`} title="Bỏ dòng chia này (số kiện của dòng này cũng bỏ)." onConfirm={() => removeRow(i)} />}
+                  </div>
+                )}
                 <div className="grid gap-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
                   <NumberField label={`Số ${unit} kế hoạch`} unit={unit} value={r.plannedUnits} onChange={(v) => setRow(i, { plannedUnits: v })} />
                   <NumberField label={`Kg cả bì / ${unit}`} unit="kg" value={r.grossKgPerUnit} onChange={(v) => setRow(i, { grossKgPerUnit: v })} hint="In ở packing list (N.W / G.W)." />
@@ -216,6 +248,8 @@ export interface LoadingCountTarget {
   contractLines: readonly ExportContractLine[];
   /** Chuyến gộp nhiều HĐ: id dòng HĐ → id HĐ (ba-spec 70). */
   lineContract?: Readonly<Record<string, string>>;
+  /** Cont của chuyến (ba-spec 73) — ≥ 2 cont ⇒ dòng nhóm theo cont để người đóng hàng biết dòng nào vào cont nào. */
+  containers?: readonly ContainerView[];
 }
 
 interface CountForm {
@@ -299,7 +333,15 @@ export function LoadingCountDialog({
       {form && tg && (
         <div className="grid gap-3 py-2">
           {!form.rows.length && <p className="text-sm text-muted-foreground">Hợp đồng chưa có dòng hàng — Phòng KH nhập dòng hàng ở hợp đồng trước.</p>}
-          {form.rows.map((l) => (
+          {linesByContainer(tg.containers && tg.containers.length > 1 ? tg.containers : [ONE_CONT], form.rows).map(({ container, lines }) => (
+            <div key={container.id || "first"} className="grid min-w-0 gap-3">
+              {tg.containers && tg.containers.length > 1 && (
+                <p className="text-sm font-semibold text-primary break-words" data-tour="export-loading-container">
+                  {containerLabel(container)}
+                  {container.sealNo ? ` · seal ${container.sealNo}` : ""} — {lines.length} dòng
+                </p>
+              )}
+          {lines.map((l) => (
             <div key={l.id} className="grid min-w-0 gap-2 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-end">
               <div className="grid min-w-0 gap-0.5">
                 <p className="font-medium break-words">{lineTitle(l)}</p>
@@ -319,6 +361,8 @@ export function LoadingCountDialog({
                 value={form.counts[l.id] ?? null}
                 onChange={(v) => setForm((f) => (f ? { ...f, counts: { ...f.counts, [l.id]: v } } : f))}
               />
+            </div>
+          ))}
             </div>
           ))}
         </div>

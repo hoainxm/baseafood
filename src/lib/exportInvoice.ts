@@ -17,6 +17,7 @@ import type {
   InvoiceComposition,
 } from "@/types";
 import type { InvoiceCell } from "./invoiceReader";
+import { linesByContainer, type ContainerView } from "./exportContainers";
 import type { CompanySeller } from "./companyProfile";
 
 /**
@@ -282,7 +283,21 @@ export interface InvoiceDocInput {
   seller?: CompanySeller;
   /** Gross (kg) của dòng theo SI đã lưu — Packing list lấy gross theo SI (Phòng KH 2026-11-04); null ⇒ kg cả bì × số kiện. */
   siGrossKg?: (line: ExportShipmentLine) => number | null;
+  /** Mọi cont của chuyến (ba-spec 73 R8). ≥ 2 cont ⇒ đầu trang kê từng cont, Packing list nhóm hàng theo cont. */
+  containers?: readonly ContainerView[];
 }
+
+/** Số liệu một cont trên Packing list (ba-spec 73 R8). */
+export interface ContainerTotals {
+  containerId: string;
+  units: number;
+  netKg: number;
+  grossKg: number;
+}
+
+/** "SZLU2030326 / VN48840AW" cho từng cont, nối bằng ", " (dòng CONTAINER NO. & SEAL NO.). */
+export const containerSealText = (conts: readonly Pick<ContainerView, "containerNo" | "sealNo">[]) =>
+  conts.map((c) => [c.containerNo.trim(), c.sealNo.trim()].filter(Boolean).join(" / ")).filter(Boolean).join(", ");
 
 export interface InvoiceTotals {
   units: number;
@@ -298,6 +313,8 @@ export interface InvoiceDocument {
   incompleteLineIds: string[];
   /** Như trên, kèm thiếu gì — để báo đích danh từng dòng. */
   incompleteLines: { lineId: string; missing: ("units" | "netKg" | "unitPrice")[] }[];
+  /** Chuyến nhiều cont: tổng từng cont theo Packing list (cộng các cont == `totals`). Một cont ⇒ []. */
+  containerTotals: ContainerTotals[];
   fileName: string;
 }
 
@@ -412,6 +429,9 @@ function headRows(input: InvoiceDocInput, title: string): InvoiceSheetRow[] {
     ["Port of loading:", input.portOfLoading.toUpperCase()],
     ["Port of discharge:", input.portOfDischarge.toUpperCase()],
   ];
+  // ba-spec 73 R8: chuyến nhiều cont ⇒ mỗi cont một dòng "Container / Seal" (chuyến một cont giữ như mẫu).
+  const conts = input.containers ?? [];
+  if (conts.length > 1) conts.forEach((c, i) => right.push([i === 0 ? "Container / Seal:" : "", [`${c.kind}`, containerSealText([c])].filter(Boolean).join(" · ")]));
   const left = [`Applicant: ${input.customer.name}`, ...addr];
   const rows: InvoiceSheetRow[] = [
     { role: "head", cells: [null, null, null, `${sellerOf(input).place},`, englishDate(input.issuedOn)] },
@@ -487,7 +507,26 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
     const gpu = p.line.grossKgPerUnit ?? (p.grossKg != null && p.units ? round(p.grossKg / p.units, 2) : null);
     return gpu != null ? `${net}kgs/${gpu}kgs` : `${net}kgs`;
   };
-  groups.forEach((g, i) => pl.push(...groupRows(g, i + 1, (p) => [nwgw(p), p.units, p.netKg, p.grossKg])));
+  const containerTotals: ContainerTotals[] = [];
+  const conts = input.containers ?? [];
+  if (conts.length > 1) {
+    // ba-spec 73 R8: mỗi cont một nhóm (dòng tiêu đề cont · các mục · dòng cộng của cont); số mục chạy tiếp.
+    let no = 0;
+    for (const { container: c, lines } of linesByContainer(conts, printed.map((p) => ({ ...p, containerId: p.line.containerId })))) {
+      const sub = { units: 0, netKg: 0, grossKg: 0 };
+      for (const p of lines) {
+        sub.units += p.units ?? 0;
+        sub.netKg += p.netKg ?? 0;
+        sub.grossKg += p.grossKg ?? 0;
+      }
+      const t = { containerId: c.id, units: round(sub.units, 3), netKg: round(sub.netKg, 3), grossKg: round(sub.grossKg, 3) };
+      containerTotals.push(t);
+      // Dòng "item" (đậm, nằm trong bảng ở cả Excel / Word / PDF) — "total" sẽ cắt bảng ở bản Word.
+      pl.push({ role: "item", cells: [null, `CONTAINER ${c.no}: ${[c.kind, containerSealText([c])].filter(Boolean).join(" · ")}`] });
+      for (const g of groupLines(lines)) pl.push(...groupRows(g, ++no, (p) => [nwgw(p), p.units, p.netKg, p.grossKg]));
+      pl.push({ role: "item", cells: [null, `Sub-total container ${c.no}`, null, t.units, t.netKg, t.grossKg || null] });
+    }
+  } else groups.forEach((g, i) => pl.push(...groupRows(g, i + 1, (p) => [nwgw(p), p.units, p.netKg, p.grossKg])));
   pl.push({ role: "total", cells: [null, "TOTAL", null, totals.units, totals.netKg, totals.grossKg || null] }, blank());
   pl.push(text(`Say: ${capitalize(integerToWords(totals.units))} ${pkg.word} only.`));
   pl.push(blank(), { role: "signature", cells: [null, null, null, seller.signature] });
@@ -509,7 +548,7 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
       { role: "head", cells: [null, "VESSEL NAME:", input.shipment.vesselVoyage] },
       { role: "head", cells: [null, "DATE OF SHIPMENT:", englishDate(input.shipment.etd || input.shipment.loadingDate).toUpperCase()] },
       { role: "head", cells: [null, "BILL OF LADING NO.:", input.blNo] },
-      { role: "head", cells: [null, "CONTAINER NO. & SEAL NO.:", [input.shipment.containerNo, input.shipment.sealNo].filter(Boolean).join(" / ")] },
+      { role: "head", cells: [null, "CONTAINER NO. & SEAL NO.:", conts.length > 1 ? containerSealText(conts) : [input.shipment.containerNo, input.shipment.sealNo].filter(Boolean).join(" / ")] },
       blank(),
       { role: "table-head", cells: ["ITEMS", "DESCRIPTION", "UNIT WEIGHT", "EXPIRY DATE", "TOTAL QUANTITY", "TOTAL WEIGHT"] },
       { role: "table-head", cells: [null, null, "N.W / G.W", "(yyyy.mm)", pkg.long, "NET", "GROSS"] },
@@ -533,6 +572,7 @@ export function buildInvoiceDocument(input: InvoiceDocInput): InvoiceDocument {
         ),
       }))
       .filter((x) => x.missing.length),
+    containerTotals,
     fileName: invoiceFileName(input.invoiceNo),
   };
 }

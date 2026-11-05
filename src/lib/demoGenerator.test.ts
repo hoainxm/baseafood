@@ -110,6 +110,15 @@ describe("generateDemoBundle", () => {
     for (const d of closedOrders) expect(bundle.exportOrders.some((l) => l.orderId === d.id), d.id).toBe(true);
   });
 
+  it("AC-16 (ba-spec 73): có ≥ 1 chuyến 2 cont, cont thêm trỏ chuyến có trong gói, dòng gán cont đó", () => {
+    expect(bundle.exportShipmentContainers.length).toBeGreaterThanOrEqual(1);
+    const shipIds = new Set(bundle.exportShipments.map((s) => s.id));
+    for (const c of bundle.exportShipmentContainers) {
+      expect(shipIds.has(c.shipmentId), c.id).toBe(true);
+      expect(bundle.exportShipmentLines.some((l) => l.shipmentId === c.shipmentId && l.containerId === c.id), c.id).toBe(true);
+    }
+  });
+
   it("id không trùng trong từng bảng", () => {
     for (const [table, items] of Object.entries(bundle) as [string, { id?: string; code?: string }[]][]) {
       const keys = items.map((x) => x.id ?? x.code);

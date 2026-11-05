@@ -96,7 +96,7 @@ export function buildCatalogTour(ctx: CatalogTourContext): PageTour {
       id: "customers",
       title: "Khách hàng",
       body:
-        "Khách mua thành phẩm (đầu ra), khác với đại lý cung cấp nguyên liệu. Mỗi khách có Tên khách hàng, Mã số gọi nhanh, Thị trường; nhóm Xuất khẩu (Quốc gia, Cảng đích mặc định, Điều kiện thanh toán, Địa chỉ, Người liên hệ, Email liên hệ) xem ở Chi tiết, Phòng Kế hoạch dùng khi lập hợp đồng.",
+        "Khách mua thành phẩm (đầu ra), khác với đại lý cung cấp nguyên liệu. Mỗi khách có Tên khách hàng, Mã số gọi nhanh, Thị trường (chọn trong danh sách, gồm cả thị trường các khách đang dùng; chưa có thì gõ tên rồi chọn Thêm mới); nhóm Xuất khẩu (Quốc gia, Cảng đích mặc định, Điều kiện thanh toán, Địa chỉ, Người liên hệ, Email liên hệ) xem ở Chi tiết, Phòng Kế hoạch dùng khi lập hợp đồng.",
     }),
     at("customers", {
       id: "customer-names",

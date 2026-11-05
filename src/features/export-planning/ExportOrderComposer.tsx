@@ -10,6 +10,7 @@ import { DocumentComposerView } from "@/features/document-composer";
 import { useProductionOrderLines, useProductionOrderShipments, useProductionOrders } from "@/lib/catalogRepo";
 import { buildExportOrderLines, exportOrderForm, exportOrderPreviousKey, newExportOrderDocument, type ExportOrderFormSource } from "@/lib/documentTypes/exportOrderForm";
 import { currentContractLineId, workingRevision, type ExportData } from "@/lib/exportPlanning";
+import { shipmentContainers } from "@/lib/exportContainers";
 import type { DocumentValues, ExportContract, ExportShipment } from "@/types";
 
 export function ExportOrderComposer({
@@ -40,6 +41,7 @@ export function ExportOrderComposer({
     const linked = new Set(links.filter((l) => l.shipmentId === shipment.id).map((l) => l.orderId));
     // Dòng HĐ của mọi HĐ có hàng trên chuyến (chuyến gộp — ba-spec 70) để tra size + HS code.
     const linkedOrders = orders.filter((o) => linked.has(o.id));
+    const conts = shipmentContainers(data, shipment); // ba-spec 73: bảng hàng + ô cont theo mọi cont của chuyến
     const contractIds = new Set([
       shipment.contractId,
       ...(data.shipmentLines ?? []).filter((l) => l.shipmentId === shipment.id).map((l) => l.contractId),
@@ -57,9 +59,11 @@ export function ExportOrderComposer({
       }),
       contractLines,
       shipmentLines: data.shipmentLines ?? [],
+      containers: conts,
     });
     const source = {
       shipment,
+      containerKinds: conts.map((c) => c.kind),
       contractNo: contract.contractNo,
       customerName,
       rows: built.rows,

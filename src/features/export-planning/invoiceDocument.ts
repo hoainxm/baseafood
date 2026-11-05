@@ -7,6 +7,7 @@ import { notify } from "@/design-system";
 import { EMPTY_COMPOSITION, bankAccountsOf, bankBlockLines, buildInvoiceDocument, defaultTradeTerms, invoiceUnitPrice, shipmentLinesOf } from "@/lib/exportInvoice";
 import { currentContractLineId, documentItems, linesWithContractNo, shipmentContractIds, shipmentContractLines, termsOf, type ExportData } from "@/lib/exportPlanning";
 import { siGrossByLine } from "@/lib/shippingInstruction";
+import { shipmentContainers } from "@/lib/exportContainers";
 import { fetchCompanyLogoBytes } from "@/lib/companyAssets";
 import type { CompanySeller } from "@/lib/companyProfile";
 import type { ComposedDocument, Customer, ExportContract, ExportShipment, ExportStepItem } from "@/types";
@@ -38,7 +39,8 @@ export function invoiceDocumentFor(
   return buildInvoiceDocument({
     invoiceNo: item?.number ?? "",
     issuedOn: item?.issuedOn || new Date().toISOString().slice(0, 10),
-    customer: { name: customer?.name ?? "", address: customer?.address ?? "" },
+    // Bên mua theo khách hàng của HĐ; phần lập invoice sửa tay được cho chuyến (Phòng KH 2026-11-05).
+    customer: { name: comp.buyerName?.trim() || customer?.name || "", address: comp.buyerAddress?.trim() || customer?.address || "" },
     shipment,
     // Số B/L gõ ở phần lập invoice; trống ⇒ số ở mục Bill of Lading.
     blNo: comp.blNo?.trim() || bl?.number || "",
@@ -54,6 +56,8 @@ export function invoiceDocumentFor(
     // Người bán từ Thông tin công ty (ba-spec 67); chưa có ⇒ mặc định trong buildInvoiceDocument.
     seller,
     siGrossKg: (l) => siGross.get(l.id) ?? null,
+    // ba-spec 73 R8: chuyến nhiều cont ⇒ kê mọi cont, Packing list nhóm theo cont.
+    containers: shipmentContainers(data, shipment),
   });
 }
 

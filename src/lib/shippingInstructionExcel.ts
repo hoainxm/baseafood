@@ -44,9 +44,28 @@ export function fillShippingInstruction(ws: Worksheet, l: SiLinked, f: SiForm): 
   ws.getCell("D27").value = l.portOfLoading;
   ws.getCell("A29").value = l.portOfDischarge;
   ws.getCell("D29").value = l.placeOfDelivery;
-  ws.getCell("A33").value = l.containerNo;
-  ws.getCell("A34").value = l.sealNo ? `SEAL: ${l.sealNo}` : "";
-  ws.getCell("C33").value = l.sizeType;
+  if (l.containers && l.containers.length > 1) {
+    // ba-spec 73 R9: mỗi cont 2 hàng (số cont · seal) ở cột A, loại + số kiện + gross của cont ở cột C; mẫu có 4 hàng
+    // (33–36) ⇒ 2 cont đầu mỗi cont một cặp hàng, cont thứ 3 trở đi ghi thêm vào hàng 36.
+    l.containers.forEach((c, i) => {
+      const r = 33 + Math.min(i, 1) * 2;
+      const extra = i >= 2;
+      const no = [c.containerNo, c.sealNo && `SEAL: ${c.sealNo}`].filter(Boolean);
+      const size = [c.sizeType, c.packages != null && `${c.packages} PKGS`, c.grossKg != null && `${c.grossKg} KGS`].filter(Boolean).join("\n");
+      if (extra) {
+        ws.getCell("A36").value = [ws.getCell("A36").value, no.join(" / ")].filter(Boolean).join("\n");
+        ws.getCell("C35").value = [ws.getCell("C35").value, size].filter(Boolean).join("\n");
+      } else {
+        ws.getCell(`A${r}`).value = c.containerNo;
+        ws.getCell(`A${r + 1}`).value = c.sealNo ? `SEAL: ${c.sealNo}` : "";
+        ws.getCell(`C${r}`).value = size;
+      }
+    });
+  } else {
+    ws.getCell("A33").value = l.containerNo;
+    ws.getCell("A34").value = l.sealNo ? `SEAL: ${l.sealNo}` : "";
+    ws.getCell("C33").value = l.sizeType;
+  }
   putLines(ws, "D", 33, 4, f.shippingMarks);
   // 4 hàng hàng hóa (33–36); quá 4 dòng ⇒ dòng 4 trở đi gộp vào hàng 36 (cộng số).
   const goods = f.goods;

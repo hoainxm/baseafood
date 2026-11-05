@@ -2,7 +2,7 @@
 
 > Load khi: sửa khối Hàng của chuyến, hàng Số lượng thực đóng (bước 4), phần Lập invoice từ app ở mục Commercial Invoice, file Excel Invoice · Packing list · Expiry date list, danh sách Tài khoản ngân hàng.
 covers: src/lib/exportInvoice.ts, src/lib/exportInvoiceExcel.ts, src/lib/exportInvoicePdf.ts, src/lib/exportInvoiceDocx.ts, src/features/export-planning/ShipmentGoods.tsx, src/features/export-planning/shipmentGoodsLogic.ts, src/features/export-planning/InvoiceComposePanel.tsx, src/features/export-planning/invoiceDocument.ts, supabase/migrations/0096_export_shipment_lines.sql
-last_verified: 2026-11-04
+last_verified: 2026-11-05
 <!-- updated: 2026-11-03 (ba-spec 67) — người bán (tên, địa chỉ, nơi lập, người ký) + logo PDF / Word lấy từ Thông tin công ty (`companySellerOf`, `fetchCompanyLogoBytes`) — ba-spec 67; `SELLER` chỉ còn là mặc định. Tài khoản ngân hàng quản lý ở Thông tin công ty (bỏ khỏi tab Danh mục của Xuất khẩu), invoice chọn như cũ. -->
 <!-- updated: 2026-11-03 (c) — R11 / AC-11: đóng cont điền số thực đóng không chờ Hàng của chuyến (dòng tạm từ dòng HĐ, mig 0098); R4 giữ dòng đã điền khi KH lưu trống kế hoạch. -->
 ttl_days: 90
@@ -154,3 +154,4 @@ status: v1 ĐÃ BUILD 2026-11-02 — mig `0096` (bảng `export_shipment_lines`,
 - 2026-11-04: R11 (đơn giá theo bản HĐ đang dùng, nối dòng của bản cũ; cảnh báo đích danh) + R12 (Packing list gross theo SI, mục PL tự điền theo invoice). Test `contractLineRevisions.test.ts`.
 - 2026-11-04 (b): mục Packing List có nút Tạo file Packing list từ invoice ⇒ PDF chỉ gồm Packing list (+ Expiry date list), gross theo SI, đưa vào ô file của mục (Phòng KH: file nằm chung trong file invoice, khó tìm). Test `packingListFile.test.ts`.
 - 2026-11-04 (c): ô **Số B/L (in trên invoice)** ở phần lập invoice (`invoiceComposition.blNo`, jsonb sẵn có — không migration); trống ⇒ số ở mục Bill of Lading như cũ.
+- 2026-11-05 (Phòng KH): invoice + packing list ghi bên mua theo khách hàng của HĐ; phần lập invoice có ô **Tên / Địa chỉ bên mua** sửa tay cho chuyến (`InvoiceComposition.buyerName` / `buyerAddress`, JSON), nút Lấy theo hợp đồng bỏ phần sửa. Chuyến nhiều cont: đầu trang kê từng cont, packing list nhóm theo cont (ba-spec 73). Test `packingListFile.test.ts`, `exportContainers.test.ts`.

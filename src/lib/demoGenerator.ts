@@ -84,6 +84,7 @@ import type {
   GoodsType,
   ExportOption,
   ExportShipmentLine,
+  ExportShipmentContainer,
   ExportShipment,
   ExportStepItem, CompanyProfile } from "@/types";
 import { EXPORT_OPTION_SEED } from "./exportOptions";
@@ -171,6 +172,8 @@ export interface DemoBundle {
   /** Hàng của chuyến (mig 0096, ba-spec 63) — chép dòng HĐ của bản mới nhất vào mỗi chuyến chưa hủy, chia
    *  đều số kiện theo số chuyến; chuyến đã có số cont ⇒ kho đã điền số thực đóng (bằng kế hoạch). */
   exportShipmentLines: ExportShipmentLine[];
+  /** Cont thêm của chuyến (mig 0106, ba-spec 73) — một chuyến cont 40 chưa đóng thêm cont 20RF, nửa số dòng sang cont 2. */
+  exportShipmentContainers: ExportShipmentContainer[];
   /** Nhập khẩu (mig 0082) — bộ nhỏ dựng sẵn (lib/importPlanningDemo.ts): 3 HĐ, 4 lần nhập đủ trạng thái;
    *  file là đường dẫn GIỮ CHỖ. NCC nước ngoài của bộ được thêm vào `suppliers`. */
   /** Danh mục NCC nhập khẩu (mig 0083) — riêng, không thêm vào Đại lý. */
@@ -747,6 +750,8 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
   const formDemo = buildProductionOrderFormDemo(orderDemo.orders, orderDemo.lines, `${tc.today}T09:00:00.000Z`);
   const invoiceDemo = buildSupplierInvoiceDemo(imports, tc.today);
 
+  // ba-spec 73: một chuyến 2 cont (40 + 20) để thử Thêm cont / chia hàng / chứng từ kê mọi cont.
+  const multiContainer = demoMultiContainer(exportDemo.shipments, demoShipmentLines(exportDemo));
   return {
     products: n.products.map((p) => ({ ...p })),
     materialTypes: n.materialTypes.map((m) => ({ ...m })),
@@ -795,7 +800,8 @@ export function generateDemoBundle(n: DemoSource, tc: DemoOptions): DemoBundle {
     ],
     exportOptions: EXPORT_OPTION_SEED.map((o) => ({ ...o })),
     companyProfiles: [{ ...COMPANY_DEFAULTS }],
-    exportShipmentLines: demoShipmentLines(exportDemo),
+    exportShipmentLines: multiContainer.lines,
+    exportShipmentContainers: multiContainer.containers,
     importSuppliers: importDemo.suppliers,
     importContracts: importDemo.contracts,
     importContractLines: importDemo.lines,
@@ -853,6 +859,23 @@ function demoShipmentLines(pack: Pick<ReturnType<typeof buildExportDemo>, "shipm
     });
   }
   return out;
+}
+
+/** Chuyến cont 40 còn mở, chưa đóng (chưa số cont), có ≥ 2 dòng ⇒ thêm cont 20RF, dòng chẵn sang cont 2 (ba-spec 73). */
+function demoMultiContainer(
+  shipments: readonly ExportShipment[],
+  lines: ExportShipmentLine[],
+): { lines: ExportShipmentLine[]; containers: ExportShipmentContainer[] } {
+  const target = shipments.find(
+    (s) => s.status === "open" && (s.kind === "40RF" || s.kind === "40HC-RF") && !s.containerNo && lines.filter((l) => l.shipmentId === s.id).length >= 2,
+  );
+  if (!target) return { lines, containers: [] };
+  const id = `${target.id}-cont-2`;
+  const own = lines.filter((l) => l.shipmentId === target.id).map((l) => l.id);
+  return {
+    containers: [{ id, shipmentId: target.id, sortOrder: 1, kind: "20RF", containerNo: "", sealNo: "", loadingDate: "", note: "", createdAt: target.createdAt }],
+    lines: lines.map((l) => (l.shipmentId === target.id ? { ...l, containerId: own.indexOf(l.id) % 2 === 1 ? id : "" } : l)),
+  };
 }
 
 function demoCustomerNames(pack: Pick<ReturnType<typeof buildExportDemo>, "contracts" | "revisions">): CustomerProductName[] {

@@ -6,7 +6,7 @@
 // ============================================================
 // Mẫu đầu tiên: Booking Receipt Notice của ONE. Hãng khác cùng kiểu nhãn tiếng Anh "Nhãn : giá trị" ⇒ đọc
 // được phần trùng nhãn; nhãn lạ thì ô để trống, người dùng gõ tay (đọc xong luôn cho soát trước khi lưu).
-import type { ExportShipmentKind } from "@/types";
+import type { ExportContainerKind, ExportShipmentKind } from "@/types";
 
 export interface BookingRead {
   bookingNo: string;
@@ -20,6 +20,8 @@ export interface BookingRead {
   equipment: string;
   /** Loại chuyến đoán từ `equipment`; "" = không đoán được (VD cont khô). */
   kind: ExportShipmentKind | "";
+  /** Booking nhiều cont ("1X20RF & 1X40RF", ba-spec 73 R14): loại các cont THÊM ngoài `kind` (cont lớn nhất). */
+  extraKinds?: ExportContainerKind[];
   returnYard: string;
   emptyPickupYard: string;
   docCutoff: string;
@@ -118,6 +120,26 @@ export function bookingContainerKind(text: string): ExportShipmentKind | "" {
   return "";
 }
 
+const KIND_RANK: Record<ExportContainerKind, number> = { "40HC-RF": 3, "40RF": 2, "20RF": 1 };
+
+/**
+ * Booking nhiều cont (R14): "1X20RF & 1X40RF", "2 x 40RF + 1 x 20RF" ⇒ mọi cont theo loại, cont lớn nhất trước.
+ * Một loại không có số lượng ⇒ 1 cont. Không đọc được ⇒ [].
+ */
+export function bookingContainerKinds(text: string): ExportContainerKind[] {
+  const parts = text.split(/\s*(?:&|\+|,|\bAND\b)\s*/i).map((p) => p.trim()).filter(Boolean);
+  const out: ExportContainerKind[] = [];
+  for (const part of parts) {
+    const m = /^(\d{1,2})\s*[X×*]\s*/i.exec(part) ?? /[-–]\s*(\d{1,2})\s*$/.exec(part);
+    // "1X20RF": bỏ phần số lượng trước khi đoán loại (chữ X dính số làm mất ranh giới từ của "20").
+    const kind = bookingContainerKind(part.replace(/^\d{1,2}\s*[X×*]\s*/i, ""));
+    if (!kind || kind === "truck" || kind === "consolidated") continue;
+    const n = m ? Math.max(1, Number(m[1])) : 1;
+    for (let i = 0; i < n; i++) out.push(kind);
+  }
+  return out.sort((a, b) => KIND_RANK[b] - KIND_RANK[a]);
+}
+
 export const EMPTY_BOOKING_READ: BookingRead = {
   bookingNo: "",
   forwarder: "",
@@ -153,7 +175,9 @@ export function parseBookingRows(rows: readonly (readonly string[])[]): { read: 
     }
   }
   if (read.equipment) {
-    read.kind = bookingContainerKind(read.equipment);
+    const kinds = bookingContainerKinds(read.equipment);
+    read.kind = kinds[0] ?? bookingContainerKind(read.equipment);
+    if (kinds.length > 1) read.extraKinds = kinds.slice(1);
     if (read.kind) found.add("kind");
   }
   return { read, found: [...found] };

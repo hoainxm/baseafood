@@ -36,6 +36,8 @@ export interface ShipmentLinesTarget {
   lines: readonly ExportShipmentLine[];
   /** Σ số kiện các chuyến KHÁC (chưa hủy) đã lên theo id dòng HĐ — nhắc phần còn lại. */
   otherShipmentUnits: Record<string, number>;
+  /** Cont của chuyến (ba-spec 73) — có khi máy chủ đã chạy 0106; ≥ 2 cont ⇒ mỗi dòng chọn cont, chia dòng sang cont khác. */
+  containers?: readonly { id: string; label: string }[];
 }
 
 /** Một dòng trong hộp: dòng HĐ + giá trị đang sửa (số kiện trống = không đóng vào chuyến này). */
@@ -50,15 +52,18 @@ export interface LineDraft {
   plannedUnits: number | null;
   grossKgPerUnit: number | null;
   expiry: string;
+  /** Cont của dòng (ba-spec 73 R4): "" = cont 1. */
+  containerId?: string;
 }
 
 export const groupLines = (groups: readonly ContractLineGroup[]): ExportContractLine[] => groups.flatMap((g) => g.lines);
 
 /** Dòng của hộp cho một nhóm HĐ: mỗi dòng HĐ một dòng, lấy số đang có của chuyến nếu có. */
 export function draftRowsOf(group: ContractLineGroup, lines: readonly ExportShipmentLine[]): LineDraft[] {
-  return group.lines.map((cl) => {
-    const own = lines.find((l) => l.contractLineId === cl.id);
-    return {
+  // Chuyến nhiều cont (ba-spec 73): một dòng HĐ có thể chia ra nhiều dòng chuyến (mỗi cont một dòng) ⇒ mỗi dòng một hàng.
+  return group.lines.flatMap((cl) => {
+    const owns = lines.filter((l) => l.contractLineId === cl.id).sort((a, b) => a.sortOrder - b.sortOrder);
+    const row = (own: ExportShipmentLine | undefined): LineDraft => ({
       contractId: group.contractId,
       contractLineId: cl.id,
       lineId: own?.id ?? "",
@@ -68,8 +73,20 @@ export function draftRowsOf(group: ContractLineGroup, lines: readonly ExportShip
       plannedUnits: own?.plannedUnits ?? null,
       grossKgPerUnit: own?.grossKgPerUnit ?? null,
       expiry: own?.expiry ?? "",
-    };
+      containerId: own?.containerId ?? "",
+    });
+    return owns.length ? owns.map(row) : [row(undefined)];
   });
+}
+
+/** Chia một dòng sang cont khác (ba-spec 73 NV2): bản chép cùng dòng HĐ, chưa có số kiện, chọn cont kế tiếp. */
+export function splitRow(rows: readonly LineDraft[], index: number, containerIds: readonly string[]): LineDraft[] {
+  const r = rows[index];
+  if (!r) return [...rows];
+  const used = rows.filter((x) => x.contractLineId === r.contractLineId).map((x) => x.containerId ?? "");
+  const next = containerIds.find((id) => !used.includes(id)) ?? containerIds[(containerIds.indexOf(r.containerId ?? "") + 1) % Math.max(1, containerIds.length)] ?? "";
+  const copy: LineDraft = { ...r, lineId: "", plannedUnits: null, containerId: next };
+  return [...rows.slice(0, index + 1), copy, ...rows.slice(index + 1)];
 }
 
 /** Ghép dòng của hộp thành hàng của chuyến: giữ id, số thực đóng kho đã điền; bỏ dòng không có số kiện. */
@@ -93,6 +110,8 @@ export function linesFromDraft(tg: ShipmentLinesTarget, rows: readonly LineDraft
       plannedUnits: planned,
       grossKgPerUnit: r.grossKgPerUnit,
       expiry: r.expiry.trim(),
+      // ba-spec 73: chỉ ghi cont khi chuyến có danh sách cont (máy chủ đã chạy 0106) — không thì giữ như cũ.
+      ...(tg.containers ? { containerId: tg.containers.some((c) => c.id === (r.containerId ?? "")) ? (r.containerId ?? "") : "" } : {}),
     });
   });
   return out;

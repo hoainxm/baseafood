@@ -58,7 +58,7 @@ import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, u
 import { findCustomerName, lineTextAfterPick } from "@/lib/customerProductNames";
 import { applyExportConflicts, fillExportContract, type ExportContractFillValues, type FillConflict, type ReadContract } from "@/lib/contractReader";
 import { validityError, validityWarning } from "@/lib/contractValidity";
-import type { Customer, CustomerProductName, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, ExportFile, Product } from "@/types";
+import type { Customer, CustomerProductName, ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportDocumentKind, ExportFile, ExportParty, Product } from "@/types";
 import { Copy, Factory, FileSignature, Plus, Save, Trash2 } from "lucide-react";
 import { FilePicker } from "./parts";
 import { ContractReadPanel, type ContractFillReport } from "./ContractReadPanel";
@@ -634,6 +634,23 @@ export function ContractFormDialog({
                 />
               </Field>
             )}
+            {/* Phòng KH 2026-11-05: invoice / packing list theo khách hàng; SI + vận đơn theo Người nhận hàng và Notify. */}
+            {form.customerId && (
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2" data-tour="contract-consignee">
+                <PartyFields
+                  title="Người nhận hàng (Consignee)"
+                  hint="SI và vận đơn ghi theo đây. Để trống = lấy tên + địa chỉ khách hàng ở trên."
+                  value={form.terms.consignee}
+                  onChange={(v) => setTerm("consignee", v)}
+                />
+                <PartyFields
+                  title="Notify party"
+                  hint="SI và vận đơn ghi theo đây. Để trống = theo SI lần trước của khách (hoặc trống)."
+                  value={form.terms.notifyParty}
+                  onChange={(v) => setTerm("notifyParty", v)}
+                />
+              </div>
+            )}
             {form.mode !== "create" && (
               <div className="grid gap-4 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
                 <DateField label="Ngày của bản này" value={form.revisedOn} onChange={(v) => set("revisedOn", v)} />
@@ -1028,5 +1045,27 @@ export function ContractFormDialog({
       {kindPicker.dialog}
       {optionPicker.dialogs}
     </FormDialog>
+  );
+}
+
+/** Tên + địa chỉ của một bên trên chứng từ (Consignee / Notify). Xóa trắng cả hai ô ⇒ bỏ hẳn (về mặc định). */
+function PartyFields({ title, hint, value, onChange }: { title: string; hint: string; value: ExportParty | undefined; onChange: (v: ExportParty | undefined) => void }) {
+  const set = (patch: Partial<ExportParty>) => {
+    const next = { name: value?.name ?? "", address: value?.address ?? "", ...patch };
+    onChange(next.name.trim() || next.address.trim() ? next : undefined);
+  };
+  return (
+    <div className="grid min-w-0 content-start gap-3 rounded-md border p-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-sm text-muted-foreground">{hint}</p>
+      </div>
+      <Field label="Tên">
+        <Input value={value?.name ?? ""} onChange={(e) => set({ name: e.target.value })} />
+      </Field>
+      <Field label="Địa chỉ" hint="Mỗi dòng một hàng.">
+        <Textarea rows={3} value={value?.address ?? ""} onChange={(e) => set({ address: e.target.value })} />
+      </Field>
+    </div>
   );
 }

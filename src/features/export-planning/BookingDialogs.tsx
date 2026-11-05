@@ -29,7 +29,7 @@ import { SHIPMENT_KINDS } from "@/lib/exportPlanning";
 import { formatDateTimeVN } from "@/lib/format";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
-import type { ExportFile, ExportShipment, ExportShipmentKind, ExportTransportInfo } from "@/types";
+import type { ExportContainerKind, ExportFile, ExportShipment, ExportShipmentKind, ExportTransportInfo } from "@/types";
 import { FileSearch, Save, Ship, Truck } from "lucide-react";
 import { useExportOptionPicker } from "./exportOptionPicker";
 import { FilePicker } from "./parts";
@@ -95,14 +95,20 @@ export function BookingDialog({
   onSave,
   recordedBy,
   filesEnabled,
+  containersEnabled = false,
+  existingExtras = 0,
 }: {
   target: BookingTarget | null;
   onClose: () => void;
-  /** `files`: file booking vừa tải lên — lưu hỏng thì màn tự gỡ file đã tải. */
-  onSave: (s: ExportShipment, files: ExportFile[], readFrom: string) => boolean;
+  /** `files`: file booking vừa tải lên — lưu hỏng thì màn tự gỡ file đã tải. `addKinds`: cont thêm theo booking (ba-spec 73 R14). */
+  onSave: (s: ExportShipment, files: ExportFile[], readFrom: string, addKinds: ExportContainerKind[]) => boolean;
   recordedBy: string;
   /** Máy chủ đã chạy 0094 + có kho file ⇒ đính / đọc file booking được. */
   filesEnabled: boolean;
+  /** Máy chủ đã chạy 0106 ⇒ booking nhiều cont đề xuất thêm cont (ba-spec 73 R14). */
+  containersEnabled?: boolean;
+  /** Số cont thêm chuyến đang có — booking 2 cont mà chuyến đã có 1 cont thêm thì không đề xuất nữa. */
+  existingExtras?: number;
 }) {
   const [draftValue, setDraftValue] = useState<BookingDraft | null>(null);
   const picker = useExportOptionPicker();
@@ -111,6 +117,8 @@ export function BookingDialog({
   const [result, setResult] = useState<{ fileName: string; r: BookingReadResult; warnings: string[] } | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [busy, setBusy] = useState(false);
+  const [addConts, setAddConts] = useState<"yes" | "no">("yes");
+  const proposedKinds: ExportContainerKind[] = containersEnabled && result?.r.ok ? (result.r.read.extraKinds ?? []).slice(existingExtras) : [];
   const draft = useDialogDraft({ form: "export-booking", value: draftValue, setValue: setDraftValue, isEmpty: (d) => bookingSnap(d) === d.initial });
 
   useEffect(() => {
@@ -122,6 +130,7 @@ export function BookingDialog({
     setDraftValue(kept && kept.key === fresh.key ? kept : fresh);
     setFiles([]);
     setResult(null);
+    setAddConts("yes");
     setErrors([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
@@ -192,7 +201,7 @@ export function BookingDialog({
       createdAt: now,
     }));
     const b = draftValue.forwarderFromFile && !booking.forwarder ? { ...booking, forwarder: draftValue.forwarderFromFile } : booking;
-    const ok = onSave(shipmentWithBooking(shipment, b, draftValue.form), rows, result?.r.ok ? result.fileName : "");
+    const ok = onSave(shipmentWithBooking(shipment, b, draftValue.form), rows, result?.r.ok ? result.fileName : "", addConts === "yes" ? proposedKinds : []);
     setBusy(false);
     if (!ok) {
       void removeExportFiles(uploaded.map((u) => u.path));
@@ -292,6 +301,19 @@ export function BookingDialog({
                     </p>
                   ))}
                 </div>
+              )}
+              {/* ba-spec 73 R14: booking nhiều cont ⇒ đề xuất thêm cont thêm; người dùng chọn Có mới ghi. */}
+              {proposedKinds.length > 0 && (
+                <ChoiceGroup
+                  label={`Booking có ${proposedKinds.length + 1 + existingExtras} cont — thêm ${proposedKinds.length} cont (${proposedKinds.join(" + ")}) vào chuyến này?`}
+                  value={addConts}
+                  onChange={(v) => setAddConts(v as "yes" | "no")}
+                  options={[
+                    { value: "yes", label: "Có — thêm cont" },
+                    { value: "no", label: "Không — giữ một cont" },
+                  ]}
+                  columns={2}
+                />
               )}
             </div>
           </FormSection>

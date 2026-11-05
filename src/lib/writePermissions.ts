@@ -158,6 +158,7 @@ export const TABLE_WRITE_RULES: Readonly<Record<string, TableRule | null>> = {
   company_profile: null, // thông tin công ty (0099) — RLS company-profile:update; app kiểm bằng useCan("company-profile")
   // Hàng của chuyến (0096, ba-spec 63) — RLS export-plans; người đóng hàng (.loading) chỉ điền số thực đóng (trigger chặn cột khác).
   export_shipment_lines: null,
+  export_shipment_containers: null, // cont thêm của chuyến (0106) — RLS export-plans riêng, như export_shipment_lines
   goods_types: null, // danh mục Loại hàng (0089) — RLS Phòng Kế hoạch, không qua ma trận app
   // Nhập khẩu (mig 0082): RLS RIÊNG theo import-plans / import-plans.receiving (thủ kho chỉ ghi
   // số lượng thực nhập) — không qua trigger 0065. App kiểm ở /planning-import bằng useCan.

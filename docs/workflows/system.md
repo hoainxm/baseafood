@@ -4,7 +4,8 @@
 covers: src/features/catalog/*, src/features/users/*, src/features/admin/*, src/features/audit/*, src/lib/permissions.ts, src/lib/audit.ts, src/lib/userDirectory.ts, src/lib/catalogRepo.ts, src/lib/productUsage.ts
 tours: src/features/catalog/catalogTour.ts
 guides: src/features/shared/guideContent.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-05
+<!-- re-verified: 2026-11-05 — sửa lỗi ô Thị trường ở Sửa thông tin khách hàng: thị trường gõ mới (Thêm mới) giờ hiện trong ô và trong danh sách chọn (gồm cả thị trường các khách đang dùng). `catalogRepo` thêm kho cont thêm của chuyến xuất (ba-spec 73). Không đổi luật, không đổi quyền. -->
 ttl_days: 90
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ). Bốn trang quản trị là tài nguyên `adminOnly`: chỉ admin vào được, ma trận quyền không cấp cho ai khác (`isGrantable`).

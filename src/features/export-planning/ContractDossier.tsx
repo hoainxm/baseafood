@@ -69,6 +69,7 @@ import { useNavigate } from "react-router-dom";
 import { useOrderCoverage } from "@/features/production-orders/useOrderCoverage";
 import { useCan } from "@/features/shared/PermissionProvider";
 import type { ExportContract, ExportContractAttachmentKind, ExportContractLine, ExportFile, ExportPayment, ExportShipment, Product } from "@/types";
+import { containerCountOf } from "@/lib/exportContainers";
 import {
   ArrowLeft,
   Ban,
@@ -516,7 +517,7 @@ export function ContractDossier({
           <Info label="Hạn hợp đồng" value={validityText} />
           <Info label="Tổng hợp đồng" value={`${formatNumber(totals.kg)} kg${can.viewPrice ? ` · ${formatMoney(totals.amount)} ${currency}` : ""}`} />
           <Info label="Dung sai" value={`±${formatNumber(terms.tolerancePct ?? 0)}% lượng và tiền`} />
-          <Info label="Chuyến" value={shipmentCountText(openShipments, terms.containerCount)} />
+          <Info label="Chuyến" value={shipmentCountText(data, openShipments, terms.containerCount)} />
           <Info
             label="Thực xuất · tiền về"
             value={
@@ -836,9 +837,10 @@ export function ContractDossier({
 }
 
 /** "2 cont / 1 cont" — xe tải / đóng ghép không phải container nên ghi riêng (XK-21). */
-function shipmentCountText(open: readonly ExportShipment[], containerCount: number | null): string {
-  const cont = open.filter((s) => isContainerKind(s.kind)).length;
-  const other = open.length - cont;
+function shipmentCountText(d: Pick<ExportData, "shipmentContainers">, open: readonly ExportShipment[], containerCount: number | null): string {
+  // ba-spec 73 R10: đếm CONT (chuyến nhiều cont đếm đủ), không đếm số chuyến.
+  const cont = open.reduce((t, s) => t + containerCountOf(d, s), 0);
+  const other = open.filter((s) => !isContainerKind(s.kind)).length;
   const base = containerCount != null ? `${cont} / ${containerCount} cont` : `${cont} cont`;
   return other ? `${base} + ${other} chuyến xe tải / đóng ghép` : base;
 }

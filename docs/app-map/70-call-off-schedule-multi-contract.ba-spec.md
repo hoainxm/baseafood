@@ -2,7 +2,7 @@
 
 > Load khi: xây / sửa lịch gọi hàng theo tháng của khách (bảng mã hàng của khách × tháng), chuyến xuất chở hàng của nhiều HĐ cùng khách, đã giao / còn phải giao theo từng HĐ khi chuyến gộp, luật "HĐ xong khi giao đủ lượng trong khung ETA".
 covers: src/lib/exportPlanning.ts, src/lib/exportInvoice.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/lib/productionOrder.ts, src/features/export-planning/
-last_verified: 2026-11-04
+last_verified: 2026-11-05
 ttl_days: 90
 status: **v1.2 ĐÃ CHỐT** (2026-11-03 — chủ dự án "Duyệt theo đề xuất" cả 9 câu §11). **Đợt 1a ĐÃ BUILD 2026-11-03** (chưa commit): R1–R8, R10, NL6, NL7 — luật ở `lib/exportPlanning.ts` (`shipmentContractIds` · `carriesContract` · `shipmentContractActuals` · `addContractGate` · `addableContracts` · `shipmentDeadline` · `linesWithContractNo` · `lineContractOf`), test `lib/exportMultiContract.test.ts` (AC-1…5 + R2, R10, NL7, Q3/R9) + `shipmentGoodsLogic.test.ts`; hộp Hàng của chuyến thêm hàng của HĐ khác; hồ sơ HĐ mục "Đi chung chuyến của hợp đồng khác"; invoice ghi Contract No. theo dòng. **R9 ĐÃ VIẾT 2026-11-04:** `0102_export_loading_lines_multi_contract.sql` (chủ dự án đồng ý; kiểm PGlite; CHƯA chạy DB thật). **Còn:** NL8 / R17 khung giao ETA, đợt 2 lịch gọi hàng (NL1, NL2, R11–R16). v1.1 đối chiếu HĐ thật BD-009/26 + trả lời của Phòng KH (chị Thảo).
 
@@ -271,6 +271,7 @@ status: **v1.2 ĐÃ CHỐT** (2026-11-03 — chủ dự án "Duyệt theo đề 
 
 ## History
 
+- 2026-11-05 — chuyến nay có thể nhiều cont ([73](73-shipment-multi-container.ba-spec.md)): dòng hàng mang cả HĐ lẫn cont; luật đã giao / tiền về theo HĐ không đổi (73 R11, AC-14).
 - 2026-11-04 — R9: viết mig 0102 nới trigger đóng cont cho dòng HĐ phụ (chủ dự án đồng ý), kiểm PGlite.
 - 2026-11-03 — v1.2: chủ dự án duyệt theo đề xuất 9 câu §11. Build đợt 1a (chuyến gộp nhiều HĐ, chưa có khung ETA / trigger / lịch).
 - 2026-11-03 — v1.1: đối chiếu HĐ thật BD-009/26 (DAIREI, UCC BRAND-3970, 1.250 bó = 12.500 kg, 9,65 USD/kg, ± 10 %, partial shipment, khung **ETA** 10/2026–09/2027, TTR theo invoice). Đơn vị lịch = bó; nối lịch ↔ HĐ bằng mã hàng của khách (R16); thêm khung giao ETA (NL8, R17); NB / PB bỏ qua (R18). AC đổi sang bó, thêm AC-3, AC-6, AC-10.

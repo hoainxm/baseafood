@@ -13,6 +13,7 @@ import { Button, ConfirmDelete, EmptyState, TableSkeleton, Tabs, TabsList, TabsT
 import { useCustomerProductNameStore, useCustomers, useExportBookingDetailsAvailable, useExportBookingFilesAvailable, useExportDeferralsAvailable, useExportLoadingExtraPhotosAvailable, useExportOptionStore,
   useCompanyProfileStore, useComposedDocuments, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { lineUnits, shipmentLinesOf } from "@/lib/exportInvoice";
+import { containerLabel, extraContainersOf, isMultiContainer, shipmentContainerSummary, shipmentContainers } from "@/lib/exportContainers";
 import { companySellerOf } from "@/lib/companyProfile";
 import { SHIPPING_INSTRUCTION_DOC } from "@/lib/shippingInstruction";
 import { extractCustomerNames } from "@/lib/customerProductNames";
@@ -20,9 +21,12 @@ import { CustomerProductNamesDialog } from "@/features/catalog/CustomerProductNa
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { newId } from "@/lib/store";
+import { formatDateVN } from "@/lib/format";
 import {
   CONTRACT_ATTACHMENT_LABELS,
   SUB_STEP_LABELS,
+  mergeShipmentGate,
+  mergeShipmentInto,
   applyProductMapping,
   contractClosure,
   documentKindLabel,
@@ -69,7 +73,7 @@ import {
   type AttachmentCandidate,
 } from "@/lib/exportPlanning";
 import { hasExportStorage } from "@/lib/exportFileStorage";
-import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportShipmentKind, type ExportShipmentLine, type ExportStepItem } from "@/types";
+import { ROLES, type ExportActivity, type ExportContract, type ExportContractAttachmentKind, type ExportDeadlineExtension, type ExportFile, type ExportPayment, type ExportShipment, type ExportContainerKind, type ExportShipmentContainer, type ExportShipmentKind, type ExportShipmentLine, type ExportStepItem } from "@/types";
 import { BarChart3, CalendarDays, FilePlus2, FileText, FolderLock, ListChecks } from "lucide-react";
 import { ExportCatalogView, normalizeExportCatalogList } from "./ExportCatalogView";
 import { ContractDossier } from "./ContractDossier";
@@ -101,6 +105,8 @@ import {
   LoadingUploadDialog,
   ScheduleDialog,
   ShipmentFormDialog,
+  MergeShipmentDialog,
+  type MergeShipmentTarget,
   StepItemDialog,
   type LoadingUploadTarget,
   type ScheduleTarget,
@@ -127,6 +133,9 @@ const KIND_FROM_TEXT = (t: string): ExportShipmentKind => {
   if (x.includes("20")) return "20RF";
   return "40RF";
 };
+
+/** So cont thêm trước / sau khi sửa chuyến (ba-spec 73) — đổi mới ghi bảng cont. */
+const containerSnap = (c: ExportShipmentContainer) => [c.id, c.sortOrder, c.kind, c.containerNo, c.sealNo, c.loadingDate, c.note];
 
 export default function ExportPlanningScreen() {
   const today = todayIso();
@@ -416,7 +425,39 @@ export default function ExportPlanningScreen() {
     return true;
   };
 
-  const saveShipment = (s: ExportShipment, isNew: boolean, bookingFiles: ExportFile[] = []): boolean => {
+  /* ---------- ba-spec 73 R13: gộp chuyến thành cont thêm ---------- */
+  const [mergeTarget, setMergeTarget] = useState<MergeShipmentTarget | null>(null);
+  const mergeCandidates = (from: ExportShipment) => d.shipments.filter((s) => mergeShipmentGate(d, s, from).ok);
+  const openMerge = (from: ExportShipment) =>
+    setMergeTarget({ from, fromLabel: `Chuyến ${shipName(from)}`, candidates: mergeCandidates(from).map((s) => ({ shipment: s, label: `${goodsLabel(s)}${s.loadingDate ? ` · đóng ${formatDateVN(s.loadingDate)}` : ""}` })) });
+  const confirmMerge = (into: ExportShipment) => {
+    const from = mergeTarget?.from;
+    if (!from || !mergeShipmentGate(d, into, from).ok) {
+      notify.error("Không gộp được — chuyến đã có file hoặc bước đã xong, hoặc khác booking / hợp đồng.");
+      return;
+    }
+    const prev = { shipments: d.shipments, items: d.items, lines: d.shipmentLines ?? [], conts: d.shipmentContainers ?? [] };
+    const out = mergeShipmentInto(d, into, from, newId(), new Date().toISOString());
+    if (!store.saveShipmentContainers(out.shipmentContainers)) return;
+    store.saveShipmentLines(out.shipmentLines);
+    store.saveItems(out.items);
+    store.saveShipments(out.shipments);
+    const what = `Gộp chuyến ${shipName(from)} vào chuyến ${shipName(into)} làm cont thêm (${from.kind})`;
+    track(into.contractId, into.id, "update", what);
+    notify.saved(
+      "Đã gộp làm cont thêm",
+      undoTracked(into.contractId, into.id, what, () => {
+        store.saveShipments(prev.shipments);
+        store.saveItems(prev.items);
+        store.saveShipmentLines(prev.lines);
+        store.saveShipmentContainers(prev.conts);
+      }),
+    );
+    setMergeTarget(null);
+    setParam({ shipment: into.id }, true);
+  };
+
+  const saveShipment = (s: ExportShipment, isNew: boolean, bookingFiles: ExportFile[] = [], extras: ExportShipmentContainer[] | null = null): boolean => {
     // Ghi chuyến MỚI chỉ sau khi HĐ đã duyệt + đủ hồ sơ (mig 0079) — nút đã ẩn, chặn thêm ở đây.
     const gate = shipmentGate(d, s.contractId, opts);
     if (isNew && !gate.ok) {
@@ -426,8 +467,13 @@ export default function ExportPlanningScreen() {
     const prevS = d.shipments;
     const prevI = d.items;
     const prevF = d.files;
+    const prevC = d.shipmentContainers ?? [];
     const nextS = isNew ? [...prevS, s] : prevS.map((x) => (x.id === s.id ? s : x));
     if (!store.saveShipments(nextS)) return false;
+    // Cont thêm (ba-spec 73): thay trọn danh sách cont thêm của chuyến — cùng lần lưu, cùng Hoàn tác.
+    const ownBefore = prevC.filter((c) => c.shipmentId === s.id);
+    const extrasChanged = extras !== null && JSON.stringify(ownBefore.map(containerSnap)) !== JSON.stringify(extras.map(containerSnap));
+    if (extrasChanged) store.saveShipmentContainers([...prevC.filter((c) => c.shipmentId !== s.id), ...extras]);
     // File booking chọn trong hộp ghi chuyến (ba-spec 60 NV1) — cùng lần lưu, cùng Hoàn tác.
     if (bookingFiles.length) store.saveFiles([...prevF, ...bookingFiles]);
     if (isNew) {
@@ -436,7 +482,8 @@ export default function ExportPlanningScreen() {
     }
     const what =
       (isNew ? `Ghi chuyến ${shipName(s)} — tháng ${shipmentMonth(s).split("-").reverse().join("/")}` : `Sửa chuyến ${shipName(s)}`) +
-      (bookingFiles.length ? ` · đính ${bookingFiles.length} file booking: ${bookingFiles.map((f) => f.fileName).join(", ")}` : "");
+      (bookingFiles.length ? ` · đính ${bookingFiles.length} file booking: ${bookingFiles.map((f) => f.fileName).join(", ")}` : "") +
+      (extrasChanged ? ` · ${(extras?.length ?? 0) + 1} cont (${[s.kind, ...(extras ?? []).map((c) => c.kind)].join(" + ")})` : "");
     track(s.contractId, s.id, isNew ? "create" : "update", what);
     notify.saved(
       isNew ? `Đã ghi chuyến${s.lotCode ? ` lô ${s.lotCode}` : ""} — tháng ${shipmentMonth(s).split("-").reverse().join("/")}` : "Đã lưu chuyến",
@@ -444,6 +491,7 @@ export default function ExportPlanningScreen() {
         store.saveShipments(prevS);
         store.saveItems(prevI);
         if (bookingFiles.length) store.saveFiles(prevF);
+        if (extrasChanged) store.saveShipmentContainers(prevC);
       }),
     );
     setShipmentTarget(null);
@@ -480,7 +528,8 @@ export default function ExportPlanningScreen() {
 
   /* ---------- Hàng của chuyến · số thực đóng · tải invoice (ba-spec 63) ---------- */
 
-  const goodsLabel = (s: ExportShipment) => [s.lotCode && `Lô ${s.lotCode}`, shipmentKindLabel(s.kind), s.containerNo].filter(Boolean).join(" · ") || "Chuyến chưa có mã lô";
+  const goodsLabel = (s: ExportShipment) =>
+    [s.lotCode && `Lô ${s.lotCode}`, isMultiContainer(d, s) ? shipmentContainerSummary(d, s) : shipmentKindLabel(s.kind), s.containerNo].filter(Boolean).join(" · ") || "Chuyến chưa có mã lô";
 
   const openShipmentLines = (s: ExportShipment) => {
     // Σ kiện các chuyến KHÁC theo id dòng HĐ — kể cả chuyến gộp của HĐ chính khác (ba-spec 70: id dòng HĐ không trùng giữa các HĐ).
@@ -494,7 +543,9 @@ export default function ExportPlanningScreen() {
     const group = (c: ExportContract | undefined, id: string) => ({ contractId: id, contractNo: c?.contractNo ?? "", lines: workingRevision(d, id)?.lines ?? [] });
     const groups = shipmentContractIds(d, s).map((id) => group(d.contracts.find((c) => c.id === id), id));
     const addable = addableContracts(d, s, opts).map((c) => group(c, c.id));
-    setLinesTarget({ shipment: s, label: goodsLabel(s), groups, addable, lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), otherShipmentUnits: other });
+    // ba-spec 73: cont của chuyến (máy chủ đã chạy 0106) — ≥ 2 cont thì mỗi dòng chọn cont.
+    const containers = store.containersAvailable ? shipmentContainers(d, s).map((c) => ({ id: c.id, label: containerLabel(c) })) : undefined;
+    setLinesTarget({ shipment: s, label: goodsLabel(s), groups, addable, lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), otherShipmentUnits: other, containers });
   };
 
   const saveShipmentLines = (s: ExportShipment, lines: ExportShipmentLine[]): boolean => {
@@ -508,7 +559,14 @@ export default function ExportPlanningScreen() {
   };
 
   const openLoadingCount = (s: ExportShipment) =>
-    setCountTarget({ shipment: s, label: goodsLabel(s), lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), contractLines: shipmentContractLines(d, s), lineContract: lineContractOf(d, s) });
+    setCountTarget({
+      shipment: s,
+      label: goodsLabel(s),
+      lines: shipmentLinesOf(d.shipmentLines ?? [], s.id),
+      contractLines: shipmentContractLines(d, s),
+      lineContract: lineContractOf(d, s),
+      containers: shipmentContainers(d, s),
+    });
 
   /** Đóng cont điền số thực đóng: cập nhật dòng đã có, thêm dòng mới lấy từ dòng HĐ (mig 0098). */
   const saveLoadingCount = (s: ExportShipment, lines: ExportShipmentLine[]): boolean => {
@@ -794,6 +852,9 @@ export default function ExportPlanningScreen() {
       contractLines: contractLinesOfShipment(s),
       shipmentLines: d.shipmentLines ?? [],
       label: goodsLabel(s),
+      containers: shipmentContainers(d, s),
+      // Người nhận hàng + Notify ghi ở HĐ (Phòng KH 2026-11-05).
+      parties: { consignee: termsOf(d, s.contractId).consignee, notifyParty: termsOf(d, s.contractId).notifyParty },
     });
 
   /** ba-spec 58: máy chủ đã chạy 0093 thì mới cho ghi "bổ sung sau" (chưa có cột ⇒ gửi lên kẹt hàng chờ). */
@@ -804,21 +865,34 @@ export default function ExportPlanningScreen() {
   const bookingDetailsEnabled = useExportBookingDetailsAvailable();
 
   /** Cập nhật booking (ba-spec 71 NV2): ghi chuyến + file booking mới cùng một lần, cùng Hoàn tác. */
-  const saveBooking = (s: ExportShipment, files: ExportFile[], readFrom: string): boolean => {
+  const saveBooking = (s: ExportShipment, files: ExportFile[], readFrom: string, addKinds: ExportContainerKind[] = []): boolean => {
     const prevS = d.shipments;
     const prevF = d.files;
+    const prevC = d.shipmentContainers ?? [];
     if (!store.saveShipments(prevS.map((x) => (x.id === s.id ? s : x)))) return false;
     if (files.length) store.saveFiles([...prevF, ...files]);
+    // ba-spec 73 R14: booking nhiều cont, người dùng chọn Có ⇒ thêm cont thêm (chưa có số / seal) sau các cont đang có.
+    if (addKinds.length) {
+      const own = prevC.filter((c) => c.shipmentId === s.id);
+      const start = own.reduce((m, c) => Math.max(m, c.sortOrder), 0);
+      const now = new Date().toISOString();
+      store.saveShipmentContainers([
+        ...prevC,
+        ...addKinds.map((kind, i) => ({ id: newId(), shipmentId: s.id, sortOrder: start + i + 1, kind, containerNo: "", sealNo: "", loadingDate: "", note: "", createdAt: now })),
+      ]);
+    }
     const what =
       `Cập nhật booking chuyến ${shipName(s)}` +
       (readFrom ? ` — đọc từ file ${readFrom}` : "") +
-      (files.length ? ` · đính ${files.length} file booking: ${files.map((f) => f.fileName).join(", ")}` : "");
+      (files.length ? ` · đính ${files.length} file booking: ${files.map((f) => f.fileName).join(", ")}` : "") +
+      (addKinds.length ? ` · thêm ${addKinds.length} cont theo booking (${addKinds.join(" + ")})` : "");
     track(s.contractId, s.id, files.length ? "attach" : "update", what);
     notify.saved(
       "Đã lưu thông tin booking",
       undoTracked(s.contractId, s.id, what, () => {
         store.saveShipments(prevS);
         if (files.length) store.saveFiles(prevF);
+        if (addKinds.length) store.saveShipmentContainers(prevC);
       }),
     );
     setBookingTarget(null);
@@ -994,6 +1068,7 @@ export default function ExportPlanningScreen() {
           onCount={openLoadingCount}
           extraPhotosEnabled={extraPhotosAvailable}
           containerPhotosEnabled={!!d.shippingInstructionEnabled}
+          shipmentContainers={d.shipmentContainers ?? []}
         />
         <LoadingUploadDialog target={loadingTarget} recordedBy={recordedBy} onClose={() => setLoadingTarget(null)} onSave={saveLoadingFiles} />
         <LoadingCountDialog target={countTarget} recordedBy={recordedBy} onClose={() => setCountTarget(null)} onSave={saveLoadingCount} />
@@ -1206,7 +1281,17 @@ export default function ExportPlanningScreen() {
               }}
               filesAvailable={filesAvailable}
               canDeleteShipment={canDeleteShipment(d, dossier.selected.id)}
-              onEdit={() => dossier.selected && setShipmentTarget({ contractId: contract.id, contractNo: contract.contractNo, existing: dossier.selected, defaults: shipmentDefaults(contract) })}
+              onEdit={() =>
+                dossier.selected &&
+                setShipmentTarget({
+                  contractId: contract.id,
+                  contractNo: contract.contractNo,
+                  existing: dossier.selected,
+                  defaults: shipmentDefaults(contract),
+                  extraContainers: extraContainersOf(d, dossier.selected),
+                  shipmentLines: shipmentLinesOf(d.shipmentLines ?? [], dossier.selected.id),
+                })
+              }
               onCancel={() => {
                 const s = dossier.selected;
                 if (!s) return;
@@ -1220,6 +1305,7 @@ export default function ExportPlanningScreen() {
               }}
               onRestore={() => dossier.selected && doRestoreShipment(dossier.selected)}
               onDelete={() => dossier.selected && setDeletingShipment(dossier.selected)}
+              onMerge={dossier.selected && store.containersAvailable && mergeCandidates(dossier.selected).length ? () => dossier.selected && openMerge(dossier.selected) : undefined}
               onOpenItem={setItemTarget}
               onUploadLoading={setLoadingTarget}
               bookingFilesEnabled={bookingFilesEnabled}
@@ -1269,8 +1355,18 @@ export default function ExportPlanningScreen() {
         recordedBy={recordedBy}
         bookingFilesEnabled={bookingFilesEnabled}
         bookingDetailsEnabled={bookingDetailsEnabled}
+        containersEnabled={store.containersAvailable}
       />
-      <BookingDialog target={bookingTarget} recordedBy={recordedBy} filesEnabled={bookingFilesEnabled} onClose={() => setBookingTarget(null)} onSave={saveBooking} />
+      <MergeShipmentDialog target={mergeTarget} onClose={() => setMergeTarget(null)} onConfirm={confirmMerge} />
+      <BookingDialog
+        target={bookingTarget}
+        recordedBy={recordedBy}
+        filesEnabled={bookingFilesEnabled}
+        containersEnabled={store.containersAvailable}
+        existingExtras={bookingTarget ? extraContainersOf(d, bookingTarget.shipment).length : 0}
+        onClose={() => setBookingTarget(null)}
+        onSave={saveBooking}
+      />
       <TransportDialog target={transportTarget} onClose={() => setTransportTarget(null)} onSave={saveTransport} />
       <ShippingInstructionDialog target={siTarget} by={recordedBy} onClose={() => setSiTarget(null)} onExported={saveShippingInstructionFile} />
       <ScheduleDialog target={scheduleTarget} onClose={() => setScheduleTarget(null)} onSave={saveSchedule} />

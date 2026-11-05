@@ -37,7 +37,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Lập hợp đồng",
     needs: ["export-plans", "create"],
     actors: KH,
-    text: "Chọn Lập hợp đồng, nhập đúng như bản giấy: khách (kèm địa chỉ — dùng làm Consignee của SI), dòng hàng, giá, điều kiện giao, hạn giao, hạn hợp đồng (ngày hết hiệu lực, không bắt buộc; hiện ở cột Hạn HĐ của tab Hợp đồng kèm Còn n ngày / Đã hết hạn). Có file Word (.docx, .doc) hoặc PDF có chữ thì chọn ở Đọc file hợp đồng: app điền sẵn ô còn trống, ô khác file liệt kê để chọn, không tự lưu, phụ lục đọc được khi Ghi bản sửa; bản scan không đọc, đính làm bằng chứng.",
+    text: "Chọn Lập hợp đồng, nhập đúng như bản giấy: khách (kèm địa chỉ — invoice, packing list ghi theo khách), Người nhận hàng và Notify (tên + địa chỉ — SI và vận đơn ghi theo đây; trống thì lấy khách), dòng hàng, giá, điều kiện giao, hạn giao, hạn hợp đồng (ngày hết hiệu lực, không bắt buộc; hiện ở cột Hạn HĐ của tab Hợp đồng kèm Còn n ngày / Đã hết hạn). Có file Word (.docx, .doc) hoặc PDF có chữ thì chọn ở Đọc file hợp đồng: app điền sẵn ô còn trống, ô khác file liệt kê để chọn, không tự lưu, phụ lục đọc được khi Ghi bản sửa; bản scan không đọc, đính làm bằng chứng.",
     done: "Lưu xong, không cần ai duyệt",
     result: { label: CONTRACT_STATE_LABELS.attaching, tone: "warning" },
   },
@@ -55,7 +55,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Ghi chuyến",
     needs: ["export-plans", "create"],
     actors: KH,
-    text: "Chọn Ghi chuyến cho từng container, xe tải hoặc lô đóng ghép: số lượng, booking (đính kèm file booking được), số cont, ETD.",
+    text: "Chọn Ghi chuyến cho từng booking, xe tải hoặc lô đóng ghép: số lượng, booking (đính kèm file booking được), số cont, ETD. Booking nhiều cont (VD 1X20RF & 1X40RF) thì một chuyến, thêm cont 2, 3… ở khối Cont thêm của Sửa chuyến.",
     done: "Mọi dòng hàng đã có chuyến (còn thiếu thì hiện thẻ Còn … chưa ghi chuyến)",
   },
   {
@@ -80,7 +80,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Hàng của chuyến · invoice",
     needs: ["export-plans", "update"],
     actors: KH,
-    text: "Nhập hàng của chuyến từ dòng hàng hợp đồng (số kiện, kg cả bì, hạn dùng); cont chở hàng của nhiều hợp đồng cùng khách thì thêm hàng của hợp đồng đó vào cùng chuyến, mỗi hợp đồng tự tính đã giao theo dòng của mình. Ở mục Commercial Invoice chọn tài khoản nhận tiền, gõ Số B/L nếu cần, sửa đơn giá, thêm thông tin riêng của khách rồi tải file Invoice · Packing list; mục Packing List có nút Tạo file Packing list từ invoice (gross theo SI; chuyến gộp: mỗi dòng ghi số hợp đồng gốc).",
+    text: "Nhập hàng của chuyến từ dòng hàng hợp đồng (số kiện, kg cả bì, hạn dùng); cont chở hàng của nhiều hợp đồng cùng khách thì thêm hàng của hợp đồng đó vào cùng chuyến, mỗi hợp đồng tự tính đã giao theo dòng của mình. Ở mục Commercial Invoice chọn tài khoản nhận tiền, sửa Tên / Địa chỉ bên mua nếu chuyến này cần ghi khác khách hàng của hợp đồng (Lấy theo hợp đồng để bỏ phần sửa), gõ Số B/L nếu cần, sửa đơn giá, thêm thông tin riêng của khách rồi tải file Invoice · Packing list; mục Packing List có nút Tạo file Packing list từ invoice (gross theo SI; chuyến gộp: mỗi dòng ghi số hợp đồng gốc).",
     done: "Ô tổng trống tự điền theo invoice lập",
   },
   {
@@ -186,8 +186,18 @@ export const exportPlanningGuide: PageGuide = {
             <b>Ảnh cont / seal</b>: đính ở hàng Số cont + seal (người đóng hàng cũng đính được). Bắt buộc: có số cont, seal và ít nhất 1 ảnh thì hàng mới Xong (đóng ghép không cần).
           </li>
           <li>
+            <b>Chuyến nhiều cont</b> (một booking, VD 40HC-RF + 20RF): cont 1 là Loại chuyến + Số container của chuyến, cont 2, 3… thêm ở
+            khối <b>Cont thêm</b> khi Sửa chuyến; Cập nhật booking đọc được nhiều cont thì hỏi có thêm cont không. Trong Nhập hàng của chuyến
+            mỗi dòng chọn <b>Đi cont</b>, dòng đi hai cont thì <b>Chia sang cont khác</b>; bộ phận đóng cont thấy hàng theo từng cont và không
+            đổi được cont của dòng. Hàng Số cont + seal mỗi cont một dòng, một nút ảnh; Xong khi <b>mọi</b> cont có số, seal và ảnh. Lệnh
+            xuất ghi "1 x 40HC-RF + 1 x 20RF", invoice kê mọi số cont / seal, packing list nhóm hàng theo cont, SI mỗi cont một dòng. Lịch đã
+            chia 2 chuyến mà booking ra một lần: ở chuyến chưa làm chọn <b>Gộp làm cont thêm</b>. Khách đòi chứng từ riêng từng cont thì giữ
+            nhiều chuyến cùng booking, chứng từ dùng chung.
+          </li>
+          <li>
             <b>SI</b>: mục bắt buộc của chuyến cont lạnh, ngay sau Số cont + seal. Lập SI tự điền ô theo booking, cont / seal, hàng của chuyến; ô của
-            khách (consignee, notify, loại B/L, cước) nhớ theo SI lần trước. Xuất Excel là Xong. Xe tải, đóng ghép:
+            khách (loại B/L, cước…) nhớ theo SI lần trước; Consignee và Notify lấy theo Người nhận hàng / Notify của hợp đồng, sửa tay được, nút
+            Lấy theo hợp đồng điền lại. Hãng tàu ra vận đơn theo SI. Xuất Excel là Xong. Xe tải, đóng ghép:
             Không áp dụng. Chuyến tạo trước 05/11/2026 đã có B/L hoặc đã xong các mục đóng cont cũ cũng Không áp dụng (hàng SI ghi lý
             do) nhưng vẫn lập SI được — lập xong là Xong.
           </li>

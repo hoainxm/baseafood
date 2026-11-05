@@ -1340,6 +1340,18 @@ export interface ExportContractTerms {
   containerCount: number | null;
   containerType: string;
   requiredDocuments: ExportRequiredDocument[];
+  /**
+   * Người nhận hàng (Consignee) và Notify party của HĐ (Phòng KH 2026-11-05) — SI (và vận đơn hãng tàu ra theo SI) lấy
+   * theo đây; invoice / packing list lấy theo khách hàng. JSON trong terms ⇒ không cần cột. Thiếu ⇒ chưa ghi.
+   */
+  consignee?: ExportParty;
+  notifyParty?: ExportParty;
+}
+
+/** Một bên trên chứng từ: tên + địa chỉ (nhiều dòng). */
+export interface ExportParty {
+  name: string;
+  address: string;
 }
 
 /** Hợp đồng — danh tính + trạng thái lưu tay (hủy / đóng tay). Duyệt, khép tự suy (lib/exportPlanning.ts). */
@@ -1512,6 +1524,31 @@ export interface ExportShipmentLine {
   /** Hạn dùng in ở Expiry date list, VD "2028.01". */
   expiry: string;
   note: string;
+  /**
+   * Cont của dòng (mig 0106, ba-spec 73 R4): id cont THÊM của chuyến (`ExportShipmentContainer.id`), "" = cont 1.
+   * `undefined` = máy chủ chưa có cột ⇒ không gửi (dòng vẫn thuộc cont 1).
+   */
+  containerId?: string;
+}
+
+/** Loại cont lạnh của một cont thêm (ba-spec 73 R2). */
+export type ExportContainerKind = "20RF" | "40RF" | "40HC-RF";
+
+/**
+ * Cont THÊM của một chuyến (mig 0106, ba-spec 73 R1) — cont 2…n. Cont 1 vẫn là `kind` / `containerNo` / `sealNo`
+ * của `ExportShipment` (chuyến cũ chạy y nguyên). Liên kết mềm tới chuyến.
+ */
+export interface ExportShipmentContainer {
+  id: string;
+  shipmentId: string;
+  sortOrder: number;
+  kind: ExportContainerKind;
+  containerNo: string;
+  sealNo: string;
+  /** Ngày đóng của cont này — "" = theo ngày đóng của chuyến. */
+  loadingDate: string;
+  note: string;
+  createdAt: string;
 }
 
 /** Phần lập invoice của mục Commercial Invoice (mig 0096) — người đóng hàng không đọc được. */
@@ -1528,6 +1565,9 @@ export interface InvoiceComposition {
   specialNotes: string;
   /** Số B/L in trên invoice (Phòng KH 2026-11-04: tự gõ). Trống ⇒ số ở mục Bill of Lading của chuyến. */
   blNo?: string;
+  /** Bên mua in trên invoice / packing list, sửa tay cho chuyến này (Phòng KH 2026-11-05). Trống ⇒ khách hàng của HĐ. */
+  buyerName?: string;
+  buyerAddress?: string;
 }
 
 /** Bước / mục của chuyến (bước 2 → 5). Bước 1 theo hợp đồng, bước 6 = tiền về (bảng riêng). */
@@ -1601,6 +1641,8 @@ export interface ExportFile {
   caption: string;
   uploadedBy: string;
   createdAt: string;
+  /** Ảnh cont / seal của cont nào (mig 0106, ba-spec 73 R6): id cont thêm, "" / thiếu = cont 1. */
+  containerId?: string;
 }
 
 /** Loại thao tác trong nhật ký hợp đồng (mig 0079). */

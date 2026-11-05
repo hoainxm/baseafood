@@ -19,6 +19,7 @@ import { formatDateTimeVN, formatDateVN, num } from "../format";
 import { safeFileName } from "../documents";
 import { expiryDate, formatProductionDates, lineCartons, orderLineKg } from "../productionOrder";
 import { shipmentKindLabel } from "../exportPlanning";
+import { containerQuantityText, linesByContainer, type ContainerView } from "../exportContainers";
 import { builtinTemplateId, sumColumn, type DocumentField, type DocumentTypeDef } from "../documentComposer";
 import { longDateText } from "./productionOrderForm";
 
@@ -34,10 +35,14 @@ export interface ExportOrderRow {
   productionDates: string;
   expiry: string;
   hsCode: string;
+  /** Chuyến nhiều cont (ba-spec 73 R5): nhãn cont của dòng, VD "Cont 2 · 20RF". Chuyến một cont ⇒ không có. */
+  container?: string;
 }
 
 export interface ExportOrderFormSource {
   shipment: ExportShipment;
+  /** Loại của mọi cont trên chuyến (ba-spec 73 R7) — bỏ trống ⇒ chỉ cont của chuyến. */
+  containerKinds?: readonly string[];
   contractNo: string;
   customerName: string;
   rows: readonly ExportOrderRow[];
@@ -57,12 +62,43 @@ export function buildExportOrderLines(input: {
   orderLines: readonly ProductionOrderLine[];
   contractLines: readonly ExportContractLine[];
   shipmentLines: readonly ExportShipmentLine[];
+  /** Cont của chuyến (ba-spec 73). ≥ 2 cont ⇒ bảng hàng dựng theo từng cont, mỗi dòng mang nhãn cont. */
+  containers?: readonly ContainerView[];
 }): { rows: ExportOrderRow[]; notices: string[] } {
+  const shipLines = input.shipmentLines.filter((l) => l.shipmentId === input.shipment.id).sort((a, b) => a.sortOrder - b.sortOrder);
+  const containers = input.containers ?? [];
+  if (containers.length < 2) return buildOrderLinesFor(input, shipLines, null);
+  const contractOf = (l: ExportShipmentLine) => l.contractId || input.shipment.contractId;
+  const rows: ExportOrderRow[] = [];
+  const notices: string[] = [];
+  const groups = linesByContainer(containers, shipLines);
+  // HĐ chưa có dòng nào trên chuyến (chỉ có LSX) ⇒ dựng ở cont 1, như chuyến một cont.
+  const withGoods = new Set(shipLines.map(contractOf));
+  groups.forEach(({ container, lines }, i) => {
+    if (!lines.length && i > 0) return;
+    const built = buildOrderLinesFor(input, lines, i === 0 ? null : withGoods);
+    const label = `Cont ${container.no} · ${container.kind}`;
+    rows.push(...built.rows.map((r) => ({ ...r, container: label })));
+    for (const n of built.notices) if (!notices.includes(n)) notices.push(n);
+  });
+  return { rows, notices };
+}
+
+/** Dòng Lệnh xuất cho một nhóm Hàng của chuyến. `onlyWithGoods` ⇒ chỉ xét HĐ có dòng trong nhóm (cont 2…n). */
+function buildOrderLinesFor(
+  input: Parameters<typeof buildExportOrderLines>[0],
+  shipLines: readonly ExportShipmentLine[],
+  onlyWithGoods: ReadonlySet<string> | null,
+): { rows: ExportOrderRow[]; notices: string[] } {
   const byLine = new Map(input.contractLines.map((l) => [l.id, l]));
   const issued = input.orders.filter((o) => o.status === "issued");
-  const shipLines = input.shipmentLines.filter((l) => l.shipmentId === input.shipment.id).sort((a, b) => a.sortOrder - b.sortOrder);
   const contractOf = (l: ExportShipmentLine) => l.contractId || input.shipment.contractId;
-  const contractIds = [...new Set([input.shipment.contractId, ...shipLines.map(contractOf), ...issued.map((o) => o.contractId)])];
+  const all = [...new Set([input.shipment.contractId, ...shipLines.map(contractOf), ...issued.map((o) => o.contractId)])];
+  const inGroup = new Set(shipLines.map(contractOf));
+  // Cont 1 của chuyến nhiều cont: HĐ có hàng ở cont khác mà không có ở cont 1 ⇒ không dựng ở đây.
+  const contractIds = onlyWithGoods
+    ? all.filter((id) => inGroup.has(id))
+    : all.filter((id) => inGroup.has(id) || !(input.containers && input.containers.length > 1 && input.shipmentLines.some((l) => l.shipmentId === input.shipment.id && contractOf(l) === id)));
   const shipCartons = (l: ExportShipmentLine): number | null => {
     const units = l.loadedUnits ?? l.plannedUnits;
     return units == null ? null : l.unitKind === "bundle" ? units * Math.max(1, l.cartonsPerUnit || 1) : units;
@@ -191,13 +227,14 @@ export const EXPORT_ORDER_FIELDS: readonly DocumentField[] = [
 const CONTAINER_TEXT: Partial<Record<ExportShipment["kind"], string>> = { "20RF": "20RF", "40RF": "40RF", "40HC-RF": "40HC-RF" };
 
 /** Ô có ánh xạ (R2–R4): dòng hàng + thông tin giao hàng theo chuyến / booking lúc soạn. */
-export function exportOrderSourceValues({ shipment: s, rows }: ExportOrderFormSource, today = ""): DocumentValues {
+export function exportOrderSourceValues({ shipment: s, rows, containerKinds }: ExportOrderFormSource, today = ""): DocumentValues {
   const b = s.booking;
   const lines: DocumentRow[] = rows.map((r) => ({ ...r }));
   return {
     orderDate: today,
     lines,
-    containers: CONTAINER_TEXT[s.kind] ? `1 x ${CONTAINER_TEXT[s.kind]}` : shipmentKindLabel(s.kind),
+    // ba-spec 73 R7: chuyến nhiều cont ⇒ "1 x 40HC-RF + 1 x 20RF".
+    containers: containerKinds && containerKinds.length > 1 ? containerQuantityText(containerKinds) : CONTAINER_TEXT[s.kind] ? `1 x ${CONTAINER_TEXT[s.kind]}` : shipmentKindLabel(s.kind),
     loadingDate: s.loadingDate,
     docCutoff: b?.docCutoff ? formatDateTimeVN(b.docCutoff) : "",
     vgmCutoff: b?.vgmCutoff ? formatDateTimeVN(b.vgmCutoff) : "",
@@ -232,7 +269,8 @@ export function exportOrderTemplateData(values: DocumentValues): Record<string, 
     ...Object.fromEntries(["containers", "docCutoff", "vgmCutoff", "dischargePort", "cargoCutoff", "etd", "eta"].map((k) => [k, dots(str(values[k]))])),
     lines: rows.map((r, i) => ({
       stt: String(i + 1),
-      productName: str(r.productName),
+      // ba-spec 73 R5: chuyến nhiều cont ⇒ tên hàng mở đầu bằng nhãn cont của dòng.
+      productName: str(r.container) ? `[${str(r.container)}] ${str(r.productName)}` : str(r.productName),
       size: str(r.size),
       quantity: [numText(r.cartons) && `${numText(r.cartons)} thùng`, numText(r.kg) && `${numText(r.kg)} kg`].filter(Boolean).join(" / "),
       lotCode: str(r.lotCode),

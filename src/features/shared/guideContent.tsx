@@ -479,7 +479,8 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
           </li>
           <li>
             Tab <b>Khách hàng</b>: nút <b>Tên hàng</b> ở mỗi khách mở bảng <b>Tên hàng trên chứng từ</b> — tên, size, quy cách,
-            mã HS khách dùng; <b>Trích xuất từ chứng từ</b> lấy thêm tên còn thiếu từ hợp đồng và invoice (không ghi đè).
+            mã HS khách dùng; <b>Trích xuất từ chứng từ</b> lấy thêm tên còn thiếu từ hợp đồng và invoice (không ghi đè). Ô{" "}
+            <b>Thị trường</b>: chọn trong danh sách (gồm cả thị trường các khách đang dùng); chưa có thì gõ tên rồi chọn <b>Thêm mới</b>.
           </li>
           <li><b>Bột tẩm</b> là phụ gia, không cộng vào kg thành phẩm. <b>Kho lưu trữ</b> gồm kho nhà và kho thuê ngoài.</li>
           <li>

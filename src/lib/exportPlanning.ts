@@ -8,11 +8,13 @@
 // Oracle: docs/app-map/41-export-planning.ba-spec.md (R1…R15, AC-1…AC-29). Hàm THUẦN — màn chỉ
 // gọi, không tự tính lại. Đổi luật ⇒ sửa test cùng thư mục (exportPlanning.test.ts).
 import { formatDateVN } from "./format";
+import { containerCountOf, filesOfContainer, isContainerKind, shipmentContainers } from "./exportContainers";
 import type {
   AttachmentDeferral,
   Customer,
   ExportContract,
   ExportShipmentLine,
+  ExportShipmentContainer,
   ExportActivity,
   ExportContractApproval,
   ExportContractAttachmentKind,
@@ -56,8 +58,7 @@ export const SHIPMENT_KINDS: { value: ExportShipmentKind; label: string; short: 
 ];
 export const shipmentKindLabel = (k: ExportShipmentKind) => SHIPMENT_KINDS.find((x) => x.value === k)?.label ?? k;
 const shipmentKindShort = (k: ExportShipmentKind) => SHIPMENT_KINDS.find((x) => x.value === k)?.short ?? k;
-/** Chuyến đi bằng container riêng (đếm vào số cont của HĐ, cần số cont + seal). */
-export const isContainerKind = (k: ExportShipmentKind) => k !== "truck" && k !== "consolidated";
+export { isContainerKind };
 
 /** 10 loại chứng từ HỆ THỐNG (luật riêng gắn theo id). Tên hiển thị đổi được ở danh mục (mig 0081). */
 export const DOCUMENT_KINDS: { value: SystemExportDocumentKind; label: string }[] = [
@@ -251,6 +252,8 @@ export interface ExportData {
   issuedOrderShipmentIds?: ReadonlySet<string>;
   /** Hàng của chuyến (mig 0096, ba-spec 63). Bỏ trống ⇒ chuyến chưa có dòng hàng chi tiết. */
   shipmentLines?: readonly ExportShipmentLine[];
+  /** Cont THÊM của chuyến (mig 0106, ba-spec 73). Bỏ trống ⇒ mỗi chuyến chỉ có cont 1 (trên chuyến). */
+  shipmentContainers?: readonly ExportShipmentContainer[];
   /** Máy chủ đã chạy 0103 (ba-spec 72) ⇒ mục SI là mục bắt buộc của bước 4. Bỏ trống ⇒ chưa có mục SI. */
   shippingInstructionEnabled?: boolean;
 }
@@ -500,6 +503,25 @@ export function validateShipment(
     out.push({ key: "loadingAfterEtd", label: "Ngày đóng cont", message: "Ngày đóng cont phải trước hoặc bằng ETD" });
   if (s.etd && s.eta && s.etd > s.eta) out.push({ key: "etdAfterEta", label: "ETA", message: "ETA phải sau hoặc bằng ETD" });
   if (s.plannedKg != null && s.plannedKg < 0) out.push({ key: "plannedKg", label: "Kg kế hoạch", message: "Kg không được âm" });
+  return out;
+}
+
+/**
+ * Cont thêm của chuyến (ba-spec 73 R3): số cont theo luật 11 ký tự (gõ sau cũng được — để trống không lỗi); hai cont
+ * trong một chuyến không trùng số (so cả cont 1). Khóa lỗi `container-<id>` / `container-duplicate`.
+ */
+export function validateExtraContainers(
+  first: Pick<ExportShipment, "containerNo">,
+  extras: readonly Pick<ExportShipmentContainer, "id" | "containerNo">[],
+): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  extras.forEach((c, i) => {
+    if (c.containerNo.trim() && !isValidContainerNo(c.containerNo))
+      out.push({ key: `container-${c.id}`, label: `Số cont ${i + 2}`, message: "Số container gồm 11 ký tự: 4 chữ cái đầu + 7 chữ số (VD SZLU2030326)" });
+  });
+  const nos = [first.containerNo, ...extras.map((c) => c.containerNo)].map(normalizeContainerNo).filter(Boolean);
+  const dup = nos.find((n, i) => nos.indexOf(n) !== i);
+  if (dup) out.push({ key: "container-duplicate", label: "Số cont", message: `Số cont ${dup} ghi hai lần trong một chuyến` });
   return out;
 }
 
@@ -910,7 +932,7 @@ const settled = (st: ExportItemState) => st === "done" || st === "not-applicable
 /** Mốc bắt ảnh cont / seal (ba-spec 72 R8 v1.7, Phòng KH 2026-11-04) — chuyến tạo trước mốc đã đóng xong thì không bắt. */
 export const CONTAINER_SEAL_PHOTO_SINCE = "2026-11-05";
 
-type SealData = Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds" | "shippingInstructionEnabled">;
+type SealData = Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds" | "shippingInstructionEnabled" | "shipmentContainers">;
 
 /**
  * Hàng Số cont + seal phải có ≥ 1 ảnh mới Xong (R8 v1.7). Không bắt: đóng ghép · máy chủ chưa chạy 0103 (chưa đính được
@@ -923,13 +945,22 @@ export function containerSealPhotoRequired(d: SealData, s: ExportShipment): bool
   return !(LOADING_STEPS.every((st) => settled(subStepState(d, s.id, st))) && containerIdentityOk(s));
 }
 
-/** Hàng Số cont + seal (biển số xe): Xong khi đã điền số VÀ (đã đính ảnh hoặc không bắt ảnh). */
+/**
+ * Hàng Số cont + seal (biển số xe): Xong khi đã điền số VÀ (đã đính ảnh hoặc không bắt ảnh). Chuyến nhiều cont
+ * (ba-spec 73 R6): MỌI cont đủ số + seal + (≥ 1 ảnh của cont đó khi bắt ảnh); ảnh không gắn cont = cont 1.
+ */
 export function containerSealState(d: SealData, s: ExportShipment): ExportItemState {
   if (s.kind === "consolidated") return "not-applicable";
-  const filled = containerIdentityOk(s);
-  const photos = shipmentFilesOf(d, s.id, "container-seal-photos").length > 0;
-  if (filled && (photos || !containerSealPhotoRequired(d, s))) return "done";
-  return filled || photos || s.containerNo.trim() || s.sealNo.trim() ? "in-progress" : "not-started";
+  const conts = shipmentContainers(d, s);
+  const photos = shipmentFilesOf(d, s.id, "container-seal-photos");
+  const needPhoto = containerSealPhotoRequired(d, s);
+  const per = conts.map((c) => ({
+    filled: containerIdentityOk({ kind: s.kind === "truck" ? "truck" : c.kind, containerNo: c.containerNo, sealNo: c.sealNo }),
+    photo: filesOfContainer(photos, conts, c.id).length > 0,
+    touched: !!c.containerNo.trim() || !!c.sealNo.trim(),
+  }));
+  if (per.every((c) => c.filled && (c.photo || !needPhoto))) return "done";
+  return per.some((c) => c.filled || c.photo || c.touched) ? "in-progress" : "not-started";
 }
 
 /** Trạng thái một mục con (bước 2, 3, 4a–4d). 4a / 4b tự xong khi có file (R10). */
@@ -1411,7 +1442,8 @@ export function contractCoverage(d: ExportData, contractId: string): Coverage {
   const ships = openShipmentsOf(d, contractId);
   const planned = ships.reduce((t, s) => t + shipmentContractPlannedKg(d, s, contractId), 0);
   const missingKg = Math.max(0, round2(target - planned));
-  const missingContainers = Math.max(0, numOr0(rev.terms.containerCount) - ships.filter((s) => isContainerKind(s.kind)).length);
+  // ba-spec 73 R10: đếm CONT của các chuyến (chuyến nhiều cont đếm đủ), không đếm số chuyến.
+  const missingContainers = Math.max(0, numOr0(rev.terms.containerCount) - ships.reduce((t, s) => t + containerCountOf(d, s), 0));
   return { missingKg, missingContainers, covered: missingKg < EPS && missingContainers === 0 };
 }
 
@@ -1695,6 +1727,60 @@ export function cancelContract(
 export function canDeleteShipment(d: Pick<ExportData, "files" | "items">, shipmentId: string): boolean {
   if (d.files.some((f) => f.shipmentId === shipmentId)) return false;
   return !d.items.some((i) => i.shipmentId === shipmentId && i.state === "done");
+}
+
+/* ---------- ba-spec 73 R13: gộp chuyến thành cont thêm của chuyến khác ---------- */
+
+export type MergeShipmentGate = { ok: true } | { ok: false; reason: "same" | "not-open" | "other-contract" | "not-container" | "has-progress" | "other-booking" };
+
+/** Gộp chuyến `from` vào `into` làm cont thêm: cùng HĐ chính, đều mở, đều cont lạnh, `from` chưa file / chưa bước Xong, booking không khác nhau. */
+export function mergeShipmentGate(d: Pick<ExportData, "files" | "items">, into: ExportShipment, from: ExportShipment): MergeShipmentGate {
+  if (into.id === from.id) return { ok: false, reason: "same" };
+  if (into.status !== "open" || from.status !== "open") return { ok: false, reason: "not-open" };
+  if (into.contractId !== from.contractId) return { ok: false, reason: "other-contract" };
+  if (!isContainerKind(into.kind) || !isContainerKind(from.kind)) return { ok: false, reason: "not-container" };
+  if (!canDeleteShipment(d, from.id)) return { ok: false, reason: "has-progress" };
+  const a = normalizeNo(into.bookingNo);
+  const b = normalizeNo(from.bookingNo);
+  if (a && b && a !== b) return { ok: false, reason: "other-booking" };
+  return { ok: true };
+}
+
+/**
+ * Kết quả gộp (R13): `from` thành cont thêm cuối của `into` (loại, số, seal, ngày đóng của `from`); dòng hàng của `from`
+ * sang `into`, gán cont mới, xếp sau dòng của `into`; chuyến `from` + mục bước của nó bị bỏ. Màn ghi một lần + Hoàn tác.
+ */
+export function mergeShipmentInto(
+  d: Pick<ExportData, "shipments" | "items" | "shipmentLines" | "shipmentContainers">,
+  into: ExportShipment,
+  from: ExportShipment,
+  newContainerId: string,
+  now: string,
+): { shipments: ExportShipment[]; items: ExportStepItem[]; shipmentLines: ExportShipmentLine[]; shipmentContainers: ExportShipmentContainer[] } {
+  const extras = (d.shipmentContainers ?? []).filter((c) => c.shipmentId === into.id);
+  const container: ExportShipmentContainer = {
+    id: newContainerId,
+    shipmentId: into.id,
+    sortOrder: extras.reduce((m, c) => Math.max(m, c.sortOrder), 0) + 1,
+    kind: from.kind === "20RF" || from.kind === "40RF" || from.kind === "40HC-RF" ? from.kind : "20RF",
+    containerNo: from.containerNo,
+    sealNo: from.sealNo,
+    loadingDate: from.loadingDate === into.loadingDate ? "" : from.loadingDate,
+    note: from.note,
+    createdAt: now,
+  };
+  const lines = d.shipmentLines ?? [];
+  const base = lines.filter((l) => l.shipmentId === into.id).reduce((m, l) => Math.max(m, l.sortOrder), 0);
+  return {
+    shipments: d.shipments.filter((s) => s.id !== from.id),
+    items: d.items.filter((i) => i.shipmentId !== from.id),
+    shipmentLines: lines.map((l) => (l.shipmentId === from.id ? { ...l, shipmentId: into.id, containerId: newContainerId, sortOrder: base + 1 + l.sortOrder } : l)),
+    // Cont thêm của `from` (nếu có) đi theo, xếp sau cont mới.
+    shipmentContainers: [
+      ...(d.shipmentContainers ?? []).map((c) => (c.shipmentId === from.id ? { ...c, shipmentId: into.id, sortOrder: container.sortOrder + c.sortOrder } : c)),
+      container,
+    ],
+  };
 }
 
 /* ---------- Tra cứu (NV11) ---------- */

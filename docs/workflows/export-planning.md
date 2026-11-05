@@ -1,10 +1,12 @@
 # Xuất khẩu — sơ đồ workflow
 
 > Load khi: review / kiểm lại trang Xuất khẩu (`/planning-export`), trước khi sửa luật hợp đồng, chuyến, đóng cont, chứng từ. Bản đọc nhanh — luật đầy đủ ở ba-spec [41](../app-map/41-export-planning.ba-spec.md) · [62](../app-map/62-export-option-lists.ba-spec.md) · [63](../app-map/63-export-invoice-from-app.ba-spec.md) · [58](../app-map/58-contract-attachment-deferral.ba-spec.md).
-covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/exportInvoice*.ts, src/lib/exportOptions.ts, src/lib/exportFiles*.ts
+covers: src/features/export-planning/*, src/lib/exportPlanning.ts, src/lib/exportInvoice*.ts, src/lib/exportOptions.ts, src/lib/exportFiles*.ts, src/lib/exportContainers.ts
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
-last_verified: 2026-11-04
+last_verified: 2026-11-05
+<!-- re-verified: 2026-11-05 (Phòng KH) — HĐ có Người nhận hàng + Notify (tên + địa chỉ, JSON terms): SI mới lấy Consignee / Notify theo HĐ (trống ⇒ khách / SI lần trước), nút Lấy theo hợp đồng; invoice + packing list theo khách hàng, sửa tay Bên mua ở phần lập invoice. Sửa lỗi Hạn hợp đồng mất khi tải lại (parseTerms bỏ sót). -->
+<!-- re-verified: 2026-11-05 (ba-spec 73) — chuyến = một booking, có cont thêm (mig 0106): Số cont + seal Xong khi MỌI cont đủ số + seal + ảnh; độ phủ / báo cáo đếm cont; gộp chuyến thành cont thêm; người đóng hàng không đổi cont của dòng. -->
 <!-- re-verified: 2026-11-04 (form HĐ) — nút Dùng file làm Hợp đồng đã ký; địa chỉ khách đọc từ file; kg tự tính khi sửa số lượng / kg mỗi thùng; chọn tay mặt hàng không bị gợi ý đè; Chép dòng ẩn ở dòng trống (trừ dòng 1). -->
 <!-- re-verified: 2026-11-04 (KAISEI 04-26-KMP) — đơn giá 0 vì bản sửa HĐ cấp id dòng mới ⇒ bản sửa giữ id + tự nối hàng của chuyến cũ; cảnh báo invoice ghi đích danh; Packing list gross theo SI, mục PL tự điền số + ngày theo invoice. -->
 <!-- re-verified: 2026-11-04 (ảnh cont / seal bắt buộc) — hàng Số cont + seal Xong khi có số VÀ ≥ 1 ảnh (ba-spec 72 R8 v1.7); chuyến cũ đã đóng xong / đóng ghép / chưa chạy 0103 không bắt. -->
@@ -68,7 +70,7 @@ Hồ sơ chỉ tính theo **loại** (`missingAttachmentKinds`). File ký đính
 | Mở lại HĐ đã đóng | Trưởng / Phó phòng KH | — | |
 
 Mỗi lần lưu, nhật ký Xuất khẩu ghi từng ô đổi **cũ → mới**: Số HĐ, Khách, Ngày ký, Số PO, điều khoản (cảng, thanh toán, hạn giao, dung sai, cont…), dòng hàng thêm / bớt / sửa (`contractChangeSummary`). Bản sửa không lưu riêng số HĐ ⇒ số cũ chỉ còn ở nhật ký.
-## 2. Một chuyến (container) đi qua 6 bước
+## 2. Một chuyến (một booking · một hay nhiều cont) đi qua 6 bước
 
 ```mermaid
 flowchart LR
@@ -114,6 +116,35 @@ Khách như DAIREI ký nhiều HĐ song song (mỗi HĐ một mã hàng, lượn
 Bộ phận đóng cont ghi số thực đóng cho dòng của HĐ phụ đã có trên chuyến (cùng khách) — mig `0102` (CHƯA chạy DB thật; trước khi chạy, máy chủ từ chối dòng mới của HĐ phụ do đóng cont tạo). Đóng cont không tự đưa HĐ mới vào chuyến.
 
 Chưa làm (ba-spec 70): khung giao ETA từ – tới (NL8), lịch gọi hàng của khách (đợt 2).
+
+## 2c. Một chuyến nhiều cont — một booking "1X20RF & 1X40RF" (ba-spec [73](../app-map/73-shipment-multi-container.ba-spec.md), mig `0106`)
+
+Chuyến = **một booking / một lần xuất**. Cont 1 = Loại chuyến + Số container + Seal của chuyến (như cũ); cont 2…n ở bảng `export_shipment_containers`. Chuyến cũ = 1 cont, không đổi gì. Máy chủ chưa chạy 0106 ⇒ ẩn khối Cont thêm, mọi thứ như trước.
+
+```mermaid
+flowchart LR
+  B["Booking 1X20RF & 1X40RF"] --> S["1 chuyến<br/>cont 1: 40HC-RF (trên chuyến)<br/>cont 2: 20RF (Cont thêm)"]
+  S --> H["Hàng của chuyến<br/>mỗi dòng chọn Đi cont"]
+  H --> D["Đóng cont: hàng nhóm theo cont<br/>ảnh seal từng cont"]
+  D --> C["1 bộ chứng từ: invoice kê mọi cont,<br/>PL nhóm theo cont, SI mỗi cont 1 dòng"]
+```
+
+| Việc | Luật | Code |
+|---|---|---|
+| Thêm / bỏ cont | Sửa chuyến → khối **Cont thêm** (chỉ chuyến cont lạnh, loại 20RF / 40RF / 40HC-RF); bỏ cont còn dòng hàng ⇒ chặn, kể dòng; đổi chuyến sang xe tải / đóng ghép khi còn cont thêm ⇒ lỗi | `extraContainersOf` · `removeContainerGate` |
+| Số cont | 11 ký tự (gõ sau được); hai cont trong chuyến không trùng số | `validateExtraContainers` |
+| Booking nhiều cont | Cập nhật booking đọc "1X20RF & 1X40RF" ⇒ hỏi Có / Không thêm cont (cont 1 = loại lớn nhất); Có mới ghi | `bookingContainerKinds` |
+| Dòng hàng | Mỗi dòng một cont (trống = cont 1; cont đã xóa ⇒ cont 1); dòng đi hai cont ⇒ **Chia sang cont khác** | `linesByContainer` · `splitRow` |
+| Số cont + seal | Xong khi **mọi** cont có số hợp lệ + seal + (≥ 1 ảnh của cont đó khi bắt ảnh); ảnh không gắn cont = cont 1 | `containerSealState` · `filesOfContainer` |
+| Lệnh xuất | "1 x 40HC-RF + 1 x 20RF" (cùng loại ⇒ "2 x 40RF"); bảng hàng theo cont, Word ghi [Cont n · loại] trước tên hàng | `containerQuantityText` · `buildExportOrderLines` |
+| Invoice / PL | Đầu trang kê mọi cont; Packing list mỗi cont một nhóm + dòng cộng; cộng các cont == tổng invoice | `buildInvoiceDocument` (`containerTotals`) |
+| SI | Mỗi cont: số, seal, loại, số kiện, gross; 2 cont đầu ở A33–A36, cont thứ 3 trở đi ghi thêm ở A36 / C35 | `siContainerRows` · `fillShippingInstruction` |
+| Độ phủ HĐ, báo cáo | Đếm **cont**, không đếm chuyến | `containerCountOf` · `contractCoverage` · `buildExportReport` |
+| Gộp chuyến | Lịch chia 2 chuyến mà booking ra một lần: chuyến cùng HĐ, chưa file, chưa bước Xong, không khác booking ⇒ **Gộp làm cont thêm** (hàng đi theo, một Hoàn tác) | `mergeShipmentGate` · `mergeShipmentInto` |
+| Đã giao, tiền về, trễ | Không đổi — theo chuyến (invoice), chuyến gộp nhiều HĐ theo dòng | — |
+| Người đóng hàng | Xem cont, điền số thực đóng, đính ảnh từng cont; **không** thêm cont, không đổi cont của dòng (trigger 0106) | `export_shipment_lines_loading_guard` |
+
+Khách đòi invoice / B/L riêng từng cont ⇒ vẫn dùng nhiều chuyến cùng booking + chứng từ **dùng chung** (luật cũ).
 
 ## 3. Số lượng thực đóng → invoice (ba-spec 63 R11, mig 0098)
 
@@ -200,6 +231,8 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 | Tổng quan | Khối Phòng Kế hoạch: số chuyến, trễ hạn, tiền chưa về theo tháng | spec che-do-demo §5b |
 
 ## Lịch sử
+
+- 2026-11-05 — §2c chuyến nhiều cont (ba-spec 73, mig 0106).
 
 - 2026-11-03 — bảng sửa / khóa hợp đồng; Số HĐ đổi được ở Ghi bản sửa (ba-spec 68).
 - 2026-11-03 — tạo (mẫu đầu tiên của bộ sơ đồ workflow, ba-spec 65).

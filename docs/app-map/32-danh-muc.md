@@ -1,6 +1,6 @@
 > Load khi: sửa danh mục (đại lý, loại NL, mặt hàng, khách hàng) hay danh mục 141 mã thành phẩm.
 covers: src/features/catalog/CatalogScreen.tsx, src/features/catalog/CustomerProductNamesDialog.tsx, src/lib/customerProductNames.ts, src/features/catalog/FinishedGoodScreen.tsx, src/data/finished-goods.json, src/design-system/patterns/CatalogCrudModal.tsx, src/lib/catalogRepo.ts, src/features/catalog/catalogConfig.tsx, src/features/catalog/BatterPicker.tsx, src/features/catalog/QuickProductDelete.tsx, src/lib/productUsage.ts
-last_verified: 2026-11-03
+last_verified: 2026-11-05
 <!-- updated: 2026-11-03 — rà UX đợt 1: `CatalogCrud` đặt ô tra (`SearchField`, `matchesSearch`) trong thanh lọc ở mọi tab Danh mục; không còn ô tìm riêng của bảng. Thanh bên: mục tra cứu ghi rõ tra gì ("Tra mặt hàng"…). -->
 <!-- updated: 2026-11-02 — tab **Loại chứng từ** và **Loại hàng** RỜI màn Danh mục, sang tab Danh mục của trang Xuất khẩu (ba-spec [62](62-export-option-lists.ba-spec.md) Q1); `/catalog?tab=document-kinds` · `goods-types` tự chuyển `/planning-export?view=catalog&list=…`. Loại danh mục MỚI `exportOption` ở `catalogConfig.tsx` (+ `exportOptionListConfig` tách theo danh sách) và `useQuickCatalogEdit("exportOption")`. `CatalogCrudFor` tách ra file riêng để trang Xuất khẩu dùng chung. -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): ô lọc nhóm ở Mặt hàng (nhóm loài, kiểu chế biến), Khách (thị trường), Loại NL (nhóm), NCC nhập khẩu (trạng thái, nước). Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->
@@ -88,3 +88,4 @@ Gộp làm một vì ba mục điều hướng cũ có tên gần giống nhau �
 - Bảng `thanh_pham`, `mat_hang`, `dai_ly`, `khach_hang`, `loai_nguyen_lieu`: [03-database.md](03-database.md)
 - Nơi danh mục được tiêu thụ: [30-nhap-hang.md](30-nhap-hang.md) · [31-can-doi-ky.md](31-can-doi-ky.md)
 - Pattern CRUD dùng chung: [`src/design-system/README.md`](../../src/design-system/README.md)
+- 2026-11-05: sửa lỗi ô Thị trường (Sửa thông tin khách hàng): gõ thị trường mới rồi Thêm mới thì ô hiện trống — danh sách chọn chỉ có 6 mục gốc. Nay gồm mục gốc + thị trường các khách đang dùng + giá trị đang chọn (`marketOptions`).

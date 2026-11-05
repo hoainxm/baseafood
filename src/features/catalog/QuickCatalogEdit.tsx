@@ -91,7 +91,9 @@ function QuickEditDialog<K extends CatalogKind>({
     // instance của màn gọi) — ghi qua nó thì màn không thấy và lần ghi kế tiếp của
     // màn sẽ đè mất loại vừa tạo. Ô "Loại nguyên liệu" trong hộp sửa nhanh mặt hàng
     // vì vậy chỉ cho CHỌN; thêm loại mới ở ô loại NL của màn hoặc tab Danh mục.
-    const fields = buildCatalogFields(materialTypes, finishedGoods, batterTypes, addBatter);
+    // Hộp sửa khách: thị trường các khách đang dùng vào danh sách chọn (thêm mới thị trường — lỗi 2026-11-05).
+    const markets = kind === "customer" ? (rows as { market?: string }[]).map((r) => r.market ?? "") : [];
+    const fields = buildCatalogFields(materialTypes, finishedGoods, batterTypes, addBatter, undefined, markets);
     const configs = buildCatalogConfigs(fields, {
       product: emptySource(),
       customer: emptySource(),
@@ -105,7 +107,7 @@ function QuickEditDialog<K extends CatalogKind>({
       exportOption: emptySource(),
     });
     return configs[kind] as unknown as CatalogConfig<T>;
-  }, [kind, materialTypes, finishedGoods, batterTypes, addBatter]);
+  }, [kind, rows, materialTypes, finishedGoods, batterTypes, addBatter]);
 
   const original = rows.find((r) => r.id === id);
   const [editing, setEditing] = useState<T | null>(original ? { ...original } : null);

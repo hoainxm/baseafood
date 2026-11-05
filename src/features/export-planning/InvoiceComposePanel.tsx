@@ -26,7 +26,7 @@ import { useCompanyProfileStore, useComposedDocuments } from "@/lib/catalogRepo"
 import { SHIPPING_INSTRUCTION_DOC } from "@/lib/shippingInstruction";
 import { documentItems, shipmentContractLines, termsOf, type ExportData } from "@/lib/exportPlanning";
 import type { Customer, ExportContract, ExportShipment, ExportStepItem, InvoiceComposition } from "@/types";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, RotateCcw } from "lucide-react";
 import { useExportOptionPicker } from "./exportOptionPicker";
 import { downloadInvoiceDocument, invoiceDocumentFor, type InvoiceFileFormat } from "./invoiceDocument";
 
@@ -129,6 +129,27 @@ export function InvoiceComposePanel({
         </Field>
       </div>
       {bank && <p className="rounded-lg bg-muted px-4 py-2 text-sm whitespace-pre-line">{bankBlockLines(bank).join("\n")}</p>}
+      {/* Phòng KH 2026-11-05: bên mua theo khách hàng của HĐ, sửa tay được cho riêng chuyến này. */}
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 rounded-md border p-3 sm:grid-cols-2" data-tour="invoice-buyer">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 sm:col-span-2">
+          <p className="text-sm">
+            <span className="font-medium">Bên mua (Applicant) trên invoice + packing list</span>
+            <span className="block text-muted-foreground">Theo khách hàng của hợp đồng; sửa ở đây khi chuyến này cần ghi khác.</span>
+          </p>
+          {(comp.buyerName || comp.buyerAddress) && (
+            <Button size="sm" variant="outline" onClick={() => setComp({ buyerName: "", buyerAddress: "" })} title="Bỏ phần sửa tay — ghi lại tên + địa chỉ theo khách hàng của hợp đồng.">
+              <RotateCcw className="mr-1 h-4 w-4" aria-hidden />
+              Lấy theo hợp đồng
+            </Button>
+          )}
+        </div>
+        <Field label="Tên bên mua" hint={`Trống ⇒ "${customer?.name ?? ""}".`}>
+          <Input value={comp.buyerName ?? ""} onChange={(e) => setComp({ buyerName: e.target.value })} />
+        </Field>
+        <Field label="Địa chỉ bên mua" hint="Trống ⇒ địa chỉ khách hàng. Mỗi dòng một hàng.">
+          <Textarea rows={3} value={comp.buyerAddress ?? ""} onChange={(e) => setComp({ buyerAddress: e.target.value })} />
+        </Field>
+      </div>
       <div className="grid gap-2">
         <p className="text-sm font-medium">Đơn giá từng dòng ({currency}/kg) — mặc định theo dòng hàng HĐ</p>
         {lines.map((l) => {

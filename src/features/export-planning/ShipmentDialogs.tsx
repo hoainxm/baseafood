@@ -45,18 +45,20 @@ import {
   requiredDocumentLabel,
   shareCandidates,
   validateShipment,
+  validateExtraContainers,
   workingRevision,
   type ExportData,
   type ScheduleRow,
   validateScheduleRows,
 } from "@/lib/exportPlanning";
+import { CONTAINER_KINDS, removeContainerGate } from "@/lib/exportContainers";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile } from "@/lib/exportFileStorage";
 import { useCompanyProfileStore, useComposedDocuments } from "@/lib/catalogRepo";
 import { companySellerOf } from "@/lib/companyProfile";
 import { invoiceDocumentFor, packingListPdfFile } from "./invoiceDocument";
 import { SHIPPING_INSTRUCTION_DOC, siFromValues, siTotals } from "@/lib/shippingInstruction";
 import { invoiceNameLines } from "@/lib/invoiceReader";
-import type { Customer, CustomerProductName, ExportContractLine, ExportLoadingExtraStep, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentKind, ExportStep, ExportStepItem, Product } from "@/types";
+import type { Customer, CustomerProductName, ExportContractLine, ExportLoadingExtraStep, ExportDocumentKind, ExportFile, ExportItemState, ExportShipment, ExportShipmentContainer, ExportShipmentKind, ExportShipmentLine, ExportContainerKind, ExportStep, ExportStepItem, Product } from "@/types";
 import { CalendarPlus, Camera, ClipboardList, Container, FileText, Plus, Save, Trash2 } from "lucide-react";
 import { FileList, FilePicker, type PreviewTarget } from "./parts";
 import { InvoiceReadPanel, type InvoiceReadState } from "./InvoiceReadPanel";
@@ -89,17 +91,37 @@ export interface ShipmentTarget {
   contractNo: string;
   existing?: ExportShipment;
   defaults: { planMonth: string; portOfDischarge: string; kind: ExportShipmentKind; plannedKg: number | null };
+  /** Cont thêm đang có của chuyến (ba-spec 73) + Hàng của chuyến (để chặn bỏ cont còn dòng). */
+  extraContainers?: readonly ExportShipmentContainer[];
+  shipmentLines?: readonly ExportShipmentLine[];
 }
+
+/** Một cont thêm trong hộp Ghi chuyến (ba-spec 73 NV1). */
+interface ContainerDraft {
+  id: string;
+  kind: ExportContainerKind;
+  containerNo: string;
+  sealNo: string;
+  loadingDate: string;
+  note: string;
+  createdAt: string;
+}
+const CONTAINER_KIND_OPTIONS = CONTAINER_KINDS.map((k) => ({ value: k, label: k }));
 
 interface ShipmentForm extends Omit<ExportShipment, "createdAt" | "status" | "cancelReason"> {
   key: string;
   contractNo: string;
   /** Chuyến có sẵn (sửa) ⇒ giữ trạng thái + ngày tạo; null = lên chuyến mới. Nằm TRONG form để nháp mở lại sau tải trang vẫn lưu đúng. */
   existingMeta: Pick<ExportShipment, "status" | "cancelReason" | "createdAt"> | null;
+  /** Cont 2…n (ba-spec 73). Nháp cũ không có ⇒ coi như []. */
+  extras?: ContainerDraft[];
   initial: string;
 }
 const shipSnap = (f: ShipmentForm) =>
-  JSON.stringify([f.planMonth, f.kind, f.goodsSummary, f.plannedKg, f.lotCode, f.portOfDischarge, f.bookingNo, f.booking?.forwarder ?? "", f.loadingDate, f.etd, f.eta, f.vesselVoyage, f.containerNo, f.sealNo, f.note]);
+  JSON.stringify([
+    f.planMonth, f.kind, f.goodsSummary, f.plannedKg, f.lotCode, f.portOfDischarge, f.bookingNo, f.booking?.forwarder ?? "", f.loadingDate, f.etd, f.eta, f.vesselVoyage, f.containerNo, f.sealNo, f.note,
+    (f.extras ?? []).map((c) => [c.kind, c.containerNo, c.sealNo, c.loadingDate]),
+  ]);
 
 export function ShipmentFormDialog({
   target,
@@ -108,12 +130,15 @@ export function ShipmentFormDialog({
   recordedBy,
   bookingFilesEnabled,
   bookingDetailsEnabled,
+  containersEnabled,
 }: {
   target: ShipmentTarget | null;
   onClose: () => void;
   /** `bookingFiles`: file booking vừa tải lên (ba-spec 60 NV1) — lưu chuyến hỏng thì màn tự gỡ file đã tải. */
-  onSave: (s: ExportShipment, isNew: boolean, bookingFiles: ExportFile[]) => boolean;
+  onSave: (s: ExportShipment, isNew: boolean, bookingFiles: ExportFile[], extras: ExportShipmentContainer[] | null) => boolean;
   recordedBy: string;
+  /** Máy chủ đã chạy 0106 ⇒ hiện khối Cont thêm (ba-spec 73). */
+  containersEnabled: boolean;
   /** Máy chủ đã chạy 0094 + có kho file ⇒ hiện ô chọn file booking. */
   bookingFilesEnabled: boolean;
   /** Máy chủ đã chạy 0101 ⇒ hiện ô Đại lý (ba-spec 71 NV1). */
@@ -153,6 +178,9 @@ export function ShipmentFormDialog({
       note: e?.note ?? "",
       // ba-spec 71: giữ khối booking + xe của chuyến khi sửa (hộp chỉ đổi Đại lý).
       ...(bookingDetailsEnabled ? { booking: e?.booking ?? EMPTY_BOOKING_DETAILS, transport: e?.transport ?? EMPTY_TRANSPORT_INFO } : {}),
+      extras: [...(target.extraContainers ?? [])]
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((c) => ({ id: c.id, kind: c.kind, containerNo: c.containerNo, sealNo: c.sealNo, loadingDate: c.loadingDate, note: c.note, createdAt: c.createdAt })),
       initial: "",
     };
     const fresh = { ...f, initial: shipSnap(f) };
@@ -164,12 +192,29 @@ export function ShipmentFormDialog({
   }, [target]);
 
   const set = <K extends keyof ShipmentForm>(k: K, v: ShipmentForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
+  const extras = form?.extras ?? [];
+  const setExtra = (id: string, patch: Partial<ContainerDraft>) => set("extras", extras.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  const addExtra = () => set("extras", [...extras, { id: newId(), kind: "20RF", containerNo: "", sealNo: "", loadingDate: "", note: "", createdAt: new Date().toISOString() }]);
+  /** Bỏ cont thêm: còn dòng hàng gán cont đó ⇒ chặn, kể tên dòng (ba-spec 73 R4). */
+  const removeExtra = (c: ContainerDraft, no: number) => {
+    const gate = removeContainerGate({ shipmentLines: target?.shipmentLines ?? [] }, { id: c.id, shipmentId: form?.id ?? "" });
+    if (!gate.ok) {
+      notify.error(`Cont ${no} còn ${gate.blockingLines.length} dòng hàng (${gate.blockingLines.map((l) => l.description || "chưa có tên").join(", ")}) — chuyển các dòng sang cont khác ở Hàng của chuyến rồi bỏ cont.`);
+      return;
+    }
+    set("extras", extras.filter((x) => x.id !== c.id));
+  };
 
   const save = async () => {
     if (busy) return;
     // Không đòi `target`: hộp mở lại từ nháp sau tải trang thì target rỗng, mọi thứ cần đã nằm trong form.
     if (!form) return;
     const errs = validateShipment(form).map((i) => ({ field: i.label, message: i.message }));
+    const keepExtras = containersEnabled && isContainerKind(form.kind);
+    if (keepExtras) for (const i of validateExtraContainers(form, extras)) errs.push({ field: i.label, message: i.message });
+    // ba-spec 73 R2: xe tải / đóng ghép không có cont thêm.
+    if (containersEnabled && !isContainerKind(form.kind) && extras.length)
+      errs.push({ field: "Cont thêm", message: "Xe tải / đóng ghép không có cont thêm — bỏ các cont thêm trước khi đổi loại chuyến" });
     // Nháp cũ (trước khi form mang existingMeta) không biết là sửa hay lên mới ⇒ không đoán, bắt mở lại.
     if (form.existingMeta === undefined) errs.push({ field: "Nháp cũ", message: "Bấm Bỏ bản nháp rồi mở lại chuyến để sửa" });
     for (const f of bookingFiles) {
@@ -204,7 +249,17 @@ export function ShipmentFormDialog({
       uploadedBy: recordedBy,
       createdAt: now,
     }));
-    const { key: _key, contractNo: _no, initial: _initial, existingMeta: _meta, ...rest } = form;
+    const { key: _key, contractNo: _no, initial: _initial, existingMeta: _meta, extras: _extras, ...rest } = form;
+    const savedExtras: ExportShipmentContainer[] | null = keepExtras
+      ? extras.map((c, i) => ({
+          ...c,
+          shipmentId: form.id,
+          sortOrder: i + 1,
+          containerNo: normalizeContainerNo(c.containerNo),
+          sealNo: c.sealNo.trim().toUpperCase(),
+          note: c.note.trim(),
+        }))
+      : null;
     const ok = onSave(
       {
         ...rest,
@@ -222,6 +277,7 @@ export function ShipmentFormDialog({
       },
       !e,
       fileRows,
+      savedExtras,
     );
     setBusy(false);
     if (!ok) {
@@ -243,7 +299,7 @@ export function ShipmentFormDialog({
         onClose();
       }}
       title={(form ? form.existingMeta : target?.existing) ? `Sửa chuyến · HĐ ${form?.contractNo ?? ""}` : `Ghi chuyến · HĐ ${form?.contractNo ?? ""}`}
-      description="Một chuyến là một container. Chuyến hiện ở tháng của ngày đóng cont; chưa có thì theo ETD, rồi tới tháng kế hoạch."
+      description="Một chuyến là một booking. Booking nhiều cont (VD 1X20RF & 1X40RF) thì thêm cont 2, 3… ở khối Cont thêm. Chuyến hiện ở tháng của ngày đóng cont; chưa có thì theo ETD, rồi tới tháng kế hoạch."
       icon={Container}
       size="lg"
       hasRequiredFields
@@ -327,6 +383,45 @@ export function ShipmentFormDialog({
               </Field>
             )}
           </div>
+          {/* ba-spec 73 NV1: cont 1 = loại / số / seal ở trên; cont 2…n ở đây. */}
+          {containersEnabled && isContainer && (
+            <div className="grid min-w-0 gap-3 rounded-md border p-3" data-tour="shipment-extra-containers">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Cont thêm (cùng booking)</p>
+                  <p className="text-sm text-muted-foreground">
+                    {extras.length ? `Chuyến ${extras.length + 1} cont · cont 1 là Loại chuyến + Số container ở trên.` : "Booking có nhiều cont thì thêm cont 2, 3… Chuyến một cont để trống."}
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={addExtra} title="Thêm một cont nữa vào chuyến (cùng booking, cùng bộ chứng từ).">
+                  <Plus className="mr-1 h-4 w-4" aria-hidden />
+                  Thêm cont
+                </Button>
+              </div>
+              {extras.map((c, i) => (
+                <div key={c.id} className="grid min-w-0 gap-3 border-t pt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium">Cont {i + 2}</span>
+                    <InlineConfirmDelete
+                      recordDescription={`Cont ${i + 2}${c.containerNo ? ` · ${c.containerNo}` : ""}`}
+                      title={`Bỏ cont ${i + 2} khỏi chuyến (còn dòng hàng gán cont này thì không bỏ được).`}
+                      onConfirm={() => removeExtra(c, i + 2)}
+                    />
+                  </div>
+                  <ChoiceGroup label="Loại cont" required value={c.kind} onChange={(v) => setExtra(c.id, { kind: v as ExportContainerKind })} options={CONTAINER_KIND_OPTIONS} columns={3} />
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field label="Số container" hint="11 ký tự, gõ sau cũng được">
+                      <Input value={c.containerNo} onChange={(e) => setExtra(c.id, { containerNo: e.target.value })} />
+                    </Field>
+                    <Field label="Số seal">
+                      <Input value={c.sealNo} onChange={(e) => setExtra(c.id, { sealNo: e.target.value })} />
+                    </Field>
+                    <DateField label="Ngày đóng cont này" hint="Trống = theo ngày đóng của chuyến" value={c.loadingDate} onChange={(v) => setExtra(c.id, { loadingDate: v })} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <Field label="Ghi chú">
             <Textarea rows={2} value={form.note} onChange={(e) => set("note", e.target.value)} />
           </Field>
@@ -954,6 +1049,8 @@ export interface LoadingUploadTarget {
   /** "loading-count-photos" · "package-weight-photos" (mig 0097) = ảnh thêm của bước 4 — file của chuyến, không làm bước nào tự xong. */
   step: Extract<ExportStep, "loading-plan" | "loading-photos"> | "booking" | ExportLoadingExtraStep | "container-seal-photos";
   label: string;
+  /** Ảnh cont / seal của cont thêm (ba-spec 73 R6) — id cont thêm; trống = cont 1. */
+  containerId?: string;
 }
 
 interface LoadingForm {
@@ -1029,6 +1126,7 @@ export function LoadingUploadDialog({
         caption: form.caption.trim(),
         uploadedBy: recordedBy,
         createdAt: new Date().toISOString(),
+        ...(tgt.step === "container-seal-photos" && tgt.containerId ? { containerId: tgt.containerId } : {}),
       }));
       if (!onSave(rows)) {
         void removeExportFiles(up.map((u) => u.path));
@@ -1098,6 +1196,55 @@ export function LoadingUploadDialog({
           <Field label="Chú thích" hint={extra ? extra.captionHint : isPhotos ? "VD: ảnh seal, cửa cont" : undefined}>
             <Input value={form.caption} onChange={(e) => setForm((f) => (f ? { ...f, caption: e.target.value } : f))} />
           </Field>
+        </div>
+      )}
+    </FormDialog>
+  );
+}
+
+/* ---------- Gộp chuyến thành cont thêm (ba-spec 73 NV6, R13) ---------- */
+
+export interface MergeShipmentTarget {
+  from: ExportShipment;
+  fromLabel: string;
+  /** Chuyến nhận (cùng HĐ, gộp được) — nhãn để chọn. */
+  candidates: { shipment: ExportShipment; label: string }[];
+}
+
+/** Chọn chuyến nhận rồi gộp: chuyến này thành cont thêm cuối của chuyến nhận, hàng đi theo. Không ghi nháp — chỉ một lựa chọn. */
+export function MergeShipmentDialog({ target, onClose, onConfirm }: { target: MergeShipmentTarget | null; onClose: () => void; onConfirm: (into: ExportShipment) => void }) {
+  const [pick, setPick] = useState("");
+  useEffect(() => setPick(target?.candidates[0]?.shipment.id ?? ""), [target]);
+  const chosen = target?.candidates.find((c) => c.shipment.id === pick);
+  return (
+    <FormDialog
+      open={!!target}
+      onOpenChange={(o) => !o && onClose()}
+      title="Gộp làm cont thêm"
+      description={target ? `${target.fromLabel} thành một cont của chuyến khác cùng hợp đồng: loại, số, seal, ngày đóng và hàng của chuyến này chuyển sang; chuyến này không còn. Hoàn tác được ngay sau khi gộp.` : ""}
+      icon={Container}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>
+            Hủy
+          </Button>
+          <Button onClick={() => chosen && onConfirm(chosen.shipment)} title="Gộp chuyến này vào chuyến đã chọn làm cont thêm.">
+            <Container className="mr-2 h-4 w-4" aria-hidden />
+            Gộp
+          </Button>
+        </>
+      }
+    >
+      {target && (
+        <div className="grid gap-3 py-2">
+          <ChoiceGroup
+            label="Gộp vào chuyến"
+            required
+            value={pick}
+            onChange={setPick}
+            options={target.candidates.map((c) => ({ value: c.shipment.id, label: c.label }))}
+            columns={2}
+          />
         </div>
       )}
     </FormDialog>

@@ -14,6 +14,7 @@ import {
   useExportFiles,
   useExportPayments,
   useExportShipmentLineStore,
+  useExportShipmentContainerStore,
   useExportShipments,
   useExportStepItems,
   useProductionOrderShipments,
@@ -44,6 +45,8 @@ export function useExportData() {
   const { lines: storedShipmentLines, setLines: saveShipmentLines, isAvailable: shipmentLinesAvailable } = useExportShipmentLineStore();
   // Hàng của chuyến trỏ id dòng của bản HĐ cũ (bản sửa trước 2026-11-04 cấp id mới) ⇒ nối sang dòng của bản đang dùng.
   const shipmentLines = useMemo(() => remapLegacyContractLineIds({ revisions, approvals, shipments }, storedShipmentLines), [revisions, approvals, shipments, storedShipmentLines]);
+  // ba-spec 73: cont thêm của chuyến (mig 0106) — chưa chạy ⇒ rỗng, mỗi chuyến một cont như cũ.
+  const { containers: shipmentContainers, setContainers: saveShipmentContainers, isAvailable: containersAvailable } = useExportShipmentContainerStore();
   const [productionOrders] = useProductionOrders();
   const [orderLinks] = useProductionOrderShipments();
   const issuedOrderShipmentIds = useMemo(() => issuedShipmentIds(productionOrders, orderLinks), [productionOrders, orderLinks]);
@@ -51,8 +54,8 @@ export function useExportData() {
   // ba-spec 72: máy chủ đã chạy 0103 ⇒ mục SI bắt buộc ở bước 4.
   const shippingInstructionEnabled = useExportShippingInstructionAvailable();
   const data: ExportData = useMemo(
-    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines, shippingInstructionEnabled }),
-    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines, shippingInstructionEnabled],
+    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines, shipmentContainers, shippingInstructionEnabled }),
+    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines, shipmentContainers, shippingInstructionEnabled],
   );
 
   return {
@@ -70,6 +73,9 @@ export function useExportData() {
     /** Hàng của chuyến (mig 0096) — `shipmentLinesAvailable` false ⇒ máy chủ chưa chạy 0096, không ghi. */
     saveShipmentLines: ro(saveShipmentLines),
     shipmentLinesAvailable,
+    /** Cont thêm của chuyến (mig 0106) — `containersAvailable` false ⇒ máy chủ chưa chạy 0106: ẩn Thêm cont, không gán cont. */
+    saveShipmentContainers: ro(saveShipmentContainers),
+    containersAvailable,
     saveActivities: ro(saveActivities),
     canLog,
     /** Danh mục loại chứng từ (mig 0081) — ô chọn Loại chứng từ thêm / sửa qua đây. */

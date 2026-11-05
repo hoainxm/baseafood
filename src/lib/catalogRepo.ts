@@ -79,6 +79,7 @@ import {
   EXPORT_OPTION_TABLE,
   COMPANY_PROFILE_TABLE,
   EXPORT_SHIPMENT_LINE_TABLE,
+  EXPORT_SHIPMENT_CONTAINER_TABLE,
   GOODS_TYPE_TABLE,
   BATTER_TYPE_TABLE,
   ROW_MARK_TABLE,
@@ -496,6 +497,18 @@ export function useExportShipmentLineStore() {
   const [lines, setLines, meta] = useExportShipmentLines();
   const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
   return { lines, setLines, isAvailable, isLoading: meta.status === "loading" && lines.length === 0 };
+}
+/** Cont thêm của chuyến xuất (mig 0106, ba-spec 73) — dùng qua `useExportShipmentContainerStore`. */
+export const useExportShipmentContainers = () => useTable(EXPORT_SHIPMENT_CONTAINER_TABLE);
+
+/**
+ * Cont thêm + cờ `isAvailable`: có máy chủ mà chưa chạy 0106 ⇒ không ghi (ẩn Thêm cont, không gửi `container_id` của
+ * dòng / ảnh) — khỏi kẹt hàng chờ. Cờ này cũng là cờ của hai cột `container_id`.
+ */
+export function useExportShipmentContainerStore() {
+  const [containers, setContainers, meta] = useExportShipmentContainers();
+  const isAvailable = !isServerConnected || (meta.status !== "loading" && !isMissingTableError(meta.error));
+  return { containers, setContainers, isAvailable };
 }
 /** Danh sách chọn Xuất khẩu (mig 0095, ba-spec 62) — dùng qua `useExportOptionStore`. */
 export const useExportOptions = () => useTable(EXPORT_OPTION_TABLE);

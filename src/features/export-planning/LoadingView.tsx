@@ -11,7 +11,8 @@ import { Button, Card, CardContent, EmptyState, Field, Input, Tag, addDays } fro
 import { filesOfStep, shipmentFilesOf, shipmentKindLabel } from "@/lib/exportPlanning";
 import { formatDateTimeVN, formatDateVN } from "@/lib/format";
 import { hasTransport } from "@/lib/exportBooking";
-import type { Customer, ExportContract, ExportFile, ExportShipment, ExportShipmentLine } from "@/types";
+import type { Customer, ExportContract, ExportFile, ExportShipment, ExportShipmentContainer, ExportShipmentLine } from "@/types";
+import { containerLabel, filesOfContainer, shipmentContainers } from "@/lib/exportContainers";
 import { Camera, ClipboardCheck, ClipboardList, Container } from "lucide-react";
 import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
 import { ShipmentLineSummary } from "./ShipmentGoods";
@@ -33,6 +34,7 @@ export function LoadingView({
   onCount,
   extraPhotosEnabled,
   containerPhotosEnabled = false,
+  shipmentContainers: extraContainers = [],
 }: {
   shipments: readonly ExportShipment[];
   contracts: readonly ExportContract[];
@@ -51,6 +53,8 @@ export function LoadingView({
   extraPhotosEnabled: boolean;
   /** Mig 0103 (ba-spec 72 R9): người đóng hàng đính ảnh cont / seal. */
   containerPhotosEnabled?: boolean;
+  /** Cont thêm của chuyến (ba-spec 73) — chuyến nhiều cont: mỗi cont một dòng + nút ảnh riêng. */
+  shipmentContainers?: readonly ExportShipmentContainer[];
 }) {
   const [query, setQuery] = useState("");
   const from = addDays(today, -7);
@@ -68,6 +72,7 @@ export function LoadingView({
   const nameOf = (s: ExportShipment) => customers.find((c) => c.id === byId.get(s.contractId)?.customerId)?.name || "(khách chưa rõ)";
   const data = { files };
   const goodsOf = (s: ExportShipment) => shipmentLinesOf(shipmentLines, s.id);
+  const contsOf = (s: ExportShipment) => shipmentContainers({ shipmentContainers: extraContainers }, s);
 
   return (
     <div className="grid min-w-0 gap-4">
@@ -94,8 +99,9 @@ export function LoadingView({
                     {[
                       s.loadingDate ? `Đóng ${formatDateVN(s.loadingDate)}` : "Chưa có ngày đóng",
                       s.bookingNo ? `Booking ${s.bookingNo}` : "Chờ booking",
-                      s.containerNo && `Cont ${s.containerNo}`,
-                      s.sealNo && `Seal ${s.sealNo}`,
+                      ...(contsOf(s).length > 1
+                        ? [contsOf(s).map((c) => [c.kind, c.containerNo, c.sealNo && `seal ${c.sealNo}`].filter(Boolean).join(" ")).join(" + ")]
+                        : [s.containerNo && `Cont ${s.containerNo}`, s.sealNo && `Seal ${s.sealNo}`]),
                     ]
                       .filter(Boolean)
                       .join(" · ")}
@@ -148,7 +154,28 @@ export function LoadingView({
                     )}
                   </div>
                 )}
-                {canUpload && containerPhotosEnabled && s.kind !== "consolidated" && (
+                {canUpload && containerPhotosEnabled && s.kind !== "consolidated" && contsOf(s).length > 1 && (
+                  // ba-spec 73 R6: chuyến nhiều cont ⇒ mỗi cont một nút ảnh, ảnh gắn đúng cont.
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {contsOf(s).map((c) => {
+                      const n = filesOfContainer(shipmentFilesOf(data, s.id, "container-seal-photos"), contsOf(s), c.id).length;
+                      return (
+                        <Button
+                          key={c.id || "first"}
+                          variant="outline"
+                          className="h-auto min-h-9 whitespace-normal"
+                          onClick={() => onUpload({ shipment: s, contractId: s.contractId, step: "container-seal-photos", label: `${label} · ${containerLabel(c)}`, containerId: c.id })}
+                          title={`Chụp số cont, seal, cửa cont của ${containerLabel(c)}.`}
+                        >
+                          <Camera className="mr-2 h-4 w-4" aria-hidden />
+                          Ảnh {containerLabel(c)}
+                          {n ? ` (${n})` : ""}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                )}
+                {canUpload && containerPhotosEnabled && s.kind !== "consolidated" && contsOf(s).length < 2 && (
                   <Button variant="outline" className="h-auto min-h-9 whitespace-normal" onClick={() => onUpload({ shipment: s, contractId: s.contractId, step: "container-seal-photos", label })} title="Chụp số container, seal, cửa cont của chuyến này — bắt buộc: Phòng Kế hoạch điền số và có ảnh thì mục Số cont + seal mới Xong.">
                     <Camera className="mr-2 h-4 w-4" aria-hidden />
                     Ảnh cont / seal{shipmentFilesOf(data, s.id, "container-seal-photos").length ? ` (${shipmentFilesOf(data, s.id, "container-seal-photos").length})` : ""}

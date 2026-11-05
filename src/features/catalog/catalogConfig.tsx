@@ -58,6 +58,19 @@ import { BatterPicker } from "./BatterPicker";
 
 const MARKETS = ["Nhật", "EU", "Mỹ", "Hàn Quốc", "Trung Quốc", "Nội địa"];
 
+/** Danh sách chọn Thị trường: mục gốc + thị trường khách đang dùng + giá trị đang chọn (vừa thêm mới), không trùng. */
+export function marketOptions(value: string, used: readonly string[] = []): { value: string; label: string }[] {
+  const seen = new Set<string>();
+  const out: { value: string; label: string }[] = [];
+  for (const m of [...MARKETS, ...used, value]) {
+    const t = (m ?? "").trim();
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push({ value: t, label: t });
+  }
+  return out;
+}
+
 export type CatalogKind = "product" | "customer" | "supplier" | "importSupplier" | "materialType" | "storageLocation" | "batter" | "documentKind" | "goodsType" | "exportOption";
 
 /** Đủ thứ để dựng màn CRUD một danh mục HOẶC hộp sửa nhanh một bản ghi. */
@@ -157,7 +170,9 @@ export function buildCatalogFields(
   finishedGoods: FinishedGood[],
   batterTypes: BatterType[] = [],
   addBatter?: (name: string) => string,
-  addMaterialType?: (name: string) => string
+  addMaterialType?: (name: string) => string,
+  /** Thị trường khách đang dùng (gồm cả tên tự thêm) — gợi ý trong ô Thị trường. */
+  usedMarkets: readonly string[] = []
 ) {
   const optTP141 = finishedGoods.map((t) => ({
     value: t.code,
@@ -362,8 +377,10 @@ export function buildCatalogFields(
           hint="Chọn trong danh sách, hoặc gõ tên mới rồi bấm Thêm mới."
           value={value}
           onChange={changeValue}
-          options={MARKETS.map((t) => ({ value: t, label: t }))}
-          onCreate={(name) => name}
+          // Thị trường gõ mới phải có trong danh sách chọn, không thì ô hiện trống như chưa chọn
+          // (lỗi 2026-11-05: Thêm mới ở Sửa thông tin khách hàng "không được").
+          options={marketOptions(value, usedMarkets)}
+          onCreate={(name) => marketOptions("", usedMarkets).find((o) => o.label.toLowerCase() === name.trim().toLowerCase())?.value ?? name.trim()}
           placeholder="— Chọn thị trường —"
         />
       ),
@@ -954,8 +971,8 @@ export function useCatalogConfigs(): CatalogConfigSet {
       notify.saved(`Đã thêm loại nguyên liệu "${trimmedName}" vào danh mục`);
       return created.id;
     };
-    return buildCatalogFields(materialTypes, finishedGoods, batterTypes, addBatter, addMaterialType);
-  }, [materialTypes, setMaterialTypes, finishedGoods, batterTypes, setBatterTypes]);
+    return buildCatalogFields(materialTypes, finishedGoods, batterTypes, addBatter, addMaterialType, customers.map((c) => c.market));
+  }, [materialTypes, setMaterialTypes, finishedGoods, batterTypes, setBatterTypes, customers]);
   return buildCatalogConfigs(fields, {
     product: { rows: products, onChange: setProducts, loading: isLoadingProducts },
     customer: { rows: customers, onChange: setCustomers, loading: isLoadingCustomers },

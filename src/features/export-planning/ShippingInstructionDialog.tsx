@@ -5,8 +5,8 @@
 //              fields carried from the latest SI of the same customer; goods rows with packages + gross (pre-computed,
 //              editable); CBM typed. "Lưu & xuất SI" saves the content (composed_documents) and hands the file back.
 // ============================================================
-import { useEffect, useMemo, useState } from "react";
-import { Button, ChoiceGroup, DateField, ErrorSummary, Field, FormDialog, FormSection, Input, NumberField, Tag, Textarea, notify, type FieldError } from "@/design-system";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Button, ChoiceGroup, DateField, ErrorSummary, Field, FormDialog, FormSection, Input, NumberField, Tag, Textarea, formatNumber, notify, type FieldError } from "@/design-system";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useCompanyProfileStore, useComposedDocuments } from "@/lib/catalogRepo";
 import { todayISO } from "@/lib/format";
@@ -22,15 +22,18 @@ import {
   previousSiOf,
   siGoodsRows,
   siLinked,
+  siPartiesFromContract,
   siToValues,
   siTotals,
   siWarnings,
+  type SiContractParties,
   type SiForm,
 } from "@/lib/shippingInstruction";
 import { downloadXlsx, loadShippingInstructionTemplate, shippingInstructionBytes } from "@/lib/shippingInstructionExcel";
 import { safeFileName } from "@/lib/documents";
 import type { ExportContractLine, ExportShipment, ExportShipmentLine } from "@/types";
-import { FileSpreadsheet, Save } from "lucide-react";
+import type { ContainerView } from "@/lib/exportContainers";
+import { FileSpreadsheet, RotateCcw, Save } from "lucide-react";
 
 export interface ShippingInstructionTarget {
   shipment: ExportShipment;
@@ -40,6 +43,10 @@ export interface ShippingInstructionTarget {
   contractLines: readonly ExportContractLine[];
   shipmentLines: readonly ExportShipmentLine[];
   label: string;
+  /** Cont của chuyến (ba-spec 73 R9) — ≥ 2 cont ⇒ SI kê từng cont. */
+  containers?: readonly ContainerView[];
+  /** Người nhận hàng + Notify ghi ở HĐ — SI mới lấy theo đây; nút Lấy theo hợp đồng điền lại. */
+  parties?: SiContractParties;
 }
 
 interface SiDraft {
@@ -75,7 +82,7 @@ export function ShippingInstructionDialog({
     if (!target) return;
     const s = target.shipment;
     const saved = docs.find((d) => d.docType === SHIPPING_INSTRUCTION_DOC && d.sourceId === s.id) ?? null;
-    const form = initialSi({ saved, previous: previousSiOf(docs, target.customer.name, s.id), customer: target.customer, goods, today: todayISO() });
+    const form = initialSi({ saved, previous: previousSiOf(docs, target.customer.name, s.id), customer: target.customer, goods, today: todayISO(), parties: target.parties });
     const fresh: SiDraft = { key: s.id, form, initial: JSON.stringify(form) };
     const kept = draft.takeKept();
     setValue(kept && kept.key === fresh.key ? kept : fresh);
@@ -83,7 +90,7 @@ export function ShippingInstructionDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
 
-  const linked = target ? siLinked(target.shipment, profile) : null;
+  const linked = target ? siLinked(target.shipment, profile, target.containers ? { containers: target.containers, lines: target.shipmentLines } : undefined) : null;
   const f = value?.form;
   const set = <K extends keyof SiForm>(k: K, v: SiForm[K]) => setValue((d) => (d ? { ...d, form: { ...d.form, [k]: v } } : d));
   const setGoods = (i: number, k: "packages" | "grossKg", v: number | null) =>
@@ -183,11 +190,27 @@ export function ShippingInstructionDialog({
               {fact("Port of Loading", linked.portOfLoading)}
               {fact("Port of Discharge", linked.portOfDischarge)}
               {fact("Place of Delivery", linked.placeOfDelivery)}
-              {fact("Container / Seal", [linked.containerNo, linked.sealNo].filter(Boolean).join(" / "))}
-              {fact("Size / Type", linked.sizeType)}
+              {linked.containers ? (
+                // ba-spec 73 R9: mỗi cont một dòng — số / seal · loại · số kiện · gross của cont.
+                linked.containers.map((c, i) => (
+                  <Fragment key={i}>
+                  {fact(
+                    `Cont ${i + 1}`,
+                    [[c.containerNo, c.sealNo].filter(Boolean).join(" / ") || "chưa có số", c.sizeType, c.packages != null && `${formatNumber(c.packages)} kiện`, c.grossKg != null && `${formatNumber(c.grossKg)} kg gross`]
+                      .filter(Boolean)
+                      .join(" · "),
+                  )}
+                  </Fragment>
+                ))
+              ) : (
+                <>
+                  {fact("Container / Seal", [linked.containerNo, linked.sealNo].filter(Boolean).join(" / "))}
+                  {fact("Size / Type", linked.sizeType)}
+                </>
+              )}
             </dl>
           </FormSection>
-          <FormSection title="Người gửi, người nhận" hint="Nhớ theo SI gần nhất của cùng khách.">
+          <FormSection title="Người gửi, người nhận" hint="Consignee, Notify theo hợp đồng; ô còn lại nhớ theo SI gần nhất của cùng khách.">
             <div className="grid gap-4 sm:grid-cols-2">
               <DateField label="Date" value={f.date} onChange={(v) => set("date", v)} />
               <Field label="Attn">
@@ -199,6 +222,25 @@ export function ShippingInstructionDialog({
               <Field label="Other requests">
                 <Textarea rows={2} value={f.otherRequests} onChange={(e) => set("otherRequests", e.target.value)} />
               </Field>
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 sm:col-span-2">
+                <p className="text-sm text-muted-foreground">
+                  Consignee và Notify party lấy theo Người nhận hàng / Notify ghi ở hợp đồng; sửa tay ở đây cho riêng chuyến này. Hãng tàu ra vận đơn theo SI.
+                </p>
+                {target && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const p = siPartiesFromContract(target.customer, target.parties ?? {});
+                      setValue((d) => (d ? { ...d, form: { ...d.form, consignee: p.consignee, ...(p.notifyParty != null ? { notifyParty: p.notifyParty } : {}) } } : d));
+                    }}
+                    title="Điền lại Consignee và Notify party theo hợp đồng (hợp đồng chưa ghi người nhận hàng thì lấy khách hàng)."
+                  >
+                    <RotateCcw className="mr-1 h-4 w-4" aria-hidden />
+                    Lấy theo hợp đồng
+                  </Button>
+                )}
+              </div>
               <Field label="Consignee" required hint="Tên + địa chỉ đầy đủ, mỗi dòng một hàng">
                 <Textarea rows={3} value={f.consignee} onChange={(e) => set("consignee", e.target.value)} />
               </Field>

@@ -5,7 +5,8 @@
 //              customer, shipment goods lines (+ contract lines for HS code); carry customer-level choices from the
 //              latest SI of the same customer; store as a composed document (mig 0091, doc_type shipping-instruction).
 // ============================================================
-import type { ComposedDocument, CompanyProfile, DocumentRow, DocumentValues, ExportContractLine, ExportShipment, ExportShipmentLine } from "@/types";
+import type { ComposedDocument, CompanyProfile, DocumentRow, DocumentValues, ExportContractLine, ExportParty, ExportShipment, ExportShipmentLine } from "@/types";
+import { linesByContainer, type ContainerView } from "./exportContainers";
 
 export const SHIPPING_INSTRUCTION_DOC = "shipping-instruction";
 
@@ -58,6 +59,34 @@ export interface SiLinked {
   containerNo: string;
   sealNo: string;
   sizeType: string;
+  /** Chuyến nhiều cont (ba-spec 73 R9): mỗi cont một dòng — số, seal, loại, số kiện, gross. Một cont ⇒ không có. */
+  containers?: SiContainerRow[];
+}
+
+/** Một cont trên SI (ba-spec 73 R9). */
+export interface SiContainerRow {
+  containerNo: string;
+  sealNo: string;
+  sizeType: string;
+  packages: number | null;
+  grossKg: number | null;
+}
+
+/**
+ * Dòng cont của SI: số kiện = Σ (thực đóng ?? kế hoạch) của dòng trong cont; gross = Σ kiện × kg cả bì (thiếu kg cả bì
+ * ở một dòng ⇒ gross của cont trống, gõ tay trên file).
+ */
+export function siContainerRows(conts: readonly ContainerView[], lines: readonly ExportShipmentLine[]): SiContainerRow[] {
+  return linesByContainer(conts, lines).map(({ container: c, lines: ls }) => {
+    let packages: number | null = ls.length ? 0 : null;
+    let gross: number | null = ls.length ? 0 : null;
+    for (const l of ls) {
+      const n = l.loadedUnits ?? l.plannedUnits;
+      if (packages != null) packages = n == null ? packages : packages + n;
+      gross = gross == null || n == null || l.grossKgPerUnit == null ? null : gross + n * l.grossKgPerUnit;
+    }
+    return { containerNo: c.containerNo, sealNo: c.sealNo, sizeType: SIZE_TYPE[c.kind] ?? c.kind, packages, grossKg: gross == null ? null : Math.round(gross * 100) / 100 };
+  });
 }
 
 export const SI_CARRY_KEYS: readonly (keyof SiCustomerFields)[] = [
@@ -95,7 +124,12 @@ export function shipperLines(c: Pick<CompanyProfile, "nameEn" | "addressEn">): s
   return [c.nameEn.trim(), ...(cut > 0 ? [addr.slice(0, cut + 1).trim(), addr.slice(cut + 1).trim()] : [addr])].filter(Boolean);
 }
 
-export function siLinked(s: ExportShipment, company: Pick<CompanyProfile, "nameEn" | "addressEn">): SiLinked {
+export function siLinked(
+  s: ExportShipment,
+  company: Pick<CompanyProfile, "nameEn" | "addressEn">,
+  /** Cont của chuyến + Hàng của chuyến (ba-spec 73) — ≥ 2 cont ⇒ `containers`. */
+  multi?: { containers: readonly ContainerView[]; lines: readonly ExportShipmentLine[] },
+): SiLinked {
   const b = s.booking;
   const vv = splitVesselVoyage(s.vesselVoyage);
   return {
@@ -110,6 +144,7 @@ export function siLinked(s: ExportShipment, company: Pick<CompanyProfile, "nameE
     containerNo: s.containerNo,
     sealNo: s.sealNo,
     sizeType: SIZE_TYPE[s.kind] ?? s.kind,
+    ...(multi && multi.containers.length > 1 ? { containers: siContainerRows(multi.containers, multi.lines.filter((l) => l.shipmentId === s.id)) } : {}),
   };
 }
 
@@ -189,6 +224,8 @@ export function initialSi(input: {
   customer: { name: string; address?: string };
   goods: SiGoodsRow[];
   today: string;
+  /** Người nhận hàng + Notify ghi ở HĐ (Phòng KH 2026-11-05) — SI MỚI lấy theo đây, hơn SI lần trước của khách. */
+  parties?: SiContractParties;
 }): SiForm {
   if (input.saved) {
     // Đã lưu: ô của khách + CBM giữ nguyên; dòng hàng dựng lại từ chuyến (tên + HS theo HĐ hiện tại), số kiện /
@@ -199,8 +236,35 @@ export function initialSi(input: {
   const prev = input.previous ? siFromValues(input.previous.values) : null;
   const carry: SiCustomerFields = prev
     ? Object.fromEntries(SI_CARRY_KEYS.map((k) => [k, prev[k]])) as unknown as SiCustomerFields
-    : { ...EMPTY_SI_CUSTOMER, consignee: [input.customer.name, input.customer.address ?? ""].map((x) => x.trim()).filter(Boolean).join("\n") };
-  return { ...carry, date: input.today, cbm: "", goods: input.goods };
+    : { ...EMPTY_SI_CUSTOMER, consignee: partyText(input.customer) };
+  const fromContract = siPartiesFromContract(input.customer, input.parties ?? {});
+  return {
+    ...carry,
+    ...(input.parties?.consignee ? { consignee: fromContract.consignee } : {}),
+    ...(fromContract.notifyParty != null ? { notifyParty: fromContract.notifyParty } : {}),
+    date: input.today,
+    cbm: "",
+    goods: input.goods,
+  };
+}
+
+export interface SiContractParties {
+  consignee?: ExportParty;
+  notifyParty?: ExportParty;
+}
+
+/** Tên + địa chỉ ⇒ chữ ô SI (tên dòng đầu, địa chỉ các dòng sau). */
+export const partyText = (p: { name: string; address?: string }) => [p.name, p.address ?? ""].map((x) => x.trim()).filter(Boolean).join("\n");
+
+/**
+ * Consignee / Notify của SI theo HĐ: Consignee = người nhận hàng của HĐ, không ghi thì khách hàng; Notify = Notify của
+ * HĐ, không ghi ⇒ null (giữ ô đang có). Dùng cho SI mới và nút Lấy theo hợp đồng.
+ */
+export function siPartiesFromContract(customer: { name: string; address?: string }, parties: SiContractParties): { consignee: string; notifyParty: string | null } {
+  return {
+    consignee: partyText(parties.consignee ?? customer),
+    notifyParty: parties.notifyParty ? partyText(parties.notifyParty) : null,
+  };
 }
 
 /** Dòng mới dựng từ chuyến + số kiện / gross đã lưu (khớp theo dòng HĐ, không có khóa thì theo thứ tự). */
@@ -225,8 +289,15 @@ export function siTotals(goods: readonly SiGoodsRow[]): { packages: number; gros
 export function siWarnings(l: SiLinked, f: SiForm): string[] {
   const w: string[] = [];
   if (!l.bookingNo.trim()) w.push("Chuyến chưa có số booking.");
-  if (!l.containerNo.trim()) w.push("Chưa có số container.");
-  if (!l.sealNo.trim()) w.push("Chưa có số seal.");
+  if (l.containers) {
+    l.containers.forEach((c, i) => {
+      if (!c.containerNo.trim()) w.push(`Cont ${i + 1} chưa có số container.`);
+      if (!c.sealNo.trim()) w.push(`Cont ${i + 1} chưa có số seal.`);
+    });
+  } else {
+    if (!l.containerNo.trim()) w.push("Chưa có số container.");
+    if (!l.sealNo.trim()) w.push("Chưa có số seal.");
+  }
   if (!f.goods.length) w.push("Chuyến chưa có hàng — nhập Hàng của chuyến trước.");
   if (f.payment === "3rd COUNTRY" && !f.paymentPlace.trim()) w.push("Cước trả ở nước thứ ba: ghi rõ nơi trả.");
   return w;

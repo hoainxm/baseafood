@@ -2,7 +2,7 @@
 
 > Load khi: xây hoặc sửa module Xuất khẩu của Phòng Kế hoạch đợt 1: hồ sơ hợp đồng (dòng hàng, bản sửa, gia hạn, file ký, kết quả duyệt giấy), chuyến (mã lô MSL, booking, cont, seal, ngày đóng/ETD), 6 bước dạng checklist tay kèm file, thực xuất lấy từ invoice, khép kín chuyến/hợp đồng theo dung sai, tiền về, vai trò Phòng Kế hoạch, mở rộng danh mục khách.
 covers: src/features/export-planning/**, src/lib/exportPlanning.ts, src/lib/invoiceReader.ts, src/lib/invoiceFileReader.ts, src/lib/exportReports.ts, src/lib/customerProductNames.ts, src/features/catalog/CustomerProductNamesDialog.tsx, supabase/migrations/0077_customer_product_names.sql, src/lib/exportPlanningDemo.ts, src/lib/exportFileStorage.ts, supabase/migrations/0075_export_planning.sql, supabase/migrations/0079_export_approval_workflow.sql, src/lib/abbreviations.ts, supabase/migrations/0081_export_document_kinds.sql
-last_verified: 2026-11-04
+last_verified: 2026-11-05
 <!-- updated: 2026-11-04 (ba-spec 72) — R46 bước 4 thêm mục **SI** (ngay sau số cont + seal — góp ý chị Thảo 2026-11-04, bắt buộc với cont lạnh; xe tải / đóng ghép / chuyến tạo trước 05/11/2026 đã xong bước 4 hoặc có B/L ⇒ Không áp dụng — `shippingInstructionState`); mục Lệnh xuất lập trong app (bộ soạn văn bản, xuất Word = có file = Xong); hàng Số cont + seal đính ảnh cont / seal (người đóng hàng được — R10 mở thêm loại file này, mig 0103). -->
 <!-- updated: 2026-11-03 (2026-11-03 tên hàng) — dòng hàng HĐ: Tên hàng (như trên HĐ), Quy cách, Ghi chú dòng, Yêu cầu vi sinh là ô nhiều dòng tự giãn (đọc đủ để đối chiếu); gợi ý mặt hàng `suggestProductMatch`: 3 bậc (tên của khách → HĐ trước → tên thương mại), mỗi bậc nguyên văn rồi gần đúng (`looseNameKey`: bỏ dấu, dấu câu, "gr" = "g"); gợi ý lại khi rời ô Size; dòng nhắc ghi nguồn + "gần giống". -->
 <!-- updated: 2026-11-03 (hạn hợp đồng) — ba-spec [69](69-contract-validity.ba-spec.md) ĐÃ BUILD: điều khoản thêm `contractValidUntil` (Hạn hợp đồng = ngày HĐ hết hiệu lực, khác hạn giao), không bắt buộc, không trước ngày ký; hồ sơ hiện "Còn n ngày" (≤ 30) / "Đã hết hạn"; bộ đọc file (66) tự điền. Không migration (terms jsonb). -->
@@ -508,7 +508,7 @@ Chủ dự án chốt 2026-10-28 (4 câu hỏi qua phiên Claude). Mục nào b�
 | NV8 thực xuất | A: lấy B/L · B: gõ tay ở chuyến · C: Σ invoice thương mại | **C** | A gồm hàng mẫu (+13,8 kg); B không có bằng chứng | Domain (XK) | — |
 | NV8 bước 5 | A: danh sách cố định · B: sinh từ chứng từ yêu cầu của HĐ (loại + form / người cấp) | **B** | Bắt được "thiếu C/O form VJ" như bộ lô 165 | Domain (XK) | — |
 | NV8 "xong" | A: tự do · B: có bằng chứng | **B** | A làm khép kín vô nghĩa (rubric #2) | Optimizer | — |
-| NV8 cont ghép | A: mỗi chuyến nộp đủ bộ · B: "dùng chung với chuyến …" | **B** | Cont "40+20" chung booking, invoice, B/L — A bắt nộp 2 lần (rubric #5) | Domain (XK) | Giữ Q2 (chuyến = 1 cont) |
+| NV8 cont ghép | A: mỗi chuyến nộp đủ bộ · B: "dùng chung với chuyến …" | **B** | Cont "40+20" chung booking, invoice, B/L — A bắt nộp 2 lần (rubric #5) | Domain (XK) | ~~Giữ Q2 (chuyến = 1 cont)~~ — từ 2026-11-05 cont "40+20" ghi **một chuyến hai cont** ([73](73-shipment-multi-container.ba-spec.md)); "dùng chung" còn cho chuyến cùng booking tách chứng từ |
 | NV9 ai đính ảnh | A: chỉ U4 · B: chỉ U1 · C: cả hai | **C** | Q7 | Optimizer | — |
 | NV9 trạng thái 4a/4b | A: U4 đánh dấu · B: tự suy từ file | **B** | RLS không chia được cột trạng thái chung; U4 chỉ cần quyền thêm file | Cross-User-Integrity | — |
 | NV10 tiền về | A: chặn khép · B: không chặn | **B** | Q5 | Optimizer | — |
@@ -877,7 +877,7 @@ Chủ dự án chốt 2026-10-28 (4 câu hỏi qua phiên Claude). Mục nào b�
 - A2. U4 gồm thủ kho và quản đốc / phó quản đốc cả 3 xưởng (hàng khô cũng đóng cont). Admin bớt được ở Vai trò & quyền.
 - A3. HĐ chờ duyệt được lên chuyến kế hoạch; chỉ bước 2 bị chặn.
 - A4. Bước 1 xong = HĐ có bản hiệu lực **và** bản đó có file ký.
-- A5. Một chuyến = một cont (Q2). Cont "40+20" = hai chuyến cùng booking, chứng từ "dùng chung".
+- A5. ~~Một chuyến = một cont (Q2). Cont "40+20" = hai chuyến cùng booking, chứng từ "dùng chung".~~ **Thay bởi [73](73-shipment-multi-container.ba-spec.md) R1 (2026-11-05):** chuyến = một booking / một lần xuất, có 1…n cont (cont 1 trên chuyến, cont thêm ở bảng riêng). Nhiều chuyến cùng booking + "dùng chung" vẫn dùng khi khách đòi chứng từ riêng từng cont.
 - A6. Tiền tệ ở cấp HĐ (mặc định USD); tiền về ghi tiền tệ riêng, chỉ cộng cùng tiền tệ.
 - A7. Kho file riêng (`export-files`), không dùng chung kho của Tài liệu công ty. Lý do: kho đó lọc theo phòng ban; nới ra là đổi RLS đang chạy (🔴).
 - A8. Số liệu tháng 10/2026 nhập tay từ sổ Excel tháng 10 (Q6). Không nạp lịch sử.
@@ -914,3 +914,5 @@ Chủ dự án chốt 2026-10-28 (4 câu hỏi qua phiên Claude). Mục nào b�
 - v2 (2026-10-20): rà bởi Domain-Specialist XK + Cross-User-Integrity (25 điểm). Sửa: thực xuất lấy từ invoice thương mại (bỏ hàng mẫu, bỏ B/L); dung sai áp cả kg lẫn tiền, tính biên; `units` vs `cartons`; duyệt gắn **bản** (bản sửa bị từ chối không hủy HĐ); hủy HĐ kéo theo chuyến; hạn giao bắt buộc + HĐ quá hạn hiện ở tháng hiện tại; loại chuyến Xe tải / Đóng ghép; "dùng chung" chứng từ cho cont ghép; quyền đọc của U4; 4a/4b tự suy từ file; thứ tự ngày; gia hạn riêng; L/C + cọc; form/người cấp chứng từ; mốc gửi bộ chứng từ; độ phủ chuyến; tra theo số giấy tờ; cột Đơn giá; demo dùng file giữ chỗ; tiền về xóa được.
 - v1 (2026-10-20): khởi tạo đợt 1 từ kế hoạch đã chốt 11 câu.
 - 2026-11-04: dòng HĐ thêm **Thời gian chần / luộc** (`cookTime`, JSON trong `lines` — không cần cột) cạnh Chiều dài / Tỉ lệ / Số miếng (R38); cột ở bảng dòng hàng hồ sơ HĐ; chép sang Quy cách dòng Lệnh sản xuất ("Chần / luộc 60 giây").
+- 2026-11-05: A5 + NV8 "cont ghép" thay bởi ba-spec [73](73-shipment-multi-container.ba-spec.md) — chuyến = một booking, nhiều cont (HĐ 23.26/BSF-SCM.2026, booking 1X20RF & 1X40RF). ĐÃ BUILD 2026-11-05, mig 0106 chưa chạy DB thật.
+- 2026-11-05 (Phòng KH): điều khoản HĐ thêm **Người nhận hàng (Consignee)** + **Notify party** (tên + địa chỉ, JSON `terms` — không cần cột). Invoice / packing list theo khách hàng; SI + vận đơn theo hai bên này (72 R12). Sửa lỗi `parseTerms` bỏ sót `contractValidUntil` (ba-spec 69) ⇒ Hạn hợp đồng mất khi tải lại; DB thật có 10 bản HĐ đã ghi hạn, giá trị vẫn còn trên máy chủ, đọc lại là hiện.

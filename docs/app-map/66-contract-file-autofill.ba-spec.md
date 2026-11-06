@@ -2,7 +2,8 @@
 
 > Load khi: xây hoặc sửa việc đọc file hợp đồng / phụ lục để điền form **Lập hợp đồng**, **Ghi bản sửa** (Xuất khẩu, [41](41-export-planning.ba-spec.md)) và **Lập / Sửa hợp đồng nhập** (Nhập khẩu, [45](45-import-planning.ba-spec.md)); bộ đọc `.docx` / PDF có chữ; luật "chỉ điền ô trống".
 covers: src/lib/contractReader.ts, src/lib/contractFileReader.ts, src/lib/legacyWordText.ts, src/features/export-planning/ContractReadPanel.tsx, src/features/export-planning/ContractFormDialog.tsx, src/features/import-planning/ImportDialogs.tsx
-last_verified: 2026-11-05
+last_verified: 2026-11-06
+<!-- updated: 2026-11-06 — `contractFileReader.readDocumentRows` tách ra dùng chung (đọc file lệnh sản xuất, 48 R21); luật đọc hợp đồng không đổi. -->
 <!-- updated: 2026-11-03 (ba-spec 69 R5) — bộ đọc thêm Hạn hợp đồng từ câu "binding / valid … to / until <ngày>" (bỏ "late", "latest") ⇒ `terms.contractValidUntil`, chỉ điền ô trống. -->
 <!-- updated: 2026-11-03 (v1.2, thêm 4 file thật) — Word cũ **.doc đọc được** (17-26-NEWPOINT.doc; dùng chung bộ đọc .doc của khung xem file, ba-spec 61); **bảng Excel nhúng** trong .doc / .docx đọc đúng phần hợp đồng hiển thị (vùng `oleSize`, bỏ dòng ẩn — bảng nhúng NEWPOINT có 31 dòng, hiện 7); **bảng của PDF xuất từ Word ghép lại theo tọa độ** (13-MAT-26.pdf: ô nhiều dòng, tiêu đề 3 tầng). R1, R2 sửa theo. -->
 <!-- updated: 2026-11-03 (v1.1, file thật) — 2 HĐ xuất (13-MAT-26, 17-26-NEWPOINT) là BẢN SCAN đã ký ⇒ không đọc; bố cục chép làm fixture. 2 HĐ nhập (MSA, KORNISH) là PDF có chữ ⇒ đọc được, dạng "nhãn : giá trị". R6 thêm tiêu đề bảng 2 tầng + dạng nhãn : giá trị; R3 "THESELLER" viết liền; R5 "BY LC" không dấu /, dung sai chỉ lấy chữ ngoài bảng, cảng đích từ "to Yokohama, Japan within …". A1 đóng; A2 còn chờ bản Word. -->

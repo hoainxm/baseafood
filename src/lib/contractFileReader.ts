@@ -185,17 +185,26 @@ async function rowsFromDoc(data: ArrayBuffer): Promise<string[][]> {
   });
 }
 
+/**
+ * File Word (.docx / .doc) hoặc PDF có chữ ⇒ các dòng chữ (đoạn văn = dòng, dòng bảng = các ô). PDF ảnh quét ⇒ "scan".
+ * Dùng chung cho đọc hợp đồng (ba-spec 66) và đọc file lệnh sản xuất (ba-spec 48 R21). Không ghi gì, không gửi file đi.
+ */
+export async function readDocumentRows(file: Blob, fileName: string, maxPdfPages = MAX_PDF_PAGES): Promise<string[][] | "scan"> {
+  const data = await file.arrayBuffer();
+  if (/\.pdf$/i.test(fileName)) {
+    const items = await pdfTextItems(data, maxPdfPages);
+    return items === "scan" ? "scan" : rowsFromPdfItems(items);
+  }
+  return /\.doc$/i.test(fileName) ? rowsFromDoc(data) : rowsFromDocx(data);
+}
+
 /** Đọc một file hợp đồng / phụ lục (vừa chọn, hoặc tải về từ kho file). Không ghi gì, không gửi file đi đâu. */
 export async function readContractFile(file: Blob, fileName: string, role: ContractRole): Promise<ContractReadResult> {
   const problem = contractFileProblem(fileName);
   if (problem) return fail(problem);
   try {
-    const data = await file.arrayBuffer();
-    if (/\.pdf$/i.test(fileName)) {
-      const items = await pdfTextItems(data, MAX_PDF_PAGES);
-      return items === "scan" ? fail("scan") : parseContractRows(rowsFromPdfItems(items), role);
-    }
-    return parseContractRows(/\.doc$/i.test(fileName) ? await rowsFromDoc(data) : await rowsFromDocx(data), role);
+    const rows = await readDocumentRows(file, fileName);
+    return rows === "scan" ? fail("scan") : parseContractRows(rows, role);
   } catch (e) {
     return fail("error", `${CONTRACT_FAILURE_MESSAGES.error}${e instanceof Error && e.message ? ` (${e.message})` : ""}`);
   }

@@ -1,8 +1,9 @@
 # 48 — ba-spec: Phòng Kế hoạch · Lệnh sản xuất (nối Nhập khẩu → sản xuất → Xuất khẩu)
 
 > Load khi: xây hoặc sửa Lệnh sản xuất của Phòng Kế hoạch: lập lệnh từ dòng hàng hợp đồng xuất, gắn nguyên liệu nhập khẩu dự kiến, phát hành tới phân xưởng / kho, gắn chuyến xuất (bước 2 của chuyến), in mẫu QTI-KH-01-04.
-covers: src/features/production-orders/**, src/lib/productionOrder.ts, src/lib/productionOrderDemo.ts, supabase/migrations/0088_production_orders.sql, src/lib/exportPlanning.ts
+covers: src/features/production-orders/**, src/lib/productionOrder.ts, src/lib/productionOrderFile.ts, src/lib/productionOrderDemo.ts, supabase/migrations/0088_production_orders.sql, src/lib/exportPlanning.ts
 last_verified: 2026-11-06
+<!-- updated: 2026-11-06 — R21 + AC-21: đọc file lệnh sản xuất điền sẵn hộp Lập lệnh (`lib/productionOrderFile.ts`, `OrderFileReadPanel.tsx`). -->
 <!-- updated: 2026-11-06 (audit B6) — bỏ gắn lệnh ngay ở bước 2 của chuyến xuất: hộp Gắn / bỏ gắn lệnh → Bỏ gắn, mọi trạng thái lệnh kể cả Đã hủy (ba-spec 41 R50, `unlinkShipmentOrder`); trang lệnh vẫn bỏ tick ở Gắn chuyến như cũ. -->
 <!-- updated: 2026-11-06 (ba-spec 74 R14) — R6 mở rộng: chuyến nhiều HĐ ⇒ bước 2 Xong khi MỌI HĐ trên chuyến có lệnh đã phát hành gắn chuyến (`issuedOrderContracts`); chuyến một HĐ giữ nguyên. -->
 <!-- updated: 2026-11-04 (chuyến gộp) — LS3: gắn LSX được vào chuyến gộp có hàng của HĐ của lệnh (`openShipmentsOf`), cả từ bước Lệnh sản xuất của chuyến (Lập lệnh / Gắn lệnh có sẵn theo từng HĐ trên chuyến). R6 không đổi (chuyến gắn ≥ 1 LSX phát hành ⇒ bước 2 Xong). Lệnh xuất dùng LSX theo từng HĐ + số lượng theo chuyến: ba-spec 72 R2b, R3b. -->
@@ -200,6 +201,7 @@ Không có handoff nào tới tổ trưởng trong đợt này (Q8).
 | R11 | Hủy LSX bắt lý do. Gỡ khỏi chuyến, nhả kg dành (R5). Không xóa cứng | — |
 | R12 | HĐ có bản hiệu lực mới sau giờ phát hành LSX ⇒ cờ "Theo bản HĐ trước" (LS6). Không tự đổi dòng LSX | — |
 | R17 | Dòng LSX lập từ dòng HĐ (2026-10-30): **Quy cách** = Size · Dài (chiều dài) · Số miếng / kg · Tỉ lệ (râu / thân / cổ) · packing, bỏ ô trống, nối bằng " · "; số miếng chỉ gõ số ⇒ thêm "miếng/kg", đã ghi "/kg" ⇒ giữ nguyên (`contractLineSpec`). **Ghi chú dòng** HĐ ⇒ `note` của dòng LSX, hiện dưới tên hàng ở hồ sơ lệnh và bản in. Đổi ở HĐ ⇒ lệnh đã lưu đổi theo khi mở ra lưu lại (R12 vẫn áp cho bản HĐ mới) | phụ lục 01 HĐ 01-26-HAT dòng 3 gr cut ⇒ "Size 3 gr cut · Dài 1.5 - 3.5 cm/pc · 330 – 370 miếng/kg · Tỉ lệ 80% râu 20% thân · IQF, 1kg/PE x 12/ctn" |
+| R21 | **Đọc file lệnh sản xuất** (2026-11-06, Phòng KH — HĐ 23.26/BSF-SCM.2026 SEACHEMOT: đã đính file LSX 17.10 ở bước 2 mà hộp Lập lệnh vẫn trống, phải gõ lại 13 dòng). Hộp Lập / Sửa lệnh có khối Đọc file: file đã đính ở mục Lệnh sản xuất các chuyến của HĐ (chuyến mở hộp trước) hoặc chọn trên máy; Word .doc / .docx, PDF có chữ (scan ⇒ báo, không đọc). Đọc: SỐ, Ngày … Tháng … Năm, bảng STT · Tên hàng · Quy cách · Số lượng ("100 thùng = 1.000 kg") · Khối lượng · MSL, ngày ISO trong quy cách ("ISO 28,29 / 10 / 2026"), HSD n tháng, Ngày giao hàng, Xuất vào thị trường (… khách …), Quy trình sản xuất, dòng lưu ý (Dự kiến có bao bì, Ghi ngày hết hạn, Đóng ngày ISO). Điền **ô còn trống hoặc còn bằng gợi ý lúc mở** (số lệnh, ngày lệnh, HSD, thị trường); ô đã gõ khác file giữ + kê "Giữ ô đã gõ". Dòng hàng: khớp dòng HĐ theo tên danh mục + size gr/pc + quy cách đóng gói (bulk / block / kiện, số túi mỗi thùng), mỗi dòng HĐ một lần, điểm thấp ⇒ không khớp; form chưa chọn dòng ⇒ thay bằng dòng file đã khớp, đã chọn ⇒ chỉ điền số thùng / ghi chú còn trống. Số thùng / kiện theo file (kg vẫn tính theo HĐ). Quy cách đóng gói của file ⇒ **Ghi chú dòng** (sửa được, in trên lệnh; trống ⇒ ghi chú dòng HĐ như R17). **Cảnh báo "Cần soát"**: dòng file không khớp HĐ · dòng HĐ không có trong file · kg vượt phần HĐ còn chưa ra lệnh · kg file ≠ số × kg theo HĐ · file đếm kiện / HĐ đếm thùng · khách trên file khác khách HĐ · số lệnh trùng lệnh khác · ngày ISO trước ngày lệnh. Không tự lưu, không ghi gì (`lib/productionOrderFile.ts`) | LSX 17.10: 13/13 dòng khớp; Tip luộc 250 thùng (3.000 kg) > HĐ 1.800 kg ⇒ cảnh báo; xiên que file 600 kg ≠ 50 kiện × 8 kg ⇒ cảnh báo |
 
 ## 10. Acceptance Criteria — ORACLE
 
@@ -298,6 +300,12 @@ Không có handoff nào tới tổ trưởng trong đợt này (Q8).
 - **When** U1 lập LSX từ dòng đó
 - **Then** Quy cách và ghi chú dòng LSX chép từ dòng HĐ theo thứ tự R17
 - **Assert** `productionOrder.test.ts` "AC-16": spec == "Size 3 gr cut · Dài 1.5 - 3.5 cm/pc · 330 – 370 miếng/kg · Tỉ lệ 80% râu 20% thân · IQF, 1kg/PE x 12/ctn"; note == "Không dùng hàng da giấy"; "590-770 pcs/kg" giữ nguyên (không thêm "miếng/kg")
+
+### AC-21 — Đọc file lệnh sản xuất điền sẵn hộp · Maps to flow: LS1 · R21 · Test: unit
+- **Given** file LSX 17.10 (.doc, 13 dòng) của HĐ 23.26/BSF-SCM.2026 bản 3 (13 dòng), hộp Lập lệnh vừa mở (số gợi ý, ngày hôm nay, chưa chọn dòng)
+- **When** đọc file
+- **Then** số lệnh 17.10, ngày lệnh 21/10/2026, MSL 201, 5 ngày sản xuất theo ISO, ngày giao 03/11/2026, thị trường Nhật, HSD 24 tháng, 13 dòng khớp đúng dòng HĐ với số thùng / kiện theo file; cảnh báo dòng 4 và 10 vượt HĐ, dòng 9 kg lệch; ô người dùng đã gõ giữ nguyên
+- **Assert:** orderNo == "17.10" · productionDates.length == 5 · lines.length == 13 · ghép STT→dòng HĐ == 1a 2b 3c 4e 5g 6i 7j 8k 9l 10m 11h 12d 13f · số cảnh báo "vượt" == 2 · ô đã gõ: orderNo giữ == "18.10" (`productionOrderFile.test.ts`)
 
 ## 11. Đã chốt + giả định
 

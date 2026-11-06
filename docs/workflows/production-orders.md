@@ -1,10 +1,11 @@
 # Lệnh sản xuất — sơ đồ workflow
 
 > Load khi: review / kiểm lại trang Lệnh sản xuất (`/planning-production`), trước khi sửa luật lập lệnh, phát hành, gắn chuyến, NL nhập khẩu dự kiến, file Word / PDF. Bản đọc nhanh — luật đầy đủ ở ba-spec [48](../app-map/48-production-order.ba-spec.md) · [54](../app-map/54-document-composer.ba-spec.md) · design-spec [49](../app-map/49-production-order-ui.design-spec.md).
-covers: src/features/production-orders/*, src/lib/productionOrder.ts, src/lib/productionOrderReports.ts, src/lib/documentComposer.ts, src/lib/documentTypes/productionOrder*.ts
+covers: src/features/production-orders/*, src/lib/productionOrder.ts, src/lib/productionOrderFile.ts, src/lib/productionOrderReports.ts, src/lib/documentComposer.ts, src/lib/documentTypes/productionOrder*.ts
 tours: src/features/production-orders/productionOrderTour.ts
 guides: src/features/shared/guides/productionOrderGuide.tsx
 last_verified: 2026-11-06
+<!-- re-verified: 2026-11-06 (Phòng KH, HĐ 23.26 SEACHEMOT) — Lập lệnh: Đọc file lệnh sản xuất điền sẵn hộp (R21); Ghi chú dòng sửa được trên lệnh. Không đổi trạng thái, không đổi quyền. -->
 <!-- re-verified: 2026-11-06 (audit "làm nhầm phải gỡ được") — bỏ gắn lệnh ngay ở chuyến xuất: bước 2 của chuyến → Gắn / bỏ gắn lệnh → Bỏ gắn, mọi trạng thái lệnh kể cả Đã hủy (`unlinkShipmentOrder`); có Hoàn tác, nhật ký HĐ + nhật ký lệnh. -->
 <!-- re-verified: 2026-11-06 (ba-spec 74 R14) — chuyến nhiều HĐ: bước 2 của chuyến Xong khi MỌI HĐ trên chuyến có lệnh đã phát hành gắn chuyến (`issuedOrderContracts`); gộp chuyến chuyển lệnh gắn sang chuyến giữ. -->
 <!-- re-verified: 2026-11-04 (chần / luộc) — Quy cách dòng lệnh thêm "Chần / luộc …" từ ô Thời gian chần / luộc của dòng HĐ (`contractLineSpec`). -->
@@ -51,7 +52,7 @@ flowchart LR
 
 | Bước | Mục | Xong khi | Ai làm |
 |---|---|---|---|
-| 1 · Lập lệnh | Hộp **Lập lệnh sản xuất** | `canCreateOrder` cho qua: HĐ chưa hủy, chưa đóng, có bản hiệu lực, dòng chọn đã nối mặt hàng. `validateOrder` hết lỗi: có số lệnh (không trùng), HĐ, ≥ 1 ngày sản xuất, ngày giao ≥ ngày sản xuất cuối, ≥ 1 dòng có số thùng (hoặc kiện) và kg > 0. Lưu xong ở **Nháp** | Phòng Kế hoạch |
+| 1 · Lập lệnh | Hộp **Lập lệnh sản xuất** | `canCreateOrder` cho qua: HĐ chưa hủy, chưa đóng, có bản hiệu lực, dòng chọn đã nối mặt hàng. `validateOrder` hết lỗi: có số lệnh (không trùng), HĐ, ≥ 1 ngày sản xuất, ngày giao ≥ ngày sản xuất cuối, ≥ 1 dòng có số thùng (hoặc kiện) và kg > 0. Lưu xong ở **Nháp**. **Đọc file lệnh** (2026-11-06, ba-spec 48 R21): file Word / PDF có chữ — đã đính ở bước 2 của chuyến hoặc chọn trên máy — điền sẵn số lệnh, ngày lệnh, MSL, ngày sản xuất (ngày ISO trên thùng), ngày giao, thị trường, HSD, quy trình, lưu ý và dòng hàng (khớp dòng HĐ theo tên danh mục + size + quy cách đóng gói; số thùng / kiện theo file; quy cách đóng gói của file ⇒ Ghi chú dòng, sửa được). Ô đã gõ khác file thì giữ + kê; cảnh báo: dòng không khớp HĐ, vượt phần HĐ còn lại, kg file ≠ kg tính theo HĐ, khách khác HĐ, số lệnh trùng, ngày ISO trước ngày lệnh. Không tự lưu (`parseOrderRows` · `matchOrderLines` · `fillOrderForm`) | Phòng Kế hoạch |
 | 2 · NL nhập khẩu dự kiến | **Gắn NL nhập khẩu** / **Sửa NL dự kiến** | Chọn lần nhập có thực nhập, chưa hủy (`materialOptions`) và gõ kg. Dành vượt thực nhập: cảnh báo, vẫn lưu. Không ghi sổ kho (`reservationOf`) | Phòng Kế hoạch |
 | 3 · Phát hành · gắn chuyến | **Phát hành** → **Gắn chuyến** | Chuyến chọn được: chuyến còn mở **có hàng của HĐ** của lệnh, kể cả chuyến gộp của HĐ khác (`openShipmentsOf`, ba-spec 70). Lệnh sang Đã phát hành. Mỗi chuyến gắn: bước **Lệnh sản xuất** của chuyến Xong (`issuedShipmentIds`) — chuyến nhiều HĐ: Xong khi mọi HĐ trên chuyến có lệnh gắn (`issuedOrderContracts`, ba-spec 74 R14); chuyến chưa có mã số lô nhận mã của lệnh (`shipmentsWithLot`) | Phòng Kế hoạch |
 | 3b · Bỏ gắn chuyến (gắn nhầm) | Trang lệnh: **Gắn chuyến** bỏ tick (lệnh còn hiệu lực). Ngay ở chuyến xuất (bước 2): **Gắn / bỏ gắn lệnh** → mục Đang gắn → **Bỏ gắn** — mọi trạng thái lệnh, cả **Đã hủy** (link cũ không tính cho bước nhưng vẫn gỡ được). Hỏi lại, có Hoàn tác; nhật ký HĐ + nhật ký lệnh ghi "Bỏ gắn"; MSL chuyến đã nhận giữ nguyên | Gỡ link xong | Phòng Kế hoạch (`production-orders` Sửa) — `unlinkShipmentOrder` |

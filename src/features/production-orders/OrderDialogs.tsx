@@ -49,6 +49,8 @@ import {
 import type { ExportContractLine, ProductionOrder, ProductionOrderLine, ProductionOrderMaterial, ProductionOrderRequirements } from "@/types";
 import { ClipboardList, Copy, Link2, Plus, Send, Trash2, Wheat } from "lucide-react";
 import { shipmentLabel } from "./orderText";
+import { OrderFileReadPanel, type AttachedOrderFile } from "./OrderFileReadPanel";
+import { fillOrderForm, type OrderFile, type OrderFillReport, type OrderFillTarget } from "@/lib/productionOrderFile";
 import type { ProductionOrderData } from "./useProductionOrderData";
 
 const NAFI_TESTS = ["Vi sinh", "Kháng sinh", "Kim loại nặng", "Histamine", "Khác"];
@@ -73,6 +75,8 @@ interface LineForm {
   units: number | null;
   /** kg gõ tay — chỉ dùng khi dòng HĐ thiếu kg tịnh/thùng. */
   kg: number | null;
+  /** Ghi chú dòng in trên lệnh — trống (undefined) ⇒ ghi chú của dòng HĐ (R17); đọc file lệnh điền quy cách đóng gói (R21). */
+  note?: string;
 }
 interface OrderForm {
   key: string;
@@ -93,6 +97,8 @@ interface OrderForm {
   note: string;
   revisionReason: string;
   initial: string;
+  /** Giá trị gợi ý lúc mở hộp — đọc file lệnh coi ô còn bằng gợi ý là chưa gõ (R21). */
+  defaults?: { orderNo: string; orderDate: string; shelfLifeMonths: number | null; market: string };
 }
 const orderSnap = (f: OrderForm) =>
   JSON.stringify([f.contractId, f.orderNo, f.orderDate, f.lotCode, f.productionDates, f.deliveryDate, f.shelfLifeMonths, f.market, f.lines, f.req, f.note, f.revisionReason]);
@@ -135,13 +141,13 @@ export function OrderFormDialog({
       deliveryDate: o?.deliveryDate ?? "",
       shelfLifeMonths: o?.shelfLifeMonths ?? DEFAULT_SHELF_LIFE_MONTHS,
       market: o?.market ?? data.customers.find((c) => c.id === customerId)?.market ?? "",
-      lines: o ? linesOfOrder(data.lines, o.id).map((l) => ({ id: l.id, contractLineId: l.contractLineId, units: l.units, kg: l.netKgPerCarton == null ? l.kg : null })) : [blankLine()],
+      lines: o ? linesOfOrder(data.lines, o.id).map((l) => ({ id: l.id, contractLineId: l.contractLineId, units: l.units, kg: l.netKgPerCarton == null ? l.kg : null, note: l.note })) : [blankLine()],
       req: o ? { ...o.requirements } : emptyRequirements(),
       note: o?.note ?? "",
       revisionReason: "",
       initial: "",
     };
-    const fresh = { ...f, initial: orderSnap(f) };
+    const fresh = { ...f, initial: orderSnap(f), defaults: { orderNo: f.orderNo, orderDate: f.orderDate, shelfLifeMonths: f.shelfLifeMonths, market: f.market } };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
     setErrors([]);
@@ -185,9 +191,62 @@ export function OrderFormDialog({
       const base = cl
         ? lineFromContract(cl, productName(cl.productId), { id: lf.id, orderId: form.id, lineNo: i + 1 })
         : ({ id: lf.id, orderId: form.id, lineNo: i + 1, contractLineId: "", productId: "", productName: "", description: "", spec: "", unitKind: "carton", cartonsPerUnit: 1, netKgPerCarton: null, units: null, kg: null, note: "" } as ProductionOrderLine);
-      const withUnits = { ...base, units: lf.units };
+      const withUnits = { ...base, units: lf.units, note: lf.note !== undefined ? lf.note.trim() : base.note };
       return { ...withUnits, kg: lineKg(withUnits) ?? lf.kg };
     });
+  /* R21: file lệnh sản xuất đã đính ở bước 2 các chuyến của HĐ (chuyến mở hộp trước), mới nhất trước. */
+  const attachedOrderFiles: AttachedOrderFile[] = ex.files
+    .filter((f) => f.step === "production-order" && f.contractId === form.contractId && f.shipmentId && /\.(docx?|pdf)$/i.test(f.fileName))
+    .sort((a, b) => Number(b.shipmentId === form.shipmentId) - Number(a.shipmentId === form.shipmentId) || b.createdAt.localeCompare(a.createdAt))
+    .map((f) => {
+      const s = ex.shipments.find((x) => x.id === f.shipmentId);
+      return { path: f.path, fileName: f.fileName, where: s ? `chuyến ${shipmentLabel(s)}` : "chuyến của hợp đồng" };
+    });
+  const readOrderFileInto = (file: OrderFile): OrderFillReport => {
+    const lineIds = rev?.lines ?? [];
+    const target: OrderFillTarget = {
+      orderNo: form.orderNo,
+      orderDate: form.orderDate,
+      lotCode: form.lotCode,
+      productionDates: form.productionDates,
+      deliveryDate: form.deliveryDate,
+      shelfLifeMonths: form.shelfLifeMonths,
+      market: form.market,
+      lines: form.lines,
+      processNote: form.req.processNote,
+      note: form.note,
+    };
+    const { form: next, report } = fillOrderForm(target, file, {
+      contractLines: lineIds,
+      productName,
+      remainingKg: (id) => {
+        const cl = lineIds.find((l) => l.id === id);
+        return cl ? contractLineCoverage(cl, rev?.terms.tolerancePct ?? null, others, othersLines).remainingKg : null;
+      },
+      customerName,
+      takenOrderNos: others.map((o) => o.orderNo),
+      defaults: form.defaults ?? { orderNo: "", orderDate: "", shelfLifeMonths: null, market: "" },
+      newId,
+    });
+    setForm((f) =>
+      f
+        ? {
+            ...f,
+            orderNo: next.orderNo,
+            orderDate: next.orderDate,
+            lotCode: next.lotCode,
+            productionDates: next.productionDates.length ? next.productionDates : [""],
+            deliveryDate: next.deliveryDate,
+            shelfLifeMonths: next.shelfLifeMonths,
+            market: next.market,
+            lines: next.lines.map((l) => ({ id: l.id, contractLineId: l.contractLineId, units: l.units, kg: l.kg, ...(l.note !== undefined ? { note: l.note } : {}) })),
+            req: { ...f.req, processNote: next.processNote },
+            note: next.note,
+          }
+        : f,
+    );
+    return report;
+  };
   const firstProduct = contractLine(form.lines[0]?.contractLineId ?? "")?.productId ?? "";
   const previous = customerName && firstProduct ? previousOrderFor(data.orders, data.lines, customerName, firstProduct, form.id) : null;
   const expiry = expiryDate(form.productionDates.filter(Boolean), form.shelfLifeMonths ?? 0);
@@ -291,6 +350,7 @@ export function OrderFormDialog({
             hint="Chỉ hợp đồng còn mở và có bản hiệu lực."
             emptyText="Chưa có hợp đồng xuất nào đủ điều kiện."
           />
+          {rev && <OrderFileReadPanel attached={attachedOrderFiles} onRead={readOrderFileInto} />}
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Số lệnh" required hint={form.isNew ? `Gợi ý số kế tiếp: ${nextOrderNumber(others, form.orderDate || today)}` : undefined}>
               <Input value={form.orderNo} onChange={(e) => set("orderNo", e.target.value)} />
@@ -360,12 +420,15 @@ export function OrderFormDialog({
                   ) : (
                     <span />
                   )}
-                  {/* R17: quy cách + ghi chú dòng chép từ dòng HĐ — xem trước, sửa ở hợp đồng. */}
-                  {cl && (contractLineSpec(cl) || cl.note) && (
-                    <p className="text-sm break-words text-muted-foreground sm:col-span-4">
-                      {contractLineSpec(cl) && <>Quy cách: {contractLineSpec(cl)}</>}
-                      {cl.note && <span className="block">Ghi chú: {cl.note}</span>}
-                    </p>
+                  {/* R17: quy cách chép từ dòng HĐ — xem trước, sửa ở hợp đồng. */}
+                  {cl && contractLineSpec(cl) && <p className="text-sm break-words text-muted-foreground sm:col-span-4">Quy cách: {contractLineSpec(cl)}</p>}
+                  {/* Ghi chú dòng in trên lệnh: mặc định ghi chú của dòng HĐ; đọc file lệnh điền quy cách đóng gói (R21). */}
+                  {cl && (
+                    <div className="sm:col-span-4">
+                      <Field label={`Ghi chú dòng ${i + 1} (in trên lệnh)`}>
+                        <Textarea rows={2} value={lf.note ?? cl.note ?? ""} onChange={(e) => setLine(lf.id, { note: e.target.value })} />
+                      </Field>
+                    </div>
                   )}
                 </div>
               );

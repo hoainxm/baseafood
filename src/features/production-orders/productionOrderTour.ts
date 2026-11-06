@@ -45,7 +45,8 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
         title: "Lập lệnh sản xuất",
         body:
           "Chọn hợp đồng xuất (phải có bản hiệu lực), rồi chọn dòng hàng và gõ số thùng: tên, quy cách (size, chiều dài, số miếng / kg, tỉ lệ râu / thân / cổ, thời gian chần / luộc, packing) và ghi chú dòng lấy sẵn từ hợp đồng, kg tịnh tự tính (số thùng × kg tịnh mỗi thùng, không phải kg cả bì). Muốn đổi quy cách thì sửa dòng hàng ở hợp đồng xuất.\n" +
-          "Ghi số lệnh, mã số lô, các ngày sản xuất, ngày giao. Hạn sử dụng tự tính từ tháng sản xuất đầu. Lưu xong lệnh ở trạng thái Nháp.",
+          "Ghi số lệnh, mã số lô, các ngày sản xuất, ngày giao. Hạn sử dụng tự tính từ tháng sản xuất đầu. Lưu xong lệnh ở trạng thái Nháp.\n" +
+          "Đã có file lệnh (Word .doc / .docx, PDF có chữ): ở khối Đọc file lệnh sản xuất chọn Đọc <tên file> (file đã đính ở bước Lệnh sản xuất của chuyến) hoặc Chọn file trên máy. App điền sẵn số lệnh, ngày lệnh, MSL, ngày sản xuất theo ngày ISO trên thùng, ngày giao, thị trường, hạn sử dụng, quy trình, lưu ý, và dòng hàng: mỗi dòng file khớp một dòng hợp đồng (tên, size, quy cách đóng gói), số thùng / kiện theo file, quy cách đóng gói của file vào Ghi chú dòng. Ô đã gõ khác file thì giữ, kê ở Giữ ô đã gõ. Cần soát: dòng không khớp hợp đồng, số vượt phần hợp đồng còn lại, kg file khác kg tính theo hợp đồng, khách trên file khác hợp đồng, số lệnh trùng. App không tự lưu — soát rồi Lưu lệnh.",
       }),
     );
   steps.push(

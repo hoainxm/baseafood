@@ -8,6 +8,9 @@ import { useSearchParams } from "react-router-dom";
 import type { WipProductionItem } from "@/types";
 import { useExportItems, useLotDispatches, useLotInputs, usePackagings, useProducts, useSalesItems, useWipProductions } from "@/lib/catalogRepo";
 import { computeWipStockDetail, collectWipDeductions, type LotStock } from "@/lib/inventory";
+import { approveWipIntake, checkIntakeReversal, revertWipIntake } from "@/lib/wipIntakeReversal";
+import { useAuth } from "@/lib/auth";
+import { recordName } from "@/lib/personName";
 import { bucketStockByAge } from "@/lib/dataFlow";
 import {
   RequiredLegend,
@@ -36,6 +39,7 @@ import {
   type FieldError,
   type ComboboxOption,
   ProportionBar,
+  ConfirmAction,
   todayIso,
   FilterBar,
   NoMatchState,
@@ -43,7 +47,7 @@ import {
 } from "@/design-system";
 import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
 import { kg, num, formatDateVN } from "@/lib/format";
-import { AlertTriangle, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Warehouse } from "lucide-react";
+import { AlertTriangle, Camera, CameraOff, ClipboardList, PackageCheck, Scale, Search, Snowflake, Undo2, Warehouse } from "lucide-react";
 import { QrScanner } from "@/features/shared";
 import { useCan, useCanOnRow } from "@/features/shared/PermissionProvider";
 import { parseQrCode, formatWipLotLabel, findLots } from "@/lib/lotTraceability";
@@ -90,6 +94,10 @@ export default function ReserveWarehouseScreen() {
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [typedCode, setTypedCode] = useState("");
+  /** Lô đang xem chi tiết (id mẻ) — nơi đặt nút Hủy duyệt. */
+  const [lotDetailId, setLotDetailId] = useState<string | null>(null);
+  const [confirmingRevert, setConfirmingRevert] = useState(false);
+  const { profile } = useAuth();
 
   const productNameOf = (id: string) => products.find((m) => m.id === id)?.name || "—";
 
@@ -195,20 +203,9 @@ export default function ReserveWarehouseScreen() {
     if (ls.length > 0) return;
     const original = wips.find((s) => s.id === approval.wipId);
     const diff = original ? approval.actualKg - original.quantityKg : 0;
-    persistWips(
-      wips.map((s) =>
-        s.id === approval.wipId
-          ? {
-              ...s,
-              warehouse: approval.warehouse,
-              quantityKg: approval.actualKg,
-              blocksCount: approval.actualBlocks,
-              status: "stocked",
-              note: approval.note || s.note,
-            }
-          : s
-      )
-    );
+    // Ghi số thực + CHỤP số xưởng ghi (preApproval) — Hủy duyệt trả về đúng số đó.
+    const meta = { approvedBy: recordName(profile), approvedAt: new Date().toISOString() };
+    persistWips(wips.map((s) => (s.id === approval.wipId ? approveWipIntake(s, approval, meta) : s)));
     notify.saved(
       `Đã nhập kho ${approval.warehouse} — ${kg(approval.actualKg)}` +
         (diff ? ` (lệch ${diff > 0 ? "+" : ""}${num(diff)} kg)` : "")
@@ -243,6 +240,31 @@ export default function ReserveWarehouseScreen() {
       ),
     },
   ];
+
+  /* ---- Chi tiết lô + Hủy duyệt (về Chờ nhập kho đúng số xưởng ghi) ---- */
+  const lotDetail = lotDetailId ? wips.find((s) => s.id === lotDetailId) : undefined;
+  const lotDetailStock = lotDetailId ? lotStock.find((t) => t.wipId === lotDetailId) : undefined;
+  const revertCheck = lotDetail ? checkIntakeReversal(lotDetail, { lotStock, exportItems, lotDispatches, lotInputs }) : null;
+  const canRevert = Boolean(lotDetail && allowed.approve && canRow("approve", lotDetail));
+  const requestRevert = () => {
+    if (!revertCheck) return;
+    if (!revertCheck.ok) {
+      notify.warning(revertCheck.reason);
+      return;
+    }
+    setConfirmingRevert(true);
+  };
+  const revertIntake = () => {
+    if (!lotDetail || !revertCheck?.ok) return;
+    const prevWips = wips;
+    const reverted = revertWipIntake(lotDetail);
+    persistWips(wips.map((s) => (s.id === lotDetail.id ? reverted : s)));
+    setLotDetailId(null);
+    notify.saved(
+      `Đã hủy duyệt lô ${formatWipLotLabel(lotDetail)} — về Chờ nhập kho (${kg(reverted.quantityKg)})`,
+      () => persistWips(prevWips)
+    );
+  };
 
   const approvalSource = approval
     ? wips.find((s) => s.id === approval.wipId)
@@ -385,6 +407,17 @@ export default function ReserveWarehouseScreen() {
             rows={shownStock}
             getKey={(r) => r.wipId}
             rowMarkKey="kho-du-tru"
+            actions={(r) => (
+              <Button
+                data-tour="warehouse-lot-view"
+                title="Mở chi tiết lô: số xưởng ghi và số kho nhận, đã xuất bao nhiêu; hủy duyệt nhập kho nếu duyệt nhầm."
+                variant="outline"
+                size="sm"
+                onClick={() => setLotDetailId(r.wipId)}
+              >
+                Xem
+              </Button>
+            )}
           />
           <div className="flex justify-end rounded-xl bg-muted px-5 py-4">
             <div className="flex items-baseline gap-3">
@@ -477,6 +510,96 @@ export default function ReserveWarehouseScreen() {
           ))}
         </div>
       </div>
+
+      {/* Chi tiết lô đã nhập kho — chỗ duy nhất có Hủy duyệt */}
+      <Dialog open={lotDetail !== undefined} onOpenChange={(o) => !o && setLotDetailId(null)}>
+        <DialogContent className="w-full sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Lô {lotDetail ? formatWipLotLabel(lotDetail) : ""}</DialogTitle>
+            <DialogDescription className="text-base">
+              {lotDetail
+                ? `${productNameOf(lotDetail.productId)}${lotDetail.spec ? ` · ${lotDetail.spec}` : ""} — SX ${formatDateVN(lotDetail.productionDate)} · xưởng ${lotDetail.workshop}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {lotDetail && (
+            <div className="space-y-4 py-2">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-base">
+                <dt className="text-muted-foreground">Kho</dt>
+                <dd>{lotDetail.warehouse || "—"}</dd>
+                <dt className="text-muted-foreground">Kho nhận</dt>
+                <dd>
+                  <span className="tnum font-semibold">{kg(lotDetail.quantityKg)}</span> · <span className="tnum">{num(lotDetail.blocksCount)}</span> block
+                </dd>
+                <dt className="text-muted-foreground">Xưởng ghi</dt>
+                <dd>
+                  {lotDetail.preApproval ? (
+                    <>
+                      <span className="tnum">{kg(lotDetail.preApproval.quantityKg)}</span> · <span className="tnum">{num(lotDetail.preApproval.blocksCount)}</span> block
+                      {lotDetail.preApproval.approvedBy ? ` · duyệt bởi ${lotDetail.preApproval.approvedBy}` : ""}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Không còn số gốc (lô duyệt trước 06/11/2026)</span>
+                  )}
+                </dd>
+                <dt className="text-muted-foreground">Đã xuất / còn</dt>
+                <dd className="tnum">
+                  {num(lotDetailStock?.outKg ?? 0)} / {num(lotDetailStock?.remainingKg ?? lotDetail.quantityKg)} kg
+                </dd>
+                {lotDetail.note && (
+                  <>
+                    <dt className="text-muted-foreground">Ghi chú</dt>
+                    <dd>{lotDetail.note}</dd>
+                  </>
+                )}
+              </dl>
+              {canRevert && revertCheck && !revertCheck.ok && (
+                <p className="rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">
+                  Chưa hủy duyệt được: {revertCheck.reason}
+                </p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            {canRevert && (
+              <Button
+                data-tour="warehouse-revert"
+                title="Duyệt nhầm? Đưa lô về Chờ nhập kho với đúng số xưởng ghi. Lô đã xuất / bán / đóng gói thì phải gỡ ở đó trước. Có hỏi lại, xong vẫn Hoàn tác được."
+                variant="edit"
+                size="lg"
+                onClick={requestRevert}
+              >
+                <Undo2 />
+                Hủy duyệt nhập kho
+              </Button>
+            )}
+            <Button variant="outline" size="lg" onClick={() => setLotDetailId(null)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ConfirmAction
+        open={confirmingRevert}
+        onOpenChange={setConfirmingRevert}
+        title={lotDetail ? `Hủy duyệt nhập kho lô ${formatWipLotLabel(lotDetail)}?` : ""}
+        description={
+          revertCheck?.ok && !revertCheck.hasSnapshot
+            ? "Lô về Chờ nhập kho và rời khỏi tồn dự trữ. Lô này duyệt trước khi app lưu số gốc ⇒ giữ nguyên số kg / block đang có; duyệt lại thì sửa số. Xong vẫn Hoàn tác được."
+            : "Lô về Chờ nhập kho, rời khỏi tồn dự trữ; kg, block, kho, ghi chú trở về đúng số xưởng ghi. Duyệt lại khi đã cân đúng. Xong vẫn Hoàn tác được."
+        }
+        detail={
+          lotDetail && revertCheck?.ok
+            ? `${productNameOf(lotDetail.productId)} · kho nhận ${kg(lotDetail.quantityKg)} → về ${kg(revertCheck.restoredKg)}`
+            : undefined
+        }
+        confirmLabel="Hủy duyệt"
+        icon={Undo2}
+        onConfirm={() => {
+          revertIntake();
+          setConfirmingRevert(false);
+        }}
+      />
 
       {/* Dialog duyệt nhập kho */}
       <Dialog open={approval !== null} onOpenChange={(o) => !o && setApproval(null)}>

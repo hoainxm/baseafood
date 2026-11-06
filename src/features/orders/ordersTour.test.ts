@@ -18,7 +18,7 @@ function screenStatusLabels(): string[] {
 }
 
 function ctx(over: Partial<OrdersTourContext> = {}): OrdersTourContext {
-  return { pick: "o1", can: { create: true, update: true, delete: true }, openOrder: vi.fn(), restoreView: vi.fn(), ...over };
+  return { pick: "o1", can: { create: true, update: true, delete: true, cancelExport: true }, openOrder: vi.fn(), restoreView: vi.fn(), ...over };
 }
 
 describe("pickTourOrder", () => {
@@ -57,11 +57,21 @@ describe("buildOrdersTour", () => {
   });
 
   it("chỉ xem ⇒ không bước Tạo đơn / Xác nhận đủ – lệnh xuất, không nhắc Kiểm lô bằng quét", () => {
-    const view = buildOrdersTour(ctx({ can: { create: false, update: false, delete: false } })).steps;
+    const view = buildOrdersTour(ctx({ can: { create: false, update: false, delete: false, cancelExport: false } })).steps;
     expect(view.filter((s) => s.id === "create" || s.id === "detail-actions")).toHaveLength(0);
     expect(view.some((s) => s.body.includes("Kiểm lô bằng quét"))).toBe(false);
+    expect(view.some((s) => s.id === "detail-delete" || s.body.includes("Hủy lệnh xuất (lập nhầm)"))).toBe(false);
     const full = buildOrdersTour(ctx()).steps;
     expect(full.filter((s) => s.id === "create" || s.id === "detail-actions")).toHaveLength(2);
+  });
+
+  it("gỡ được việc làm nhầm: tour kể Mở lại đơn, Xóa đơn (trong chi tiết), Hủy lệnh xuất, Bỏ kiểm", () => {
+    const text = buildOrdersTour(ctx()).steps.map((s) => s.body).join("\n");
+    for (const l of ["Mở lại đơn", "Xóa đơn", "Hủy lệnh xuất", "Bỏ kiểm", "Đã hủy"]) expect(text).toContain(l);
+    expect(buildOrdersTour(ctx()).steps.find((s) => s.id === "detail-delete")?.target).toBe("orders-delete");
+    // chỉ xóa đơn được, không hủy lệnh (thiếu quyền xóa ở Bán hàng) ⇒ không kể Hủy lệnh xuất
+    const noCancel = buildOrdersTour(ctx({ can: { create: true, update: true, delete: true, cancelExport: false } })).steps;
+    expect(noCancel.some((s) => s.body.includes("Hủy lệnh xuất (lập nhầm)"))).toBe(false);
   });
 
   it("AC-10: lời tour gọi đủ nhãn trạng thái đơn và thẻ dòng hàng đang hiện trên trang", () => {

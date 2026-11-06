@@ -27,10 +27,18 @@ describe("buildWarehouseTour", () => {
     const ids = buildWarehouseTour({ can: { approve: true } }).steps.map((s) => s.id);
     // 2026-11-02 (Đầu trang gọn): tổng quan tuổi tồn + dung tích xuống SAU bảng tồn.
     // 2026-11-03 (rà UX): lọc → thẻ số → bảng, như mọi sổ; thẻ "Chờ nhập" bỏ (số đã ở đầu khối duyệt).
-    const order = ["pending", "scan", "approve", "filter", "stats", "stock", "age", "capacity"];
+    const order = ["pending", "scan", "approve", "filter", "stats", "stock", "lot-detail", "age", "capacity"];
     const at = order.map((id) => ids.indexOf(id));
     expect(at.every((i) => i >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+
+  it("gỡ duyệt nhầm: có quyền Duyệt ⇒ bước chi tiết lô kể Hủy duyệt và các trường hợp bị chặn; không quyền ⇒ không kể", () => {
+    const body = (approve: boolean) => buildWarehouseTour({ can: { approve } }).steps.find((s) => s.id === "lot-detail")?.body ?? "";
+    expect(body(true)).toContain("Hủy duyệt nhập kho");
+    expect(body(true)).toContain("Hủy lệnh xuất");
+    expect(body(true)).toContain("Xưởng ghi");
+    expect(body(false)).not.toContain("Hủy duyệt");
   });
 
   it("AC-10: lời tour gọi đủ nhãn nhóm tuổi tồn và nhãn trạng thái lô đang hiện trên trang", () => {

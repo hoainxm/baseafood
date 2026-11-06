@@ -8,7 +8,9 @@
 //   • lô khác CÙNG mặt hàng × quy cách, còn đủ tồn ⇒ hỏi THAY LÔ: sửa dòng lệnh trỏ
 //     sang lô đang cầm trên tay (ghi đè ⇒ xác nhận trước + Hoàn tác). Hồ sơ thu hồi
 //     khi đó đúng lô thật đã lên xe;
-//   • lô khác mặt hàng / hết tồn ⇒ báo đỏ, đừng xếp lên xe.
+//   • lô khác mặt hàng / hết tồn ⇒ báo đỏ, đừng xếp lên xe;
+//   • ghi kiểm nhầm (quét tem rồi bốc lô đó xuống) ⇒ Bỏ kiểm ở dòng lô: xóa dấu export_item
+//     của lô trong lệnh (hỏi lại + Hoàn tác), lô về Chưa quét. Không đổi dòng lệnh / tồn.
 // Thiết kế: docs/spec/qr-truy-xuat-lo.md §6c–6d
 // ============================================================
 import { useMemo, useState } from "react";
@@ -34,7 +36,7 @@ import {
   ConfirmAction,
   notify,
 } from "@/design-system";
-import { ArrowLeftRight, Camera, CameraOff, Search } from "lucide-react";
+import { ArrowLeftRight, Camera, CameraOff, Search, Undo2 } from "lucide-react";
 import { recordName } from "@/lib/personName";
 
 interface OrderLot {
@@ -171,6 +173,16 @@ export function ExportLotCheck({
     });
   };
 
+  /** Lô đang chờ xác nhận Bỏ kiểm. */
+  const [unchecking, setUnchecking] = useState<OrderLot | null>(null);
+  const uncheckLot = (l: OrderLot) => {
+    const prevDispatches = lotDispatches;
+    const itemIds = new Set(orderItems.filter((d) => d.wipId === l.wipId).map((d) => d.id));
+    const isCheckOfLot = (x: LotDispatch) => x.docKind === "export_item" && itemIds.has(x.docId) && x.lotId === l.wipId;
+    saveLotDispatches(lotDispatches.filter((x) => !isCheckOfLot(x)));
+    notify.deleted(`Đã bỏ kiểm lô ${l.label} — về Chưa quét`, () => saveLotDispatches(prevDispatches));
+  };
+
   const allChecked = lotsOfOrder.length > 0 && checked.size === lotsOfOrder.length;
 
   return (
@@ -221,7 +233,22 @@ export function ExportLotCheck({
                     {l.block ? ` · ${l.block} block` : ""}
                   </span>
                 </span>
-                {checked.has(l.wipId) ? <Tag variant="done">Đã quét</Tag> : <Tag variant="pending">Chưa quét</Tag>}
+                {checked.has(l.wipId) ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Tag variant="done">Đã quét</Tag>
+                    <Button
+                      title="Ghi kiểm nhầm lô này (đã bốc xuống, quét nhầm)? Bỏ dấu đã quét, lô về Chưa quét. Có hỏi lại, xong vẫn Hoàn tác được."
+                      variant="danger"
+                      size="sm"
+                      onClick={() => setUnchecking(l)}
+                    >
+                      <Undo2 />
+                      Bỏ kiểm
+                    </Button>
+                  </span>
+                ) : (
+                  <Tag variant="pending">Chưa quét</Tag>
+                )}
               </li>
             ))}
           </ul>
@@ -246,6 +273,20 @@ export function ExportLotCheck({
         confirmLabel="Thay lô"
         icon={ArrowLeftRight}
         onConfirm={replaceLot}
+      />
+      <ConfirmAction
+        open={unchecking !== null}
+        onOpenChange={(o) => !o && setUnchecking(null)}
+        title={unchecking ? `Bỏ kiểm lô ${unchecking.label}?` : ""}
+        description="Xóa dấu đã quét kiểm của lô này trong lệnh xuất — lô về Chưa quét, quét lại khi xếp lên xe. Dòng lệnh và tồn kho không đổi. Xong vẫn Hoàn tác được."
+        detail={unchecking ? `${productNameOf(unchecking.productId)} · ${kg(unchecking.kg)}${unchecking.block ? ` · ${unchecking.block} block` : ""}` : undefined}
+        confirmLabel="Bỏ kiểm"
+        destructive
+        icon={Undo2}
+        onConfirm={() => {
+          if (unchecking) uncheckLot(unchecking);
+          setUnchecking(null);
+        }}
       />
     </Dialog>
   );

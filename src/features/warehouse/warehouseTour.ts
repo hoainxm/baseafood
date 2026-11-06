@@ -65,7 +65,8 @@ export function buildWarehouseTour(ctx: WarehouseTourContext): PageTour {
         title: "Duyệt nhập kho",
         body:
           "Chọn Duyệt nhập kho ở một dòng để mở hộp duyệt: chọn Kho (phòng đông), nhập Khối lượng thực và Block thực đã cân, ghi lý do nếu lệch so với số đã ghi ở Sản xuất.\n" +
-          "Chọn Xác nhận nhập kho: lô chuyển sang đã nhập kho, tồn của kho đã chọn tăng đúng kg thực. Từ lúc này lô mới xuất, bán hoặc đóng gói được.",
+          "Chọn Xác nhận nhập kho: lô chuyển sang đã nhập kho, tồn của kho đã chọn tăng đúng kg thực. Từ lúc này lô mới xuất, bán hoặc đóng gói được.\n" +
+          "Số xưởng ghi (kg, block, kho, ghi chú) vẫn được giữ lại để đối chiếu — duyệt nhầm thì Hủy duyệt ở chi tiết lô trả về đúng số đó.",
       },
     );
   }
@@ -95,6 +96,18 @@ export function buildWarehouseTour(ctx: WarehouseTourContext): PageTour {
         "Mỗi dòng là một lô còn hàng: Mặt hàng · Kho · Lô (ngày SX) · Còn (kg) · Block · Nhập / xuất (kg nhập khi duyệt / kg đã ra). Lô đã hết hàng không hiện.\n" +
         "Chọn tên cột để sắp xếp. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu, đánh dấu những dòng đã kiểm. Dòng Tổng tồn ở cuối bảng.\n" +
         "Chưa có lô nào thì trang ghi \"Chưa có tồn trong kho\": duyệt các lô chờ nhập ở trên, hoặc ghi sản lượng ở Sản xuất thành phẩm trước. Ô tra không khớp lô nào thì trang ghi \"Không có dòng nào khớp bộ lọc\".",
+    },
+    {
+      id: "lot-detail",
+      target: "warehouse-lot-view",
+      optional: true,
+      title: "Chi tiết lô" + (can.approve ? " và Hủy duyệt" : ""),
+      body:
+        "Chọn Xem ở một dòng để mở chi tiết lô: kho, số Kho nhận (kg · block khi duyệt), số Xưởng ghi lúc sản xuất, đã xuất / còn và ghi chú. Lô duyệt trước 06/11/2026 không còn số xưởng ghi." +
+        (can.approve
+          ? "\nDuyệt nhầm thì chọn Hủy duyệt nhập kho (có hỏi lại, xong vẫn Hoàn tác được): lô về Chờ nhập kho, rời khỏi tồn, kg / block / kho / ghi chú trở về đúng số xưởng ghi.\n" +
+            "Không hủy được khi lô đã đi: đã nằm trong lệnh xuất (Hủy lệnh xuất ở Đơn đặt trước), đã gắn cho dòng bán hoặc phiếu đóng gói, đã bị bán lẻ / đóng gói trừ vào, hoặc kỳ Cân đối đã hút mẻ mà số kg sẽ đổi. Hộp chi tiết ghi rõ lý do và chỗ cần sửa."
+          : ""),
     },
     {
       id: "age",

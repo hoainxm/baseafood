@@ -31,6 +31,7 @@ import type {
   SalesInvoice,
   SalesItem,
   WipProductionItem,
+  WipPreApproval,
   Packaging,
   SalesOrder,
   OrderItem,
@@ -794,6 +795,21 @@ export const SALES_ITEM_TABLE: TableMapping<SalesItem> = {
 /* ---------- Module WIP ---------- */
 
 /** Dòng BTP sản xuất ngày. */
+/** Đọc cột jsonb `pre_approval` (mig 0108) — hỏng / rỗng ⇒ null (coi như không có số gốc). */
+export function readPreApproval(v: unknown): WipPreApproval | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.quantityKg !== "number" || !Number.isFinite(o.quantityKg)) return null;
+  return {
+    quantityKg: o.quantityKg,
+    blocksCount: typeof o.blocksCount === "number" && Number.isFinite(o.blocksCount) ? o.blocksCount : 0,
+    warehouse: typeof o.warehouse === "string" ? o.warehouse : "",
+    note: typeof o.note === "string" ? o.note : "",
+    approvedBy: typeof o.approvedBy === "string" ? o.approvedBy : "",
+    approvedAt: typeof o.approvedAt === "string" ? o.approvedAt : "",
+  };
+}
+
 export const WIP_PRODUCTION_TABLE: TableMapping<WipProductionItem> = {
   table: "production_wips",
   localKey: "bsf.production-wips.v2",
@@ -822,6 +838,9 @@ export const WIP_PRODUCTION_TABLE: TableMapping<WipProductionItem> = {
     // Migration 0051 → gửi LUÔN (như leftover_by_material 0038): gửi có điều kiện
     // sẽ KHÔNG xoá được lượng bột khi sửa về rỗng.
     batter_kg: sanitizeBatterKg(x.batterKg),
+    // Cột 0108 (số xưởng ghi trước duyệt): CHỈ gửi khi dòng đã đi qua Duyệt / Hủy duyệt bản
+    // mới (object hoặc null) — dòng chưa đụng tới vẫn lên máy chủ khi DB chưa chạy 0108.
+    ...(x.preApproval !== undefined ? { pre_approval: x.preApproval } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -844,6 +863,7 @@ export const WIP_PRODUCTION_TABLE: TableMapping<WipProductionItem> = {
     balancingPeriodId: s(r.balancing_period_id),
     operator: s(r.operator),
     batterKg: sanitizeBatterKg(r.batter_kg),
+    preApproval: r.pre_approval === undefined ? undefined : readPreApproval(r.pre_approval),
   }),
   // Dòng ghi trước 0019/0030/0033/0037/0051 chưa có cột kỳ / khách / chế biến / thành phần / người thao tác / bột → mặc định trống.
   // Bộ đệm / hàng chờ trước 2026-10-14 còn tên trường `componentRauKg/componentBaoTuKg` (lib/legacyValues).

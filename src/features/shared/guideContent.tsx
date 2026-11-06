@@ -304,8 +304,9 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             <li><b>Chưa ánh xạ</b>: chọn đại lý / loại cho mã kế toán rồi nạp lại.</li>
             <li>
               <b>Gắn nhầm hóa đơn</b>: chọn <b>Chi tiết</b> ở dòng đầu hóa đơn → <b>Gỡ hóa đơn</b> (hỏi xác nhận, có Hoàn tác, cần quyền Xóa hóa đơn).
-              Hóa đơn, các dòng sổ chi tiết và file bị bỏ; sổ Nhập hàng không đổi, chuyến về <b>Chờ HĐ</b>. Hóa đơn đã{" "}
-              <b>Tạo chuyến từ HĐ</b> thì xóa chuyến đó trước. Dòng đã Cập nhật theo HĐ giữ số mới — số cũ ở vết "[Sửa theo HĐ …]".
+              Hóa đơn, các dòng sổ chi tiết và file bị bỏ; chuyến về <b>Chờ HĐ</b>. Dòng chuyến đã <b>Cập nhật theo HĐ</b> được{" "}
+              <b>trả số cũ</b> (hộp xác nhận kể từng dòng, cần thêm quyền Sửa Nhập hàng); dòng đã sửa tay sau đó thì giữ số. Hóa đơn đã{" "}
+              <b>Tạo chuyến từ HĐ</b> thì xóa chuyến đó trước.
             </li>
             <li>
               Lọc: <b>Đại lý</b> · <b>Phân xưởng</b> · <b>Trạng thái dòng</b> · ô tra số HĐ, ký hiệu, số phiếu nhập, mã đại lý / vật tư,

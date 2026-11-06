@@ -37,7 +37,7 @@ Từ trên xuống, một cột:
 
 Cập nhật theo HĐ ⇒ `notify.saved` + Hoàn tác (luật 13). Tạo chuyến ⇒ `notify.saved` có link "Xem chuyến".
 
-Gỡ hóa đơn (chỉ trong hộp Chi tiết, KHÔNG đặt nút trên dòng bảng): `ConfirmDelete` nêu "HĐ ‹số› — ‹đại lý› — N dòng sổ chi tiết — ‹kg› — file ‹tên›" ⇒ `notify.deleted` + Hoàn tác. Hộp báo trước: số dòng chuyến về Chờ HĐ; dòng đã Cập nhật theo HĐ giữ số mới (nhãn "Lưu ý"). HĐ đã tạo chuyến ghi bù ⇒ nhãn "Chưa gỡ được", bấm Gỡ hóa đơn (không `disabled`) chỉ hiện `ErrorSummary` "xóa chuyến đó ở sổ Nhập hàng trước", không mở hộp xác nhận.
+Gỡ hóa đơn (chỉ trong hộp Chi tiết, KHÔNG đặt nút trên dòng bảng): `ConfirmDelete` nêu "HĐ ‹số› — ‹đại lý› — N dòng sổ chi tiết — ‹kg› — file ‹tên›" ⇒ `notify.deleted` + Hoàn tác. Hộp báo trước: số dòng chuyến về Chờ HĐ; nhãn "Trả số cũ" + danh sách từng dòng chuyến sẽ trả (loại · ngày · xưởng: kg cũ ← mới, giá nếu Xem giá, "SAU KHI CHỐT NGÀY" khi ngày đã chốt) — cùng danh sách ghi trong câu xác nhận; nhãn "Giữ số" cho dòng không trả được, kèm lý do. HĐ đã tạo chuyến ghi bù, hoặc phải trả số mà thiếu quyền Sửa Nhập hàng ⇒ nhãn "Chưa gỡ được", bấm Gỡ hóa đơn (không `disabled`) chỉ hiện `ErrorSummary` "xóa chuyến đó ở sổ Nhập hàng trước", không mở hộp xác nhận.
 
 ## 3. Nhãn HĐ trên chuyến (mọi người xem Nhập hàng)
 `Tag` nhỏ ở đầu chuyến trong **Sổ chi tiết các chuyến** và **cột "Đã ghi ngày"**: "Chờ HĐ" (muted) · "HĐ 936" (thành công) · "HĐ 936 · lệch" (cảnh báo) · "Thiếu HĐ một phần". Người không có `imports.invoices` chỉ thấy chữ, không có link mở file.

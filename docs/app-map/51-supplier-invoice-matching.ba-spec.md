@@ -125,7 +125,7 @@ Tên file theo mẫu `<số>_<ký hiệu>_<MST người bán>.pdf` (`936_1C26THP
 - **Start:** HĐ nạp nhầm (sai file, HĐ bị thay — O2). Tab Hóa đơn → **Chi tiết** ở dòng đầu HĐ (hộp chi tiết; nút gỡ KHÔNG đặt trên dòng bảng).
 - **Steps:** **Gỡ hóa đơn** → hộp xác nhận nêu đích danh (số HĐ · đại lý · số dòng · kg · file) → gỡ. Bỏ bản ghi HĐ (kèm thông tin file PDF) + mọi dòng sổ chi tiết của nó. Toast **Hoàn tác** trả lại đủ; nhật ký ghi ở hồ sơ HĐ + hồ sơ ngày × xưởng của mỗi chuyến đang gắn.
 - **Chặn:** HĐ đã **Tạo chuyến từ HĐ** mà chuyến đó còn trong sổ ⇒ không gỡ, báo xóa chuyến trước (mở chuyến → Xóa chuyến, cần quyền Xóa Nhập hàng). Khỏi để chuyến "Theo HĐ …" mồ côi.
-- **End:** sổ Nhập hàng không đổi; chuyến đang gắn về **Chờ HĐ** như trước khi ghép. Dòng đã "Cập nhật theo HĐ" **giữ số mới** (hộp chi tiết báo trước; số cũ ở dòng vết "[Sửa theo HĐ …]"). File PDF trên kho file giữ nguyên (Hoàn tác được; nạp lại đúng file thì gắn lại).
+- **End:** chuyến đang gắn về **Chờ HĐ** như trước khi ghép. Dòng đã "Cập nhật theo HĐ" **trả số cũ** (kg + đơn giá) và bỏ dòng vết "[Sửa theo HĐ ‹số› …]" — hộp xác nhận kể từng dòng; cần thêm quyền Sửa Nhập hàng. Số cũ lưu chính xác trong `resolution_reason` của dòng HĐ lúc cập nhật (cột chữ sẵn có, không migration); dữ liệu cập nhật trước 2026-11-06 đọc từ dòng vết. Dòng đã sửa tay sau khi cập nhật, hoặc mất dòng vết ⇒ giữ số, hộp báo lý do. File PDF trên kho file giữ nguyên (Hoàn tác được; nạp lại đúng file thì gắn lại).
 
 ### Flow NV6 — Theo dõi · owner: kế toán
 - **Input:** mọi chuyến + HĐ trong một khoảng ngày hàng về.
@@ -173,7 +173,7 @@ Tên file theo mẫu `<số>_<ký hiệu>_<MST người bán>.pdf` (`936_1C26THP
 | R13 | Chuyến tạo từ HĐ là ghi bù bình thường: `laGhiBu` đúng, lý do không rỗng, `operator` = kế toán; tổng ngày đã chốt hiện lệch sau chốt như [30 §4](30-nhap-hang.md) | ngày hàng về đã chốt |
 | R14 | Xóa chuyến đã gắn HĐ (hoặc bỏ dòng khi sửa chuyến) ⇒ liên kết về lại "Không có chuyến" cho HĐ đó (không xóa HĐ, không xóa file), bỏ luôn quyết định cũ (Cập nhật theo HĐ / Giữ số xưởng). Người xóa có quyền ghi HĐ ⇒ bỏ liên kết ngay (`unlinkRemovedTripLines`); không có quyền ⇒ liên kết treo vẫn hiện "Không có chuyến" (`lineStateNow`) và lần nạp lại ghép mới, quyết định cũ chỉ giữ khi ghép đúng dòng chuyến cũ (`planLedgerImport`) | Hoàn tác xóa chuyến ⇒ liên kết trở lại |
 | R15 | File HĐ đọc **tại máy**, không gửi ra dịch vụ ngoài; chỉ lưu vào kho file của app | — |
-| R17 | **Gỡ HĐ gắn nhầm** (NV7): bỏ HĐ + dòng sổ chi tiết, không đụng sổ Nhập hàng; chặn khi chuyến "Tạo chuyến từ HĐ" của HĐ còn trong sổ (`tripsCreatedFromInvoice`: cùng đại lý, lý do ghi bù bắt đầu "Theo HĐ <số>"); xác nhận + Hoàn tác + nhật ký (`planInvoiceRemoval`) | dòng đã Cập nhật theo HĐ giữ số mới; HĐ 93 không bắt chuyến của HĐ 936 |
+| R17 | **Gỡ HĐ gắn nhầm** (NV7): bỏ HĐ + dòng sổ chi tiết; dòng chuyến đã Cập nhật theo HĐ trả số cũ (`restores`), dòng khác của sổ Nhập hàng không đổi; chặn khi chuyến "Tạo chuyến từ HĐ" của HĐ còn trong sổ (`tripsCreatedFromInvoice`: cùng đại lý, lý do ghi bù bắt đầu "Theo HĐ <số>"); xác nhận + Hoàn tác + nhật ký (`planInvoiceRemoval`) | dòng sửa tay sau khi cập nhật ⇒ giữ số (`unrestorable`); HĐ 93 không bắt chuyến / dòng vết của HĐ 936 |
 | R16 | Chế độ demo: HĐ + liên kết + file thuộc `site_id` hiện hành, có trong bộ demo (luật 15) | bật demo không lộ HĐ thật |
 
 ## 10. Acceptance Criteria — ORACLE
@@ -288,6 +288,12 @@ Tên file theo mẫu `<số>_<ký hiệu>_<MST người bán>.pdf` (`936_1C26THP
 - **Then** dòng 1 da ghép sang dòng mới, quyết định bỏ; 2 dòng kia giữ quyết định
 - **Assert** `tripLineId` = dòng mới, `resolution` = "" · 2 dòng còn lại `resolution` = "explained"
 
+### AC-20 — Gỡ HĐ trả số cũ cho dòng đã Cập nhật theo HĐ · Maps to flow: NV7 · Test: unit
+- **Given** dòng 1 da Hồng Phú 1.700,125 kg · 154.000 đã Cập nhật theo HĐ 936 (1.707 kg · 152.000); một dòng dữ liệu cũ chỉ có vết "[Sửa theo HĐ 936 · …] giá 154.000 → 152.000"; một dòng đã sửa tay thành 1.690 kg sau khi cập nhật
+- **When** gỡ HĐ 936
+- **Then** dòng thứ nhất về đúng 1.700,125 kg · 154.000, Ghi chú như trước khi cập nhật; dòng dữ liệu cũ về giá 154.000, vết bị bỏ; dòng sửa tay giữ 1.690 kg, báo lý do
+- **Assert** `nextTrips[0]` == chuyến trước cập nhật · count(`restores`) == 1 mỗi ca · `unrestorable[0].reason` chứa "sửa tay"
+
 ### AC-16 — Tỷ lệ tự ghép trên file thật · Maps to flow: NV3 · Test: unit
 - **Given** fixture sổ Nhập hàng 01–20/10 (`site_id='bsf1'`, chụp 2026-10-30, đã sửa giá 936) và file tháng 10
 - **When** chạy bộ ghép cho các dòng `Ngày HĐ` ≤ 20/10
@@ -314,5 +320,6 @@ Q1 "Ngày HĐ" = ngày hàng về, ghép theo cột này · Q2 kế toán nạp 
 
 ## History
 - v1 (2026-10-30): khởi tạo từ file thật tháng 10 + HĐ 936 + sổ Nhập hàng DB thật; Q1–Q11 chốt theo đề xuất.
+- v1.3 (2026-11-06): Gỡ HĐ trả số cũ cho dòng đã Cập nhật theo HĐ (AC-20); số trước khi cập nhật lưu ở `resolution_reason` từ nay, dữ liệu cũ đọc dòng vết.
 - v1.2 (2026-11-06): audit "thêm thừa / làm nhầm thì phải gỡ được" — NV7 Gỡ hóa đơn gắn nhầm trong hộp Chi tiết (R17, AC-17/18), R14 bỏ liên kết ngay khi xóa / bỏ dòng chuyến + AC-19. Dùng policy delete sẵn có của mig 0090 — không thêm migration.
 - v1.1 (2026-10-30): build P1. Ánh xạ mã kế toán lưu ở bảng riêng `accounting_code_maps` (không thêm cột vào `suppliers` / `material_types` ⇒ chưa chạy 0090 không kẹt hàng chờ danh mục) — cùng nghĩa R2/R3. Kế toán không có quyền Xóa HĐ (giữ luật ma trận: kế toán không xóa); KTT có.

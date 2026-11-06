@@ -320,7 +320,7 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
           "• Không có chuyến — chọn Tạo chuyến từ HĐ (chuyến ghi bù, lý do điền sẵn “Theo HĐ …”) hoặc Không thuộc chuyến (hàng đông gửi kho lạnh, không đi qua Nhập hàng; Bỏ xếp để ghép lại).\n" +
           "• Chưa ánh xạ — mã kế toán chưa chọn đại lý / loại, nạp lại sau khi chọn.\n" +
           "Nhãn Không còn trong file: lần nạp sau không còn dòng đó, liên kết vẫn giữ. Mở file để xem PDF hóa đơn.\n" +
-          "Chi tiết (dòng đầu mỗi hóa đơn) mở đủ thông tin hóa đơn. Gắn nhầm thì chọn Gỡ hóa đơn trong hộp đó (cần quyền Xóa hóa đơn, hỏi xác nhận, có Hoàn tác): bỏ hóa đơn cùng các dòng sổ chi tiết và file, sổ Nhập hàng không đổi, chuyến về Chờ HĐ. Hóa đơn đã Tạo chuyến từ HĐ thì xóa chuyến đó trước. Xóa một chuyến đã gắn hóa đơn thì dòng hóa đơn về Không có chuyến.",
+          "Chi tiết (dòng đầu mỗi hóa đơn) mở đủ thông tin hóa đơn. Gắn nhầm thì chọn Gỡ hóa đơn trong hộp đó (cần quyền Xóa hóa đơn, hỏi xác nhận, có Hoàn tác): bỏ hóa đơn cùng các dòng sổ chi tiết và file, chuyến về Chờ HĐ; dòng chuyến đã Cập nhật theo HĐ được trả số cũ (hộp xác nhận kể từng dòng), dòng đã sửa tay sau đó thì giữ số. Hóa đơn đã Tạo chuyến từ HĐ thì xóa chuyến đó trước. Xóa một chuyến đã gắn hóa đơn thì dòng hóa đơn về Không có chuyến.",
       }),
     );
   }

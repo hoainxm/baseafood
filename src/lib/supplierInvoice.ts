@@ -680,6 +680,63 @@ export function applyInvoiceToTripLine(
   return { ...trip, quantityKg: line.quantityKg, unitPrice: line.unitPrice, note: trip.note ? `${trip.note}\n${trace}` : trace };
 }
 
+/** Số chuyến trước khi "Cập nhật theo HĐ" — để Gỡ hóa đơn gắn nhầm trả lại đúng số cũ (R17). */
+export interface TripFigures {
+  quantityKg: number;
+  unitPrice: number | null;
+}
+
+const BEFORE_PREFIX = "Số xưởng trước khi cập nhật theo HĐ:";
+
+/**
+ * Ghi số chuyến trước khi cập nhật vào `resolutionReason` của dòng HĐ (cột chữ sẵn có, quyết định "updated"
+ * không dùng cột này để hiện) — số máy đọc chính xác, không làm tròn: "… kg=1707; giá=154000" ("giá=—" khi chưa giá).
+ */
+export const encodeTripBefore = (t: TripFigures) => `${BEFORE_PREFIX} kg=${t.quantityKg}; giá=${t.unitPrice == null ? "—" : t.unitPrice}`;
+
+export function decodeTripBefore(text: string): TripFigures | null {
+  const m = text.startsWith(BEFORE_PREFIX) ? /kg=(-?[\d.]+); giá=(—|-?[\d.]+)/.exec(text) : null;
+  if (!m) return null;
+  const kgV = Number(m[1]);
+  const pr = m[2] === "—" ? null : Number(m[2]);
+  return Number.isFinite(kgV) && (pr === null || Number.isFinite(pr)) ? { quantityKg: kgV, unitPrice: pr } : null;
+}
+
+/** "1.707" · "12,5" (vi-VN) ⇒ số; "—" ⇒ null. */
+const parseLocaleNumber = (v: string): number | null => {
+  const t = v.trim();
+  if (t === "—" || t === "") return null;
+  const n = Number(t.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
+const traceHead = (invoiceNo: string) => `[Sửa theo HĐ ${invoiceNo}`;
+/** Dòng vết của đúng HĐ này (số đứng riêng — HĐ 93 không bắt vết của HĐ 936). */
+const isTraceOf = (line: string, invoiceNo: string) => line.startsWith(traceHead(invoiceNo)) && /^[\] ·]/.test(line.charAt(traceHead(invoiceNo).length));
+
+/**
+ * Số cũ đọc từ dòng vết "[Sửa theo HĐ ‹số› …] kg A → B; giá C → D" (dữ liệu cập nhật trước khi có
+ * `encodeTripBefore`). Phần không đổi (vết chỉ có kg hoặc chỉ có giá) lấy số hiện tại của chuyến. Không có vết ⇒ null.
+ */
+export function tripBeforeFromTrace(trip: MaterialImportItem, invoiceNo: string): TripFigures | null {
+  const trace = trip.note.split("\n").filter((l) => isTraceOf(l, invoiceNo)).at(-1);
+  if (!trace) return null;
+  const body = trace.slice(trace.indexOf("]") + 1);
+  const kgM = /kg (\S+) → /.exec(body);
+  const prM = /giá (\S+) → /.exec(body);
+  if (!kgM && !prM) return null;
+  const kgV = kgM ? parseLocaleNumber(kgM[1]) : trip.quantityKg;
+  if (kgV == null) return null;
+  return { quantityKg: kgV, unitPrice: prM ? parseLocaleNumber(prM[1]) : (trip.unitPrice ?? null) };
+}
+
+/** Bỏ dòng vết "[Sửa theo HĐ ‹số› …]" khỏi Ghi chú — trả số cũ thì vết cập nhật hết nghĩa (như Hoàn tác, R6). */
+export const removeInvoiceTrace = (note: string, invoiceNo: string) =>
+  note
+    .split("\n")
+    .filter((l) => !isTraceOf(l, invoiceNo))
+    .join("\n");
+
 // ---------- 9. Tạo chuyến từ HĐ (NV5) ----------
 
 export interface TripFromInvoice {
@@ -782,15 +839,20 @@ export interface InvoiceRemovalPlan {
   blockingShipments: ImportShipment[];
   /** Dòng chuyến (còn trong sổ) đang gắn HĐ này ⇒ gỡ xong về Chờ HĐ. */
   linkedTripLineIds: string[];
-  /** Dòng chuyến đã "Cập nhật theo HĐ" — gỡ HĐ KHÔNG trả số cũ (dòng vết "[Sửa theo HĐ …]" ghi số cũ). */
-  updatedTripLineIds: string[];
+  /** Dòng chuyến đã "Cập nhật theo HĐ", trả lại số cũ khi gỡ: `next` = dòng chuyến sau khi trả. */
+  restores: { trip: MaterialImportItem; before: TripFigures; next: MaterialImportItem }[];
+  /** Dòng chuyến đã "Cập nhật theo HĐ" nhưng KHÔNG trả được — giữ số, màn hình báo lý do. */
+  unrestorable: { trip: MaterialImportItem; reason: string }[];
+  /** Sổ chuyến sau khi trả số cũ (= `trips` khi không có dòng nào trả). */
+  nextTrips: MaterialImportItem[];
   nextInvoices: SupplierInvoice[];
   nextLines: SupplierInvoiceLine[];
 }
 
 /**
- * Gỡ một hóa đơn gắn nhầm: bỏ bản ghi HĐ (kèm thông tin file PDF) và mọi dòng sổ chi tiết của nó. Sổ Nhập hàng
- * không đổi — chuyến đang gắn về Chờ HĐ như trước khi ghép. HĐ đã sinh chuyến ghi bù ⇒ `blockingShipments`
+ * Gỡ một hóa đơn gắn nhầm: bỏ bản ghi HĐ (kèm thông tin file PDF) và mọi dòng sổ chi tiết của nó; chuyến đang gắn
+ * về Chờ HĐ như trước khi ghép. Dòng chuyến đã "Cập nhật theo HĐ" được TRẢ SỐ CŨ (số lưu lúc cập nhật, dữ liệu
+ * cũ đọc từ dòng vết) và bỏ dòng vết — trừ khi chuyến đã sửa tay sau đó hoặc mất số cũ (`unrestorable`). HĐ đã sinh chuyến ghi bù ⇒ `blockingShipments`
  * khác rỗng, màn hình không được gỡ (xóa chuyến trước, khỏi để chuyến "Theo HĐ …" mồ côi).
  */
 export function planInvoiceRemoval(
@@ -804,15 +866,34 @@ export function planInvoiceRemoval(
 ): InvoiceRemovalPlan | null {
   const invoice = data.invoices.find((i) => i.id === invoiceId);
   if (!invoice) return null;
-  const tripIds = new Set(data.trips.map((t) => t.id));
+  const tripById = new Map(data.trips.map((t) => [t.id, t]));
   const own = data.lines.filter((l) => l.invoiceId === invoiceId);
-  const live = own.filter((l) => l.tripLineId && tripIds.has(l.tripLineId));
+  const live = own.filter((l) => l.tripLineId && tripById.has(l.tripLineId));
+  const restores: InvoiceRemovalPlan["restores"] = [];
+  const unrestorable: InvoiceRemovalPlan["unrestorable"] = [];
+  for (const l of live) {
+    if (l.resolution !== "updated") continue;
+    const trip = tripById.get(l.tripLineId)!;
+    if (trip.quantityKg !== l.quantityKg || (trip.unitPrice ?? null) !== l.unitPrice) {
+      unrestorable.push({ trip, reason: "dòng chuyến đã sửa tay sau khi cập nhật theo HĐ" });
+      continue;
+    }
+    const before = decodeTripBefore(l.resolutionReason) ?? tripBeforeFromTrace(trip, invoice.invoiceNo);
+    if (!before) {
+      unrestorable.push({ trip, reason: "không còn số cũ (Ghi chú mất dòng vết “[Sửa theo HĐ …]”)" });
+      continue;
+    }
+    restores.push({ trip, before, next: { ...trip, quantityKg: before.quantityKg, unitPrice: before.unitPrice, note: removeInvoiceTrace(trip.note, invoice.invoiceNo) } });
+  }
+  const nextById = new Map(restores.map((r) => [r.trip.id, r.next]));
   return {
     invoice,
     lines: own,
     blockingShipments: tripsCreatedFromInvoice(invoice, data.shipments),
     linkedTripLineIds: [...new Set(live.map((l) => l.tripLineId))],
-    updatedTripLineIds: [...new Set(live.filter((l) => l.resolution === "updated").map((l) => l.tripLineId))],
+    restores,
+    unrestorable,
+    nextTrips: restores.length ? data.trips.map((t) => nextById.get(t.id) ?? t) : [...data.trips],
     nextInvoices: data.invoices.filter((i) => i.id !== invoiceId),
     nextLines: data.lines.filter((l) => l.invoiceId !== invoiceId),
   };

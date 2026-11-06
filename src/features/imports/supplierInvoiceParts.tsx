@@ -148,6 +148,10 @@ export interface InvoiceDetailTarget {
   canViewPrice: boolean;
   /** Quyền Xóa `imports.invoices` — không có thì không hiện khối gỡ. */
   canRemove: boolean;
+  /** Quyền Sửa Nhập hàng — cần để trả số cũ cho dòng chuyến đã Cập nhật theo HĐ. */
+  canRestoreTrips: boolean;
+  /** Mỗi dòng chuyến sẽ trả số cũ, một câu (cùng thứ tự `plan.restores`). */
+  restoreTexts: string[];
 }
 
 /**
@@ -175,7 +179,15 @@ export function InvoiceDetailDialog({
   };
   const totalKg = plan.lines.reduce((s, l) => s + l.quantityKg, 0);
   const amount = plan.lines.reduce((s, l) => s + l.amount, 0);
-  const blocked = plan.blockingShipments.length > 0;
+  const blockReason =
+    plan.blockingShipments.length > 0
+      ? `Hóa đơn này đã tạo ${plan.blockingShipments.length} chuyến ghi bù (${plan.blockingShipments
+          .map((s) => `${formatDateVN(s.deliveryDate)} · xưởng ${s.workshop}${s.lotCode ? ` · lô ${s.lotCode}` : ""}`)
+          .join("; ")}). Xóa chuyến đó ở sổ Nhập hàng trước (mở chuyến → Xóa chuyến), rồi gỡ hóa đơn.`
+      : plan.restores.length > 0 && !target.canRestoreTrips
+        ? `Hóa đơn này đã đổi số ${plan.restores.length} dòng chuyến. Gỡ hóa đơn phải trả số cũ cho các dòng đó — cần thêm quyền Sửa Nhập hàng (nhờ Kế toán trưởng).`
+        : "";
+  const blocked = Boolean(blockReason);
   const rows: [string, string][] = [
     ["Đại lý", target.supplierLabel],
     ["Số hóa đơn", `${inv.invoiceNo}${inv.invoiceSymbol ? ` · ký hiệu ${inv.invoiceSymbol}` : ""}`],
@@ -186,7 +198,9 @@ export function InvoiceDetailDialog({
     ["Dòng chuyến đang gắn", num(plan.linkedTripLineIds.length)],
     ["File PDF", inv.fileName || "Chưa có file"],
   ];
-  const removeText = `HĐ ${inv.invoiceNo} — ${target.supplierLabel} — ${plan.lines.length} dòng sổ chi tiết — ${kg(totalKg)}${inv.fileName ? ` — file ${inv.fileName}` : ""}`;
+  const removeText = `HĐ ${inv.invoiceNo} — ${target.supplierLabel} — ${plan.lines.length} dòng sổ chi tiết — ${kg(totalKg)}${inv.fileName ? ` — file ${inv.fileName}` : ""}${
+    target.restoreTexts.length ? ` — trả số cũ ${target.restoreTexts.length} dòng chuyến: ${target.restoreTexts.join("; ")}` : ""
+  }`;
   return (
     <FormDialog
       open
@@ -199,17 +213,8 @@ export function InvoiceDetailDialog({
             (blocked ? (
               <Button
                 variant="danger"
-                title="Gỡ hóa đơn gắn nhầm khỏi tab Hóa đơn. Hóa đơn này đã tạo chuyến ghi bù — phải xóa chuyến đó trước."
-                onClick={() =>
-                  setErrors([
-                    {
-                      field: "Gỡ hóa đơn",
-                      message: `Hóa đơn này đã tạo ${plan.blockingShipments.length} chuyến ghi bù (${plan.blockingShipments
-                        .map((s) => `${formatDateVN(s.deliveryDate)} · xưởng ${s.workshop}${s.lotCode ? ` · lô ${s.lotCode}` : ""}`)
-                        .join("; ")}). Xóa chuyến đó ở sổ Nhập hàng trước (mở chuyến → Xóa chuyến), rồi gỡ hóa đơn.`,
-                    },
-                  ])
-                }
+                title="Gỡ hóa đơn gắn nhầm khỏi tab Hóa đơn. Hiện chưa gỡ được — bấm để xem lý do."
+                onClick={() => setErrors([{ field: "Gỡ hóa đơn", message: blockReason }])}
               >
                 <Trash2 />
                 Gỡ hóa đơn
@@ -224,7 +229,7 @@ export function InvoiceDetailDialog({
                   close();
                 }}
                 trigger={
-                  <Button variant="danger" title="Bỏ hóa đơn và các dòng sổ chi tiết của nó khỏi tab Hóa đơn. Sổ Nhập hàng không đổi; có hỏi xác nhận và có Hoàn tác.">
+                  <Button variant="danger" title="Bỏ hóa đơn và các dòng sổ chi tiết của nó khỏi tab Hóa đơn; dòng chuyến đã Cập nhật theo HĐ được trả số cũ. Có hỏi xác nhận và có Hoàn tác.">
                     <Trash2 />
                     Gỡ hóa đơn
                   </Button>
@@ -255,21 +260,42 @@ export function InvoiceDetailDialog({
         <div className="space-y-2 rounded-lg border border-border p-3 text-sm">
           <p className="font-semibold text-foreground">Gỡ hóa đơn gắn nhầm</p>
           <p className="text-muted-foreground">
-            Bỏ hóa đơn, {num(plan.lines.length)} dòng sổ chi tiết và thông tin file PDF khỏi tab Hóa đơn. Sổ Nhập hàng không đổi
+            Bỏ hóa đơn, {num(plan.lines.length)} dòng sổ chi tiết và thông tin file PDF khỏi tab Hóa đơn
             {plan.linkedTripLineIds.length ? <> — {num(plan.linkedTripLineIds.length)} dòng chuyến về <b>Chờ HĐ</b> như trước khi ghép</> : null}. Gỡ xong
             vẫn Hoàn tác được; nạp lại đúng file thì gắn lại.
           </p>
-          {plan.updatedTripLineIds.length > 0 && (
-            <p className="flex flex-wrap items-center gap-1 text-foreground">
-              <Tag variant="warning">Lưu ý</Tag>
-              {num(plan.updatedTripLineIds.length)} dòng chuyến đã Cập nhật theo HĐ này. Gỡ hóa đơn không trả lại số cũ — Ghi chú dòng chuyến còn vết
-              “[Sửa theo HĐ …]” ghi số cũ, sửa tay ở chuyến nếu cần.
-            </p>
+          {plan.restores.length > 0 && (
+            <div className="space-y-1 text-foreground">
+              <p className="flex flex-wrap items-center gap-1">
+                <Tag variant="pending">Trả số cũ</Tag>
+                {num(plan.restores.length)} dòng chuyến đã Cập nhật theo HĐ này — gỡ xong trả về số trước khi cập nhật, bỏ dòng vết “[Sửa theo HĐ {inv.invoiceNo} …]”:
+              </p>
+              <ul className="tnum list-disc space-y-0.5 pl-5">
+                {target.restoreTexts.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {plan.unrestorable.length > 0 && (
+            <div className="space-y-1 text-foreground">
+              <p className="flex flex-wrap items-center gap-1">
+                <Tag variant="warning">Giữ số</Tag>
+                {num(plan.unrestorable.length)} dòng chuyến đã Cập nhật theo HĐ này nhưng không trả số cũ được — sửa tay ở chuyến nếu cần:
+              </p>
+              <ul className="list-disc space-y-0.5 pl-5">
+                {plan.unrestorable.map((u) => (
+                  <li key={u.trip.id}>
+                    {u.trip.materialTypeName} {formatDateVN(u.trip.deliveryDate)} xưởng {u.trip.workshop}: {u.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           {blocked && (
             <p className="flex flex-wrap items-center gap-1 text-foreground">
               <Tag variant="error">Chưa gỡ được</Tag>
-              Hóa đơn đã tạo {num(plan.blockingShipments.length)} chuyến ghi bù — xóa chuyến đó ở sổ Nhập hàng trước.
+              {blockReason}
             </p>
           )}
         </div>

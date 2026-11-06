@@ -44,6 +44,7 @@ import {
   applyPdfToInvoice,
   buildCodeMaps,
   buildTripsFromInvoice,
+  encodeTripBefore,
   indexLinesByTripLine,
   isOpenMismatch,
   lineStateNow,
@@ -362,7 +363,7 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
     const prevTrips = [...p.trips];
     const prevLines = lines;
     p.persistTrips(p.trips.map((t) => (t.id === trip.id ? next : t)));
-    store.setLines(lines.map((l) => (l.id === row.line.id ? { ...l, resolution: "updated", resolutionReason: "", resolvedBy: p.operator, resolvedAt: new Date().toISOString() } : l)));
+    store.setLines(lines.map((l) => (l.id === row.line.id ? { ...l, resolution: "updated", resolutionReason: encodeTripBefore(trip), resolvedBy: p.operator, resolvedAt: new Date().toISOString() } : l)));
     const what = `Cập nhật dòng ${trip.materialTypeName} của chuyến ${trip.supplierName} theo hóa đơn ${row.invoice.invoiceNo}: ${kg(trip.quantityKg)} → ${kg(next.quantityKg)}`;
     logTripDays([trip.id], "update", () => what);
     notify.saved(`Đã cập nhật chuyến ${formatDateVN(trip.deliveryDate)} theo HĐ ${row.invoice.invoiceNo}`, () => {
@@ -477,23 +478,41 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
       notify.error(`HĐ ${inv.invoiceNo} đã tạo chuyến ghi bù — xóa chuyến đó ở sổ Nhập hàng trước rồi mới gỡ hóa đơn.`);
       return;
     }
+    if (r.restores.length && !p.canUpdateTrip) {
+      notify.error(`HĐ ${inv.invoiceNo} đã đổi số ${r.restores.length} dòng chuyến — cần quyền Sửa Nhập hàng để trả số cũ khi gỡ.`);
+      return;
+    }
     const prevInv = invoices;
     const prevLines = lines;
+    const prevTrips = [...p.trips];
+    if (r.restores.length) p.persistTrips(r.nextTrips);
     store.setInvoices(r.nextInvoices);
     store.setLines(r.nextLines);
-    const what = `Gỡ hóa đơn ${inv.invoiceNo} (${supplierOf(inv)}) gắn nhầm — ${r.lines.length} dòng sổ chi tiết${r.linkedTripLineIds.length ? `, ${r.linkedTripLineIds.length} dòng chuyến về Chờ HĐ` : ""}${inv.fileName ? ` · bỏ file ${inv.fileName}` : ""}`;
+    const restoredText = r.restores.length ? `, trả số cũ ${r.restores.length} dòng chuyến (${r.restores.map(restoreText).join("; ")})` : "";
+    const what = `Gỡ hóa đơn ${inv.invoiceNo} (${supplierOf(inv)}) gắn nhầm — ${r.lines.length} dòng sổ chi tiết${r.linkedTripLineIds.length ? `, ${r.linkedTripLineIds.length} dòng chuyến về Chờ HĐ` : ""}${restoredText}${inv.fileName ? ` · bỏ file ${inv.fileName}` : ""}`;
     const log = (action: ExportActivityAction, prefix: string) => {
       p.onLog([{ recordType: "supplier-invoice", recordId: inv.id, action, summary: `${prefix}${what}` }]);
       logTripDays(r.linkedTripLineIds, action, () => `${prefix}${what}`);
     };
     log("delete", "");
-    notify.deleted(`Đã gỡ HĐ ${inv.invoiceNo} — ${r.lines.length} dòng sổ chi tiết${r.linkedTripLineIds.length ? ` · ${r.linkedTripLineIds.length} dòng chuyến về Chờ HĐ` : ""}`, () => {
+    notify.deleted(`Đã gỡ HĐ ${inv.invoiceNo} — ${r.lines.length} dòng sổ chi tiết${r.linkedTripLineIds.length ? ` · ${r.linkedTripLineIds.length} dòng chuyến về Chờ HĐ` : ""}${r.restores.length ? ` · trả số cũ ${r.restores.length} dòng` : ""}`, () => {
+      if (r.restores.length) p.persistTrips(prevTrips);
       store.setInvoices(prevInv);
       store.setLines(prevLines);
       log("undo", "Hoàn tác: ");
     });
     setDetailId(null);
   };
+  /** "Bạch tuộc 1 da 05/11 xưởng Đông: 1.707 → 1.710 kg; giá 152.000 → 154.000" (giá chỉ khi được xem giá). */
+  function restoreText(x: { trip: MaterialImportItem; before: { quantityKg: number; unitPrice: number | null } }) {
+    const t = x.trip;
+    const parts = [
+      t.quantityKg !== x.before.quantityKg ? `${num(t.quantityKg)} → ${num(x.before.quantityKg)} kg` : "",
+      p.canViewPrice && (t.unitPrice ?? null) !== x.before.unitPrice ? `giá ${t.unitPrice == null ? "—" : price(t.unitPrice)} → ${x.before.unitPrice == null ? "chưa giá" : price(x.before.unitPrice)}` : "",
+    ].filter(Boolean);
+    const locked = isLocked(t.deliveryDate, t.workshop) ? " · SAU KHI CHỐT NGÀY" : "";
+    return `${t.materialTypeName} ${formatDateVN(t.deliveryDate)} xưởng ${t.workshop}: ${parts.join("; ") || "giá về số cũ"}${locked}`;
+  }
   const detailPlan = detailId ? planInvoiceRemoval(detailId, { invoices, lines, trips: p.trips, shipments: p.shipments }) : null;
 
   const openFile = async (inv: SupplierInvoice) => {
@@ -797,7 +816,18 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
       <ExplainMismatchDialog target={explainTarget} onClose={() => setExplainTarget(null)} onSave={explain} />
       <CreateTripDialog target={tripTarget} onClose={() => setTripTarget(null)} onCreate={createTrips} />
       <InvoiceDetailDialog
-        target={detailPlan ? { plan: detailPlan, supplierLabel: supplierOf(detailPlan.invoice), canViewPrice: p.canViewPrice, canRemove: allowed.delete } : null}
+        target={
+          detailPlan
+            ? {
+                plan: detailPlan,
+                supplierLabel: supplierOf(detailPlan.invoice),
+                canViewPrice: p.canViewPrice,
+                canRemove: allowed.delete,
+                canRestoreTrips: p.canUpdateTrip,
+                restoreTexts: detailPlan.restores.map(restoreText),
+              }
+            : null
+        }
         onClose={() => setDetailId(null)}
         onRemove={removeInvoice}
         onOpenFile={() => detailPlan && void openFile(detailPlan.invoice)}

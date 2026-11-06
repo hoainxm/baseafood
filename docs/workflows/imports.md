@@ -63,9 +63,10 @@ stateDiagram-v2
 
 | Trường hợp | Kết quả | Code |
 |---|---|---|
-| HĐ chưa tạo chuyến ghi bù | Bỏ HĐ + mọi dòng sổ chi tiết + thông tin file. Sổ Nhập hàng không đổi, chuyến đang gắn về **Chờ HĐ** | `planInvoiceRemoval` |
+| HĐ chưa tạo chuyến ghi bù | Bỏ HĐ + mọi dòng sổ chi tiết + thông tin file. Chuyến đang gắn về **Chờ HĐ** | `planInvoiceRemoval` |
 | HĐ đã **Tạo chuyến từ HĐ**, chuyến còn trong sổ | **Chặn**, báo xóa chuyến đó trước (mở chuyến → Xóa chuyến) | `tripsCreatedFromInvoice` |
-| Dòng chuyến đã **Cập nhật theo HĐ** | Gỡ vẫn được, số chuyến **giữ số mới**. Hộp chi tiết báo trước; số cũ ở vết "[Sửa theo HĐ …]" | `updatedTripLineIds` |
+| Dòng chuyến đã **Cập nhật theo HĐ** | **Trả số cũ** (kg, đơn giá) và bỏ vết "[Sửa theo HĐ ‹số› …]". Hộp xác nhận kể từng dòng. Cần thêm quyền Sửa Nhập hàng, thiếu ⇒ chặn gỡ. Số cũ: lưu chính xác lúc cập nhật (từ 2026-11-06), dữ liệu cũ đọc từ dòng vết | `restores` · `encodeTripBefore` · `tripBeforeFromTrace` |
+| Dòng đó đã sửa tay sau khi cập nhật, hoặc mất dòng vết | Giữ số, hộp chi tiết nêu lý do | `unrestorable` |
 
 File PDF trên kho file giữ nguyên để Hoàn tác được; nạp lại đúng file thì gắn lại.
 

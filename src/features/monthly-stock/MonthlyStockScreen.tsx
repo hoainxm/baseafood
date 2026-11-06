@@ -13,7 +13,8 @@ import { NxtImportDialog, useNxtImportForm } from "./NxtImportDialog";
 import { NXT_FILE_ACCEPT, readNxtReportFile } from "@/lib/nxtReportFile";
 import { warehouseOfReport } from "@/lib/nxtStockImport";
 import { uid } from "@/lib/db";
-import { renameLedgerItems, revertCatalogSync, type CatalogSyncRun } from "@/lib/monthlyStockCatalogSync";
+import { buildCatalogSyncUsage, renameLedgerItems, revertCatalogSync, type CatalogSyncRun } from "@/lib/monthlyStockCatalogSync";
+import { CatalogSyncUsageProbe, type CatalogSyncUsageSnapshot } from "./CatalogSyncUsageProbe";
 import { chuan0, num, formatDateVN } from "@/lib/format";
 import {
   parseStockStatementFile,
@@ -950,7 +951,15 @@ export default function MonthlyStockScreen() {
   /* Mục gõ thêm mới NGAY trong hộp (ô "Ánh xạ … tới", `addCanonicalName`) — tính vào cùng
      lần đồng bộ để một Hoàn tác gỡ được cả chúng. Chỉ đọc/ghi trong xử lý sự kiện. */
   const syncDialogCreated = useRef<{ products: Product[]; materials: MaterialType[] }>({ products: [], materials: [] });
+  /* Các sổ đang dùng mặt hàng / loại NL — chỉ nạp từ lần mở hộp Đồng bộ đầu tiên (đỡ nạp 11 bảng
+     mỗi lần vào màn), để Hoàn tác giữ lại mục vừa tạo mà đã có sổ dùng. */
+  const [isUsageProbeOn, setIsUsageProbeOn] = useState(false);
+  const usageSnapshot = useRef<CatalogSyncUsageSnapshot | null>(null);
+  const keepUsageSnapshot = useCallback((snapshot: CatalogSyncUsageSnapshot | null) => {
+    usageSnapshot.current = snapshot;
+  }, []);
   const openSyncDialog = () => {
+    setIsUsageProbeOn(true);
     syncDialogCreated.current = { products: [], materials: [] };
     setSavedTargets({}); // rỗng = dùng đích GỢI Ý mỗi dòng
     setMapDB({}); // rỗng = giữ nguyên tên file (chưa ánh xạ)
@@ -1008,6 +1017,8 @@ export default function MonthlyStockScreen() {
       createdProducts: [...fromDialog.products, ...productsToAdd],
       createdMaterials: [...fromDialog.materials, ...materialsToAdd],
       renamedLines: renamed.renamed,
+      // Mốc tên từng dòng NGAY SAU đồng bộ: dòng nào sau đó mới mang tên mục vừa tạo = đang dùng.
+      ledgerAtSync: Object.fromEntries(renamed.lines.map((l) => [l.id, l.itemName])),
     };
     notify.saved(
       `Đồng bộ: +${run.createdProducts.length} mặt hàng · +${run.createdMaterials.length} loại NL · đổi tên ${renames.size} mã trong sổ`,
@@ -1022,15 +1033,31 @@ export default function MonthlyStockScreen() {
   });
   const undoSync = (run: CatalogSyncRun<Product, MaterialType>) => {
     const cur = latestSyncState.current;
-    const r = revertCatalogSync({ lines: cur.lines, products: cur.products, materials: cur.mtypes }, run);
+    const usage = usageSnapshot.current;
+    // Sổ khác chưa nạp xong ⇒ không biết chắc mục nào đang dùng ⇒ giữ hết (gỡ tay ở Danh mục sau).
+    const isUsed = usage?.ready
+      ? buildCatalogSyncUsage<Product, MaterialType>(run, { ledger: cur.lines, products: cur.products, ...usage.sources })
+      : { product: () => true, material: () => true };
+    const r = revertCatalogSync({ lines: cur.lines, products: cur.products, materials: cur.mtypes }, run, isUsed);
     if (r.removedMaterials) setMtypes(r.materials);
     if (r.removedProducts) setProducts(r.products);
     // Ghi thẳng (không chụp vào Ctrl+Z): hàm này chạy từ toast của lần vẽ cũ, `lines` trong writeLines đã cũ.
     if (r.revertedLines) writeLinesRaw(r.lines);
     const kept = [...r.keptProducts, ...r.keptMaterials];
+    const keptEdited = kept.length - r.keptInUse;
+    const keptNote = !kept.length
+      ? ""
+      : !usage?.ready
+        ? ` · giữ ${kept.length} mục vừa thêm vì chưa nạp xong các sổ khác để kiểm (${kept.join(", ")}) — gỡ tay ở Danh mục nếu cần`
+        : ` · giữ ${kept.length} mục (${[
+            r.keptInUse ? `${r.keptInUse} đang được dùng` : "",
+            keptEdited ? `${keptEdited} đã sửa sau đồng bộ` : "",
+          ]
+            .filter(Boolean)
+            .join(", ")}: ${kept.join(", ")})`;
     const message =
       `Đã hoàn tác đồng bộ: gỡ ${r.removedProducts} mặt hàng · ${r.removedMaterials} loại NL · trả tên ${r.revertedLines} dòng sổ` +
-      (kept.length ? ` · giữ ${kept.length} mục đã sửa sau đồng bộ (${kept.join(", ")})` : "") +
+      keptNote +
       (r.skippedLines ? ` · ${r.skippedLines} dòng đã đổi/xóa sau đồng bộ nên để nguyên` : "");
     if (kept.length || r.skippedLines) notify.warning(message);
     else notify.saved(message);
@@ -2563,6 +2590,7 @@ export default function MonthlyStockScreen() {
       </Dialog>
 
       {/* Dialog đồng bộ danh mục loại nguyên liệu */}
+      {isUsageProbeOn && <CatalogSyncUsageProbe onSnapshot={keepUsageSnapshot} />}
       <Dialog open={isSyncOpen} onOpenChange={setIsSyncOpen}>
         <DialogContent className="w-full sm:max-w-3xl">
           <DialogHeader>

@@ -1,5 +1,5 @@
 > Load khi: sửa màn Sổ kho theo tháng (/monthly-stock), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
-covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/NxtImportDialog.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts, src/lib/frozenStockLines.ts, src/lib/nxtStockImport.ts, src/lib/nxtReportFile.ts, src/lib/monthlyStockCatalogSync.ts, src/lib/nxtPeriods.ts
+covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/NxtImportDialog.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts, src/lib/frozenStockLines.ts, src/lib/nxtStockImport.ts, src/lib/nxtReportFile.ts, src/lib/monthlyStockCatalogSync.ts, src/lib/nxtPeriods.ts, src/features/monthly-stock/CatalogSyncUsageProbe.tsx
 last_verified: 2026-11-06
 <!-- updated: 2026-11-06 (gỡ khi nhầm) — Đồng bộ danh mục có Hoàn tác gỡ đúng lần đó (`lib/monthlyStockCatalogSync.ts`); /nxt-warehouse xóa cả kỳ tạo nhầm + Hoàn tác xóa một mã (`lib/nxtPeriods.ts`). -->
 <!-- updated: 2026-11-03 — rà UX đợt 3: Nhập xuất tồn kho — Ghi nhập/xuất · Tạo kỳ kế tiếp ra khỏi hàng ô lọc, thành nút trang qua `OverflowActions` (điện thoại: Ghi nhập/xuất + "Thêm"). -->
@@ -243,6 +243,15 @@ mục đã bị sửa sau đồng bộ (bút chì, gắn mã kế toán) thì GI
 mang đúng tên mới thì trả tên cũ, dòng đã đổi tên tiếp / đã xóa thì để nguyên (đếm, báo). Không
 có Hoàn tác thì vẫn gỡ tay được ở Danh mục (thùng rác trong ô chọn `QuickProductDelete`, kiểm sổ
 đang dùng). Lần ghi trả tên dòng không vào ngăn Ctrl+Z của sổ.
+
+**Mục vừa tạo đã được DÙNG thì giữ** (rà 2026-11-06 mục 7): `buildCatalogSyncUsage` báo "đang
+dùng" khi (a) có dòng sổ kho tháng mang tên mục mà lúc đồng bộ chưa mang (mốc `ledgerAtSync`
+id → tên ngay sau đồng bộ — dòng vốn mang tên đó từ trước, tức tên file = tên chuẩn, không tính);
+(b) mặt hàng: một trong 7 sổ trỏ theo id (`findProductUsage` — cùng nguồn thùng rác
+`QuickProductDelete`); (c) loại NL: tên nằm ở sổ nhập, kỳ cân đối, bán nội địa, tồn đầu NL, hoặc
+có mặt hàng gắn `materialTypeId`. Các sổ (b)(c) nạp bởi `CatalogSyncUsageProbe` — chỉ gắn từ lần
+mở hộp Đồng bộ đầu tiên (đỡ nạp 11 bảng mỗi lần vào màn); sổ nào chưa nạp xong ⇒ giữ HẾT mục.
+Thông báo Hoàn tác nêu số mục giữ vì đang dùng / vì đã sửa.
 - **Trùng cách ghi**: các tên chỉ khác khoảng trắng/hoa thường/dấu câu (chuẩn hoá ngặt
   bỏ hết space+dấu câu), VD `"BẠCH TUỘC 2 DA 250UP"` ≡ `"…250 UP"`, `"200 UP"` ≡ `"200 up"`.
   Đây là nguồn **đếm thành nhiều mặt hàng** khi tổng hợp → liệt kê để sửa tay về một cách ghi.

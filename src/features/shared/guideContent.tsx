@@ -731,8 +731,8 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             </li>
             <li>
               Đồng bộ nhầm: chọn <b>Hoàn tác</b> trên thông báo (vài giây). App gỡ đúng phần lần đó làm: mục vừa thêm (kể cả tên chuẩn gõ mới trong hộp) còn y
-              nguyên thì xóa, tên dòng sổ trả về như cũ. Mục đã sửa sau đồng bộ, hoặc dòng đã đổi tên / xóa sau đó, thì giữ
-              nguyên và thông báo nêu rõ.
+              nguyên thì xóa, tên dòng sổ trả về như cũ. Mục đã sửa sau đồng bộ hoặc đã được dùng (dòng sổ mới, sổ sản xuất, bán,
+              sổ nhập…), và dòng đã đổi tên / xóa sau đó, thì giữ nguyên; thông báo nêu rõ số mục giữ lại.
             </li>
           </Y>
         </Section>

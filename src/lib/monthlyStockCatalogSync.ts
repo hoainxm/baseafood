@@ -10,6 +10,9 @@
 // mặt hàng / loại NL và đổi tên dòng sổ — trước đây không có đường lùi (từng lọt quy cách NL
 // vào danh mục mặt hàng, xem QuickProductDelete). Hoàn tác KHÔNG chụp đè cả sổ / danh mục:
 // chỉ gỡ đúng phần lần đó làm, để số ai vừa gõ trong lúc toast còn hiện không mất.
+// Mục lần đó tạo mà trong lúc toast còn hiện đã được DÙNG (dòng sổ mới mang tên nó, sổ khác
+// trỏ tới nó) thì giữ lại — `buildCatalogSyncUsage` (rà 2026-11-06, mục 7).
+import { findProductUsage, type ProductUsageSources } from "@/lib/productUsage";
 
 export interface LedgerRename {
   /** id dòng sổ bị đổi tên. */
@@ -25,6 +28,48 @@ export interface CatalogSyncRun<P, M> {
   createdProducts: P[];
   createdMaterials: M[];
   renamedLines: LedgerRename[];
+  /**
+   * Tên từng dòng sổ (id → tên) NGAY SAU lần đồng bộ — mốc để biết dòng nào là dùng MỚI
+   * (thêm sau, hoặc đổi sang tên mục vừa tạo sau đó). Thiếu ⇒ không xét dòng sổ.
+   */
+  ledgerAtSync?: Readonly<Record<string, string>>;
+}
+
+const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+/** Các sổ màn thấy được, để biết mục vừa tạo đã được dùng chưa. */
+export interface CatalogSyncUsageSources {
+  /** Sổ kho tháng hiện tại (mọi tháng). */
+  ledger: readonly { id: string; itemName: string }[];
+  /** Bảy sổ trỏ tới mặt hàng theo id (sản xuất, đóng gói, bán, đơn, lệnh xuất, cân đối, tồn đầu TP). */
+  productSources: ProductUsageSources;
+  /** Tên loại NL các sổ đang dùng (sổ nhập, kỳ cân đối, bán nội địa, tồn đầu NL — theo TÊN). */
+  materialNamesInUse: readonly string[];
+  /** Mặt hàng hiện có (mặt hàng gắn `materialTypeId` = đang dùng loại NL đó). */
+  products: readonly { id: string; materialTypeId?: string }[];
+}
+
+/**
+ * Bộ kiểm "đang được dùng" cho `revertCatalogSync`. Dòng sổ tính là dùng MỚI khi mang tên
+ * mục (không phân hoa thường / khoảng trắng) mà lúc đồng bộ chưa mang tên đó — dòng vốn đã
+ * mang tên ấy trước khi đồng bộ (tên file = tên chuẩn) không giữ mục lại.
+ */
+export function buildCatalogSyncUsage<P extends CatalogRow, M extends CatalogRow>(
+  run: Pick<CatalogSyncRun<P, M>, "ledgerAtSync">,
+  sources: CatalogSyncUsageSources
+): { product: (p: P) => boolean; material: (m: M) => boolean } {
+  const baseline = run.ledgerAtSync;
+  const ledgerUses = (name: string) => {
+    if (!baseline) return false;
+    const n = norm(name);
+    return sources.ledger.some((l) => norm(l.itemName) === n && norm(baseline[l.id] ?? "") !== n);
+  };
+  const materialNames = new Set(sources.materialNamesInUse.map(norm));
+  return {
+    product: (p) => ledgerUses(p.name) || findProductUsage(p.id, sources.productSources).length > 0,
+    material: (m) =>
+      ledgerUses(m.name) || materialNames.has(norm(m.name)) || sources.products.some((x) => x.materialTypeId === m.id),
+  };
 }
 
 /** Đổi tên dòng sổ theo bảng `renames` (tên file → tên chuẩn) và ghi lại từng dòng đã đổi. */
@@ -51,6 +96,8 @@ export interface CatalogSyncRevert<L, P, M> {
   /** Mục do lần đồng bộ tạo nhưng đã bị sửa / đã được dùng ⇒ giữ lại (tên để báo). */
   keptProducts: string[];
   keptMaterials: string[];
+  /** Trong số mục giữ lại: bao nhiêu mục giữ vì ĐANG ĐƯỢC DÙNG (còn lại là đã sửa). */
+  keptInUse: number;
   revertedLines: number;
   /** Dòng đã đổi tên tiếp hoặc đã bị xóa sau lần đồng bộ ⇒ để nguyên. */
   skippedLines: number;
@@ -64,22 +111,25 @@ function dropUntouched<R extends CatalogRow>(
   current: readonly R[],
   created: readonly R[],
   isUsed: ((row: R) => boolean) | undefined
-): { rows: R[]; removed: number; kept: string[] } {
+): { rows: R[]; removed: number; kept: string[]; inUse: number } {
   const createdById = new Map(created.map((r) => [r.id, r]));
   const kept: string[] = [];
   let removed = 0;
+  let inUse = 0;
   const rows = current.filter((r) => {
     const original = createdById.get(r.id);
     if (!original) return true;
     // Đã sửa (bút chì, gắn mã…) hoặc đã có sổ dùng ⇒ là dữ liệu người dùng rồi, giữ.
-    if (!same(r, original) || isUsed?.(r)) {
+    const edited = !same(r, original);
+    if (edited || isUsed?.(r)) {
       kept.push(r.name);
+      if (!edited) inUse++;
       return true;
     }
     removed++;
     return false;
   });
-  return { rows, removed, kept };
+  return { rows, removed, kept, inUse };
 }
 
 /**
@@ -111,6 +161,7 @@ export function revertCatalogSync<L extends { id: string; itemName: string }, P 
     removedMaterials: m.removed,
     keptProducts: p.kept,
     keptMaterials: m.kept,
+    keptInUse: p.inUse + m.inUse,
     revertedLines,
     skippedLines: run.renamedLines.length - revertedLines,
   };

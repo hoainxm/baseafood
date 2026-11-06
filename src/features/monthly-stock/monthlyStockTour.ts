@@ -209,7 +209,7 @@ export function buildMonthlyStockTour(ctx: MonthlyStockTourContext): PageTour {
       body:
         "Tên hàng trong sổ (nhất là sổ nạp từ Excel) hay lệch với danh mục. Số trong ngoặc là số tên chưa có trong danh mục.\n" +
         "Chọn Đồng bộ danh mục để đối chiếu với Loại nguyên liệu và Mặt hàng: mỗi tên chọn đích (Mặt hàng, Loại NL hoặc Bỏ qua) và tên chuẩn có sẵn để ánh xạ, hoặc thêm mới. Lưu xong, tên chưa có được thêm vào danh mục và mọi dòng sổ mang tên cũ đổi sang tên chuẩn.\n" +
-        "Đồng bộ nhầm thì chọn Hoàn tác trên thông báo (vài giây): gỡ đúng phần lần đó làm. Mặt hàng, loại NL vừa thêm (kể cả tên chuẩn gõ thêm mới trong hộp) bị xóa nếu còn y nguyên; mục đã sửa sau đồng bộ thì giữ lại và được nêu tên. Tên dòng sổ trả về tên cũ; dòng đã đổi hoặc xóa sau đó thì để nguyên.\n" +
+        "Đồng bộ nhầm thì chọn Hoàn tác trên thông báo (vài giây): gỡ đúng phần lần đó làm. Mặt hàng, loại NL vừa thêm (kể cả tên chuẩn gõ thêm mới trong hộp) bị xóa nếu còn y nguyên và chưa ai dùng; mục đã sửa sau đồng bộ, hoặc đã có dòng sổ / sổ khác dùng (sản xuất, bán, sổ nhập…), thì giữ lại và được nêu tên. Tên dòng sổ trả về tên cũ; dòng đã đổi hoặc xóa sau đó thì để nguyên.\n" +
         "141 mã thành phẩm của kế toán không bị đụng tới.",
     });
   }

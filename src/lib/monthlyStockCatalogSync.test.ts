@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renameLedgerItems, revertCatalogSync } from "./monthlyStockCatalogSync";
+import { buildCatalogSyncUsage, renameLedgerItems, revertCatalogSync, type CatalogSyncUsageSources } from "./monthlyStockCatalogSync";
 
 const line = (id: string, itemName: string, openingKg = 0) => ({ id, itemName, openingKg });
 const product = (id: string, name: string, finishedGoodCode = "") => ({ id, name, finishedGoodCode });
@@ -70,5 +70,70 @@ describe("Đồng bộ danh mục — Hoàn tác", () => {
     const r = revertCatalogSync({ ...s, products: oldProducts }, s.run);
     expect(r.removedProducts).toBe(0);
     expect(r.products).toEqual(oldProducts);
+  });
+});
+
+describe("Đồng bộ danh mục — Hoàn tác giữ mục đã được DÙNG trong lúc thông báo còn hiện", () => {
+  const noSources = (ledger: { id: string; itemName: string }[]): CatalogSyncUsageSources => ({
+    ledger,
+    productSources: { wips: [], packagings: [], salesItems: [], orderItems: [], exportItems: [], balancingOutputs: [], finishedOpeningStock: [] },
+    materialNamesInUse: [],
+    products: [],
+  });
+  const syncWithBaseline = () => {
+    const s = runSync();
+    const ledgerAtSync = Object.fromEntries(s.lines.map((l) => [l.id, l.itemName]));
+    return { ...s, run: { ...s.run, ledgerAtSync } };
+  };
+
+  it("không ai dùng thêm ⇒ gỡ hết như cũ (dòng vốn mang tên đó từ trước không tính là dùng)", () => {
+    const s = syncWithBaseline();
+    // "Ghẹ" vừa tạo, giả sử sổ có sẵn dòng tên "Ghẹ" từ TRƯỚC đồng bộ (tên file = tên chuẩn).
+    const lines = [...s.lines, line("l5", "Ghẹ")];
+    const run = { ...s.run, ledgerAtSync: { ...s.run.ledgerAtSync, l5: "Ghẹ" } };
+    const r = revertCatalogSync({ ...s, lines }, run, buildCatalogSyncUsage(run, noSources(lines)));
+    expect([r.removedProducts, r.removedMaterials, r.keptInUse]).toEqual([1, 1, 0]);
+  });
+
+  it("dòng sổ MỚI mang tên mục vừa tạo ⇒ giữ mục, đếm là đang dùng", () => {
+    const s = syncWithBaseline();
+    const lines = [...s.lines, line("l9", "  bạch tuộc 2 DA <80gr ", 12)];
+    const r = revertCatalogSync({ ...s, lines }, s.run, buildCatalogSyncUsage(s.run, noSources(lines)));
+    expect(r.products.map((p) => p.id)).toEqual(["p0", "p1"]);
+    expect(r.keptProducts).toEqual(["Bạch tuộc 2 da <80gr"]);
+    expect(r.keptInUse).toBe(1);
+    // tên dòng sổ vẫn trả về như trước cho các dòng lần đó đổi
+    expect(r.lines.filter((l) => l.id === "l1" || l.id === "l2").map((l) => l.itemName)).toEqual(["BT 2DA <80GR", "BT 2DA <80GR"]);
+  });
+
+  it("dòng có sẵn đổi tên SANG mục vừa tạo sau đồng bộ ⇒ cũng là dùng", () => {
+    const s = syncWithBaseline();
+    const lines = s.lines.map((l) => (l.id === "l3" ? { ...l, itemName: "Ghẹ" } : l));
+    const r = revertCatalogSync({ ...s, lines }, s.run, buildCatalogSyncUsage(s.run, noSources(lines)));
+    expect(r.keptMaterials).toEqual(["Ghẹ"]);
+    expect(r.removedProducts).toBe(1);
+  });
+
+  it("sổ khác trỏ tới mặt hàng (sản xuất) / loại NL (sổ nhập theo tên, mặt hàng gắn loại NL) ⇒ giữ", () => {
+    const s = syncWithBaseline();
+    const src = noSources(s.lines);
+    const usedByWip = { ...src, productSources: { ...src.productSources, wips: [{ productId: "p1" }] } };
+    const r1 = revertCatalogSync(s, s.run, buildCatalogSyncUsage(s.run, usedByWip));
+    expect([r1.removedProducts, r1.removedMaterials, r1.keptInUse]).toEqual([0, 1, 1]);
+
+    const usedByImport = { ...src, materialNamesInUse: ["GHẸ"] };
+    expect(revertCatalogSync(s, s.run, buildCatalogSyncUsage(s.run, usedByImport)).keptMaterials).toEqual(["Ghẹ"]);
+
+    const linkedProduct = { ...src, products: [{ id: "p7", materialTypeId: "m1" }] };
+    expect(revertCatalogSync(s, s.run, buildCatalogSyncUsage(s.run, linkedProduct)).removedMaterials).toBe(0);
+  });
+
+  it("mục vừa sửa VÀ đang dùng ⇒ giữ, chỉ đếm là đã sửa (không đếm đôi)", () => {
+    const s = syncWithBaseline();
+    const products = s.products.map((p) => (p.id === "p1" ? { ...p, finishedGoodCode: "TP-01" } : p));
+    const src = noSources(s.lines);
+    const used = { ...src, productSources: { ...src.productSources, salesItems: [{ productId: "p1" }] } };
+    const r = revertCatalogSync({ ...s, products }, s.run, buildCatalogSyncUsage(s.run, used));
+    expect([r.keptProducts.length, r.keptInUse]).toEqual([1, 0]);
   });
 });

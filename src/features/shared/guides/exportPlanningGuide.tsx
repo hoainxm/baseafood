@@ -191,6 +191,14 @@ export const exportPlanningGuide: PageGuide = {
             khách: hàng thành dòng của hợp đồng đó trên chuyến cont, kg từng hợp đồng giữ nguyên, chuyến Đóng ghép bỏ đi (Hoàn tác được).
           </li>
           <li>
+            <b>Có thể trùng lần xuất</b>: một khách có từ 2 chuyến đang mở cùng booking, hoặc cùng ngày đóng mà một chuyến chưa có booking.
+            Một lần xuất thì chọn <b>Gộp thành một lần xuất</b>: còn một chuyến, file, mục chứng từ, lệnh sản xuất, booking, thông tin xe
+            về chuyến giữ; ô hai chuyến ghi khác nhau thì chọn giá trị đúng; Hoàn tác được. Không gộp được khi đã gửi chứng từ / tiền về, cùng
+            một mục đã làm ở hai chuyến, hoặc chuyến có file mà hợp đồng thiếu hồ sơ. Hai lần xuất khác nhau thì chọn <b>Giữ riêng</b>. Lập
+            lịch hợp đồng mới trùng ngày đóng với chuyến có sẵn ⇒ dòng đó chọn sẵn <b>Đi chung chuyến</b> (hoặc <b>Tạo chuyến riêng</b>).
+            Chuyến nhiều hợp đồng: bước 2 Xong khi mọi hợp đồng có lệnh sản xuất đã phát hành gắn chuyến.
+          </li>
+          <li>
             <b>Chuyến nhiều cont</b> (một booking, VD 40HC-RF + 20RF): cont 1 là Loại chuyến + Số container của chuyến, cont 2, 3… thêm ở
             khối <b>Cont thêm</b> khi Sửa chuyến; Cập nhật booking đọc được nhiều cont thì hỏi có thêm cont không. Trong Nhập hàng của chuyến
             mỗi dòng chọn <b>Đi cont</b>, dòng đi hai cont thì <b>Chia sang cont khác</b>; bộ phận đóng cont thấy hàng theo từng cont và không

@@ -103,7 +103,7 @@ export const productionOrderGuide: PageGuide = {
       <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">
         <GuideList>
           <li>NL lấy từ trang <b>Nhập khẩu</b>: chỉ lần nhập đã ghi thực nhập mới chọn được.</li>
-          <li>Lệnh phát hành và gắn chuyến thì bước <b>Lệnh sản xuất</b> của chuyến ở trang <b>Xuất khẩu</b> tự xong. Hồ sơ lệnh có lối mở hồ sơ hợp đồng xuất.</li>
+          <li>Lệnh phát hành và gắn chuyến thì bước <b>Lệnh sản xuất</b> của chuyến ở trang <b>Xuất khẩu</b> tự xong. Chuyến chở hàng của nhiều hợp đồng: mỗi hợp đồng một lệnh, cùng gắn chuyến — mọi hợp đồng trên chuyến có lệnh đã phát hành thì bước đó mới Xong, thiếu một hợp đồng thì Đang làm. Gộp chuyến ở Xuất khẩu thì lệnh gắn chuyến bỏ tự gắn sang chuyến giữ. Hồ sơ lệnh có lối mở hồ sơ hợp đồng xuất.</li>
           <li>Gắn được cả chuyến chở hàng của nhiều hợp đồng, miễn chuyến có hàng của hợp đồng của lệnh. Lệnh xuất hàng của chuyến lấy dòng của lệnh theo đúng hợp đồng, số thùng / kg theo Hàng của chuyến.</li>
         </GuideList>
       </GuideSection>

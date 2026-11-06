@@ -50,7 +50,7 @@ export function consolidateTargets(d: ExportData, from: ExportShipment, opts?: E
  * Dòng kế hoạch của một HĐ từ kg của chuyến (chuyến chưa nhập Hàng của chuyến): HĐ một dòng hàng ⇒ số kiện = kg ÷ kg mỗi
  * kiện; HĐ nhiều dòng ⇒ mỗi dòng một hàng chưa có số kiện (Phòng KH ghi ở Hàng của chuyến) + nhắc.
  */
-function plannedLines(
+export function plannedLines(
   d: ExportData,
   contractId: string,
   shipmentId: string,

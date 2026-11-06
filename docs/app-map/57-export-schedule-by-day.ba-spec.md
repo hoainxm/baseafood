@@ -2,7 +2,8 @@
 
 > Load khi: sửa tab **Lịch xuất hàng** của `/planning-export` — cách xếp chuyến trong kỳ, số khách / chuyến mỗi ngày, mở chi tiết một ngày, khối chuyến chưa có ngày.
 covers: src/features/export-planning/MonthView.tsx, src/lib/exportDaySchedule.ts
-last_verified: 2026-11-04
+last_verified: 2026-11-06
+<!-- updated: 2026-11-06 (ba-spec 74 GC4) — R6: chuyến nhiều HĐ một dòng ghi mọi số HĐ + kg từng HĐ; ngày có nhóm có thể trùng ⇒ thẻ "Có thể trùng"; số chuyến vẫn đếm chuyến. -->
 ttl_days: 90
 status: v1 ĐÃ BUILD 2026-11-02 — `lib/exportDaySchedule.ts` (`buildDaySchedule`, `defaultOpenDay`, 8 test AC-1…AC-7), `MonthView.tsx` danh sách ngày mở / thu; AC-8 thử tay trên sandbox (bấm ngày → Mở ⇒ URL có contract + shipment); tour + hộp "?" (AC-9). Sửa phần Output "chuyến gom theo khách" của Flow NV11 ở [41](41-export-planning.ba-spec.md); mọi luật khác của NV11 (kỳ xem, lọc khách, tra cứu, 4 thẻ số, Excel, HĐ chưa ghi đủ chuyến) giữ nguyên.
 

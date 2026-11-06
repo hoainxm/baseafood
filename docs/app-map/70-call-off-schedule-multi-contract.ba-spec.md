@@ -271,6 +271,7 @@ status: **v1.2 ĐÃ CHỐT** (2026-11-03 — chủ dự án "Duyệt theo đề 
 
 ## History
 
+- 2026-11-06 — chuyến 06/11 BD-007 / BD-008 (cùng booking, đều 20RF, đã có file) không gộp được bằng Đưa vào cont / Gộp làm cont thêm; lịch theo HĐ vẫn sinh chuyến trùng (35 chuyến / 13 lần xuất DAIREI). Phân tích tiếp ở [74](74-merge-shipments-one-export.ba-spec.md).
 - 2026-11-05 — Phòng KH: "một cont nhiều hợp đồng, mở chuyến ra chưa chọn được cont". DB thật: DAIREI BD-007/008/009 có 31 chuyến **Đóng ghép** (mỗi HĐ mỗi tháng một chuyến, không cont). Chủ dự án chọn hướng A: chuyến Đóng ghép có nút **Đưa vào cont** — hàng thành dòng của HĐ đó trên chuyến cont cùng khách (đúng mô hình R1), chuyến Đóng ghép bỏ; chuyến cont chưa có dòng thì dựng dòng HĐ chính từ kg để kg từng HĐ không đổi. Không migration. `lib/exportConsolidate.ts`, test `exportConsolidate.test.ts`.
 - 2026-11-05 — chuyến nay có thể nhiều cont ([73](73-shipment-multi-container.ba-spec.md)): dòng hàng mang cả HĐ lẫn cont; luật đã giao / tiền về theo HĐ không đổi (73 R11, AC-14).
 - 2026-11-04 — R9: viết mig 0102 nới trigger đóng cont cho dòng HĐ phụ (chủ dự án đồng ý), kiểm PGlite.

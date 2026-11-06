@@ -14,6 +14,22 @@ import { useCustomerProductNameStore, useCustomers, useExportBookingDetailsAvail
   useCompanyProfileStore, useComposedDocuments, useGoodsTypeStore, useProducts } from "@/lib/catalogRepo";
 import { lineUnits, shipmentLinesOf } from "@/lib/exportInvoice";
 import { consolidateGate, consolidateInto, consolidateTargets } from "@/lib/exportConsolidate";
+import {
+  SEPARATE_SHIPMENT,
+  applyScheduleRows,
+  duplicateShipmentGroups,
+  jointShipmentsFor,
+  keepSeparateOffTag,
+  keepSeparateTag,
+  mergedInto,
+  mergedTag,
+  mergeGate,
+  mergeShipments,
+  MERGE_FIELD_LABELS,
+  sameExportShipments,
+  type DuplicateGroup,
+} from "@/lib/exportMergeShipments";
+import { MergeExportDialog, mergeGateText, type MergeExportChoice, type MergeExportTarget } from "./MergeExportDialog";
 import { containerLabel, extraContainersOf, isMultiContainer, shipmentContainerSummary, shipmentContainers } from "@/lib/exportContainers";
 import { companySellerOf } from "@/lib/companyProfile";
 import { SHIPPING_INSTRUCTION_DOC } from "@/lib/shippingInstruction";
@@ -302,10 +318,29 @@ export default function ExportPlanningScreen() {
     // Lịch xuất hàng gõ ngay trong form Lập HĐ (ba-spec 41 R42 + R43): N chuyến + mục chứng từ bước 5 (R6) ghi CÙNG lần lưu, chung Hoàn tác.
     const prevS = d.shipments;
     const t = p.revision.terms;
-    const scheduled = p.mode === "create" && p.schedule?.length
-      ? shipmentsFromSchedule(p.schedule, { contractId: p.contract.id, kind: KIND_FROM_TEXT(t.containerType), portOfDischarge: t.portOfDischarge }, newId, new Date().toISOString())
-      : [];
-    if (scheduled.length && !store.saveShipments([...prevS, ...scheduled])) {
+    // ba-spec 74 R13: dòng lịch trùng ngày / booking với chuyến có sẵn cùng khách ⇒ đi chung chuyến đó.
+    const plan = p.mode === "create" && p.schedule?.length
+      ? applyScheduleRows(
+          { ...d, contracts: nextC, revisions: nextR },
+          p.contract.customerId,
+          p.contract.id,
+          // Máy chủ chưa có Hàng của chuyến (0096) ⇒ không đi chung được, tạo chuyến như cũ.
+          store.shipmentLinesAvailable ? p.schedule : p.schedule.map((r) => ({ ...r, joinShipmentId: SEPARATE_SHIPMENT })),
+          (rows) => shipmentsFromSchedule(rows, { contractId: p.contract.id, kind: KIND_FROM_TEXT(t.containerType), portOfDischarge: t.portOfDischarge }, newId, new Date().toISOString()),
+          newId,
+        )
+      : null;
+    const scheduled = plan?.created ?? [];
+    const joinedS = plan?.joined ?? [];
+    const prevL = d.shipmentLines ?? [];
+    if (joinedS.length && !store.saveShipmentLines(plan!.shipmentLines)) {
+      undoFiles();
+      store.saveRevisions(prevR);
+      store.saveContracts(prevC);
+      return false;
+    }
+    if ((scheduled.length || joinedS.length) && !store.saveShipments(plan!.shipments)) {
+      if (joinedS.length) store.saveShipmentLines(prevL);
       undoFiles();
       store.saveRevisions(prevR);
       store.saveContracts(prevC);
@@ -313,9 +348,12 @@ export default function ExportPlanningScreen() {
     }
     const scheduleItems = scheduled.flatMap((s) => missingDocumentItems(s.id, t, prevI, newId));
     if (added.length || scheduleItems.length) store.saveItems([...prevI, ...added, ...scheduleItems]);
-    const scheduleText = scheduled.length
-      ? `lịch xuất hàng ${scheduled.length} chuyến (${[...new Set(scheduled.map((s) => shipmentMonth(s).split("-").reverse().join("/")))].join(", ")})`
-      : "";
+    const scheduleText = [
+      scheduled.length && `lịch xuất hàng ${scheduled.length} chuyến (${[...new Set(scheduled.map((s) => shipmentMonth(s).split("-").reverse().join("/")))].join(", ")})`,
+      joinedS.length && `đi chung ${joinedS.length} chuyến có sẵn (${joinedS.map((s) => (s.loadingDate ? formatDateVN(s.loadingDate) : shipmentMonth(s))).join(", ")})`,
+    ]
+      .filter(Boolean)
+      .join(" + ");
     const what =
       p.mode === "create"
         ? `Lập HĐ ${p.contract.contractNo} (bản 0)${scheduleText ? ` + ${scheduleText}` : ""}`
@@ -333,6 +371,7 @@ export default function ExportPlanningScreen() {
     const changes = contractChangeSummary(before, { contract: p.contract, revision: p.revision }, (id) => customers.find((x) => x.id === id)?.name ?? "");
     const logged = changes.length ? `${what}: ${changes.join("; ")}`.slice(0, 1000) : what;
     track(p.contract.id, "", p.mode === "create" ? "create" : "update", logged);
+    for (const j of joinedS) track(j.contractId, j.id, "update", `HĐ ${p.contract.contractNo} đi chung chuyến này (lịch xuất hàng)`);
     notify.saved(
       (p.mode === "create"
         ? `Đã lập HĐ ${p.contract.contractNo}${scheduleText ? ` + ${scheduleText}` : ""} — ${p.thenCreateOrder ? "đang mở Lập lệnh sản xuất; đính kèm hợp đồng đã ký sau ở hồ sơ HĐ" : "việc tiếp: đính kèm hợp đồng đã ký"}`
@@ -343,7 +382,8 @@ export default function ExportPlanningScreen() {
       undoTracked(p.contract.id, "", what, () => {
         store.saveContracts(prevC);
         store.saveRevisions(prevR);
-        if (scheduled.length) store.saveShipments(prevS);
+        if (scheduled.length || joinedS.length) store.saveShipments(prevS);
+        if (joinedS.length) store.saveShipmentLines(prevL);
         if (added.length || scheduleItems.length) store.saveItems(prevI);
         learned.undo();
         undoFiles();
@@ -368,19 +408,32 @@ export default function ExportPlanningScreen() {
       return false;
     }
     const terms = termsOf(d, contractId);
-    const created = shipmentsFromSchedule(rows, { contractId, kind: KIND_FROM_TEXT(terms.containerType), portOfDischarge: terms.portOfDischarge }, newId, new Date().toISOString());
+    const customerId = d.contracts.find((c) => c.id === contractId)?.customerId ?? "";
+    // ba-spec 74 R13: dòng trùng chuyến có sẵn cùng khách ⇒ đi chung, không tạo chuyến mới.
+    const plan = applyScheduleRows(d, customerId, contractId, store.shipmentLinesAvailable ? rows : rows.map((r) => ({ ...r, joinShipmentId: SEPARATE_SHIPMENT })), (rs) => shipmentsFromSchedule(rs, { contractId, kind: KIND_FROM_TEXT(terms.containerType), portOfDischarge: terms.portOfDischarge }, newId, new Date().toISOString()), newId);
+    const created = plan.created;
     const prevS = d.shipments;
     const prevI = d.items;
-    if (!store.saveShipments([...prevS, ...created])) return false;
+    const prevL = d.shipmentLines ?? [];
+    if (plan.joined.length && !store.saveShipmentLines(plan.shipmentLines)) return false;
+    if (!store.saveShipments(plan.shipments)) {
+      if (plan.joined.length) store.saveShipmentLines(prevL);
+      return false;
+    }
     const add = created.flatMap((s) => missingDocumentItems(s.id, terms, prevI, newId));
     if (add.length) store.saveItems([...prevI, ...add]);
-    const what = `Tạo lịch xuất hàng: ${created.length} chuyến (${[...new Set(created.map((s) => s.planMonth.split("-").reverse().join("/")))].join(", ")})`;
+    const what =
+      `Tạo lịch xuất hàng: ${created.length} chuyến${created.length ? ` (${[...new Set(created.map((s) => s.planMonth.split("-").reverse().join("/")))].join(", ")})` : ""}` +
+      (plan.joined.length ? ` + đi chung ${plan.joined.length} chuyến có sẵn (${plan.joined.map((s) => (s.loadingDate ? formatDateVN(s.loadingDate) : shipmentMonth(s))).join(", ")})` : "");
     track(contractId, "", "create", what);
+    const no = d.contracts.find((c) => c.id === contractId)?.contractNo ?? "";
+    for (const j of plan.joined) track(j.contractId, j.id, "update", `HĐ ${no} đi chung chuyến này (lịch xuất hàng)`);
     notify.saved(
-      `Đã tạo lịch xuất hàng: ${created.length} chuyến`,
+      `Đã ghi lịch xuất hàng: ${[created.length && `tạo ${created.length} chuyến`, plan.joined.length && `đi chung ${plan.joined.length} chuyến có sẵn`].filter(Boolean).join(" + ")}${plan.notices.length ? ` — ${plan.notices.join(" ")}` : ""}`,
       undoTracked(contractId, "", what, () => {
         store.saveShipments(prevS);
         store.saveItems(prevI);
+        if (plan.joined.length) store.saveShipmentLines(prevL);
       }),
     );
     setScheduleTarget(null);
@@ -496,6 +549,85 @@ export default function ExportPlanningScreen() {
     setParam({ shipment: into.id }, true);
   };
 
+  /* ---------- ba-spec 74: một lần xuất của nhiều HĐ = một chuyến ---------- */
+  const duplicateGroups = useMemo(() => duplicateShipmentGroups(d), [d]);
+  const canMergeExport = can.update && can.delete && store.shipmentLinesAvailable;
+  const [mergeExport, setMergeExport] = useState<MergeExportTarget | null>(null);
+  const contractNo = (id: string) => d.contracts.find((c) => c.id === id)?.contractNo ?? "";
+  const exportShipLabel = (s: ExportShipment) =>
+    [`HĐ ${contractNo(s.contractId)}`, shipmentKindLabel(s.kind), s.loadingDate && `đóng ${formatDateVN(s.loadingDate)}`].filter(Boolean).join(" · ");
+  const groupReasonText = (g: DuplicateGroup) => (g.reason === "booking" ? `cùng booking ${g.value}` : `cùng ngày đóng ${formatDateVN(g.value)}`);
+  const openMergeGroup = (g: DuplicateGroup) =>
+    setMergeExport({ shipments: g.shipmentIds.map((id) => d.shipments.find((s) => s.id === id)).filter((s): s is ExportShipment => !!s), reasonText: groupReasonText(g) });
+  /** Câu báo kèm khi vừa ghi booking / ngày trùng một chuyến khác cùng khách (R13 c) — vẫn lưu. */
+  const sameExportNote = (s: ExportShipment, shipments: readonly ExportShipment[]) => {
+    const others = sameExportShipments({ contracts: d.contracts, shipments }, s);
+    return others.length
+      ? ` — ${s.bookingNo.trim() ? "booking này" : "ngày đóng này"} đã có ở chuyến của HĐ ${[...new Set(others.map((o) => contractNo(o.contractId)))].join(", ")}: mở Lịch xuất hàng, chọn Gộp thành một lần xuất`
+      : "";
+  };
+  const confirmMergeExport = (c: MergeExportChoice) => {
+    const blocked = c.drops.map((s) => ({ s, g: mergeGate(d, c.keep, s, c.mode, opts) })).filter((x) => !x.g.ok);
+    if (blocked.length) {
+      notify.error(`Chưa gộp được — ${blocked.map(({ s, g }) => `${exportShipLabel(s)}: ${g.ok ? "" : mergeGateText(d, g)}`).join("; ")}`);
+      return;
+    }
+    if (c.mode === "separate-containers" && !store.containersAvailable) {
+      notify.error("Máy chủ chưa có bảng cont thêm (0106) — chọn Cùng một cont.");
+      return;
+    }
+    const prev = { s: d.shipments, i: d.items, f: d.files, l: d.shipmentLines ?? [], c: d.shipmentContainers ?? [], o: store.orderLinks };
+    const out = mergeShipments(d, c.keep, c.drops, { choices: c.choices, mode: c.mode, orderLinks: store.orderLinks, newId, now: new Date().toISOString() });
+    if (!store.saveShipmentLines(out.shipmentLines)) return;
+    if (JSON.stringify(out.shipmentContainers) !== JSON.stringify(prev.c)) store.saveShipmentContainers(out.shipmentContainers);
+    store.saveFiles(out.files);
+    store.saveItems(out.items);
+    if (JSON.stringify(out.orderLinks) !== JSON.stringify(prev.o)) store.saveOrderLinks(out.orderLinks);
+    store.saveShipments(out.shipments);
+    const picked = Object.entries(c.choices)
+      .filter(([, id]) => id !== c.keep.id)
+      .map(([k, id]) => `${MERGE_FIELD_LABELS[k] ?? k} theo HĐ ${contractNo(c.drops.find((x) => x.id === id)?.contractId ?? "")}`);
+    const what =
+      `Gộp ${c.drops.length + 1} chuyến thành một lần xuất: ${c.drops.map(exportShipLabel).join(", ")} vào chuyến ${exportShipLabel(c.keep)}` +
+      (c.mode === "separate-containers" ? " (mỗi chuyến một cont)" : "") +
+      (picked.length ? ` · ${picked.join(", ")}` : "");
+    const tagged = `${what} ${mergedTag(c.drops.map((x) => x.id), c.keep.id)}`.slice(0, 1000);
+    for (const cid of new Set([c.keep.contractId, ...c.drops.map((x) => x.contractId)])) track(cid, c.keep.id, "update", tagged);
+    notify.saved(
+      `Đã gộp thành một lần xuất (${c.drops.length + 1} chuyến)` +
+        (out.notices.length ? ` — ${out.notices.join(" ")}` : "") +
+        (out.duplicateFileNames ? ` · ${out.duplicateFileNames} file trùng tên — xóa bớt nếu thừa` : ""),
+      undoTracked(c.keep.contractId, c.keep.id, what, () => {
+        store.saveShipments(prev.s);
+        store.saveItems(prev.i);
+        store.saveFiles(prev.f);
+        store.saveShipmentLines(prev.l);
+        store.saveShipmentContainers(prev.c);
+        store.saveOrderLinks(prev.o);
+      }),
+    );
+    setMergeExport(null);
+    setParam({ contract: c.keep.contractId, shipment: c.keep.id }, true);
+  };
+  /** R3: hai chuyến cùng ngày / cùng booking nhưng là hai lần xuất thật ⇒ không báo nữa (ghi vào nhật ký). */
+  const keepSeparate = (g: DuplicateGroup) => {
+    const ships = g.shipmentIds.map((id) => d.shipments.find((s) => s.id === id)).filter((s): s is ExportShipment => !!s);
+    const what = `Giữ riêng ${ships.length} chuyến ${groupReasonText(g)} (${ships.map(exportShipLabel).join(", ")}) — là các lần xuất khác nhau`;
+    for (const cid of new Set(ships.map((s) => s.contractId))) track(cid, ships[0]?.id ?? "", "update", `${what} ${keepSeparateTag(g.shipmentIds)}`);
+    notify.saved("Đã ghi giữ riêng — không báo trùng cho các chuyến này nữa", () => {
+      for (const cid of new Set(ships.map((s) => s.contractId))) track(cid, ships[0]?.id ?? "", "undo", `Hoàn tác: ${what} ${keepSeparateOffTag(g.shipmentIds)}`);
+    });
+  };
+  // R12: mở link chuyến đã gộp (Zalo, Việc của tôi) ⇒ sang chuyến giữ.
+  useEffect(() => {
+    if (!shipmentParam || d.shipments.some((s) => s.id === shipmentParam)) return;
+    const hit = mergedInto(d, shipmentParam);
+    const keep = hit && d.shipments.find((s) => s.id === hit.shipmentId);
+    if (!keep) return;
+    notify.warning(`Chuyến này đã gộp vào chuyến ${exportShipLabel(keep)} ngày ${formatDateVN(hit.mergedAt.slice(0, 10))}`);
+    setParam({ contract: keep.contractId, shipment: keep.id }, true);
+  }, [shipmentParam, d.shipments, d.activities]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const saveShipment = (s: ExportShipment, isNew: boolean, bookingFiles: ExportFile[] = [], extras: ExportShipmentContainer[] | null = null): boolean => {
     // Ghi chuyến MỚI chỉ sau khi HĐ đã duyệt + đủ hồ sơ (mig 0079) — nút đã ẩn, chặn thêm ở đây.
     const gate = shipmentGate(d, s.contractId, opts);
@@ -525,7 +657,7 @@ export default function ExportPlanningScreen() {
       (extrasChanged ? ` · ${(extras?.length ?? 0) + 1} cont (${[s.kind, ...(extras ?? []).map((c) => c.kind)].join(" + ")})` : "");
     track(s.contractId, s.id, isNew ? "create" : "update", what);
     notify.saved(
-      isNew ? `Đã ghi chuyến${s.lotCode ? ` lô ${s.lotCode}` : ""} — tháng ${shipmentMonth(s).split("-").reverse().join("/")}` : "Đã lưu chuyến",
+      (isNew ? `Đã ghi chuyến${s.lotCode ? ` lô ${s.lotCode}` : ""} — tháng ${shipmentMonth(s).split("-").reverse().join("/")}` : "Đã lưu chuyến") + sameExportNote(s, nextS),
       undoTracked(s.contractId, s.id, what, () => {
         store.saveShipments(prevS);
         store.saveItems(prevI);
@@ -927,7 +1059,7 @@ export default function ExportPlanningScreen() {
       (addKinds.length ? ` · thêm ${addKinds.length} cont theo booking (${addKinds.join(" + ")})` : "");
     track(s.contractId, s.id, files.length ? "attach" : "update", what);
     notify.saved(
-      "Đã lưu thông tin booking",
+      "Đã lưu thông tin booking" + sameExportNote(s, prevS.map((x) => (x.id === s.id ? s : x))),
       undoTracked(s.contractId, s.id, what, () => {
         store.saveShipments(prevS);
         if (files.length) store.saveFiles(prevF);
@@ -1191,6 +1323,9 @@ export default function ExportPlanningScreen() {
               filesAvailable={filesAvailable}
               canExport={can.export}
               onPeriodChange={setPeriod}
+              duplicateGroups={duplicateGroups}
+              onMergeGroup={canMergeExport ? openMergeGroup : undefined}
+              onKeepSeparate={can.update ? keepSeparate : undefined}
               onOpenContract={(cid, sid) => setParam({ contract: cid, shipment: sid ?? "" })}
               onExportExcel={(p, cid) => void exportExcel(p, cid)}
             />
@@ -1345,6 +1480,15 @@ export default function ExportPlanningScreen() {
               onRestore={() => dossier.selected && doRestoreShipment(dossier.selected)}
               onDelete={() => dossier.selected && setDeletingShipment(dossier.selected)}
               onMerge={dossier.selected && store.containersAvailable && mergeCandidates(dossier.selected).length ? () => dossier.selected && openMerge(dossier.selected) : undefined}
+              sameExport={(() => {
+                const g = dossier.selected && duplicateGroups.find((x) => x.shipmentIds.includes(dossier.selected!.id));
+                if (!g || !dossier.selected) return undefined;
+                const others = g.shipmentIds.filter((id) => id !== dossier.selected!.id).map((id) => d.shipments.find((s) => s.id === id)).filter((s): s is ExportShipment => !!s);
+                return {
+                  text: `${groupReasonText(g)} với ${others.map(exportShipLabel).join("; ")}. Một lần xuất thì gộp lại để làm Lệnh sản xuất → Tiền về một lần.`,
+                  onMerge: canMergeExport ? () => openMergeGroup(g) : undefined,
+                };
+              })()}
               onConsolidate={
                 // Luôn hiện ở chuyến Đóng ghép còn mở — chưa có chuyến cont nhận được thì hộp nói cần ghi chuyến cont trước.
                 dossier.selected?.kind === "consolidated" && dossier.selected.status === "open" && store.shipmentLinesAvailable
@@ -1403,6 +1547,7 @@ export default function ExportPlanningScreen() {
         containersEnabled={store.containersAvailable}
       />
       <MergeShipmentDialog target={mergeTarget} onClose={() => setMergeTarget(null)} onConfirm={confirmMerge} />
+      <MergeExportDialog target={mergeExport} data={d} opts={opts} shipmentLabel={exportShipLabel} onClose={() => setMergeExport(null)} onConfirm={confirmMergeExport} />
       <BookingDialog
         target={bookingTarget}
         recordedBy={recordedBy}
@@ -1414,7 +1559,15 @@ export default function ExportPlanningScreen() {
       />
       <TransportDialog target={transportTarget} onClose={() => setTransportTarget(null)} onSave={saveTransport} />
       <ShippingInstructionDialog target={siTarget} by={recordedBy} onClose={() => setSiTarget(null)} onExported={saveShippingInstructionFile} />
-      <ScheduleDialog target={scheduleTarget} onClose={() => setScheduleTarget(null)} onSave={saveSchedule} />
+      <ScheduleDialog
+        target={scheduleTarget}
+        onClose={() => setScheduleTarget(null)}
+        onSave={saveSchedule}
+        joint={(cid) => ({
+          candidates: (r) => jointShipmentsFor(d, d.contracts.find((c) => c.id === cid)?.customerId ?? "", cid, r),
+          label: (s) => [exportShipLabel(s), s.bookingNo && `booking ${s.bookingNo}`, `${formatNumber(s.plannedKg)} kg`].filter(Boolean).join(" · "),
+        })}
+      />
       <StepItemDialog
         target={itemTarget}
         documentKindSource={store.documentKindSource}

@@ -30,6 +30,7 @@ import { useExportOptionPicker } from "./exportOptionPicker";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
 import { EMPTY_BOOKING_DETAILS, EMPTY_TRANSPORT_INFO } from "@/lib/exportBooking";
+import { SEPARATE_SHIPMENT } from "@/lib/exportMergeShipments";
 import {
   ITEM_STATE_LABELS,
   MISSING_LABELS,
@@ -469,16 +470,24 @@ export const scheduleRowsToSave = (rows: readonly ScheduleRowForm[]): ScheduleRo
  * xuất hàng: tháng + kg kế hoạch, và tùy chọn Số booking · Ngày đóng cont · ETD · ETA (ô như Ghi chuyến). Gõ ngày
  * đóng / ETD thì tháng của chuyến đi theo ngày đó (R1).
  */
+/** ba-spec 74 R13: chuyến có sẵn của HĐ khác cùng khách mà dòng lịch đi chung được. */
+export interface ScheduleJoint {
+  candidates: (row: ScheduleRow) => ExportShipment[];
+  label: (s: ExportShipment) => string;
+}
+
 export function ScheduleRowsEditor({
   rows,
   onChange,
   totalKg,
   deadline,
+  joint,
 }: {
   rows: readonly ScheduleRowForm[];
   onChange: (rows: ScheduleRowForm[]) => void;
   totalKg: number;
   deadline: string;
+  joint?: ScheduleJoint;
 }) {
   const setRow = (id: string, patch: Partial<ScheduleRow>) =>
     onChange(
@@ -515,6 +524,24 @@ export function ScheduleRowsEditor({
             <DateField label="ETD" value={r.etd ?? ""} onChange={(v) => setRow(r.id, { etd: v })} />
             <DateField label="ETA" value={r.eta ?? ""} onChange={(v) => setRow(r.id, { eta: v })} />
           </div>
+          {(() => {
+            const cands = joint?.candidates(r) ?? [];
+            if (!cands.length) return null;
+            const value = r.joinShipmentId && (r.joinShipmentId === SEPARATE_SHIPMENT || cands.some((c) => c.id === r.joinShipmentId)) ? r.joinShipmentId : cands[0].id;
+            return (
+              <ChoiceGroup
+                label={`Chuyến ${i + 1} — khách đã có chuyến cùng ${cands[0].bookingNo && r.bookingNo?.trim() ? "booking" : "ngày đóng"}`}
+                value={value}
+                onChange={(v) => setRow(r.id, { joinShipmentId: v })}
+                hint="Đi chung: hàng của hợp đồng này thành dòng hàng trên chuyến có sẵn, không tạo chuyến mới — các bước làm một lần cho cả lần xuất."
+                options={[
+                  ...cands.map((c) => ({ value: c.id, label: `Đi chung chuyến ${joint!.label(c)}` })),
+                  { value: SEPARATE_SHIPMENT, label: "Tạo chuyến riêng", description: "Khi đây là lần xuất khác (VD cont khác, khách đòi chứng từ riêng)." },
+                ]}
+                columns={2}
+              />
+            );
+          })()}
         </div>
       ))}
       <div className="flex flex-wrap items-center gap-3">
@@ -545,10 +572,13 @@ export function ScheduleDialog({
   target,
   onClose,
   onSave,
+  joint,
 }: {
   target: ScheduleTarget | null;
   onClose: () => void;
   onSave: (contractId: string, rows: ScheduleRow[]) => boolean;
+  /** Dòng lịch đi chung chuyến có sẵn (ba-spec 74 R13) — theo HĐ đang tạo lịch. */
+  joint?: (contractId: string) => ScheduleJoint;
 }) {
   const [form, setForm] = useState<ScheduleForm | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
@@ -618,7 +648,13 @@ export function ScheduleDialog({
           )}
           <Button variant="save" onClick={save} title="Ghi các chuyến dự kiến này lên lịch xuất hàng.">
             <Save className="mr-2 h-4 w-4" aria-hidden />
-            Tạo {form?.rows.length ?? 0} chuyến
+            {(() => {
+              // ba-spec 74 R13: dòng đi chung chuyến có sẵn không tạo chuyến mới.
+              const j = form ? joint?.(form.contractId) : undefined;
+              const joined = form && j ? form.rows.filter((r) => r.joinShipmentId !== SEPARATE_SHIPMENT && j.candidates(r).length > 0).length : 0;
+              const own = (form?.rows.length ?? 0) - joined;
+              return joined ? `${own ? `Tạo ${own} chuyến + ` : ""}Đi chung ${joined} chuyến` : `Tạo ${own} chuyến`;
+            })()}
           </Button>
         </>
       }
@@ -632,7 +668,7 @@ export function ScheduleDialog({
             {form.totalKg > 0 ? ` · ${formatNumber(form.totalKg)} kg chia đều` : ""}
             {deadlineText ? ` · rải từ tháng sau ngày ký tới hạn giao ${deadlineText}` : ""}. Sửa tháng, kg từng chuyến nếu cần.
           </p>
-          <ScheduleRowsEditor rows={form.rows} onChange={(rows) => setForm((f) => (f ? { ...f, rows } : f))} totalKg={form.totalKg} deadline={form.deadline} />
+          <ScheduleRowsEditor rows={form.rows} onChange={(rows) => setForm((f) => (f ? { ...f, rows } : f))} totalKg={form.totalKg} deadline={form.deadline} joint={joint?.(form.contractId)} />
         </div>
       )}
     </FormDialog>

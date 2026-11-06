@@ -22,7 +22,7 @@ import {
   useExportShippingInstructionAvailable,
 } from "@/lib/catalogRepo";
 import { remapLegacyContractLineIds, type ExportData } from "@/lib/exportPlanning";
-import { issuedShipmentIds } from "@/lib/productionOrder";
+import { issuedOrderContracts, issuedShipmentIds } from "@/lib/productionOrder";
 
 /** Hàm ghi của repo nhận mảng thường — bọc lại để màn truyền thẳng mảng chỉ-đọc của `ExportData`. */
 const ro =
@@ -48,14 +48,15 @@ export function useExportData() {
   // ba-spec 73: cont thêm của chuyến (mig 0106) — chưa chạy ⇒ rỗng, mỗi chuyến một cont như cũ.
   const { containers: shipmentContainers, setContainers: saveShipmentContainers, isAvailable: containersAvailable } = useExportShipmentContainerStore();
   const [productionOrders] = useProductionOrders();
-  const [orderLinks] = useProductionOrderShipments();
+  const [orderLinks, saveOrderLinks] = useProductionOrderShipments();
   const issuedOrderShipmentIds = useMemo(() => issuedShipmentIds(productionOrders, orderLinks), [productionOrders, orderLinks]);
+  const orderContractsByShipment = useMemo(() => issuedOrderContracts(productionOrders, orderLinks), [productionOrders, orderLinks]);
 
   // ba-spec 72: máy chủ đã chạy 0103 ⇒ mục SI bắt buộc ở bước 4.
   const shippingInstructionEnabled = useExportShippingInstructionAvailable();
   const data: ExportData = useMemo(
-    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines, shipmentContainers, shippingInstructionEnabled }),
-    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, shipmentLines, shipmentContainers, shippingInstructionEnabled],
+    () => ({ contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, orderContractsByShipment, shipmentLines, shipmentContainers, shippingInstructionEnabled }),
+    [contracts, revisions, approvals, extensions, shipments, items, files, payments, activities, documentKinds, issuedOrderShipmentIds, orderContractsByShipment, shipmentLines, shipmentContainers, shippingInstructionEnabled],
   );
 
   return {
@@ -77,6 +78,9 @@ export function useExportData() {
     saveShipmentContainers: ro(saveShipmentContainers),
     containersAvailable,
     saveActivities: ro(saveActivities),
+    /** Lệnh sản xuất gắn chuyến (mig 0088) — gộp chuyến (ba-spec 74 R8) chuyển gắn sang chuyến giữ. */
+    orderLinks,
+    saveOrderLinks: ro(saveOrderLinks),
     canLog,
     /** Danh mục loại chứng từ (mig 0081) — ô chọn Loại chứng từ thêm / sửa qua đây. */
     documentKindSource: { rows: documentKinds, setRows: ro(saveDocumentKinds), isAvailable: documentKindsAvailable },

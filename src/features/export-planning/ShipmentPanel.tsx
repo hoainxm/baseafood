@@ -35,11 +35,12 @@ import {
   SHIPPING_INSTRUCTION_SINCE,
   type ExportData,
   type StepNo,
+  productionOrderMissingContracts,
 } from "@/lib/exportPlanning";
 import { formatDateTimeVN, formatDateVN, formatMoney } from "@/lib/format";
 import { BOOKING_LABELS, TRANSPORT_LABELS, cutoffOverdue, hasTransport, localNowMinute } from "@/lib/exportBooking";
 import type { ExportContract, ExportFile, ExportItemState, ExportLoadingExtraStep, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
-import { Ban, Boxes, Camera, Container, ClipboardCheck, ClipboardList, Download, FilePlus2, FileSpreadsheet, FileText, Pencil, Plus, RotateCcw, Send, Ship, Trash2, Truck, Wallet } from "lucide-react";
+import { Ban, Boxes, Camera, Container, Layers, ClipboardCheck, ClipboardList, Download, FilePlus2, FileSpreadsheet, FileText, Pencil, Plus, RotateCcw, Send, Ship, Trash2, Truck, Wallet } from "lucide-react";
 import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
 import { containerLabel, filesOfContainer, isMultiContainer, shipmentContainerSummary, shipmentContainers } from "@/lib/exportContainers";
 import { ShipmentLineSummary } from "./ShipmentGoods";
@@ -142,6 +143,7 @@ export function ShipmentPanel({
   onDelete,
   onMerge,
   onConsolidate,
+  sameExport,
   onOpenItem,
   onUploadLoading,
   onPayment,
@@ -177,6 +179,8 @@ export function ShipmentPanel({
   onMerge?: () => void;
   /** Chuyến Đóng ghép: đưa vào cont của chuyến khác (một cont nhiều HĐ, 2026-11-05) — có chuyến cont nhận được mới truyền. */
   onConsolidate?: () => void;
+  /** ba-spec 74 GC1: chuyến này có thể cùng một lần xuất với chuyến khác cùng khách. `onMerge` trống ⇒ không có quyền gộp. */
+  sameExport?: { text: string; onMerge?: () => void };
   onOpenItem: (t: StepItemTarget) => void;
   onUploadLoading: (t: LoadingUploadTarget) => void;
   onPayment: (t: PaymentTarget) => void;
@@ -629,6 +633,19 @@ export function ShipmentPanel({
               )}
             </div>
           )}
+          {sameExport && !isCancelled && (
+            <div role="status" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-warning-surface px-4 py-3 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="font-semibold">Có thể trùng lần xuất:</span> {sameExport.text}
+              </span>
+              {sameExport.onMerge && (
+                <Button size="sm" onClick={sameExport.onMerge} title="Gộp thành một chuyến: booking, xe, file, mục chứng từ, lệnh sản xuất về một chỗ. Hoàn tác được.">
+                  <Layers className="mr-1 h-4 w-4" aria-hidden />
+                  Gộp thành một lần xuất
+                </Button>
+              )}
+            </div>
+          )}
         </div>
         {/* Lưới tự chia theo bề ngang: điện thoại 2 cột, desktop 6 cột một hàng; phóng chữ 130 % tự bớt cột. */}
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 text-sm">
@@ -696,6 +713,16 @@ export function ShipmentPanel({
 
       <StepBlock n={2} state={progress.steps[2]} summary={summaryOf(2)} isCurrent={progress.next === 2}>
         {singleRow("production-order", 2)}
+        {(() => {
+          // ba-spec 74 R14: chuyến nhiều HĐ — mọi HĐ có lệnh đã phát hành gắn chuyến thì bước 2 mới xong.
+          const gap = productionOrderMissingContracts(data, shipment.id);
+          return gap && gap.covered > 0 && gap.ids.length > 0 ? (
+            <p className="border-b border-border py-3 text-sm">
+              Còn HĐ {gap.ids.map((id) => data.contracts.find((c) => c.id === id)?.contractNo ?? "").join(", ")} chưa có lệnh sản xuất đã phát hành gắn chuyến này — mọi
+              hợp đồng trên chuyến có lệnh thì bước 2 mới Xong.
+            </p>
+          ) : null;
+        })()}
         {/* Lệnh sản xuất có cấu trúc (ba-spec 48 R6): lệnh phát hành gắn chuyến ⇒ bước 2 xong; file cũ vẫn tính. */}
         <ShipmentOrders shipment={shipment} isCancelled={isCancelled} />
       </StepBlock>

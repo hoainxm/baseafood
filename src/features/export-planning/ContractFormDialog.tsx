@@ -70,6 +70,8 @@ import { useGoodsTypePicker } from "./goodsTypePicker";
 import { useExportOptionPicker } from "./exportOptionPicker";
 import { uploadExtraContractFiles } from "./RecordDialogs";
 import { ScheduleRowsEditor, scheduleRowsToSave, type ScheduleRowForm } from "./ShipmentDialogs";
+import { jointShipmentsFor } from "@/lib/exportMergeShipments";
+import { formatDateVN } from "@/lib/format";
 
 export type ContractFormTarget =
   | { mode: "create" }
@@ -1061,6 +1063,14 @@ export function ContractFormDialog({
                       onChange={(rows) => setSchedule({ edited: true, rows })}
                       totalKg={totals.kg}
                       deadline={form.terms.latestShipmentDate || today}
+                      joint={{
+                        // ba-spec 74 R13: khách đã có chuyến cùng ngày đóng / booking ⇒ đề xuất đi chung.
+                        candidates: (r) => jointShipmentsFor(data, form.customerId, form.contractId, r),
+                        label: (s) =>
+                          [`HĐ ${data.contracts.find((c) => c.id === s.contractId)?.contractNo ?? ""}`, s.loadingDate && `đóng ${formatDateVN(s.loadingDate)}`, s.bookingNo && `booking ${s.bookingNo}`, `${formatNumber(s.plannedKg)} kg`]
+                            .filter(Boolean)
+                            .join(" · "),
+                      }}
                     />
                   </>
                 )}

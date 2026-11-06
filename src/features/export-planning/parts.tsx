@@ -4,6 +4,7 @@
 // Description: Shared UI bits for the export planning screens: step state dots, file preview,
 //              multi-file picker, vertical file list.
 // ============================================================
+import { visibleActivitySummary } from "@/lib/exportMergeShipments";
 import { useRef, useState, type ReactNode } from "react";
 import { Button, FormDialog, Tag, notify, type TagVariant } from "@/design-system";
 import { CONTRACT_FLOW_STAGES, ITEM_STATE_LABELS, STEP_TITLES, contractFlowIndex, type ContractState, type StepNo } from "@/lib/exportPlanning";
@@ -363,7 +364,7 @@ export function ActivityList({ items, shipmentLabel }: { items: readonly ExportA
           const ship = a.shipmentId ? shipmentLabel(a.shipmentId) : "";
           return (
             <li key={a.id} className="grid min-w-0 gap-0.5 px-3 py-2">
-              <span className="break-words">{a.summary}</span>
+              <span className="break-words">{visibleActivitySummary(a.summary)}</span>
               <span className="tnum text-sm text-muted-foreground">{[when, a.actor, ship].filter(Boolean).join(" · ")}</span>
             </li>
           );

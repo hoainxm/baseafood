@@ -243,6 +243,18 @@ export function issuedShipmentIds(orders: readonly ProductionOrder[], links: rea
   return new Set(links.filter((l) => issued.has(l.orderId)).map((l) => l.shipmentId));
 }
 
+/** ba-spec 74 R14: chuyến → HĐ của các lệnh "Đã phát hành" gắn chuyến (bước 2 của chuyến nhiều HĐ xét từng HĐ). */
+export function issuedOrderContracts(orders: readonly ProductionOrder[], links: readonly ProductionOrderShipment[]): Map<string, Set<string>> {
+  const contractOf = new Map(orders.filter((o) => o.status === "issued").map((o) => [o.id, o.contractId]));
+  const out = new Map<string, Set<string>>();
+  for (const l of links) {
+    const c = contractOf.get(l.orderId);
+    if (!c) continue;
+    out.set(l.shipmentId, (out.get(l.shipmentId) ?? new Set()).add(c));
+  }
+  return out;
+}
+
 /** MSL của chuyến khác MSL của lệnh (chuyến đã có MSL riêng). */
 export const lotMismatch = (shipment: Pick<ExportShipment, "lotCode">, order: Pick<ProductionOrder, "lotCode">): boolean =>
   Boolean(shipment.lotCode.trim() && order.lotCode.trim() && shipment.lotCode.trim() !== order.lotCode.trim());

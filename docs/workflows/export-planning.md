@@ -1,10 +1,11 @@
 # Xuất khẩu — sơ đồ workflow
 
 > Load khi: review / kiểm lại trang Xuất khẩu (`/planning-export`), trước khi sửa luật hợp đồng, chuyến, đóng cont, chứng từ. Bản đọc nhanh — luật đầy đủ ở ba-spec [41](../app-map/41-export-planning.ba-spec.md) · [62](../app-map/62-export-option-lists.ba-spec.md) · [63](../app-map/63-export-invoice-from-app.ba-spec.md) · [58](../app-map/58-contract-attachment-deferral.ba-spec.md).
-covers: src/features/export-planning/*, src/lib/exportConsolidate.ts, src/lib/exportPlanning.ts, src/lib/exportInvoice*.ts, src/lib/exportOptions.ts, src/lib/exportFiles*.ts, src/lib/exportContainers.ts
+covers: src/features/export-planning/*, src/lib/exportConsolidate.ts, src/lib/exportMergeShipments.ts, src/lib/exportPlanning.ts, src/lib/exportInvoice*.ts, src/lib/exportOptions.ts, src/lib/exportFiles*.ts, src/lib/exportContainers.ts
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
-last_verified: 2026-11-05
+last_verified: 2026-11-06
+<!-- re-verified: 2026-11-06 (ba-spec 74) — §2d: dò chuyến có thể trùng lần xuất (cùng booking / cùng ngày đóng, cùng khách), Gộp thành một lần xuất (mang file, mục, lệnh SX, booking, xe; ô lệch chọn; Hoàn tác), Giữ riêng, lịch HĐ mới Đi chung chuyến có sẵn; bước 2 chuyến nhiều HĐ xét từng HĐ; Lịch xuất hàng một dòng ghi mọi HĐ. -->
 <!-- re-verified: 2026-11-05 — SI: ô Gross mỗi kiện, Tổng gross tự nhân với số kiện; luật không đổi. -->
 <!-- re-verified: 2026-11-05 — chuyến Đóng ghép có nút Đưa vào cont (một cont nhiều HĐ, §2b): hàng sang chuyến cont thành dòng của HĐ đó. -->
 <!-- re-verified: 2026-11-05 — thẻ Còn … chưa ghi chuyến ghi kèm đã ghi / tối thiểu kg (HĐ, dung sai) và đã ghi / số cont; luật không đổi. -->
@@ -92,7 +93,7 @@ Mỗi mục trong bước có một trong 4 nhãn: **Chưa làm** · **Đang là
 | Bước | Mục bên trong | Xong khi (code `stepState`) | Ai làm |
 |---|---|---|---|
 | 1 · Hợp đồng | Hồ sơ đính kèm của HĐ | Hồ sơ bắt buộc của HĐ đủ (`contractStepState`) | Nhân viên Kế hoạch |
-| 2 · Lệnh sản xuất | Lệnh sản xuất | Mục Lệnh sản xuất Xong / Không áp dụng (`subStepState`); lệnh lập ở trang Lệnh sản xuất | Nhân viên Kế hoạch |
+| 2 · Lệnh sản xuất | Lệnh sản xuất | Mục Lệnh sản xuất Xong / Không áp dụng (`subStepState`); lệnh lập ở trang Lệnh sản xuất. Chuyến **nhiều HĐ** (2026-11-06, ba-spec 74 R14): Xong khi **mọi** HĐ trên chuyến có lệnh đã phát hành gắn chuyến; mới một phần ⇒ Đang làm + kể HĐ thiếu (`productionOrderMissingContracts`) | Nhân viên Kế hoạch |
 | 3 · Bao bì | Bao bì | Mục Bao bì Xong / Không áp dụng (`subStepState`) | Nhân viên Kế hoạch |
 | 4 · Đóng cont | Theo trình tự đóng thật (`LOADING_STEPS`): Lệnh xuất → (số cont + seal) → **SI** (ba-spec [72](../app-map/72-export-order-and-si.ba-spec.md), ngay sau số cont + seal; máy chủ đã chạy 0103) → Sơ đồ container → Hình ảnh đóng cont → Tờ khai | Cả các mục Xong / Không áp dụng **và** hàng Số cont + seal Xong (`containerSealState`): số container + seal hợp lệ (`containerIdentityOk`; xe tải: biển số) **và có ≥ 1 ảnh cont / seal** (từ 04/11/2026, Phòng KH yêu cầu; đóng ghép, máy chủ chưa chạy 0103, chuyến tạo trước 05/11/2026 đã có B/L hoặc đã xong 4 mục cũ + số ⇒ không bắt ảnh — `containerSealPhotoRequired`); mới có số hoặc ảnh ⇒ Đang làm. Lệnh xuất Xong khi có file — xuất Word từ **Lập lệnh xuất** là đủ. SI (`shippingInstructionState`) Xong khi có file SI; xe tải / đóng ghép ⇒ Không áp dụng; chuyến tạo trước 05/11/2026 đã xong bước 4 cũ hoặc có B/L ⇒ Không áp dụng nhưng vẫn lập SI được (lập xong ⇒ Xong) — `shippingInstructionExemption` cho lý do | Kế hoạch: lệnh xuất, SI, tờ khai, số cont + seal, file booking. **Bộ phận đóng cont**: sơ đồ, ảnh, ảnh cont / seal |
 | 4 · (không chặn) | Booking (12 trường + file booking, ba-spec [71](../app-map/71-export-booking-details.ba-spec.md)) · Thông tin xe vận chuyển · Số lượng thực đóng · Hình ảnh bao bì + cân gross | Không tính vào bước 4. Thông tin xe chỉ lưu khi đủ 4 ô bắt buộc (công ty vận chuyển, nơi lấy rỗng, nơi đóng, nơi hạ bãi) | Kế hoạch (booking, thông tin xe; bộ phận đóng cont chỉ xem) · **Bộ phận đóng cont** (số thực đóng, ảnh) |
@@ -153,6 +154,32 @@ flowchart LR
 | Người đóng hàng | Xem cont, điền số thực đóng, đính ảnh từng cont; **không** thêm cont, không đổi cont của dòng (trigger 0106) | `export_shipment_lines_loading_guard` |
 
 Khách đòi invoice / B/L riêng từng cont ⇒ vẫn dùng nhiều chuyến cùng booking + chứng từ **dùng chung** (luật cũ).
+
+## 2d. Một lần xuất của nhiều HĐ = một chuyến (ba-spec [74](../app-map/74-merge-shipments-one-export.ba-spec.md), 2026-11-06)
+
+Lịch từng HĐ dựng mỗi HĐ một chuyến ⇒ một cont thật thành 2–4 chuyến (DAIREI: 35 chuyến mở / 13 lần xuất; 06/11 BD-007 + BD-008 cùng booking SGNGCZ486800 phải gõ booking, xe, ảnh 2 lần).
+
+```mermaid
+flowchart LR
+  A["Chuyến HĐ A"] & B["Chuyến HĐ B"] --> D{"Cùng khách, cùng booking<br/>hoặc cùng ngày đóng (một bên chưa booking)"}
+  D -- Có thể trùng lần xuất --> G["Gộp thành một lần xuất"] --> M["1 chuyến · dòng hàng HĐ A + HĐ B<br/>file, mục, lệnh SX, booking, xe về chuyến giữ"]
+  D -- lần xuất khác --> K["Giữ riêng — không báo nữa"]
+```
+
+| Việc | Luật | Code |
+|---|---|---|
+| Dò trùng | Chuyến **mở**, cùng khách; cùng booking (bỏ khoảng trắng, không phân biệt hoa thường) **hoặc** cùng ngày đóng mà một bên chưa booking; bắc cầu. Cùng ngày khác booking ⇒ không báo. Báo ở Lịch xuất hàng (thẻ Có thể trùng ở ngày, khung vàng trong ngày) + hồ sơ chuyến | `duplicateShipmentGroups` · `sameExport` |
+| Giữ riêng | Ghi nhật ký (dấu máy đọc, không cột mới); không báo nữa cho đúng tập chuyến đó; thêm chuyến mới vào nhóm ⇒ báo lại | `keptSeparateSets` |
+| Chuyến giữ | Mặc định: nhiều file → nhiều mục Xong → nhiều ô đã điền → tạo sớm; đổi được trong hộp | `defaultKeeper` |
+| Cổng gộp | Mở; cùng khách; không có gửi chứng từ / tiền về (cả hai chuyến); không có mục cùng loại đã làm ở **cả hai**; chuyến bỏ đã có file / mục Xong ⇒ HĐ của nó qua cổng thêm HĐ (không còn Thiếu); chuyến chỉ là kế hoạch ⇒ chỉ cần HĐ mở + có bản | `mergeGate` |
+| Ô lệch | Ô hai bên có mà khác ⇒ chọn; ô trống lấy bù; thông tin xe lấy nguyên khối; ghi chú nối | `mergeConflicts` · `mergeShipments` |
+| Đi theo | Dòng hàng (chưa có ⇒ dựng từ kg như Đưa vào cont), kg cộng, file (trùng tên giữ cả hai + báo), mục bước (mục có tiến độ thắng mục trống), mục "dùng chung" trỏ lại, lệnh SX gắn chuyến, cont thêm. Loại: chuyến giữ Đóng ghép + chuyến bỏ cont lạnh ⇒ cont lạnh | `mergeShipments` |
+| Cách gộp | Cùng một cont (mặc định) · Mỗi chuyến một cont (chuyến bỏ thành cont thêm — 73 R13 cho cả HĐ khác) | `MergeMode` |
+| Sau gộp | Một Hoàn tác; nhật ký mọi HĐ ghi một dòng gộp; mở link chuyến đã gộp ⇒ sang chuyến giữ | `mergedInto` |
+| Lập lịch HĐ mới | Dòng lịch trùng ngày đóng / booking với chuyến mở của HĐ khác cùng khách ⇒ chọn sẵn **Đi chung chuyến**: thêm dòng hàng HĐ vào chuyến đó, không tạo chuyến mới; **Tạo chuyến riêng** vẫn được | `jointShipmentsFor` · `applyScheduleRows` |
+| Ghi booking / chuyến | Booking hoặc ngày trùng chuyến khác cùng khách ⇒ lưu được, thông báo mời gộp | `sameExportShipments` |
+| Lịch xuất hàng | Chuyến nhiều HĐ một dòng: "HĐ BD-008/26 + BD-007/26", kg từng HĐ; tra số HĐ phụ ra chuyến | `plannedKgByContract` · `searchShipments` |
+| Quyền | Gộp: `export-plans` Sửa + Xóa; Giữ riêng: Sửa | — |
 
 ## 3. Số lượng thực đóng → invoice (ba-spec 63 R11, mig 0098)
 
@@ -240,6 +267,7 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 
 ## Lịch sử
 
+- 2026-11-06 — §2d một lần xuất nhiều HĐ = một chuyến (ba-spec 74).
 - 2026-11-05 — §2c chuyến nhiều cont (ba-spec 73, mig 0106).
 
 - 2026-11-03 — bảng sửa / khóa hợp đồng; Số HĐ đổi được ở Ghi bản sửa (ba-spec 68).

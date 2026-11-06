@@ -251,6 +251,11 @@ export interface ExportData {
    * xong. Tính bằng `issuedShipmentIds` (lib/productionOrder.ts). Bỏ trống ⇒ chỉ luật cũ (file / dùng chung).
    */
   issuedOrderShipmentIds?: ReadonlySet<string>;
+  /**
+   * ba-spec 74 R14: chuyến → HĐ có Lệnh sản xuất "Đã phát hành" gắn chuyến. Chuyến nhiều HĐ ⇒ bước 2 xong khi MỌI HĐ có
+   * lệnh. Bỏ trống ⇒ chỉ `issuedOrderShipmentIds` (luật 48 R6).
+   */
+  orderContractsByShipment?: ReadonlyMap<string, ReadonlySet<string>>;
   /** Hàng của chuyến (mig 0096, ba-spec 63). Bỏ trống ⇒ chuyến chưa có dòng hàng chi tiết. */
   shipmentLines?: readonly ExportShipmentLine[];
   /** Cont THÊM của chuyến (mig 0106, ba-spec 73). Bỏ trống ⇒ mỗi chuyến chỉ có cont 1 (trên chuyến). */
@@ -988,14 +993,36 @@ export function containerSealState(d: SealData, s: ExportShipment): ExportItemSt
   return per.some((c) => c.filled || c.photo || c.touched) ? "in-progress" : "not-started";
 }
 
+/**
+ * ba-spec 74 R14: HĐ trên chuyến NHIỀU HĐ chưa có Lệnh sản xuất đã phát hành gắn chuyến. `null` = chuyến một HĐ hoặc
+ * chưa có dữ liệu lệnh theo HĐ (luật 48 R6 giữ nguyên).
+ */
+export function productionOrderMissingContracts(
+  d: Pick<ExportData, "shipments"> & Partial<Pick<ExportData, "shipmentLines" | "orderContractsByShipment">>,
+  shipmentId: string,
+): { ids: string[]; covered: number } | null {
+  if (!d.orderContractsByShipment) return null;
+  const s = d.shipments.find((x) => x.id === shipmentId);
+  if (!s) return null;
+  const ids = shipmentContractIds(d, s);
+  if (ids.length < 2) return null;
+  const have = d.orderContractsByShipment.get(shipmentId);
+  return { ids: ids.filter((id) => !have?.has(id)), covered: ids.filter((id) => have?.has(id)).length };
+}
+
 /** Trạng thái một mục con (bước 2, 3, 4a–4d). 4a / 4b tự xong khi có file (R10). */
 export function subStepState(
-  d: Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds">,
+  d: Pick<ExportData, "items" | "shipments" | "files" | "issuedOrderShipmentIds"> & Partial<Pick<ExportData, "shipmentLines" | "orderContractsByShipment">>,
   shipmentId: string,
   step: ExportStep,
 ): ExportItemState {
-  // R6 (ba-spec 48, Q6 = A): Lệnh sản xuất đã phát hành gắn chuyến ⇒ xong; không thì luật cũ (file / dùng chung).
-  if (step === "production-order" && d.issuedOrderShipmentIds?.has(shipmentId)) return "done";
+  if (step === "production-order") {
+    // ba-spec 74 R14: chuyến nhiều HĐ ⇒ mọi HĐ có lệnh đã phát hành gắn chuyến mới xong; thiếu một ⇒ đang làm.
+    const missing = productionOrderMissingContracts(d, shipmentId);
+    if (missing && missing.covered > 0) return missing.ids.length ? "in-progress" : "done";
+    // R6 (ba-spec 48, Q6 = A): Lệnh sản xuất đã phát hành gắn chuyến ⇒ xong; không thì luật cũ (file / dùng chung).
+    if (!missing && d.issuedOrderShipmentIds?.has(shipmentId)) return "done";
+  }
   const item = stepItem(d, shipmentId, step);
   if (step === "loading-plan" || step === "loading-photos") {
     if (filesOfStep(d, shipmentId, step).length) return "done";
@@ -1624,6 +1651,11 @@ export interface ScheduleRow {
   loadingDate?: string;
   etd?: string;
   eta?: string;
+  /**
+   * ba-spec 74 R13: dòng lịch đi chung chuyến có sẵn của HĐ khác cùng khách. Bỏ trống ⇒ chọn sẵn chuyến khớp đầu tiên
+   * (nếu có); "none" ⇒ Tạo chuyến riêng; id ⇒ chuyến đó.
+   */
+  joinShipmentId?: string;
 }
 
 const monthIndex = (ym: string) => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
@@ -1871,7 +1903,9 @@ export function searchShipments(d: ExportData, query: string, customers: readonl
   return d.shipments.filter((s) => {
     const c = contractById.get(s.contractId);
     const docNos = d.items.filter((i) => i.shipmentId === s.id && i.step === "document").map((i) => i.number);
-    const hay = [s.lotCode, s.bookingNo, s.containerNo, s.sealNo, c?.contractNo ?? "", c?.orderRef ?? "", customerName.get(c?.customerId ?? "") ?? "", ...docNos];
+    // ba-spec 74 GC4: chuyến nhiều HĐ ra khi tra số HĐ phụ.
+    const others = shipmentContractIds(d, s).slice(1).map((id) => contractById.get(id)?.contractNo ?? "");
+    const hay = [s.lotCode, s.bookingNo, s.containerNo, s.sealNo, c?.contractNo ?? "", c?.orderRef ?? "", customerName.get(c?.customerId ?? "") ?? "", ...others, ...docNos];
     return hay.some((h) => h && squash(h).includes(q));
   });
 }

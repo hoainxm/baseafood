@@ -55,9 +55,10 @@ import {
   type StepNo,
 } from "@/lib/exportPlanning";
 import { progressText, shipmentProgress } from "./progress";
+import { plannedKgByContract, type DuplicateGroup } from "@/lib/exportMergeShipments";
 import { formatDateVN } from "@/lib/format";
 import type { Customer, ExportContract, ExportItemState } from "@/types";
-import { AlarmClock, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, CircleCheck, Container, Eye, FileSpreadsheet, ListChecks } from "lucide-react";
+import { AlarmClock, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, CircleCheck, Container, Eye, FileSpreadsheet, Layers, ListChecks } from "lucide-react";
 import { StepBar } from "./parts";
 
 /** Khóa "ngày" của khối chuyến chưa có ngày đóng cont / ETD. */
@@ -81,6 +82,9 @@ export function MonthView({
   onPeriodChange,
   onOpenContract,
   onExportExcel,
+  duplicateGroups = [],
+  onMergeGroup,
+  onKeepSeparate,
 }: {
   data: ExportData;
   customers: readonly Customer[];
@@ -91,6 +95,11 @@ export function MonthView({
   onPeriodChange: (p: Period) => void;
   onOpenContract: (contractId: string, shipmentId?: string) => void;
   onExportExcel: (p: Period, customerId: string) => void;
+  /** ba-spec 74 GC1: nhóm chuyến có thể cùng một lần xuất. */
+  duplicateGroups?: readonly DuplicateGroup[];
+  /** Không truyền ⇒ không có quyền gộp (cần Sửa + Xóa). */
+  onMergeGroup?: (g: DuplicateGroup) => void;
+  onKeepSeparate?: (g: DuplicateGroup) => void;
 }) {
   const opts = { filesAvailable };
   const [customerFilter, setCustomerFilter] = useState("");
@@ -174,6 +183,12 @@ export function MonthView({
   );
 
   const nameOf = (id: string) => customers.find((c) => c.id === id)?.name || "(khách chưa rõ)";
+  const contractNoOf = (id: string) => data.contracts.find((c) => c.id === id)?.contractNo ?? "";
+  /** GC4: mọi HĐ của chuyến (HĐ chính trước) + kg kế hoạch từng HĐ. */
+  const contractsOf = (r: MonthShipmentRow) => plannedKgByContract(data, r.shipment).map((x) => ({ no: contractNoOf(x.contractId), kg: x.kg }));
+  const groupsIn = (ids: readonly string[]) => duplicateGroups.filter((g) => g.shipmentIds.some((id) => ids.includes(id)));
+  const dupOf = (shipmentId: string) => duplicateGroups.find((g) => g.shipmentIds.includes(shipmentId));
+  const groupText = (g: DuplicateGroup) => (g.reason === "booking" ? `cùng booking ${g.value}` : `cùng ngày đóng ${formatDateVN(g.value)}`);
 
   const columns = (withCustomer: boolean): RecordTableColumn<MonthShipmentRow>[] => [
     ...(withCustomer
@@ -188,9 +203,16 @@ export function MonthView({
         <span className="grid gap-0.5">
           <span className="font-semibold">{[r.shipment.lotCode && `Lô ${r.shipment.lotCode}`, shipmentKindLabel(r.shipment.kind)].filter(Boolean).join(" · ")}</span>
           <span className="text-sm text-muted-foreground">
-            HĐ {r.contract.contractNo}
+            HĐ {contractsOf(r).map((x) => x.no).join(" + ")}
             {r.shipment.goodsSummary ? ` · ${r.shipment.goodsSummary}` : ""}
           </span>
+          {dupOf(r.shipment.id) && (
+            <span>
+              <Tag variant="warning" title={`Có thể cùng một lần xuất với chuyến khác (${groupText(dupOf(r.shipment.id)!)}) — gộp để làm các bước một lần.`}>
+                Có thể trùng lần xuất
+              </Tag>
+            </span>
+          )}
         </span>
       ),
       getSortValue: (r) => r.shipment.lotCode,
@@ -212,7 +234,15 @@ export function MonthView({
       header: "Kg kế hoạch · thực xuất",
       numeric: true,
       width: withCustomer ? undefined : "17%",
-      render: (r) => `${formatNumber(r.shipment.plannedKg)}${r.actuals.kg ? ` · ${formatNumber(r.actuals.kg)}` : ""}`,
+      render: (r) => {
+        const per = contractsOf(r);
+        return (
+          <span className="grid gap-0.5">
+            <span>{`${formatNumber(r.shipment.plannedKg)}${r.actuals.kg ? ` · ${formatNumber(r.actuals.kg)}` : ""}`}</span>
+            {per.length > 1 && <span className="text-sm text-muted-foreground">{per.map((x) => `${x.no}: ${formatNumber(x.kg)}`).join(" · ")}</span>}
+          </span>
+        );
+      },
       getSortValue: (r) => r.shipment.plannedKg ?? 0,
     },
     {
@@ -289,7 +319,7 @@ export function MonthView({
   ];
 
   /** Một mục ngày ở cột trái: ngày đang chọn tô viền + nền nhấn; chọn ⇒ chi tiết bên phải (điện thoại: sang trang chi tiết). */
-  const dayButton = (day: string, heading: string, counts: string, lateCount: number, missingCount: number, sub: string) => {
+  const dayButton = (day: string, heading: string, counts: string, lateCount: number, missingCount: number, sub: string, dupCount = 0) => {
     const active = day === selectedDay;
     return (
       <button
@@ -305,6 +335,7 @@ export function MonthView({
           <span className="tnum font-semibold">{heading}</span>
           {lateCount > 0 && <Tag variant="error">{lateCount} trễ</Tag>}
           {missingCount > 0 && <Tag variant="warning">{missingCount} còn thiếu</Tag>}
+          {dupCount > 0 && <Tag variant="warning">Có thể trùng</Tag>}
         </span>
         <span className="tnum text-sm">{counts}</span>
         <span className="truncate text-sm text-muted-foreground">{sub}</span>
@@ -319,6 +350,25 @@ export function MonthView({
         <h4 className="font-semibold">
           {c.customerName} <span className="tnum font-normal text-muted-foreground">· {c.rows.length} chuyến</span>
         </h4>
+        {groupsIn(c.rows.map((r) => r.shipment.id)).map((g) => (
+          <div key={g.shipmentIds.join(",")} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-warning-surface px-4 py-3 text-sm">
+            <span className="min-w-0 flex-1">
+              <span className="font-semibold">Có thể trùng lần xuất:</span> {g.shipmentIds.length} chuyến {groupText(g)} (HĐ{" "}
+              {g.shipmentIds.map((id) => contractNoOf(data.shipments.find((s) => s.id === id)?.contractId ?? "")).join(", ")}). Một lần xuất thì gộp lại để làm Lệnh sản xuất → Tiền về một lần.
+            </span>
+            {onMergeGroup && (
+              <Button size="sm" variant="default" onClick={() => onMergeGroup(g)} title="Gộp các chuyến này thành một chuyến: booking, xe, file, mục chứng từ, lệnh sản xuất về một chỗ. Hoàn tác được.">
+                <Layers className="mr-1 h-4 w-4" aria-hidden />
+                Gộp thành một lần xuất
+              </Button>
+            )}
+            {onKeepSeparate && (
+              <Button size="sm" variant="outline" onClick={() => onKeepSeparate(g)} title="Đây là các lần xuất khác nhau (VD khách đòi chứng từ riêng từng cont) — không báo trùng nữa.">
+                Giữ riêng
+              </Button>
+            )}
+          </div>
+        ))}
         <RecordTable
           columns={columns(false)}
           rows={c.rows}
@@ -457,7 +507,7 @@ export function MonthView({
                 <ol className="grid min-w-0 gap-2">
                   {schedule.days.map((day) => (
                     <li key={day.date}>
-                      {dayButton(day.date, dayHeading(day.date), `${day.customerCount} khách · ${day.shipmentCount} chuyến`, day.lateCount, day.missingCount, day.customers.map((c) => c.customerName).join(" · "))}
+                      {dayButton(day.date, dayHeading(day.date), `${day.customerCount} khách · ${day.shipmentCount} chuyến`, day.lateCount, day.missingCount, day.customers.map((c) => c.customerName).join(" · "), groupsIn(day.customers.flatMap((c) => c.rows.map((r) => r.shipment.id))).length)}
                     </li>
                   ))}
                   {schedule.undated.length > 0 && (

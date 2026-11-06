@@ -4,7 +4,8 @@
 covers: src/features/production-orders/*, src/lib/productionOrder.ts, src/lib/productionOrderReports.ts, src/lib/documentComposer.ts, src/lib/documentTypes/productionOrder*.ts
 tours: src/features/production-orders/productionOrderTour.ts
 guides: src/features/shared/guides/productionOrderGuide.tsx
-last_verified: 2026-11-04
+last_verified: 2026-11-06
+<!-- re-verified: 2026-11-06 (ba-spec 74 R14) — chuyến nhiều HĐ: bước 2 của chuyến Xong khi MỌI HĐ trên chuyến có lệnh đã phát hành gắn chuyến (`issuedOrderContracts`); gộp chuyến chuyển lệnh gắn sang chuyến giữ. -->
 <!-- re-verified: 2026-11-04 (chần / luộc) — Quy cách dòng lệnh thêm "Chần / luộc …" từ ô Thời gian chần / luộc của dòng HĐ (`contractLineSpec`). -->
 <!-- re-verified: 2026-11-04 (chuyến gộp) — gắn chuyến: mọi chuyến có hàng của HĐ (cả chuyến gộp). Lệnh xuất lấy dòng lệnh theo HĐ + số lượng theo chuyến (ba-spec 72 R2b, R3b). Quyền: vai đã chỉnh cần mig 0105. -->
 <!-- re-verified: 2026-11-04 — nhãn "Kg (tự tính)" của dòng lệnh đổi thành "Kg tịnh (tự tính)" (ô gõ tay: "Kg tịnh") cho khỏi nhầm với kg cả bì; không đổi luật, không đổi quyền. -->
@@ -51,7 +52,7 @@ flowchart LR
 |---|---|---|---|
 | 1 · Lập lệnh | Hộp **Lập lệnh sản xuất** | `canCreateOrder` cho qua: HĐ chưa hủy, chưa đóng, có bản hiệu lực, dòng chọn đã nối mặt hàng. `validateOrder` hết lỗi: có số lệnh (không trùng), HĐ, ≥ 1 ngày sản xuất, ngày giao ≥ ngày sản xuất cuối, ≥ 1 dòng có số thùng (hoặc kiện) và kg > 0. Lưu xong ở **Nháp** | Phòng Kế hoạch |
 | 2 · NL nhập khẩu dự kiến | **Gắn NL nhập khẩu** / **Sửa NL dự kiến** | Chọn lần nhập có thực nhập, chưa hủy (`materialOptions`) và gõ kg. Dành vượt thực nhập: cảnh báo, vẫn lưu. Không ghi sổ kho (`reservationOf`) | Phòng Kế hoạch |
-| 3 · Phát hành · gắn chuyến | **Phát hành** → **Gắn chuyến** | Chuyến chọn được: chuyến còn mở **có hàng của HĐ** của lệnh, kể cả chuyến gộp của HĐ khác (`openShipmentsOf`, ba-spec 70). Lệnh sang Đã phát hành. Mỗi chuyến gắn: bước **Lệnh sản xuất** của chuyến Xong (`issuedShipmentIds`); chuyến chưa có mã số lô nhận mã của lệnh (`shipmentsWithLot`) | Phòng Kế hoạch |
+| 3 · Phát hành · gắn chuyến | **Phát hành** → **Gắn chuyến** | Chuyến chọn được: chuyến còn mở **có hàng của HĐ** của lệnh, kể cả chuyến gộp của HĐ khác (`openShipmentsOf`, ba-spec 70). Lệnh sang Đã phát hành. Mỗi chuyến gắn: bước **Lệnh sản xuất** của chuyến Xong (`issuedShipmentIds`) — chuyến nhiều HĐ: Xong khi mọi HĐ trên chuyến có lệnh gắn (`issuedOrderContracts`, ba-spec 74 R14); chuyến chưa có mã số lô nhận mã của lệnh (`shipmentsWithLot`) | Phòng Kế hoạch |
 | 4 · In · file | **In lệnh** · **File Word / PDF** | In A4 mẫu QTI-KH-01-04, không in giá. File soạn có trạng thái ở bảng dưới | Phòng Kế hoạch soạn; nơi nhận chỉ xem |
 
 Quy ước tính trong lệnh:

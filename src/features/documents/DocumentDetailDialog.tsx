@@ -22,12 +22,15 @@ import {
   expiryOf,
   formatRevision,
   isPastRetention,
+  latestVersionOf,
+  versionDeleteBlocker,
   versionsOf,
+  type VersionFileKind,
 } from "@/lib/documents";
 import { hasDocumentStorage } from "@/lib/documentStorage";
 import { formatDateVN } from "@/lib/format";
 import type { CompanyDocument, DocumentVersion } from "@/types";
-import { Archive, ArchiveRestore, Download, Eye, FilePlus2, FileSignature, FileWarning, FolderOpen, Paperclip, Pencil, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Download, Eye, FilePlus2, FileSignature, FileWarning, FolderOpen, Paperclip, Pencil, Replace, Trash2, Unlink } from "lucide-react";
 import type { PreviewFile } from "./FilePreviewDialog";
 import { openDocumentFile } from "./openDocumentFile";
 
@@ -56,6 +59,9 @@ export function DocumentDetailDialog({
   onAddChild,
   onRecordVersion,
   onAttach,
+  onRemoveFile,
+  onReplaceFile,
+  onDeleteVersion,
   onWithdraw,
   onRestore,
   onDelete,
@@ -74,6 +80,12 @@ export function DocumentDetailDialog({
   onAddChild: (d: CompanyDocument) => void;
   onRecordVersion: (d: CompanyDocument) => void;
   onAttach: (v: DocumentVersion, kind: "pdf" | "source", file: File) => Promise<void>;
+  /** Mở hộp hỏi gỡ file đã đính (DOC-R11). */
+  onRemoveFile: (v: DocumentVersion, kind: VersionFileKind) => void;
+  /** Đã chọn file thay ⇒ mở hộp hỏi thay (DOC-R11). */
+  onReplaceFile: (v: DocumentVersion, kind: VersionFileKind, file: File) => void;
+  /** Mở hộp hỏi xóa lần ban hành mới nhất ghi nhầm (DOC-R12). */
+  onDeleteVersion: (v: DocumentVersion) => void;
   onWithdraw: (d: CompanyDocument) => void;
   onRestore: (d: CompanyDocument) => void;
   onDelete: (d: CompanyDocument) => void;
@@ -95,6 +107,11 @@ export function DocumentDetailDialog({
   const expiry = expiryOf(doc, today);
   // Đính file: cần quyền ghi + đã nối máy chủ; tài liệu thu hồi thì thôi.
   const canAttach = can.write && hasDocumentStorage && !doc.isWithdrawn;
+  // Gỡ file chỉ sửa dòng (file giữ ở kho) ⇒ không cần máy chủ; Thay cần tải lên ⇒ như Đính.
+  const canRemoveFile = can.write && !doc.isWithdrawn;
+  // Xóa lần ban hành (DOC-R12): xóa dòng cần ô Xóa, đưa lần trước về hiệu lực cần ô ghi.
+  const latest = latestVersionOf(versions, doc.id);
+  const canDeleteVersion = (v: DocumentVersion) => can.delete && can.write && v.id === latest?.id && !versionDeleteBlocker(doc, versions, v.id);
   const caption = (v: DocumentVersion) => `${doc.code} · lần ${formatRevision(v.revisionNo)}`;
 
   const info: [string, ReactNode][] = [
@@ -126,83 +143,127 @@ export function DocumentDetailDialog({
     ]);
   if (doc.note) info.push(["Ghi chú", doc.note]);
 
-  /** Khối file của một lần ban hành: xem / tải nếu có, đính nếu thiếu và có quyền, không thì nói rõ. */
-  const fileActions = (v: DocumentVersion, isCurrent: boolean) => (
-    <div className="grid gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        {v.pdfPath ? (
-          <>
-            <Button
-              size={isCurrent ? "default" : "sm"}
-              variant={isCurrent ? "default" : "outline"}
-              onClick={() => onPreview({ path: v.pdfPath, name: v.pdfFileName || `${doc.code}.pdf`, caption: caption(v) })}
-              title="Xem bản PDF đã ký ngay trong app."
-            >
-              <Eye className="mr-2 h-4 w-4" aria-hidden />
-              Xem PDF
-            </Button>
-            <Button
-              size={isCurrent ? "default" : "sm"}
-              variant="outline"
-              onClick={() => void openDocumentFile(v.pdfPath, v.pdfFileName || undefined)}
-              title="Tải bản PDF đã ký về máy."
-            >
-              <Download className="mr-2 h-4 w-4" aria-hidden />
-              Tải PDF
-            </Button>
-          </>
-        ) : canAttach ? (
+  /**
+   * Khối file của một lần ban hành, mỗi loại file một hàng: xem / tải nếu có, thay / gỡ khi có quyền
+   * (DOC-R11 — file cũ giữ ở kho, có Hoàn tác); thiếu thì đính nếu có quyền, không thì nói rõ.
+   */
+  const fileActions = (v: DocumentVersion, isCurrent: boolean) => {
+    const viewSize = isCurrent ? "default" : "sm";
+    const manage = (kind: VersionFileKind, label: string, accept: string) => (
+      <>
+        {canAttach && (
           <AttachFileButton
-            label="Đính PDF đã ký"
-            accept={DOCUMENT_PDF_ACCEPT}
-            onPick={(f) => onAttach(v, "pdf", f)}
-            title="Chọn bản PDF đã ký từ máy để đính vào lần ban hành này."
-            size={isCurrent ? "default" : "sm"}
+            label={`Thay ${label}`}
+            accept={accept}
+            onPick={async (f) => onReplaceFile(v, kind, f)}
+            title={`Chọn file khác thay ${label} của lần ban hành này (scan / đính nhầm). Hỏi trước; file cũ giữ lại, có Hoàn tác.`}
+            variant="edit"
+            icon="replace"
           />
-        ) : (
-          <Tag variant="warning">Chưa có PDF</Tag>
         )}
-        {v.sourcePath ? (
-          <>
-            <Button
-              size={isCurrent ? "default" : "sm"}
-              variant="outline"
-              onClick={() => onPreview({ path: v.sourcePath, name: v.sourceFileName || v.sourcePath.split("/").pop() || "File gốc", caption: `File gốc · ${caption(v)}` })}
-              title="Xem file gốc (Word / Excel) ngay trong app, không cần tải về."
-            >
-              <Eye className="mr-2 h-4 w-4" aria-hidden />
-              Xem file gốc
-            </Button>
-            <Button
-              size={isCurrent ? "default" : "sm"}
-              variant="outline"
-              onClick={() => void openDocumentFile(v.sourcePath, v.sourceFileName || undefined)}
-              title="Tải file gốc (Word / Excel) của lần ban hành này về máy."
-            >
-              <Download className="mr-2 h-4 w-4" aria-hidden />
-              Tải file gốc
-            </Button>
-          </>
-        ) : (
-          canAttach && (
+        {canRemoveFile && (
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => onRemoveFile(v, kind)}
+            title={`Gỡ ${label} khỏi lần ban hành này (đính nhầm). Hỏi trước; file không bị xóa khỏi kho, có Hoàn tác.`}
+          >
+            <Unlink className="mr-1 h-4 w-4" aria-hidden />
+            Gỡ {label}
+          </Button>
+        )}
+      </>
+    );
+    return (
+      <div className="grid gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {v.pdfPath ? (
+            <>
+              <Button
+                size={viewSize}
+                variant={isCurrent ? "default" : "outline"}
+                onClick={() => onPreview({ path: v.pdfPath, name: v.pdfFileName || `${doc.code}.pdf`, caption: caption(v) })}
+                title="Xem bản PDF đã ký ngay trong app."
+              >
+                <Eye className="mr-2 h-4 w-4" aria-hidden />
+                Xem PDF
+              </Button>
+              <Button size={viewSize} variant="outline" onClick={() => void openDocumentFile(v.pdfPath, v.pdfFileName || undefined)} title="Tải bản PDF đã ký về máy.">
+                <Download className="mr-2 h-4 w-4" aria-hidden />
+                Tải PDF
+              </Button>
+              {manage("pdf", "PDF", DOCUMENT_PDF_ACCEPT)}
+            </>
+          ) : canAttach ? (
             <AttachFileButton
-              label="Đính file gốc"
-              accept={DOCUMENT_SOURCE_ACCEPT}
-              onPick={(f) => onAttach(v, "source", f)}
-              title="Chọn file Word / Excel gốc từ máy để đính vào lần ban hành này (không bắt buộc)."
-              size={isCurrent ? "default" : "sm"}
-              outline
+              label="Đính PDF đã ký"
+              accept={DOCUMENT_PDF_ACCEPT}
+              onPick={(f) => onAttach(v, "pdf", f)}
+              title="Chọn bản PDF đã ký từ máy để đính vào lần ban hành này."
+              size={viewSize}
             />
-          )
+          ) : (
+            <Tag variant="warning">Chưa có PDF</Tag>
+          )}
+        </div>
+        {(v.sourcePath || canAttach) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {v.sourcePath ? (
+              <>
+                <Button
+                  size={viewSize}
+                  variant="outline"
+                  onClick={() => onPreview({ path: v.sourcePath, name: v.sourceFileName || v.sourcePath.split("/").pop() || "File gốc", caption: `File gốc · ${caption(v)}` })}
+                  title="Xem file gốc (Word / Excel) ngay trong app, không cần tải về."
+                >
+                  <Eye className="mr-2 h-4 w-4" aria-hidden />
+                  Xem file gốc
+                </Button>
+                <Button
+                  size={viewSize}
+                  variant="outline"
+                  onClick={() => void openDocumentFile(v.sourcePath, v.sourceFileName || undefined)}
+                  title="Tải file gốc (Word / Excel) của lần ban hành này về máy."
+                >
+                  <Download className="mr-2 h-4 w-4" aria-hidden />
+                  Tải file gốc
+                </Button>
+                {manage("source", "file gốc", DOCUMENT_SOURCE_ACCEPT)}
+              </>
+            ) : (
+              <AttachFileButton
+                label="Đính file gốc"
+                accept={DOCUMENT_SOURCE_ACCEPT}
+                onPick={(f) => onAttach(v, "source", f)}
+                title="Chọn file Word / Excel gốc từ máy để đính vào lần ban hành này (không bắt buộc)."
+                size={viewSize}
+                variant="outline"
+              />
+            )}
+          </div>
+        )}
+        {!v.pdfPath && !canAttach && isCurrent && (
+          <p className="text-sm text-muted-foreground">
+            {!hasDocumentStorage ? "Đang chạy không nối máy chủ — chưa lưu / mở được file." : doc.isWithdrawn ? "Tài liệu đã thu hồi." : NO_WRITE_HINT}
+          </p>
         )}
       </div>
-      {!v.pdfPath && !canAttach && isCurrent && (
-        <p className="text-sm text-muted-foreground">
-          {!hasDocumentStorage ? "Đang chạy không nối máy chủ — chưa lưu / mở được file." : doc.isWithdrawn ? "Tài liệu đã thu hồi." : NO_WRITE_HINT}
-        </p>
-      )}
-    </div>
-  );
+    );
+  };
+
+  /** Nút xóa lần ban hành — chỉ ở lần mới nhất, người có quyền xóa (DOC-R12). */
+  const deleteVersionButton = (v: DocumentVersion) =>
+    canDeleteVersion(v) && (
+      <Button
+        size="sm"
+        variant="danger"
+        onClick={() => onDeleteVersion(v)}
+        title={`Xóa lần ${formatRevision(v.revisionNo)} ghi nhầm. Chỉ lần mới nhất; lần trước trở lại Đang hiệu lực. Hỏi trước, có Hoàn tác.`}
+      >
+        <Trash2 className="mr-1 h-4 w-4" aria-hidden />
+        Xóa lần {formatRevision(v.revisionNo)}
+      </Button>
+    );
 
   const people = (v: DocumentVersion) =>
     [
@@ -254,7 +315,7 @@ export function DocumentDetailDialog({
                 </Button>
               ))}
             {can.delete && canDeleteDocument(doc.id, versions) && (
-              <Button variant="danger" onClick={() => onDelete(doc)} title="Xóa tài liệu chưa từng ban hành (ghi nhầm). Tài liệu đã ban hành chỉ thu hồi được.">
+              <Button variant="danger" onClick={() => onDelete(doc)} title="Xóa tài liệu chưa từng ban hành (ghi nhầm). Tài liệu đã ban hành: xóa lần ban hành ghi nhầm trước, hoặc thu hồi.">
                 <Trash2 className="mr-2 h-4 w-4" aria-hidden />
                 Xóa
               </Button>
@@ -286,6 +347,16 @@ export function DocumentDetailDialog({
               )}
               {active.changeSummary && <p className="text-sm text-muted-foreground">{active.changeSummary}</p>}
               {fileActions(active, true)}
+              {canDeleteVersion(active) && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                  <span className="min-w-0 flex-1 basis-48 text-sm text-muted-foreground">
+                    {history.length
+                      ? "Ghi nhầm lần này? Xóa đi thì lần trước trở lại Đang hiệu lực."
+                      : "Ghi nhầm lần này? Xóa đi thì tài liệu về Chưa ban hành."}
+                  </span>
+                  {deleteVersionButton(active)}
+                </div>
+              )}
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
@@ -319,6 +390,7 @@ export function DocumentDetailDialog({
                       <Tag variant="pending">Dự thảo</Tag>
                     )}
                     {isPastRetention(v, doc.retentionYears, today) && <Tag variant="warning">Quá hạn lưu</Tag>}
+                    <span className="ml-auto">{deleteVersionButton(v)}</span>
                   </div>
                   {(people(v).length > 0 || v.changeSummary) && (
                     <p className="min-w-0 break-words text-sm text-muted-foreground">
@@ -365,22 +437,25 @@ export function DocumentDetailDialog({
   );
 }
 
-/** Nút chọn file từ máy rồi đính ngay (input file ẩn). Đang tải ⇒ đổi chữ, bấm thêm không chạy lại. */
+/** Nút chọn file từ máy rồi đính / thay (input file ẩn). Đang tải ⇒ đổi chữ, bấm thêm không chạy lại. */
 function AttachFileButton({
   label,
   accept,
   title,
   onPick,
-  outline,
+  variant = "default",
+  icon = "attach",
   size = "sm",
 }: {
   label: string;
   accept: string;
   title: string;
   onPick: (file: File) => Promise<void>;
-  outline?: boolean;
+  variant?: "default" | "outline" | "edit";
+  icon?: "attach" | "replace";
   size?: "sm" | "default";
 }) {
+  const Icon = icon === "replace" ? Replace : Paperclip;
   const ref = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const pick = async (file: File | undefined) => {
@@ -396,8 +471,8 @@ function AttachFileButton({
   return (
     <>
       <input ref={ref} type="file" accept={accept} hidden onChange={(e) => void pick(e.target.files?.[0])} />
-      <Button size={size} variant={outline ? "outline" : "default"} onClick={() => !isUploading && ref.current?.click()} title={title}>
-        <Paperclip className="mr-2 h-4 w-4" aria-hidden />
+      <Button size={size} variant={variant} onClick={() => !isUploading && ref.current?.click()} title={title}>
+        <Icon className="mr-2 h-4 w-4" aria-hidden />
         {isUploading ? "Đang tải file…" : label}
       </Button>
     </>

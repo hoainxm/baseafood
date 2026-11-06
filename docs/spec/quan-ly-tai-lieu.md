@@ -3,7 +3,7 @@
 > **Load khi:** xây trang `/documents` "Tài liệu công ty": quy trình, hướng dẫn, biểu mẫu, chứng nhận, hồ sơ năng lực; lần ban hành; duyệt; file gốc trên Storage; giới hạn xem theo phòng ban.
 > **Trạng thái:** ✅ **ĐỢT 1 ĐÃ BUILD 2026-10-19** (code + `0072_company_documents.sql`, kiểm PGlite) — `0072` ✅ đã chạy trên DB thật 2026-10-19. Đợt 2 (duyệt trên app) + đợt 3 chưa làm. Còn các câu ở §9 (đang dùng mặc định). Doc code: [`app-map/40-documents.md`](../app-map/40-documents.md).
 > **Nguồn:** yêu cầu chủ dự án 2026-10-19 · mẫu tài liệu thật [`ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md`](../ho-so-nang-luc/qti-kh-01-quan-ly-don-hang.md) · phân quyền [`role-permissions.md`](role-permissions.md) · lưu file [`ops/supabase-storage.md`](../ops/supabase-storage.md).
-> **last_verified:** 2026-10-19
+> **last_verified:** 2026-11-06
 
 ## 1. Vấn đề
 
@@ -47,7 +47,7 @@ Trạng thái của **tài liệu** = trạng thái lần ban hành mới nhất
 | Mã | Luật |
 |---|---|
 | DOC-R1 | Mỗi tài liệu có **đúng 0 hoặc 1** lần ban hành "Đang hiệu lực". Lần mới có hiệu lực ⇒ lần cũ tự sang "Hết hiệu lực". |
-| DOC-R2 | Lần ban hành đã hiệu lực **không sửa được** — ngoại lệ duy nhất: **đính file vào ô còn trống** (lần nạp từ bản giấy chưa có file), không thay file đã có. Muốn sửa ⇒ tạo lần mới. Lần cũ **luôn mở xem được**, kèm nhãn "Hết hiệu lực". |
+| DOC-R2 | Lần ban hành đã hiệu lực **không sửa nội dung** (ngày hiệu lực, người soạn / xem xét / phê duyệt, nội dung sửa đổi). Ngoại lệ: **file** — đính vào ô còn trống, gỡ / thay file đính nhầm (DOC-R11). Muốn sửa nội dung ⇒ tạo lần mới; ghi nhầm cả lần ⇒ xóa lần mới nhất (DOC-R12). Lần cũ **luôn mở xem được**, kèm nhãn "Hết hiệu lực". |
 | DOC-R3 | **Hai đường duyệt** *(đợt 1 mới có đường b; PDF chỉ bắt buộc khi đã nối máy chủ — chạy localStorage không lưu được file; dữ liệu đầu QTI-KH-01 nạp từ bản giấy chưa có file, thẻ "Thiếu file PDF" nhắc tải lên)*: (a) *Duyệt trên app* — người soạn gửi ⇒ người xem xét bấm Đạt/Trả lại ⇒ người phê duyệt bấm Duyệt/Trả lại; app ghi người + giờ từng bước. (b) *Bản đã ký giấy* — người có quyền ghi tên soạn/xem xét/duyệt + **bắt buộc đính PDF đã ký**. |
 | DOC-R4 | Người xem xét và người phê duyệt là **tài khoản trong app** khi duyệt trên app. Họ nhận việc ở **Việc của tôi** (`task_assignments`), không dựng chỗ báo riêng. |
 | DOC-R5 | **Phạm vi xem:** tài liệu có *phòng sở hữu* + danh sách *phòng được xem* (mặc định = phòng sở hữu). Hoặc chọn *Cả công ty*. **Ban giám đốc và admin xem tất cả.** Người không thuộc phòng nào được xem ⇒ **không thấy tài liệu trong danh sách** và **không tải được file** (chặn cả ở máy chủ và kho file, không chỉ ẩn nút). |
@@ -56,6 +56,8 @@ Trạng thái của **tài liệu** = trạng thái lần ban hành mới nhất
 | DOC-R8 | Không xóa tài liệu đã có lần hiệu lực (luật 6 repo). Chỉ **Dự thảo chưa từng hiệu lực** xóa được, qua hộp xác nhận + Hoàn tác. |
 | DOC-R9 | Thời hạn lưu (ví dụ 2 năm của QTI-KH-01) chỉ **đánh dấu "Quá hạn lưu"** để người phụ trách quyết định. App **không tự xóa** file. |
 | DOC-R10 | Mã tài liệu **duy nhất**, không phân hoa thường. Tạo trùng ⇒ báo lỗi, mở tài liệu đã có. |
+| DOC-R11 | *(audit 2026-11-06 — "thêm thừa / làm nhầm thì phải gỡ được")* **Gỡ / thay file** của một lần ban hành (PDF đã ký hoặc file gốc), **kể cả PDF của lần đang hiệu lực** (scan nhầm, đính nhầm tài liệu): người có quyền ghi, trong hộp chi tiết, hỏi trước + Hoàn tác, có nhật ký thao tác (đường dẫn cũ → mới). File cũ **không xóa khỏi kho file** — Hoàn tác trỏ lại đúng file. Tài liệu đã thu hồi ⇒ không gỡ / thay. `replaceVersionFile` · `removeVersionFile`. |
+| DOC-R12 | **Xóa lần ban hành ghi nhầm**: chỉ lần **mới nhất** (xóa lần giữa làm đứt chuỗi 01, 02, 03), cần ô **Xóa** + ô ghi, tài liệu chưa thu hồi; hỏi trước + Hoàn tác + nhật ký (dòng "Xóa Lần ban hành tài liệu" kèm id lần; nhật ký xóa của `repo.ts` hiện chưa chụp nội dung dòng — nội dung + đường dẫn file nằm ở dòng "Thêm" lúc ghi lần đó). Lần đó đang hiệu lực ⇒ **lần ngay trước trở lại Đang hiệu lực**, bỏ ngày hết hiệu lực. Xóa lần duy nhất ⇒ tài liệu về Chưa ban hành, khi đó DOC-R8 cho xóa cả tài liệu. File của lần bị xóa giữ ở kho file, thư mục `<site>/documents/<id tài liệu>/<id lần>/`. `versionDeleteBlocker` · `deleteLatestVersion`. |
 
 ## 5. Phân quyền
 

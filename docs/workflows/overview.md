@@ -4,7 +4,7 @@
 covers: src/features/my-tasks/*, src/features/dashboard/*, src/features/documents/*, src/lib/myTasks.ts, src/lib/dataFlow.ts, src/lib/dashboardAttention.ts, src/lib/documents.ts, src/lib/documentStorage.ts, src/features/workflows/*, src/lib/companyProfile.ts, src/lib/companyAssets.ts
 tours: src/features/my-tasks/myTasksTour.ts, src/features/dashboard/dashboardTour.ts, src/features/documents/documentsTour.ts, src/features/workflows/workflowsTour.ts
 guides: src/features/shared/guideContent.tsx, src/features/shared/guides/dashboardGuide.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-06
 ttl_days: 90
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ). Cả ba trang là màn xem / điều phối: số liệu do module khác ghi, ở đây chỉ đọc (trừ giao việc và tài liệu).
@@ -66,6 +66,8 @@ stateDiagram-v2
   active --> active: Ghi lần ban hành mới (lần cũ hết hiệu lực)
   active --> withdrawn: Thu hồi
   withdrawn --> active: Mở lại (trạng thái tính lại theo các lần ban hành)
+  active --> active: Xóa lần mới nhất ghi nhầm (lần trước trở lại hiệu lực)
+  active --> not_issued: Xóa lần ban hành duy nhất ghi nhầm
   not_issued --> deleted: Xóa (chưa từng ban hành)
   state "Chưa ban hành" as not_issued
   state "Đang hiệu lực" as active
@@ -77,10 +79,12 @@ stateDiagram-v2
 |---|---|---|---|---|
 | Chưa ban hành | Tài liệu vừa thêm, chưa có lần ban hành nào | Ghi một lần ban hành đã ký giấy (có hiệu lực ngay). Xóa chỉ được ở trạng thái này | Người có quyền ghi tài liệu | `documentState` · `canDeleteDocument` |
 | Dự thảo | Có lần ban hành nhưng chưa lần nào đang hiệu lực | Ghi lần ban hành mới | Người có quyền ghi | `DOCUMENT_STATE_LABELS` |
-| Đang hiệu lực | Có một lần `active` | Ghi lần mới ⇒ lần cũ chuyển Hết hiệu lực từ ngày hiệu lực mới, không ghi đè | Người có quyền ghi | `recordPaperVersion` |
+| Đang hiệu lực | Có một lần `active` | Ghi lần mới ⇒ lần cũ chuyển Hết hiệu lực từ ngày hiệu lực mới, không ghi đè. Ghi nhầm ⇒ **Xóa lần 0x** (chỉ lần mới nhất, hỏi trước, Hoàn tác): lần ngay trước trở lại Đang hiệu lực; xóa lần duy nhất ⇒ về Chưa ban hành | Ghi: người có quyền ghi · Xóa lần: thêm ô Xóa | `recordPaperVersion` · `versionDeleteBlocker` · `deleteLatestVersion` |
 | Hết hiệu lực | Tài liệu đã thu hồi; mọi lần ban hành và file giữ nguyên, mở lại được | **Mở lại** | Người có quyền ghi | `documentState` |
 
-- Lần ban hành còn thiếu file: **Đính PDF đã ký** / **Đính file gốc**, chỉ điền ô đang trống, không thay file đã có (`attachVersionFile`).
+- Lần ban hành còn thiếu file: **Đính PDF đã ký** / **Đính file gốc** (`attachVersionFile`).
+- File đính nhầm (kể cả PDF của lần đang hiệu lực): **Thay PDF / Thay file gốc** · **Gỡ PDF / Gỡ file gốc** trong hộp chi tiết, hỏi trước, Hoàn tác, nhật ký. File cũ giữ ở kho file. Tài liệu đã thu hồi thì không (`replaceVersionFile` · `removeVersionFile`).
+- Nội dung lần đã ban hành (ngày, người ký, nội dung sửa) vẫn không sửa — sai thì xóa lần mới nhất rồi ghi lại, hoặc ghi lần mới.
 - Chứng nhận / hồ sơ năng lực có hạn: còn ≤ `DOCUMENT_EXPIRY_NOTICE_DAYS` (60) ngày hoặc đã hết ⇒ thành việc "Tài liệu sắp hết hạn", hạn việc = ngày hết hạn (`buildDocumentWarnings`, `expiryOf`).
 
 ## 2. Các bước của luồng
@@ -141,7 +145,7 @@ Mục **Quy trình** ở thanh bên và nút **Xem sơ đồ quy trình** trong 
 
 ## Tab Thông tin công ty (`/documents?tab=company`, ba-spec 67)
 
-Logo (chỉ chọn một ảnh), thông tin pháp nhân (tên VN / EN, viết tắt, MST, địa chỉ, nơi lập chứng từ, liên hệ, người ký), tài khoản ngân hàng thụ hưởng. Xem: mọi người có vai trò; Sửa: quyền `company-profile` (Kế toán trưởng, Trưởng / Phó phòng KH, admin). Chứng từ lập SAU khi lưu dùng thông tin mới (`companySellerOf`), chứng từ đã tải không đổi; mọi lần sửa có nhật ký.
+Logo (chỉ chọn một ảnh; **Gỡ logo** ⇒ về logo có sẵn của phần mềm; đổi / gỡ đều hỏi hoặc có Hoàn tác, file cũ giữ lại), thông tin pháp nhân (tên VN / EN, viết tắt, MST, địa chỉ, nơi lập chứng từ, liên hệ, người ký), tài khoản ngân hàng thụ hưởng. Xem: mọi người có vai trò; Sửa: quyền `company-profile` (Kế toán trưởng, Trưởng / Phó phòng KH, admin). Chứng từ lập SAU khi lưu dùng thông tin mới (`companySellerOf`), chứng từ đã tải không đổi; mọi lần sửa có nhật ký.
 ## 5. Ai được làm gì
 
 Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể khác). Admin luôn đủ quyền. `my-tasks` và `documents`: Xem do hệ thống tự cấp cho ai đã có quyền ở đâu đó (`resolvePermissions`).

@@ -40,6 +40,7 @@ import {
   attachVersionFile,
   checkDocumentFile,
   canViewDocument,
+  deleteLatestVersion,
   departmentLabel,
   documentKindLabel,
   documentState,
@@ -47,7 +48,10 @@ import {
   expiryOf,
   formatRevision,
   recordPaperVersion,
+  removeVersionFile,
+  replaceVersionFile,
   type DocumentState,
+  type VersionFileKind,
 } from "@/lib/documents";
 import { documentFilePath, hasDocumentStorage, removeDocumentFiles, uploadDocumentFile } from "@/lib/documentStorage";
 import { formatDateVN } from "@/lib/format";
@@ -60,6 +64,8 @@ import {
   FilePlus2,
   FileWarning,
   FolderOpen,
+  Replace,
+  Trash2,
 } from "lucide-react";
 import { DocumentDetailDialog } from "./DocumentDetailDialog";
 import { DocumentFormDialog, type DocumentFormTarget } from "./DocumentFormDialog";
@@ -156,6 +162,16 @@ export default function DocumentsScreen() {
   const [withdrawing, setWithdrawing] = useState<CompanyDocument | null>(null);
   const [deleting, setDeleting] = useState<CompanyDocument | null>(null);
   const [preview, setPreview] = useState<PreviewFile | null>(null);
+  /** Hộp hỏi trước khi gỡ / thay file đã đính (DOC-R11) và xóa lần ban hành ghi nhầm (DOC-R12). */
+  type FileChange = { version: DocumentVersion; kind: VersionFileKind; file?: File };
+  const [fileChange, setFileChange] = useState<FileChange | null>(null);
+  const [deletingVersion, setDeletingVersion] = useState<DocumentVersion | null>(null);
+  const fileLabel = (kind: VersionFileKind) => (kind === "pdf" ? "PDF đã ký" : "file gốc");
+  const currentFileName = (c: FileChange) =>
+    c.kind === "pdf" ? c.version.pdfFileName || c.version.pdfPath.split("/").pop() || "" : c.version.sourceFileName || c.version.sourcePath.split("/").pop() || "";
+  const deletingVersionDoc = deletingVersion ? documents.find((d) => d.id === deletingVersion.documentId) : undefined;
+  const deletePreview = deletingVersion && deletingVersionDoc ? deleteLatestVersion(deletingVersionDoc, versions, deletingVersion.id) : null;
+  const codeOf = (v: DocumentVersion) => documents.find((d) => d.id === v.documentId)?.code ?? "tài liệu";
 
   // ---- Ghi ----
   const saveDocument = (doc: CompanyDocument, isNew: boolean) => {
@@ -185,19 +201,74 @@ export default function DocumentsScreen() {
       notify.error(err);
       return;
     }
-    const r = await uploadDocumentFile(documentFilePath(v.documentId, v.id, kind, file.name), file);
+    // stamp: file đã gỡ trước đó vẫn ở đường dẫn cũ (DOC-R11) ⇒ đính lại cùng tên không đụng độ.
+    const r = await uploadDocumentFile(documentFilePath(v.documentId, v.id, kind, file.name, Date.now()), file);
     if ("error" in r) {
       notify.error(r.error);
       return;
     }
     const prev = versions;
     const next = attachVersionFile(prev, v.id, kind, r.path, file.name);
-    if (!next) notify.error("Lần ban hành này đã có file — muốn đổi file thì ghi lần ban hành mới.");
+    if (!next) notify.error("Lần ban hành này đã có file — dùng nút Thay file.");
     if (!next || !saveVersions(next)) {
       void removeDocumentFiles([r.path]);
       return;
     }
     notify.saved(`Đã đính ${kind === "pdf" ? "PDF" : "file gốc"} cho lần ${formatRevision(v.revisionNo)}`, () => saveVersions(prev));
+  };
+
+  /**
+   * DOC-R11 — gỡ file đã đính: chỉ bỏ đường dẫn trên dòng lần ban hành. File KHÔNG xóa khỏi kho file
+   * (đường dẫn cũ ở nhật ký thao tác) ⇒ Hoàn tác trỏ lại đúng file.
+   */
+  const removeFile = (v: DocumentVersion, kind: VersionFileKind) => {
+    const prev = versions;
+    const next = removeVersionFile(prev, v.id, kind);
+    if (!next) {
+      notify.error("Lần ban hành này không có file để gỡ.");
+      return;
+    }
+    if (!saveVersions(next)) return;
+    notify.deleted(`Đã gỡ ${fileLabel(kind)} khỏi lần ${formatRevision(v.revisionNo)} của ${codeOf(v)}`, () => saveVersions(prev));
+  };
+
+  /** DOC-R11 — thay file đã đính: tải file mới lên TRƯỚC, ghi dòng SAU; file cũ giữ ở kho file cho Hoàn tác. */
+  const replaceFile = async (v: DocumentVersion, kind: VersionFileKind, file: File) => {
+    const err = checkDocumentFile(file, kind);
+    if (err) {
+      notify.error(err);
+      return;
+    }
+    const r = await uploadDocumentFile(documentFilePath(v.documentId, v.id, kind, file.name, Date.now()), file);
+    if ("error" in r) {
+      notify.error(r.error);
+      return;
+    }
+    const prev = versions;
+    const next = replaceVersionFile(prev, v.id, kind, r.path, file.name);
+    if (!next) notify.error("Lần ban hành này chưa có file để thay — dùng nút Đính.");
+    if (!next || !saveVersions(next)) {
+      void removeDocumentFiles([r.path]);
+      return;
+    }
+    notify.saved(`Đã thay ${fileLabel(kind)} của lần ${formatRevision(v.revisionNo)} (${codeOf(v)}) — file cũ còn trong nhật ký`, () => saveVersions(prev));
+  };
+
+  /** DOC-R12 — xóa lần ban hành MỚI NHẤT ghi nhầm; lần trước trở lại Đang hiệu lực. */
+  const removeVersion = (v: DocumentVersion) => {
+    const doc = documents.find((d) => d.id === v.documentId);
+    if (!doc) return;
+    const prev = versions;
+    const r = deleteLatestVersion(doc, prev, v.id);
+    if ("error" in r) {
+      notify.error(r.error);
+      return;
+    }
+    if (!saveVersions(r.versions)) return;
+    notify.deleted(
+      `Đã xóa lần ${formatRevision(v.revisionNo)} của ${doc.code}${r.restored ? ` — lần ${formatRevision(r.restored.revisionNo)} trở lại Đang hiệu lực` : ""}`,
+      () => saveVersions(prev),
+    );
   };
 
   const setWithdrawn = (doc: CompanyDocument, isWithdrawn: boolean) => {
@@ -440,6 +511,9 @@ export default function DocumentsScreen() {
             onAddChild={(d) => setFormTarget({ kind: "create", parentId: d.id })}
             onRecordVersion={(d) => setVersionDoc(d)}
             onAttach={attachFile}
+            onRemoveFile={(v, kind) => setFileChange({ version: v, kind })}
+            onReplaceFile={(v, kind, file) => setFileChange({ version: v, kind, file })}
+            onDeleteVersion={setDeletingVersion}
             onWithdraw={(d) => setWithdrawing(d)}
             onRestore={(d) => setWithdrawn(d, false)}
             onDelete={(d) => setDeleting(d)}
@@ -469,6 +543,65 @@ export default function DocumentsScreen() {
             onConfirm={() => {
               if (withdrawing) setWithdrawn(withdrawing, true);
               setWithdrawing(null);
+            }}
+          />
+
+          <ConfirmAction
+            open={!!fileChange}
+            onOpenChange={(o) => !o && setFileChange(null)}
+            title={
+              fileChange
+                ? `${fileChange.file ? "Thay" : "Gỡ"} ${fileLabel(fileChange.kind)} của lần ${formatRevision(fileChange.version.revisionNo)}?`
+                : ""
+            }
+            description={
+              fileChange?.file
+                ? "Lần ban hành này sẽ mở file mới. Ngày hiệu lực, người ký, nội dung sửa đổi giữ nguyên. File cũ không bị xóa: vẫn nằm trong kho file và nhật ký thao tác, bấm Hoàn tác là dùng lại."
+                : "Lần ban hành này sẽ không còn file này, đính lại được bất cứ lúc nào. File không bị xóa: vẫn nằm trong kho file và nhật ký thao tác, bấm Hoàn tác là gắn lại."
+            }
+            detail={
+              fileChange
+                ? fileChange.file
+                  ? `${codeOf(fileChange.version)} · ${currentFileName(fileChange)} → ${fileChange.file.name}`
+                  : `${codeOf(fileChange.version)} · ${currentFileName(fileChange)}`
+                : undefined
+            }
+            confirmLabel={fileChange?.file ? "Thay file" : "Gỡ file"}
+            destructive={!fileChange?.file}
+            icon={fileChange?.file ? Replace : Trash2}
+            onConfirm={() => {
+              const c = fileChange;
+              setFileChange(null);
+              if (!c) return;
+              if (c.file) void replaceFile(c.version, c.kind, c.file);
+              else removeFile(c.version, c.kind);
+            }}
+          />
+
+          <ConfirmAction
+            open={!!deletingVersion}
+            onOpenChange={(o) => !o && setDeletingVersion(null)}
+            title={deletingVersion ? `Xóa lần ban hành ${formatRevision(deletingVersion.revisionNo)}?` : ""}
+            description={`Dùng khi lần này ghi nhầm. ${
+              deletePreview && !("error" in deletePreview)
+                ? deletePreview.restored
+                  ? `Lần ${formatRevision(deletePreview.restored.revisionNo)} trở lại Đang hiệu lực như trước khi ghi.`
+                  : deletePreview.versions.some((x) => x.documentId === deletingVersion?.documentId)
+                    ? "Các lần ban hành khác giữ nguyên."
+                    : "Tài liệu về Chưa ban hành (khi đó mới xóa được cả tài liệu)."
+                : ""
+            } File đã đính không bị xóa khỏi kho file. Bấm Hoàn tác trên thông báo là lấy lại cả lần ban hành.`}
+            detail={
+              deletingVersion
+                ? `${codeOf(deletingVersion)} · lần ${formatRevision(deletingVersion.revisionNo)} · hiệu lực từ ${formatDateVN(deletingVersion.effectiveDate)}`
+                : undefined
+            }
+            confirmLabel="Xóa lần ban hành"
+            destructive
+            icon={Trash2}
+            onConfirm={() => {
+              if (deletingVersion) removeVersion(deletingVersion);
+              setDeletingVersion(null);
             }}
           />
 

@@ -171,7 +171,7 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
           <Y>
             <li><b>Tài liệu</b>: quy trình, hướng dẫn, biểu mẫu, chứng nhận, hồ sơ năng lực và các lần ban hành (các mục dưới đây).</li>
             <li><b>Thông tin công ty</b>: logo, tên, mã số thuế, địa chỉ, người ký, <b>tài khoản ngân hàng</b>. Invoice, Packing list của Xuất khẩu lấy thông tin từ đây.</li>
-            <li>Đổi logo: chọn một ảnh (PNG / JPG / WEBP, tối đa 5 MB), không điền gì thêm. Sửa thông tin: <b>Sửa thông tin</b> → Lưu. Chứng từ lập sau khi lưu dùng thông tin mới; chứng từ đã tải không đổi.</li>
+            <li>Đổi logo: chọn một ảnh (PNG / JPG / WEBP, tối đa 5 MB), không điền gì thêm; đổi nhầm thì bấm <b>Hoàn tác</b>. <b>Gỡ logo</b>: hỏi trước, chứng từ quay về logo có sẵn, có Hoàn tác. Sửa thông tin: <b>Sửa thông tin</b> → Lưu. Chứng từ lập sau khi lưu dùng thông tin mới; chứng từ đã tải không đổi.</li>
             <li>Ai có vai trò cũng xem; Kế toán trưởng, Trưởng / Phó phòng Kế hoạch và quản trị sửa được (đổi ở Vai trò &amp; quyền).</li>
           </Y>
         </Section>
@@ -198,12 +198,25 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
               Trong chi tiết tài liệu chọn <b>Ghi lần ban hành</b>: điền ngày hiệu lực, nội dung sửa, người soạn / xem xét / phê duyệt,
               đính <b>PDF đã ký</b> (bắt buộc) và file Word gốc nếu có.
             </li>
-            <li>Lưu xong lần mới có hiệu lực ngay, lần cũ tự chuyển Hết hiệu lực. Không sửa lần đã ban hành, muốn sửa thì ghi lần mới.</li>
+            <li>Lưu xong lần mới có hiệu lực ngay, lần cũ tự chuyển Hết hiệu lực. Không sửa nội dung lần đã ban hành, muốn sửa thì ghi lần mới (ghi nhầm: xem mục dưới).</li>
             <li>
               Lần ban hành <b>chưa có file</b> (vd QTI-KH-01 nạp từ bản giấy): mở hộp chi tiết rồi chọn <b>Đính PDF đã ký</b> / <b>Đính file gốc</b> để đính
-              bản đã có. Chỉ đính được vào ô còn trống, không thay file đã có.
+              bản đã có.
             </li>
           </Step>
+        </Section>
+        <Section title="Ghi nhầm thì gỡ (người có quyền)">
+          <Y>
+            <li>
+              <b>File đính nhầm</b> (kể cả PDF của lần đang hiệu lực): trong hộp chi tiết chọn <b>Thay PDF</b> / <b>Thay file gốc</b> (chọn file mới, hộp hỏi
+              hiện tên cũ → mới) hoặc <b>Gỡ PDF</b> / <b>Gỡ file gốc</b>. Hỏi trước, có <b>Hoàn tác</b>, ghi nhật ký; file cũ không bị xóa khỏi kho.
+            </li>
+            <li>
+              <b>Ghi nhầm cả lần ban hành</b>: chọn <b>Xóa lần 0x</b> — chỉ có ở lần <b>mới nhất</b>, cần quyền Xóa. Lần ngay trước trở lại Đang hiệu lực;
+              xóa lần duy nhất thì tài liệu về Chưa ban hành (khi đó xóa được cả tài liệu). Tài liệu đã thu hồi phải <b>Mở lại</b> trước.
+            </li>
+            <li>Nội dung lần đã ban hành (ngày, người ký, nội dung sửa) không sửa — sai thì xóa lần mới nhất rồi ghi lại, hoặc ghi lần mới.</li>
+          </Y>
         </Section>
         <Section title="Chứng nhận có hạn">
           <Y>

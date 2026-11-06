@@ -71,6 +71,8 @@ Mọi dòng của kỳ đang mở gỡ được bằng **cùng một nút 🗑 c
 | Thêm tay (Thêm mặt hàng, Thêm nhanh, dòng NL tay, Lấy xả đông / Gửi đông) | **Xoá**; dòng có số thì ô hỏi nói mất gì | — | Hoàn tác |
 | Nhận chuyển từ kỳ trước | **Xoá**, phần chuyển kỳ trả về kỳ trước | Kỳ trước bỏ đánh dấu "đã nhận" | Bấm lại **Nhận N dòng chuyển kỳ** |
 
+**Lấy lại** gắn lại đúng các chuyến tự tick đã gỡ lúc bỏ (kg lấy lại = kg đã bỏ); lấy lại dòng bán đã có trong kỳ thì bỏ qua. Hộp **Sửa kỳ** chỉ ghi các ô của hộp, không đè nguồn đã bỏ.
+
 Kỳ **nhớ** nguồn đã bỏ (`excludedSourceKeys`, mig 0110) ⇒ tự lấy sổ nhập và nút **Lấy N dòng từ sổ** không kéo lại. Hoàn tác toast **"Đã tự lấy N chuyến nhập"** = bỏ các họ vừa tự lấy (ghi vào nguồn đã bỏ, không thì tự lấy lại ngay). Code: `lib/balancingRemoval.ts` · `usePeriodGrid` `removeMaterialRow` / `removeFinishedGoodRow` / `restoreExcludedSource`.
 
 Công thức (`calculateBalancing`, không có phí xuất khẩu, phí đó phòng Kế hoạch tính riêng):

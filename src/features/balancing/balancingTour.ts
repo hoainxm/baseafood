@@ -153,7 +153,7 @@ export function buildBalancingTour(ctx: BalancingTourContext): PageTour {
         title: "Nguồn đã bỏ khỏi kỳ",
         body:
           "Dòng \"Đã bỏ khỏi kỳ\" kể các họ nguyên liệu đã Bỏ khỏi kỳ. Kỳ nhớ danh sách này: mở lại kỳ, máy khác mở cùng kỳ cũng không tự lấy lại họ đó. Sổ Nhập hàng không đổi.\n" +
-          "• Lấy lại: dựng lại dòng từ các chuyến nhập trong khoảng ngày, có Hoàn tác.\n" +
+          "• Lấy lại: dựng lại dòng đủ số như lúc bỏ, gồm cả chuyến từng tự chọn ngoài khoảng ngày (chuyến nay thuộc kỳ khác thì để yên và báo), có Hoàn tác.\n" +
           "Khối Bán thành phẩm có dòng tương tự cho mặt hàng sổ sản xuất và dòng bán đã bỏ.",
       }),
       period({

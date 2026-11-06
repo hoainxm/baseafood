@@ -39,6 +39,8 @@ import {
   findUnpricedMaterialRows,
   getMaterialFamily,
   isEmptyPulledSalesOutput,
+  isSalesItemPulled,
+  mergePeriodFormEdit,
   salesExclusionKey,
   salesItemToOutput,
 } from "@/lib/balancingGrid";
@@ -188,7 +190,8 @@ export default function BalancingScreen() {
       if (d.isAdding)
         return !d.editing.materialTypeName.trim() && d.editing.totalInputKg == null && d.editing.processingCostPerKg == null;
       const stored = periods.find((k) => k.id === d.editing.id);
-      return !stored || JSON.stringify(stored) === JSON.stringify(d.editing);
+      // So đúng các ô hộp sửa — kỳ đổi chỗ khác (nguồn đã bỏ, chốt…) không làm nháp thành "có sửa".
+      return !stored || JSON.stringify(stored) === JSON.stringify(mergePeriodFormEdit(stored, d.editing));
     },
     onRestore: (d) => {
       if (!d) return;
@@ -251,7 +254,8 @@ export default function BalancingScreen() {
       notify.saved(`Đã tạo kỳ cân đối "${draft.materialTypeName}"`);
       setSelId(draft.id);
     } else {
-      persistPeriods(periods.map((k) => (k.id === draft.id ? draft : k)));
+      // Chỉ ô hộp sửa đè lên kỳ ĐANG CÓ — bản trong hộp / nháp có thể cũ (nguồn đã "Bỏ khỏi kỳ", chốt…).
+      persistPeriods(periods.map((k) => (k.id === draft.id ? mergePeriodFormEdit(k, draft) : k)));
       notify.saved("Đã lưu thay đổi");
     }
     setEditing(null);
@@ -668,7 +672,8 @@ function PeriodDetail({
     const salesItemId = key.slice("sales:".length);
     const item = allSalesItems.find((b) => b.id === salesItemId);
     const invoice = item ? salesInvoices.find((p) => p.id === item.invoiceId) : undefined;
-    if (item && invoice) pullSalesIntoPeriod([{ salesItem: item, invoice }]);
+    // Bấm "Lấy lại" lần hai (chip còn hiện do khóa chưa kịp về) ⇒ không hút trùng một dòng bán.
+    if (item && invoice && !isSalesItemPulled(grid.outputs, item.id)) pullSalesIntoPeriod([{ salesItem: item, invoice }]);
   };
 
   const { result } = grid;

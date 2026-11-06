@@ -17,8 +17,11 @@
 
 import type { BalancingInputItem, BalancingOutputItem, BalancingPeriod, MaterialImportItem, WipProductionItem } from "@/types";
 import {
+  IMPORT_TRIP_KEY_PREFIX,
+  filterEligibleImports,
   getMaterialFamily,
   importExclusionKey,
+  importTripKey,
   isSameMaterialFamily,
   productSpecKey,
   productionExclusionKey,
@@ -113,20 +116,25 @@ export function planRemoveMaterialRow(
     const family = getMaterialFamily(row.name);
     const sameFamily = (name: string) => isSameMaterialFamily(name, family);
     const trips = selectPeriodImports(period, allImports).filter((r) => sameFamily(r.materialTypeName));
-    let importsChanged = false;
+    const detachedIds: string[] = [];
     const imports = allImports.map((r) => {
       if (r.balancingPeriodId !== period.id || !sameFamily(r.materialTypeName)) return r;
-      importsChanged = true;
+      detachedIds.push(r.id);
       return { ...r, balancingPeriodId: "" };
     });
+    const isPeriodFamily = isSameMaterialFamily(family, period.materialTypeName);
     return {
       kind: "imports",
       inputs: allInputs.filter((r) => !(r.periodId === period.id && r.autoSource === "imports" && sameFamily(r.name))),
-      imports: importsChanged ? imports : null,
-      /* Chỉ họ CỦA KỲ mới tự lấy ⇒ chỉ họ đó cần nhớ "đã bỏ". Họ khác loại (tự tick ở "Chọn dòng
-         nhập") gỡ gắn kỳ là đủ — lấy lại bằng chính hộp đó, không hiện "Lấy lại" vô tác dụng. */
-      excludedSourceKeys: isSameMaterialFamily(family, period.materialTypeName)
-        ? addExcludedSourceKey(period.excludedSourceKeys, importExclusionKey(family))
+      imports: detachedIds.length > 0 ? imports : null,
+      /* Chỉ họ CỦA KỲ mới tự lấy ⇒ chỉ họ đó cần nhớ "đã bỏ" — kèm id các chuyến vừa gỡ gắn kỳ
+         (chuyến tự tick, có thể ngoài khoảng ngày) để "Lấy lại" gắn lại đúng chúng, đủ kg. Họ khác
+         loại (tự tick ở "Chọn dòng nhập") gỡ gắn kỳ là đủ — lấy lại bằng chính hộp đó. */
+      excludedSourceKeys: isPeriodFamily
+        ? detachedIds.reduce(
+            (keys, id) => addExcludedSourceKey(keys, importTripKey(id)),
+            addExcludedSourceKey(period.excludedSourceKeys, importExclusionKey(family))
+          )
         : null,
       tripCount: trips.length,
       totalKg: trips.reduce((s, r) => s + r.quantityKg, 0),
@@ -143,6 +151,69 @@ export function planRemoveMaterialRow(
     totalKg: row.quantityKg,
     releasedCarryOverIds: releasedIds,
   };
+}
+
+/**
+ * Bỏ khóa "đã bỏ" của MỘT họ NL + các khóa chuyến (`imports-trip:`) của họ đó. Chuyến không còn
+ * trong sổ thì khóa của nó cũng bỏ (không để rác).
+ */
+export function dropImportFamilyKeys(keys: string[], family: string, allImports: MaterialImportItem[]): string[] {
+  const byId = new Map(allImports.map((r) => [r.id, r]));
+  const familyKey = importExclusionKey(family);
+  return keys.filter((k) => {
+    if (k === familyKey) return false;
+    if (!k.startsWith(IMPORT_TRIP_KEY_PREFIX)) return true;
+    const trip = byId.get(k.slice(IMPORT_TRIP_KEY_PREFIX.length));
+    return Boolean(trip) && !isSameMaterialFamily(trip!.materialTypeName, family);
+  });
+}
+
+/**
+ * "Lấy lại" họ NL đã bỏ: gỡ khóa họ, GẮN LẠI đúng các chuyến đã gỡ gắn kỳ lúc bỏ (chuyến nay
+ * đang thuộc kỳ khác thì để yên, đếm vào `skippedTripIds`), trả mọi chuyến của họ sẽ vào kỳ
+ * (trong khoảng ngày ∪ chuyến gắn lại) để dựng dòng ⇒ kg lấy lại = kg đã bỏ.
+ */
+export function planRestoreImportFamily(
+  period: BalancingPeriod,
+  allImports: MaterialImportItem[],
+  familyKey: string
+): { excludedSourceKeys: string[]; imports: MaterialImportItem[] | null; trips: MaterialImportItem[]; skippedTripIds: string[] } {
+  const keys = period.excludedSourceKeys ?? [];
+  const family = familyKey.slice("imports:".length);
+  const sameFamily = (name: string) => isSameMaterialFamily(name, family);
+  const detached = new Set(
+    keys.filter((k) => k.startsWith(IMPORT_TRIP_KEY_PREFIX)).map((k) => k.slice(IMPORT_TRIP_KEY_PREFIX.length))
+  );
+  const excludedSourceKeys = dropImportFamilyKeys(keys, family, allImports);
+  const skippedTripIds: string[] = [];
+  let changed = false;
+  const imports = allImports.map((r) => {
+    if (!detached.has(r.id) || !sameFamily(r.materialTypeName)) return r;
+    if (r.balancingPeriodId && r.balancingPeriodId !== period.id) {
+      skippedTripIds.push(r.id);
+      return r;
+    }
+    if (r.balancingPeriodId === period.id) return r;
+    changed = true;
+    return { ...r, balancingPeriodId: period.id };
+  });
+  const nextPeriod = { ...period, excludedSourceKeys };
+  const inRange = filterEligibleImports(nextPeriod, imports).filter((r) => sameFamily(r.materialTypeName));
+  const attached = imports.filter((r) => r.balancingPeriodId === period.id && sameFamily(r.materialTypeName));
+  const trips = [...new Map([...inRange, ...attached].map((r) => [r.id, r])).values()];
+  return { excludedSourceKeys, imports: changed ? imports : null, trips, skippedTripIds };
+}
+
+/**
+ * Ảnh chụp bảng kỳ để Hoàn tác: kỳ trong ảnh chưa có `excludedSourceKeys` (undefined) mà bản
+ * hiện tại đã có ⇒ trả về `[]`. Gửi lên máy chủ chỉ khi trường KHÁC undefined ⇒ không chuẩn hoá
+ * thì Hoàn tác bỏ cột, máy chủ giữ nguyên khóa cũ, tải lại là họ lại bị bỏ (kỳ thiếu kg).
+ */
+export function normalizeRestoredPeriods(snapshot: BalancingPeriod[], current: BalancingPeriod[]): BalancingPeriod[] {
+  const currentById = new Map(current.map((k) => [k.id, k]));
+  return snapshot.map((k) =>
+    k.excludedSourceKeys === undefined && currentById.get(k.id)?.excludedSourceKeys !== undefined ? { ...k, excludedSourceKeys: [] } : k
+  );
 }
 
 /**
@@ -209,7 +280,7 @@ export function planRemoveFinishedGoodRow(
       releasedCarryOverIds: [],
     };
   }
-  if (row.autoSource === "sales") {
+  if (isSalesPulledOutput(row)) {
     return {
       kind: "sales",
       outputs: allOutputs.filter((r) => r.id !== rowId),
@@ -233,6 +304,15 @@ export function planRemoveFinishedGoodRow(
     releasedWipCount: 0,
     releasedCarryOverIds: releasedIds,
   };
+}
+
+/**
+ * Dòng thành phẩm hút từ sổ Bán hàng. `salesItemToOutput` KHÔNG đặt `autoSource = "sales"` (dòng
+ * cũ cũng vậy) — nhận ra bằng `salesItemId`. Thiếu luật này thì dòng bán bị coi là dòng tay: xoá
+ * xong nút "Lấy từ sổ bán" hút lại ngay (lọt ở lần thử tay 2026-11-06).
+ */
+export function isSalesPulledOutput(o: Pick<BalancingOutputItem, "autoSource" | "salesItemId">): boolean {
+  return o.autoSource !== "production" && (o.autoSource === "sales" || Boolean(o.salesItemId));
 }
 
 /**

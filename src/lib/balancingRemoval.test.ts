@@ -1,7 +1,11 @@
 import { describe, expect, test } from "vitest";
 import type { BalancingInputItem, BalancingOutputItem, BalancingPeriod, MaterialImportItem, WipProductionItem } from "@/types";
+import { BALANCING_PERIOD_TABLE } from "./repo";
 import {
   buildMaterialGridRows,
+  importTripKey,
+  isSalesItemPulled,
+  mergePeriodFormEdit,
   filterEligibleImports,
   filterEligibleWips,
   importExclusionKey,
@@ -17,8 +21,10 @@ import {
   parseExcludedSourceKey,
   planRemoveFinishedGoodRow,
   planRemoveMaterialRow,
+  planRestoreImportFamily,
   planUndoAutoPull,
   removeExcludedSourceKey,
+  normalizeRestoredPeriods,
 } from "./balancingRemoval";
 
 const period = (patch: Partial<BalancingPeriod> = {}): BalancingPeriod => ({
@@ -135,7 +141,7 @@ describe("Bỏ khỏi kỳ — dòng hút sổ nhập", () => {
     expect(plan.kind).toBe("imports");
     expect(plan.inputs.map((r) => r.id)).toEqual([rowOneDa.id, manual.id, otherPeriodRow.id]);
     expect(plan.imports).toBeNull(); // chuyến cùng họ không gắn kỳ ⇒ sổ nhập giữ nguyên
-    expect(plan.excludedSourceKeys).toEqual([importExclusionKey("Bạch tuộc 2 da")]);
+    expect(plan.excludedSourceKeys).toEqual([importExclusionKey("Bạch tuộc 2 da")]); // không chuyến nào bị gỡ gắn kỳ
     expect(plan.tripCount).toBe(2);
     expect(plan.totalKg).toBe(1500);
   });
@@ -237,6 +243,13 @@ describe("Bỏ khỏi kỳ — khối bán thành phẩm", () => {
     expect(plan.excludedSourceKeys).toEqual([salesExclusionKey("si1")]);
   });
 
+  test("dòng hút sổ bán THẬT (salesItemToOutput không đặt autoSource) vẫn là Bỏ khỏi kỳ + ghi khóa", () => {
+    const row = output({ id: "s2", autoSource: undefined, salesItemId: "si9", quantityKg: 40, dailyQuantities: { "2026-10-02": 40 } });
+    const plan = planRemoveFinishedGoodRow(period(), [row], [], "s2")!;
+    expect(plan.kind).toBe("sales");
+    expect(plan.excludedSourceKeys).toEqual([salesExclusionKey("si9")]);
+  });
+
   test("dòng thêm tay: xoá, không đụng sổ nào", () => {
     const row = output({ id: "m", quantityKg: 12, dailyQuantities: { "2026-10-01": 12 } });
     const plan = planRemoveFinishedGoodRow(period(), [row], [], "m")!;
@@ -249,5 +262,71 @@ describe("Bỏ khỏi kỳ — khối bán thành phẩm", () => {
     expect(
       describeFinishedGoodLoss({ quantityKg: 70, unitPrice: 3.2, carryOverKg: 20, debtKg: 5, note: "x" }, 50, f)
     ).toEqual(["50 kg theo ngày", "Trả 15 kg", "Nợ 5 kg", "đơn giá 3.2", "ghi chú dòng"]);
+  });
+});
+
+describe("audit 2026-11-06 — Hoàn tác / Lấy lại không lệch số", () => {
+  test("cột 0110 về [] ⇒ vẫn là [] và LUÔN gửi lại (Hoàn tác lần bỏ đầu tiên xoá được khóa trên máy chủ)", () => {
+    const fromDb = BALANCING_PERIOD_TABLE.fromRow({ id: "k1", excluded_source_keys: [] });
+    expect(fromDb.excludedSourceKeys).toEqual([]);
+    expect(BALANCING_PERIOD_TABLE.toRow(fromDb).excluded_source_keys).toEqual([]);
+    // DB chưa chạy 0110 (không có cột) ⇒ không gửi cột.
+    const noColumn = BALANCING_PERIOD_TABLE.fromRow({ id: "k1" });
+    expect(noColumn.excludedSourceKeys).toBeUndefined();
+    expect("excluded_source_keys" in BALANCING_PERIOD_TABLE.toRow(noColumn)).toBe(false);
+  });
+
+  test("Hoàn tác sau lần bỏ đầu tiên: ảnh chụp chưa có khóa ⇒ ghi [] (dòng gửi lên mang [])", () => {
+    const snap = [period(), period({ id: "k2" })];
+    const now = [period({ excludedSourceKeys: [importExclusionKey("Bạch tuộc 2 da")] }), period({ id: "k2" })];
+    const restored = normalizeRestoredPeriods(snap, now);
+    expect(restored[0].excludedSourceKeys).toEqual([]);
+    expect(BALANCING_PERIOD_TABLE.toRow(restored[0]).excluded_source_keys).toEqual([]);
+    expect(restored[1]).toBe(snap[1]); // kỳ khác không đụng
+  });
+
+  test("Lấy lại dòng bán hai lần ⇒ lần hai bỏ qua (một dòng bán một dòng kỳ)", () => {
+    const pulled = [output({ autoSource: "sales", salesItemId: "si1", quantityKg: 40, dailyQuantities: { "2026-10-02": 40 } })];
+    expect(isSalesItemPulled(pulled, "si1")).toBe(true);
+    expect(isSalesItemPulled(pulled, "si2")).toBe(false);
+    // Dòng hút hỏng (0 kg) không tính là đã hút.
+    expect(isSalesItemPulled([output({ autoSource: "sales", salesItemId: "si3", quantityKg: 0, dailyQuantities: {} })], "si3")).toBe(false);
+  });
+
+  test("Bỏ khỏi kỳ rồi Lấy lại: gắn lại ĐÚNG chuyến tự tick ngoài khoảng ngày ⇒ kg lấy lại = kg đã bỏ", () => {
+    const p = period();
+    const inRange = trip("2026-10-02", "Bạch tuộc 2 da lớn (80↑)", 1000, 50000);
+    const outside = trip("2026-09-28", "Bạch tuộc 2 da nhỏ (80↓)", 400, 40000, "k1"); // tự tick, ngoài kỳ
+    const other = trip("2026-10-03", "Bạch tuộc 1 da", 300, 30000);
+    const imports = [inRange, outside, other];
+    const row = input({ id: "k1-imports-Bạch tuộc 2 da", name: "Bạch tuộc 2 da", autoSource: "imports" });
+    const removal = planRemoveMaterialRow(p, [row], imports, row.id)!;
+    expect(removal.totalKg).toBe(1400);
+    expect(removal.excludedSourceKeys).toEqual([importExclusionKey("Bạch tuộc 2 da"), importTripKey(outside.id)]);
+    const afterRemove = { ...p, excludedSourceKeys: removal.excludedSourceKeys! };
+    const restore = planRestoreImportFamily(afterRemove, removal.imports!, importExclusionKey("Bạch tuộc 2 da"));
+    expect(restore.excludedSourceKeys).toEqual([]);
+    expect(restore.imports!.find((r) => r.id === outside.id)!.balancingPeriodId).toBe("k1");
+    expect(restore.trips.reduce((s, r) => s + r.quantityKg, 0)).toBe(1400);
+    expect(restore.skippedTripIds).toEqual([]);
+  });
+
+  test("Lấy lại: chuyến đã gỡ mà nay thuộc kỳ khác ⇒ để yên, báo bỏ qua", () => {
+    const outside = trip("2026-09-28", "Bạch tuộc 2 da nhỏ (80↓)", 400, 40000, "k9");
+    const p = period({ excludedSourceKeys: [importExclusionKey("Bạch tuộc 2 da"), importTripKey(outside.id)] });
+    const restore = planRestoreImportFamily(p, [outside], importExclusionKey("Bạch tuộc 2 da"));
+    expect(restore.imports).toBeNull();
+    expect(restore.skippedTripIds).toEqual([outside.id]);
+    expect(restore.trips).toEqual([]);
+  });
+
+  test("Lưu hộp Sửa kỳ từ bản cũ / nháp: giữ nguồn đã bỏ + cờ chốt của kỳ đang có", () => {
+    const live = period({ excludedSourceKeys: [importExclusionKey("Bạch tuộc 2 da")], isLocked: true });
+    const staleForm = period({ exchangeRate: 25500, endDate: "2026-10-06" }); // mở hộp trước khi bỏ / chốt
+    const saved = mergePeriodFormEdit(live, staleForm);
+    expect(saved.excludedSourceKeys).toEqual(live.excludedSourceKeys);
+    expect(saved.isLocked).toBe(true);
+    expect(saved.exchangeRate).toBe(25500);
+    expect(saved.endDate).toBe("2026-10-06");
   });
 });

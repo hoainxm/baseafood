@@ -39,7 +39,7 @@ import {
   type GridColumn,
   type GridRow,
 } from "@/design-system";
-import { describeFinishedGoodLoss, parseExcludedSourceKey } from "@/lib/balancingRemoval";
+import { describeFinishedGoodLoss, isSalesPulledOutput, parseExcludedSourceKey } from "@/lib/balancingRemoval";
 import { num, formatDateVN } from "@/lib/format";
 import { useCan } from "@/features/shared/PermissionProvider";
 
@@ -418,8 +418,8 @@ export function WipGrid({
     if (!original) return undefined;
     const label = `${productName(h.productId)}${h.spec ? ` · ${h.spec}` : ""}`;
     const dailyKg = Object.values(h.dailyQuantities).reduce((s, v) => s + (v || 0), 0);
-    if (h.fromProduction || original.autoSource === "sales") {
-      const fromSales = original.autoSource === "sales";
+    if (h.fromProduction || isSalesPulledOutput(original)) {
+      const fromSales = isSalesPulledOutput(original);
       return (
         <InlineConfirmDelete
           question="Bỏ dòng này khỏi kỳ?"

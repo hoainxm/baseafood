@@ -457,7 +457,8 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
               chuyển kỳ thì phần đó trả về kỳ trước, nhận lại được.
             </li>
             <li>
-              Hỏi lại trước, xong có <b>Hoàn tác</b>. Nguồn đã bỏ hiện ở dòng <b>Đã bỏ khỏi kỳ</b> kèm nút <b>Lấy lại</b>.
+              Hỏi lại trước, xong có <b>Hoàn tác</b>. Nguồn đã bỏ hiện ở dòng <b>Đã bỏ khỏi kỳ</b> kèm nút <b>Lấy lại</b>
+              (lấy lại đủ số như lúc bỏ, kể cả chuyến tự chọn ngoài khoảng ngày; dòng bán đã có trong kỳ thì không hút trùng).
               Thông báo <b>Đã tự lấy … chuyến nhập</b> cũng có Hoàn tác (= bỏ các họ vừa tự lấy).
             </li>
           </Y>

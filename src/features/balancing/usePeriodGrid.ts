@@ -81,7 +81,10 @@ import {
 import { sumLeftoverByDay, computeMaterialNxt, type MaterialPeriodNxtRow } from "@/lib/inventoryMaterial";
 import { getPeriodDomesticSales, type PeriodDomesticSales } from "@/lib/domesticSales";
 import {
+  dropImportFamilyKeys,
+  normalizeRestoredPeriods,
   parseExcludedSourceKey,
+  planRestoreImportFamily,
   planRemoveFinishedGoodRow,
   planRemoveMaterialRow,
   planUndoAutoPull,
@@ -338,7 +341,8 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       writeAllImports(m.imports);
       writeAllProductions(m.wips);
       if (m.stockLines !== monthlyStock) writeStockLedger(m.stockLines);
-      if (m.periods !== allPeriods) writeAllPeriods(m.periods);
+      // Kỳ trong ảnh chưa có khóa (undefined) ⇒ ghi [] để máy chủ xoá khóa (undefined = không gửi cột).
+      if (m.periods !== allPeriods) writeAllPeriods(normalizeRestoredPeriods(m.periods, allPeriods));
     },
     [writeAllMaterials, writeAllFinishedGoods, writeAllImports, writeAllProductions, writeStockLedger, monthlyStock, writeAllPeriods, allPeriods]
   );
@@ -488,7 +492,10 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       const prevPeriods = allPeriods;
       saveCheckpoint(`hut-nhap:${selectedIds.length}:${selectedIds[0].id}`);
       /* Người dùng TỰ TICK chuyến của họ đã "Bỏ khỏi kỳ" ⇒ coi như lấy lại họ đó. */
-      const keptKeys = selectedIds.reduce((keys, r) => removeExcludedSourceKey(keys, importExclusionKey(r.materialTypeName)), excludedSourceKeys);
+      const keptKeys = selectedIds.reduce(
+        (keys, r) => (keys.includes(importExclusionKey(r.materialTypeName)) ? dropImportFamilyKeys(keys, r.materialTypeName, allImports) : keys),
+        excludedSourceKeys
+      );
       if (keptKeys.length !== excludedSourceKeys.length) writeExcludedSourceKeys(keptKeys);
       const dropIds = new Set(selectedIds.map((r) => r.id));
       writeAllImports(
@@ -1141,7 +1148,8 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       if (plan.excludedSourceKeys) writeExcludedSourceKeys(plan.excludedSourceKeys);
       // writeMaterials tự đặt mốc Ctrl+Z + đồng bộ Sổ kho tháng (xoá dòng Lấy xả đông / Gửi đông).
       if (!writeMaterials(periodRows, `bo-dong-nl:${rowId}`, otherRows)) {
-        if (plan.excludedSourceKeys) writeAllPeriods(before.periods);
+        // Trả khóa về như trước bằng mảng (không phải undefined) — undefined thì máy chủ giữ khóa mới.
+        if (plan.excludedSourceKeys) writeExcludedSourceKeys(excludedSourceKeys);
         return;
       }
       if (plan.imports) writeAllImports(plan.imports);
@@ -1151,7 +1159,7 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
           : `Đã xóa dòng "${label}"${plan.releasedCarryOverIds.length ? " — phần chuyển kỳ trả về kỳ trước" : ""}`;
       notify.deleted(message, () => restoreLatest(before));
     },
-    [isLocked, canDeleteRows, livePeriod, allMaterialRows, allImports, snapshotCurrent, period.id, writeExcludedSourceKeys, writeMaterials, writeAllPeriods, writeAllImports, restoreLatest]
+    [isLocked, canDeleteRows, livePeriod, allMaterialRows, allImports, snapshotCurrent, period.id, writeExcludedSourceKeys, writeMaterials, excludedSourceKeys, writeAllImports, restoreLatest]
   );
 
   const removeFinishedGoodRow = useCallback(
@@ -1196,10 +1204,13 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       }
       const before = snapshotCurrent(`lay-lai:${key}`);
       saveCheckpoint(`lay-lai:${key}`);
-      writeExcludedSourceKeys(keptKeys);
       if (parsed.kind === "imports") {
-        /* Dựng lại NGAY dòng hút của họ (cùng id cố định với tự lấy) — không chờ effect, một toast. */
-        const trips = filterEligibleImports(nextPeriod, allImports).filter((r) => importExclusionKey(r.materialTypeName) === key);
+        /* Dựng lại NGAY dòng hút của họ (cùng id cố định với tự lấy) — không chờ effect, một toast.
+           Chuyến đã gỡ gắn kỳ lúc bỏ (tự tick, có thể ngoài khoảng ngày) được GẮN LẠI ⇒ đủ kg. */
+        const plan = planRestoreImportFamily(livePeriod, allImports, key);
+        writeExcludedSourceKeys(plan.excludedSourceKeys);
+        if (plan.imports) writeAllImports(plan.imports);
+        const trips = plan.trips;
         const toAdd: BalancingInputItem[] = [];
         for (const [family, o] of groupImportsByMaterialType(trips)) {
           if (materialInRows.some((r) => r.autoSource === "imports" && getMaterialFamily(r.name) === family)) continue;
@@ -1221,18 +1232,20 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
         }
         if (toAdd.length > 0) writeMaterials([...materialInRows, ...toAdd], "");
         notify.saved(
-          trips.length > 0 ? `Đã lấy lại "${label}" vào kỳ (${trips.length} chuyến nhập)` : `Đã gỡ "Bỏ khỏi kỳ" của "${label}" — chưa có chuyến nhập nào trong khoảng ngày`,
+          (trips.length > 0 ? `Đã lấy lại "${label}" vào kỳ (${trips.length} chuyến nhập)` : `Đã gỡ "Bỏ khỏi kỳ" của "${label}" — chưa có chuyến nhập nào trong khoảng ngày`) +
+            (plan.skippedTripIds.length ? ` — ${plan.skippedTripIds.length} chuyến nay thuộc kỳ khác, không kéo về` : ""),
           // Hoàn tác xoá dòng vừa dựng ⇒ cần quyền Xóa (thiếu thì Bỏ khỏi kỳ lại bằng 🗑 — người có quyền).
           canDeleteRows ? () => restoreLatest(before) : undefined
         );
         return;
       }
+      writeExcludedSourceKeys(keptKeys);
       notify.saved(
         parsed.kind === "sales" ? `Đã gỡ "Bỏ khỏi kỳ" của "${label}"` : `Đã gỡ "Bỏ khỏi kỳ" của "${label}" — sổ sản xuất chưa có dòng nào để lấy`,
         () => restoreLatest(before)
       );
     },
-    [isLocked, excludedSourceKeys, livePeriod, allWips, allImports, materialInRows, pullProductionRows, snapshotCurrent, saveCheckpoint, writeExcludedSourceKeys, writeMaterials, restoreLatest, period.id, canDeleteRows]
+    [isLocked, excludedSourceKeys, livePeriod, allWips, allImports, materialInRows, pullProductionRows, snapshotCurrent, saveCheckpoint, writeExcludedSourceKeys, writeAllImports, writeMaterials, restoreLatest, period.id, canDeleteRows]
   );
 
   return {

@@ -1,10 +1,10 @@
 # Báo cáo & Cân đối — sơ đồ workflow
 
 > Load khi: review / kiểm lại các trang Cân đối kỳ (`/balancing`), Báo cáo thành phẩm (`/production-report`), Báo cáo đơn xuất (`/export-report`), Tồn kho thành phẩm (`/nxt`), Đối soát hóa đơn điện tử (`/reconciliation`); trước khi sửa công thức định mức, lãi / lỗ, chốt kỳ, tồn thành phẩm. Bản đọc nhanh — luật đầy đủ ở [31-can-doi-ky](../app-map/31-can-doi-ky.md) · [37-doi-soat-hddt](../app-map/37-doi-soat-hddt.md) · ba-spec [34](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [53](../app-map/53-filters.ba-spec.md).
-covers: src/features/balancing/*, src/features/reports/*, src/features/reconciliation/*, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/lib/balancingStockLines.ts, src/lib/inventoryFinished.ts, src/lib/einvoiceReconciliation.ts, src/lib/twoVersionReconciliation.ts, src/lib/reconciliation*.ts
+covers: src/features/balancing/*, src/features/reports/*, src/features/reconciliation/*, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/lib/balancingRemoval.ts, src/lib/balancingStockLines.ts, src/lib/inventoryFinished.ts, src/lib/einvoiceReconciliation.ts, src/lib/twoVersionReconciliation.ts, src/lib/reconciliation*.ts
 tours: src/features/balancing/balancingTour.ts, src/features/reports/productionReportTour.ts, src/features/reports/exportReportTour.ts, src/features/reports/finishedGoodStockTour.ts, src/features/reconciliation/reconciliationTour.ts
 guides: src/features/shared/guideContent.tsx, src/features/shared/guides/reconciliationGuide.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-06
 ttl_days: 90
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ).
@@ -58,6 +58,20 @@ flowchart LR
 | 5 · Thông số | Chi phí CB / kg TP · Tỉ giá · Tổng NL nhận cả kỳ | Gõ ngay trong ô Ghi chú, kết quả tính lại theo từng phím | Người có quyền Sửa |
 | 6 · Chốt | **Chốt kỳ** ở cuối màn | Xem hết số rồi mới chốt (mục 1) | Người có quyền Chốt |
 | 7 · In | **Xem / in bảng** | Bản A4, kỳ dài hơn 3 ngày tự in ngang; không tô màu dòng | Người có quyền Xuất |
+
+### Gỡ dòng thêm thừa / lấy nhầm (rà soát 2026-11-06)
+
+Mọi dòng của kỳ đang mở gỡ được bằng **cùng một nút 🗑 cuối ô tên dòng** (ô hỏi nhỏ tại dòng, `InlineConfirmDelete`), luôn có toast **Hoàn tác** và Ctrl+Z, nhật ký thao tác tự ghi. Kỳ đã chốt: không có nút (mở lại kỳ trước). Cần quyền **Xóa** (`balancing.delete`).
+
+| Dòng | Nút làm gì | Sổ nguồn | Lấy lại bằng |
+|---|---|---|---|
+| Hút từ sổ **Nhập hàng** (tự lấy theo họ NL) | **Bỏ khỏi kỳ** cả họ (mọi loại / size của họ) | Giữ nguyên kg, giá, ngày. Chuyến tự tick vào kỳ chỉ gỡ gắn kỳ | Nút **Lấy lại** cạnh "Đã bỏ khỏi kỳ" ở khối Nguyên liệu; họ khác loại thì tick lại ở **Chọn dòng nhập** |
+| Hút từ sổ **Sản xuất** | **Bỏ khỏi kỳ** mặt hàng × quy cách | Giữ nguyên, dòng SX trả về chưa gắn kỳ (kỳ khác hút được) | **Lấy lại** ở khối Bán thành phẩm |
+| Hút từ sổ **Bán hàng** | **Bỏ khỏi kỳ** dòng bán | Giữ nguyên | **Lấy lại** ở khối Bán thành phẩm |
+| Thêm tay (Thêm mặt hàng, Thêm nhanh, dòng NL tay, Lấy xả đông / Gửi đông) | **Xoá**; dòng có số thì ô hỏi nói mất gì | — | Hoàn tác |
+| Nhận chuyển từ kỳ trước | **Xoá**, phần chuyển kỳ trả về kỳ trước | Kỳ trước bỏ đánh dấu "đã nhận" | Bấm lại **Nhận N dòng chuyển kỳ** |
+
+Kỳ **nhớ** nguồn đã bỏ (`excludedSourceKeys`, mig 0110) ⇒ tự lấy sổ nhập và nút **Lấy N dòng từ sổ** không kéo lại. Hoàn tác toast **"Đã tự lấy N chuyến nhập"** = bỏ các họ vừa tự lấy (ghi vào nguồn đã bỏ, không thì tự lấy lại ngay). Code: `lib/balancingRemoval.ts` · `usePeriodGrid` `removeMaterialRow` / `removeFinishedGoodRow` / `restoreExcludedSource`.
 
 Công thức (`calculateBalancing`, không có phí xuất khẩu, phí đó phòng Kế hoạch tính riêng):
 

@@ -455,6 +455,12 @@ export interface BalancingPeriod {
   lockedAt?: string;
   lockNote?: string;
   reopenReason?: string;
+  /**
+   * Nguồn đã "Bỏ khỏi kỳ" (mig 0110) — kỳ KHÔNG tự lấy / hút lại các nguồn này:
+   * `imports:<họ NL viết thường>` · `production:<mã mặt hàng>|<quy cách>` · `sales:<id dòng bán>`.
+   * Sổ nguồn không đổi. Xem lib/balancingRemoval.ts.
+   */
+  excludedSourceKeys?: string[];
 }
 
 /** Nguồn dựng dòng lưới: rỗng = nhập tay, còn lại = dựng từ sổ khác. */

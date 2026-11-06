@@ -44,6 +44,8 @@ import {
   filterFreeImportsInPeriod,
   getPeriodDates,
   filterEligibleWips,
+  importExclusionKey,
+  productionExclusionKey,
   type MaterialGridRow,
   type FinishedGoodGridRow,
 } from "@/lib/balancingGrid";
@@ -78,6 +80,13 @@ import {
 } from "@/lib/balancingStockLines";
 import { sumLeftoverByDay, computeMaterialNxt, type MaterialPeriodNxtRow } from "@/lib/inventoryMaterial";
 import { getPeriodDomesticSales, type PeriodDomesticSales } from "@/lib/domesticSales";
+import {
+  parseExcludedSourceKey,
+  planRemoveFinishedGoodRow,
+  planRemoveMaterialRow,
+  planUndoAutoPull,
+  removeExcludedSourceKey,
+} from "@/lib/balancingRemoval";
 
 /** Nhóm cột (`GridColumn.group`) mà nút "Thu cột ngày" của cả hai lưới dựa vào —
     MỘT nguồn để khai cột và `collapsedGroups` không lệch tên (lệch ⇒ cột không thu
@@ -191,6 +200,18 @@ export interface PeriodGrid {
   pullAllSources: () => void;
   saveWipDayCells: (cells: DayCell[], backdateReason: string) => boolean;
   lockedDates: Set<string>;
+  /* --- gỡ dòng khỏi kỳ (rà soát 2026-11-06) --- */
+  /**
+   * Gỡ một dòng khối NL: dòng hút sổ nhập = "Bỏ khỏi kỳ" (sổ nhập giữ nguyên, kỳ nhớ họ đã bỏ
+   * để không tự lấy lại); dòng tay = xoá (dòng nhận chuyển kỳ ⇒ trả về kỳ trước). Có Hoàn tác.
+   */
+  removeMaterialRow: (rowId: string, label: string) => void;
+  /** Như trên cho khối bán thành phẩm (dòng hút sổ SX / sổ bán = "Bỏ khỏi kỳ"; dòng tay = xoá). */
+  removeFinishedGoodRow: (rowId: string, label: string) => void;
+  /** Khóa nguồn kỳ đã bỏ (`imports:` · `production:` · `sales:`) — màn hiện kèm nút "Lấy lại". */
+  excludedSourceKeys: string[];
+  /** "Lấy lại" một nguồn đã bỏ: gỡ khóa + hút lại ngay (nhập / sản xuất). Sổ bán: chỉ gỡ khóa — màn tự hút dòng bán. */
+  restoreExcludedSource: (key: string, label: string) => void;
   /* --- chuyển kỳ --- */
   previousPeriod: BalancingPeriod | null;
   carryOverRowCount: number;
@@ -218,6 +239,8 @@ interface HistoryEntry {
   wips: WipProductionItem[];
   /** Sổ kho tháng — hai dòng kho ghi thẳng vào đây nên hoàn tác phải trả cả sổ. */
   stockLines: MonthlyStockLine[];
+  /** Danh sách kỳ — "Bỏ khỏi kỳ" ghi nguồn đã bỏ lên dòng kỳ (mig 0110) nên hoàn tác trả cả kỳ. */
+  periods: BalancingPeriod[];
 }
 
 /** Giữ tối đa ngần này bước lùi — đủ cho một ca nhập, không phình bộ nhớ. */
@@ -239,17 +262,29 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
   const [allWips, writeAllProductions, { status: wipStatus }] = useWipProductions();
   const [productionLocks] = useProductionLocks();
   const [domesticSales] = useDomesticSales();
-  const [allPeriods] = useBalancingPeriods();
+  const [allPeriods, writeAllPeriods] = useBalancingPeriods();
   const [manualOpeningStock] = useMaterialOpeningStock();
   const [monthlyStock, writeStockLedger, { status: stockLedgerStatus }] = useMonthlyStock();
   const [storageLocations] = useStorageLocations();
 
   /** Không có quyền sửa cân đối ⇒ chỉ xem: khoá như kỳ đã chốt (kể cả ghi tự động). */
-  const isReadOnly = !useCan("balancing").update;
+  const balancingRights = useCan("balancing");
+  const isReadOnly = !balancingRights.update;
+  /** Gỡ dòng khỏi kỳ (xoá dòng balancing_inputs/outputs) cần quyền Xóa — chốt ghi (writeGuard) chặn nếu thiếu. */
+  const canDeleteRows = balancingRights.delete;
   /** Kỳ đã chốt ⇒ mọi ô khoá, mọi nút ghi ẩn. Mở lại ở thanh cuối màn. */
   const isLocked = Boolean(period.isLocked) || isReadOnly;
 
   const dates = useMemo(() => getPeriodDates(period), [period]);
+
+  /* Nguồn đã "Bỏ khỏi kỳ" đọc từ bảng kỳ CỦA HOOK NÀY (không chờ prop `period` từ màn cha):
+     bỏ dòng ⇒ ghi kỳ + ghi dòng trong CÙNG một lượt render; đọc khóa từ prop thì effect tự lấy
+     có thể chạy giữa chừng (dòng đã mất, khóa chưa tới) và lấy lại ngay dòng vừa bỏ. */
+  const excludedSourceKeys = useMemo(
+    () => allPeriods.find((k) => k.id === period.id)?.excludedSourceKeys ?? period.excludedSourceKeys ?? [],
+    [allPeriods, period.id, period.excludedSourceKeys]
+  );
+  const livePeriod = useMemo(() => ({ ...period, excludedSourceKeys }), [period, excludedSourceKeys]);
 
   /* ---------- Ngăn xếp hoàn tác (Ctrl+Z / Ctrl+Y) ----------
      Người dùng đến từ Excel, ở đó Ctrl+Z lùi được MỌI thứ vừa làm chứ không chỉ
@@ -277,8 +312,9 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       imports: allImports,
       wips: allWips,
       stockLines: monthlyStock,
+      periods: allPeriods,
     }),
-    [allMaterialRows, allOutputs, allImports, allWips, monthlyStock]
+    [allMaterialRows, allOutputs, allImports, allWips, monthlyStock, allPeriods]
   );
 
   /** Đánh dấu "trước khi đổi" — gọi TRƯỚC mọi lần ghi. */
@@ -302,9 +338,25 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       writeAllImports(m.imports);
       writeAllProductions(m.wips);
       if (m.stockLines !== monthlyStock) writeStockLedger(m.stockLines);
+      if (m.periods !== allPeriods) writeAllPeriods(m.periods);
     },
-    [writeAllMaterials, writeAllFinishedGoods, writeAllImports, writeAllProductions, writeStockLedger, monthlyStock]
+    [writeAllMaterials, writeAllFinishedGoods, writeAllImports, writeAllProductions, writeStockLedger, monthlyStock, writeAllPeriods, allPeriods]
   );
+
+  /* Nút Hoàn tác trên TOAST giữ closure lúc bấm xoá ⇒ gọi bản restoreEntry MỚI NHẤT (bản cũ so
+     `m.periods !== allPeriods` với chính ảnh chụp ⇒ bỏ qua không trả bảng kỳ / Sổ kho tháng). */
+  const restoreEntryRef = useRef(restoreEntry);
+  useEffect(() => {
+    restoreEntryRef.current = restoreEntry;
+  }, [restoreEntry]);
+  const restoreLatest = useCallback((m: HistoryEntry) => restoreEntryRef.current(m), []);
+
+  /** Ghi danh sách nguồn đã bỏ lên dòng kỳ (mig 0110). */
+  const writeExcludedSourceKeys = useCallback(
+    (keys: string[]) => writeAllPeriods(allPeriods.map((k) => (k.id === period.id ? { ...k, excludedSourceKeys: keys } : k))),
+    [allPeriods, period.id, writeAllPeriods]
+  );
+
 
   const undo = useCallback(() => {
     const m = lui.current.pop();
@@ -342,7 +394,7 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
      (Lấy xả đông / Gửi đông) ghi THẲNG vào Sổ kho tháng theo kiểu đặt giá trị — xem
      lib/balancingStockLines.ts. Sổ kho từ chối (vượt tồn lô, chưa chọn lô/kho) ⇒ KHÔNG ghi gì. */
   const writeMaterials = useCallback(
-    (written: BalancingInputItem[], group = "nl"): boolean => {
+    (written: BalancingInputItem[], group = "nl", otherPeriodRows?: BalancingInputItem[]): boolean => {
       /* Giá gửi đông theo ngày: ngày mới gửi tự có giá, đơn giá dòng = bình quân (mig 0071). */
       const rows = written.map(normalizeDepositPrices);
       const result = syncMonthlyStockLedger(monthlyStock, materialInRows, rows, ngucanh);
@@ -351,7 +403,7 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
         return false;
       }
       saveCheckpoint(group);
-      writeAllMaterials([...allMaterialRows.filter((r) => r.periodId !== period.id), ...rows]);
+      writeAllMaterials([...(otherPeriodRows ?? allMaterialRows.filter((r) => r.periodId !== period.id)), ...rows]);
       if (result.changed) writeStockLedger(result.lines);
       if (result.carriedCount > 0)
         notify.saved(`Sổ kho tháng: đã tự kế thừa ${result.carriedCount} dòng tồn sang tháng mới`);
@@ -360,9 +412,9 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     [writeAllMaterials, allMaterialRows, period.id, saveCheckpoint, monthlyStock, materialInRows, ngucanh, writeStockLedger]
   );
   const writeFinishedGoods = useCallback(
-    (rows: BalancingOutputItem[], group = "tp") => {
+    (rows: BalancingOutputItem[], group = "tp", otherPeriodRows?: BalancingOutputItem[]) => {
       saveCheckpoint(group);
-      writeAllFinishedGoods([...allOutputs.filter((r) => r.periodId !== period.id), ...rows]);
+      writeAllFinishedGoods([...(otherPeriodRows ?? allOutputs.filter((r) => r.periodId !== period.id)), ...rows]);
     },
     [writeAllFinishedGoods, allOutputs, period.id, saveCheckpoint]
   );
@@ -371,14 +423,14 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
 
   /* Kỳ TỰ LẤY sổ nhập theo khoảng ngày + họ NL (chốt 2026-10-20) — không cần bấm "Lấy n dòng",
      và kỳ chồng ngày cùng dùng chung các chuyến của ngày trùng (`selectPeriodImports`). */
-  const assignedImports = useMemo(() => selectPeriodImports(period, allImports), [period, allImports]);
+  const assignedImports = useMemo(() => selectPeriodImports(livePeriod, allImports), [livePeriod, allImports]);
   /** Dòng lưới "hút từ sổ nhập" còn THIẾU: họ có chuyến trong kỳ mà kỳ chưa có dòng của họ đó. */
   const importsToPull = useMemo(() => {
     const families = new Set(
       materialInRows.filter((r) => r.autoSource === "imports").map((r) => getMaterialFamily(r.name))
     );
-    return filterEligibleImports(period, allImports).filter((r) => !families.has(getMaterialFamily(r.materialTypeName)));
-  }, [period, allImports, materialInRows]);
+    return filterEligibleImports(livePeriod, allImports).filter((r) => !families.has(getMaterialFamily(r.materialTypeName)));
+  }, [livePeriod, allImports, materialInRows]);
   /* Khớp theo tên loại NL hay trượt vì sổ nhập ghi tên tự do. Giữ sẵn danh sách
      "trong khoảng ngày nhưng khác loại" để người dùng tự tick, thay vì màn hình
      báo "không có gì để lấy" trong khi sổ đầy số. */
@@ -433,7 +485,11 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       if (selectedIds.length === 0) return;
       const prevImports = allImports;
       const prevMaterials = allMaterialRows;
+      const prevPeriods = allPeriods;
       saveCheckpoint(`hut-nhap:${selectedIds.length}:${selectedIds[0].id}`);
+      /* Người dùng TỰ TICK chuyến của họ đã "Bỏ khỏi kỳ" ⇒ coi như lấy lại họ đó. */
+      const keptKeys = selectedIds.reduce((keys, r) => removeExcludedSourceKey(keys, importExclusionKey(r.materialTypeName)), excludedSourceKeys);
+      if (keptKeys.length !== excludedSourceKeys.length) writeExcludedSourceKeys(keptKeys);
       const dropIds = new Set(selectedIds.map((r) => r.id));
       writeAllImports(
         allImports.map((r) => (dropIds.has(r.id) ? { ...r, balancingPeriodId: period.id } : r))
@@ -467,9 +523,10 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       notify.saved(`Đã lấy ${selectedIds.length} dòng nhập hàng vào kỳ`, () => {
         writeAllImports(prevImports);
         writeAllMaterials(prevMaterials);
+        if (keptKeys.length !== excludedSourceKeys.length) writeAllPeriods(prevPeriods);
       });
     },
-    [allImports, importsToPull, allMaterialRows, materialInRows, assignedImports, writeAllImports, writeAllMaterials, writeMaterials, saveCheckpoint, period.id]
+    [allImports, importsToPull, allMaterialRows, materialInRows, assignedImports, writeAllImports, writeAllMaterials, writeMaterials, saveCheckpoint, period.id, allPeriods, excludedSourceKeys, writeExcludedSourceKeys, writeAllPeriods]
   );
 
   const isImportDayLocked = useCallback(
@@ -599,8 +656,8 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     [allWips, period.id]
   );
   const pendingWips = useMemo(
-    () => filterEligibleWips(period, allWips).filter((r) => !r.balancingPeriodId),
-    [period, allWips]
+    () => filterEligibleWips(livePeriod, allWips).filter((r) => !r.balancingPeriodId),
+    [livePeriod, allWips]
   );
 
   /* ---------- Dòng mẫu khối 2 (A) + gợi ý khách/giá (B) ---------- */
@@ -615,12 +672,15 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     [finishedGoodTemplates, allOutputs, allPeriods, period.id]
   );
 
-  const pullProduction = useCallback(() => {
-    if (pendingWips.length === 0) return;
+  /** Hút các dòng sổ SX `toPull` vào kỳ (gán kỳ lên dòng SX + dựng dòng lưới mỗi mặt hàng × quy cách). */
+  const pullProductionRows = useCallback((toPull: WipProductionItem[], keptKeys?: string[]) => {
+    if (toPull.length === 0) return;
+    const prevPeriods = allPeriods;
+    if (keptKeys) writeExcludedSourceKeys(keptKeys);
     const prevProduction = allWips;
     const prevFinishedGoods = allOutputs;
-    saveCheckpoint(`hut-sx:${pendingWips.length}:${pendingWips[0].id}`);
-    const dropIds = new Set(pendingWips.map((r) => r.id));
+    saveCheckpoint(`hut-sx:${toPull.length}:${toPull[0].id}`);
+    const dropIds = new Set(toPull.map((r) => r.id));
     writeAllProductions(
       allWips.map((r) => (dropIds.has(r.id) ? { ...r, balancingPeriodId: period.id } : r))
     );
@@ -630,7 +690,7 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
         .map((r) => productSpecKey(r.productId, r.spec ?? ""))
     );
     const toAdd: BalancingOutputItem[] = [];
-    for (const [key, o] of groupWipsByProduct([...assignedWips, ...pendingWips])) {
+    for (const [key, o] of groupWipsByProduct([...assignedWips, ...toPull])) {
       if (existing.has(key)) continue;
       const [productId, spec] = key.split("|");
       /* (B) Khách · kênh · giá lấy theo dòng mẫu / kỳ gần nhất — trước đây để trống
@@ -653,12 +713,15 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       });
     }
     if (toAdd.length > 0) writeFinishedGoods([...finishedGoods, ...toAdd], "");
-    notify.saved(`Đã lấy ${pendingWips.length} dòng sản xuất vào kỳ`, () => {
+    notify.saved(`Đã lấy ${toPull.length} dòng sản xuất vào kỳ`, () => {
       writeAllProductions(prevProduction);
       writeAllFinishedGoods(prevFinishedGoods);
+      if (keptKeys) writeAllPeriods(prevPeriods);
     });
   }, [
-    pendingWips,
+    allPeriods,
+    writeExcludedSourceKeys,
+    writeAllPeriods,
     assignedWips,
     allWips,
     allOutputs,
@@ -670,6 +733,8 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     period.id,
     suggestTemplate,
   ]);
+
+  const pullProduction = useCallback(() => pullProductionRows(pendingWips), [pullProductionRows, pendingWips]);
 
   /* Một chạm kéo CẢ HAI nguồn tự động (nhập + sản xuất) vào kỳ. KHÔNG gộp sổ bán
      — bán là seam đầu ra thay thế, kéo nhầm sẽ sai nguồn. Chỉ một nguồn có dòng
@@ -811,8 +876,15 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
      ĐỊNH theo kỳ + họ ⇒ hai máy cùng mở kỳ chỉ ghi đè cùng một dòng, không đẻ dòng trùng.
      Cùng hai cổng như ghi ngược ở trên: nguồn đã nạp xong + kỳ chưa chốt (+ có quyền ghi). */
   /* Chốt CHỐNG CHẠY HAI LẦN: kho ghi xong mới vẽ lại ⇒ effect có thể chạy lần nữa khi
-     `importsToPull` chưa kịp rỗng (đã thấy: toast "Đã tự lấy…" hiện đôi). Ghi theo kỳ + họ. */
+     `importsToPull` chưa kịp rỗng (đã thấy: toast "Đã tự lấy…" hiện đôi). Ghi theo kỳ + họ.
+     "Lấy lại" họ đã bỏ KHÔNG đi qua effect này (dựng dòng ngay) nên không cần xoá chốt. */
   const autoPulledRef = useRef("");
+  /* Bản MỚI NHẤT của bảng dòng NL + bảng kỳ cho nút Hoàn tác trên toast tự lấy — toast giữ
+     closure lúc lấy (trước khi dòng vừa thêm vào kho). */
+  const latestForAutoPullUndo = useRef({ rows: allMaterialRows, periods: allPeriods });
+  useEffect(() => {
+    latestForAutoPullUndo.current = { rows: allMaterialRows, periods: allPeriods };
+  }, [allMaterialRows, allPeriods]);
   useEffect(() => {
     if (isLocked || isReadOnly || !materialSourcesReady || importsToPull.length === 0) return;
     const pullKey = `${period.id}|${[...new Set(importsToPull.map((r) => getMaterialFamily(r.materialTypeName)))].sort().join(",")}`;
@@ -837,9 +909,20 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
       });
     }
     if (toAdd.length > 0 && writeMaterials([...materialInRows, ...toAdd], "")) {
-      notify.saved(`Đã tự lấy ${importsToPull.length} chuyến nhập trong khoảng ngày của kỳ`);
+      const addedIds = toAdd.map((r) => r.id);
+      /* Hoàn tác (rà soát 2026-11-06): bỏ dòng vừa tự lấy VÀ ghi họ vào nguồn đã bỏ — chỉ bỏ
+         dòng thì effect này lấy lại ngay vòng sau. Lấy lại: nút "Lấy lại" ở khối NL. */
+      // Hoàn tác = xoá dòng ⇒ chỉ người có quyền Xóa mới có nút (thiếu quyền thì chốt ghi bỏ lượt xoá, kỳ lệch).
+      notify.saved(`Đã tự lấy ${importsToPull.length} chuyến nhập trong khoảng ngày của kỳ`, !canDeleteRows ? undefined : () => {
+        const { rows, periods } = latestForAutoPullUndo.current;
+        const current = periods.find((k) => k.id === period.id);
+        if (!current) return;
+        const plan = planUndoAutoPull(current, rows, addedIds);
+        writeAllPeriods(periods.map((k) => (k.id === period.id ? { ...k, excludedSourceKeys: plan.excludedSourceKeys } : k)));
+        writeAllMaterials(plan.inputs);
+      });
     }
-  }, [importsToPull, isLocked, isReadOnly, materialSourcesReady, materialInRows, writeMaterials, period.id]);
+  }, [importsToPull, isLocked, isReadOnly, materialSourcesReady, materialInRows, writeMaterials, writeAllMaterials, writeAllPeriods, period.id, canDeleteRows]);
   useEffect(() => {
     if (isLocked || !finishedGoodSourcesReady) return;
     if (finishedGoodsToCalc.some((r, i) => r !== finishedGoods[i])) writeFinishedGoods(finishedGoodsToCalc, "");
@@ -1043,6 +1126,115 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     );
   }, [prevPeriod, materialCarryOver, finishedGoodCarryOver, allMaterialRows, allOutputs, writeAllMaterials, writeAllFinishedGoods, saveCheckpoint, period.id]);
 
+  /* ---------- Gỡ dòng khỏi kỳ: "Bỏ khỏi kỳ" (dòng hút) / xoá (dòng tay) — rà soát 2026-11-06 ----------
+     Luật: sổ nguồn GIỮ NGUYÊN (chỉ gỡ liên kết kỳ mà lần hút đã gắn); kỳ nhớ nguồn đã bỏ để
+     không tự lấy / hút lại; xoá dòng nhận chuyển kỳ ⇒ trả về kỳ trước; luôn có Hoàn tác (toast +
+     Ctrl+Z — ảnh chụp lấy trước khi ghi, gồm cả bảng kỳ). Nhật ký thao tác repo tự ghi. */
+  const removeMaterialRow = useCallback(
+    (rowId: string, label: string) => {
+      if (isLocked || !canDeleteRows) return;
+      const plan = planRemoveMaterialRow(livePeriod, allMaterialRows, allImports, rowId);
+      if (!plan) return;
+      const before = snapshotCurrent(`bo-dong-nl:${rowId}`);
+      const periodRows = plan.inputs.filter((r) => r.periodId === period.id);
+      const otherRows = plan.inputs.filter((r) => r.periodId !== period.id);
+      if (plan.excludedSourceKeys) writeExcludedSourceKeys(plan.excludedSourceKeys);
+      // writeMaterials tự đặt mốc Ctrl+Z + đồng bộ Sổ kho tháng (xoá dòng Lấy xả đông / Gửi đông).
+      if (!writeMaterials(periodRows, `bo-dong-nl:${rowId}`, otherRows)) {
+        if (plan.excludedSourceKeys) writeAllPeriods(before.periods);
+        return;
+      }
+      if (plan.imports) writeAllImports(plan.imports);
+      const message =
+        plan.kind === "imports"
+          ? `Đã bỏ "${label}" khỏi kỳ (${plan.tripCount} chuyến · ${num(plan.totalKg)} kg) — sổ Nhập hàng giữ nguyên${plan.excludedSourceKeys ? ", kỳ không tự lấy lại" : ""}`
+          : `Đã xóa dòng "${label}"${plan.releasedCarryOverIds.length ? " — phần chuyển kỳ trả về kỳ trước" : ""}`;
+      notify.deleted(message, () => restoreLatest(before));
+    },
+    [isLocked, canDeleteRows, livePeriod, allMaterialRows, allImports, snapshotCurrent, period.id, writeExcludedSourceKeys, writeMaterials, writeAllPeriods, writeAllImports, restoreLatest]
+  );
+
+  const removeFinishedGoodRow = useCallback(
+    (rowId: string, label: string) => {
+      if (isLocked || !canDeleteRows) return;
+      const plan = planRemoveFinishedGoodRow(livePeriod, allOutputs, allWips, rowId);
+      if (!plan) return;
+      const before = snapshotCurrent(`bo-dong-tp:${rowId}`);
+      if (plan.excludedSourceKeys) writeExcludedSourceKeys(plan.excludedSourceKeys);
+      writeFinishedGoods(
+        plan.outputs.filter((r) => r.periodId === period.id),
+        `bo-dong-tp:${rowId}`,
+        plan.outputs.filter((r) => r.periodId !== period.id)
+      );
+      if (plan.wips) writeAllProductions(plan.wips);
+      const message =
+        plan.kind === "production"
+          ? `Đã bỏ "${label}" khỏi kỳ — ${plan.releasedWipCount} dòng sổ Sản xuất giữ nguyên, trả về chưa gắn kỳ`
+          : plan.kind === "sales"
+            ? `Đã bỏ "${label}" khỏi kỳ — sổ Bán hàng giữ nguyên`
+            : `Đã xóa dòng "${label}"${plan.releasedCarryOverIds.length ? " — phần chuyển kỳ trả về kỳ trước" : ""}`;
+      notify.deleted(message, () => restoreLatest(before));
+    },
+    [isLocked, canDeleteRows, livePeriod, allOutputs, allWips, snapshotCurrent, period.id, writeExcludedSourceKeys, writeFinishedGoods, writeAllProductions, restoreLatest]
+  );
+
+  const restoreExcludedSource = useCallback(
+    (key: string, label: string) => {
+      if (isLocked) return;
+      const parsed = parseExcludedSourceKey(key);
+      const keptKeys = removeExcludedSourceKey(excludedSourceKeys, key);
+      if (!parsed || keptKeys.length === excludedSourceKeys.length) return;
+      const nextPeriod = { ...livePeriod, excludedSourceKeys: keptKeys };
+      if (parsed.kind === "production") {
+        const rows = filterEligibleWips(nextPeriod, allWips).filter(
+          (r) => !r.balancingPeriodId && productionExclusionKey(r.productId, r.spec) === key
+        );
+        if (rows.length > 0) {
+          pullProductionRows(rows, keptKeys);
+          return;
+        }
+      }
+      const before = snapshotCurrent(`lay-lai:${key}`);
+      saveCheckpoint(`lay-lai:${key}`);
+      writeExcludedSourceKeys(keptKeys);
+      if (parsed.kind === "imports") {
+        /* Dựng lại NGAY dòng hút của họ (cùng id cố định với tự lấy) — không chờ effect, một toast. */
+        const trips = filterEligibleImports(nextPeriod, allImports).filter((r) => importExclusionKey(r.materialTypeName) === key);
+        const toAdd: BalancingInputItem[] = [];
+        for (const [family, o] of groupImportsByMaterialType(trips)) {
+          if (materialInRows.some((r) => r.autoSource === "imports" && getMaterialFamily(r.name) === family)) continue;
+          toAdd.push({
+            id: `${period.id}-imports-${family}`,
+            periodId: period.id,
+            groupName: "Thủy sản",
+            name: family,
+            quantityKg: Object.values(o.dailyQuantities).reduce((s, v) => s + v, 0),
+            unitPrice: null,
+            ratioPercentage: null,
+            sourceWarehouse: "",
+            dailyQuantities: {},
+            carryOverKg: 0,
+            isReduction: false,
+            reductionWarehouseId: "",
+            autoSource: "imports",
+          });
+        }
+        if (toAdd.length > 0) writeMaterials([...materialInRows, ...toAdd], "");
+        notify.saved(
+          trips.length > 0 ? `Đã lấy lại "${label}" vào kỳ (${trips.length} chuyến nhập)` : `Đã gỡ "Bỏ khỏi kỳ" của "${label}" — chưa có chuyến nhập nào trong khoảng ngày`,
+          // Hoàn tác xoá dòng vừa dựng ⇒ cần quyền Xóa (thiếu thì Bỏ khỏi kỳ lại bằng 🗑 — người có quyền).
+          canDeleteRows ? () => restoreLatest(before) : undefined
+        );
+        return;
+      }
+      notify.saved(
+        parsed.kind === "sales" ? `Đã gỡ "Bỏ khỏi kỳ" của "${label}"` : `Đã gỡ "Bỏ khỏi kỳ" của "${label}" — sổ sản xuất chưa có dòng nào để lấy`,
+        () => restoreLatest(before)
+      );
+    },
+    [isLocked, excludedSourceKeys, livePeriod, allWips, allImports, materialInRows, pullProductionRows, snapshotCurrent, saveCheckpoint, writeExcludedSourceKeys, writeMaterials, restoreLatest, period.id, canDeleteRows]
+  );
+
   return {
     periodId: period.id,
     date: dates,
@@ -1089,6 +1281,10 @@ export function usePeriodGrid(period: BalancingPeriod): PeriodGrid {
     previousPeriod: prevPeriod,
     carryOverRowCount: materialCarryOver.length + finishedGoodCarryOver.length,
     applyCarryOver: receiveCarryOver,
+    removeMaterialRow,
+    removeFinishedGoodRow,
+    excludedSourceKeys,
+    restoreExcludedSource,
     isLocked,
     isReadOnly,
     canUndo: historyCount.undo > 0,

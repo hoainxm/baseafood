@@ -396,6 +396,9 @@ Luật khi dùng:
   phủ / không làm mờ màn, nêu đích danh dòng, nút "Không" đứng trước (Esc = không xoá),
   màn gọi vẫn bắn toast Hoàn tác. Thay cho hộp liệt kê mọi dòng để xoá (người dùng không nhớ
   dòng nào là dòng nào). Xoá bản ghi ở nơi khác (danh mục, phiếu) vẫn `ConfirmDelete`.
+  **Gỡ dòng HÚT từ sổ khác** (2026-11-06, Cân đối "Bỏ khỏi kỳ"): CÙNG nút này, chỉ đổi chữ —
+  `question="Bỏ dòng này khỏi kỳ?"` · `confirmLabel="Bỏ khỏi kỳ"` · `note` một câu nói sổ nguồn
+  giữ nguyên. Đừng dựng cách gỡ thứ hai (nút riêng, menu riêng).
 - **Hàng phụ GÕ ĐƯỢC — `GridRow.kind = "detail"`** (2026-10-19): thụt vào như dòng con,
   không ô tick tô màu, nhưng ô vẫn gõ được (khoá từng ô bằng `isLocked` của cột). VD hàng
   "Giá gửi (đ/kg)" theo ngày dưới dòng Gửi đông ở Cân đối (id `<id dòng>::price`; màn tự

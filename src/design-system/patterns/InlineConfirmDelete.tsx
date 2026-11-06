@@ -10,6 +10,8 @@
 // trước (Esc = không xoá), màn gọi bắn toast Hoàn tác sau khi xoá.
 // Dùng cho XOÁ DÒNG TRONG LƯỚI / BẢNG mà dòng đang hiện ngay cạnh nút; xoá bản ghi ở chỗ
 // khác (danh mục, phiếu) vẫn dùng ConfirmDelete.
+// GỠ DÒNG HÚT TỪ SỔ KHÁC (2026-11-06, Cân đối "Bỏ khỏi kỳ"): CÙNG nút / ô hỏi này, chỉ đổi chữ
+// (`question` · `confirmLabel` · `note` nói sổ nguồn giữ nguyên) — không dựng cách gỡ thứ hai.
 import * as React from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,12 +21,21 @@ export function InlineConfirmDelete({
   recordDescription,
   onConfirm,
   title,
+  question = "Xoá dòng này?",
+  confirmLabel = "Xoá",
+  note,
 }: {
   /** Đích danh dòng sắp xoá, VD "Gửi đông · Bạch tuộc 2 da — 2.000 kg". */
   recordDescription: string;
   onConfirm: () => void;
   /** Tooltip nút 🗑 (luật §9: mọi nút có title). */
   title?: string;
+  /** Câu hỏi đầu ô hỏi — mặc định "Xoá dòng này?"; dòng hút từ sổ khác: "Bỏ dòng này khỏi kỳ?". */
+  question?: string;
+  /** Chữ nút xác nhận — mặc định "Xoá"; dòng hút: "Bỏ khỏi kỳ". */
+  confirmLabel?: string;
+  /** Một câu nói hệ quả (VD "Sổ Nhập hàng giữ nguyên…") — hiện dưới đích danh dòng. */
+  note?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   return (
@@ -34,15 +45,21 @@ export function InlineConfirmDelete({
           variant="danger"
           size="icon-sm"
           className="shrink-0"
-          title={title ?? `Xoá dòng "${recordDescription}" (hỏi lại trước, xoá xong vẫn Hoàn tác được).`}
-          aria-label={`Xoá dòng ${recordDescription}`}
+          title={
+            title ??
+            (confirmLabel === "Xoá"
+              ? `Xoá dòng "${recordDescription}" (hỏi lại trước, xoá xong vẫn Hoàn tác được).`
+              : `${confirmLabel}: "${recordDescription}" (hỏi lại trước, xong vẫn Hoàn tác được).`)
+          }
+          aria-label={confirmLabel === "Xoá" ? `Xoá dòng ${recordDescription}` : `${confirmLabel}: ${recordDescription}`}
         >
           <Trash2 />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-3">
-        <p className="text-sm font-semibold">Xoá dòng này?</p>
+        <p className="text-sm font-semibold">{question}</p>
         <p className="mt-1 text-sm text-muted-foreground">{recordDescription}</p>
+        {note && <p className="mt-1 text-sm">{note}</p>}
         <div className="mt-3 flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={() => setOpen(false)} autoFocus>
             Không
@@ -56,7 +73,7 @@ export function InlineConfirmDelete({
             }}
           >
             <Trash2 />
-            Xoá
+            {confirmLabel}
           </Button>
         </div>
       </PopoverContent>

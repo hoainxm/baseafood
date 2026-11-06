@@ -446,6 +446,22 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             </li>
           </Y>
         </Section>
+        <Section title="Lấy nhầm, thêm thừa">
+          <Y>
+            <li>
+              Nút thùng rác cuối tên dòng (kỳ chưa chốt). Dòng lấy từ sổ Nhập hàng / Sản xuất / Bán hàng là{" "}
+              <b>Bỏ khỏi kỳ</b>: sổ gốc giữ nguyên, kỳ không tự lấy lại. Dòng sổ nhập bỏ theo cả họ nguyên liệu.
+            </li>
+            <li>
+              Dòng gõ tay (kể cả <b>Thêm nhanh mặt hàng</b>) là <b>Xoá</b>; dòng có số thì ô hỏi kể rõ phần sẽ mất. Xoá dòng nhận
+              chuyển kỳ thì phần đó trả về kỳ trước, nhận lại được.
+            </li>
+            <li>
+              Hỏi lại trước, xong có <b>Hoàn tác</b>. Nguồn đã bỏ hiện ở dòng <b>Đã bỏ khỏi kỳ</b> kèm nút <b>Lấy lại</b>.
+              Thông báo <b>Đã tự lấy … chuyến nhập</b> cũng có Hoàn tác (= bỏ các họ vừa tự lấy).
+            </li>
+          </Y>
+        </Section>
         <Section title="Kết quả & in">
           <p>
             Có đủ nguyên liệu và thành phẩm, hệ thống tự tính <b>định mức</b>{" "}

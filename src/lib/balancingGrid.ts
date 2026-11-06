@@ -90,6 +90,25 @@ export function findOverlappingFamilyPeriods(
   });
 }
 
+/* ---------- Nguồn đã "Bỏ khỏi kỳ" (mig 0110) ---------- */
+
+/** Khóa nguồn sổ nhập của một HỌ NL trong `excludedSourceKeys` — so không phân biệt hoa thường như `isSameMaterialFamily`. */
+export function importExclusionKey(materialTypeName: string): string {
+  return `imports:${getMaterialFamily(materialTypeName).toLowerCase()}`;
+}
+/** Khóa nguồn sổ sản xuất của một mặt hàng × quy cách. */
+export function productionExclusionKey(productId: string, spec: string): string {
+  return `production:${productId}|${spec || ""}`;
+}
+/** Khóa nguồn sổ bán của một dòng bán. */
+export function salesExclusionKey(salesItemId: string): string {
+  return `sales:${salesItemId}`;
+}
+/** Kỳ đã bỏ nguồn này chưa (người dùng bấm "Bỏ khỏi kỳ" ⇒ kỳ không tự lấy / hút lại). */
+export function isSourceExcluded(period: Pick<BalancingPeriod, "excludedSourceKeys">, key: string): boolean {
+  return (period.excludedSourceKeys ?? []).includes(key);
+}
+
 /* ---------- Hút số liệu vào kỳ ---------- */
 
 /**
@@ -106,7 +125,11 @@ export function filterEligibleImports(
   const dates = new Set(getPeriodDates(period));
   if (dates.size === 0) return [];
   return imports.filter(
-    (r) => dates.has(r.deliveryDate) && isSameMaterialFamily(r.materialTypeName, period.materialTypeName)
+    (r) =>
+      dates.has(r.deliveryDate) &&
+      isSameMaterialFamily(r.materialTypeName, period.materialTypeName) &&
+      // Họ đã "Bỏ khỏi kỳ" ⇒ kỳ không tự lấy lại (người dùng gỡ bằng "Lấy lại").
+      !isSourceExcluded(period, importExclusionKey(r.materialTypeName))
   );
 }
 
@@ -134,7 +157,9 @@ export function filterEligibleWips(
   return wips.filter(
     (r) =>
       dates.has(r.productionDate) &&
-      (!r.balancingPeriodId || r.balancingPeriodId === period.id)
+      (!r.balancingPeriodId || r.balancingPeriodId === period.id) &&
+      // Mặt hàng đã "Bỏ khỏi kỳ" ⇒ nút "Lấy n dòng từ sổ sản xuất" không hút lại.
+      !isSourceExcluded(period, productionExclusionKey(r.productId, r.spec))
   );
 }
 

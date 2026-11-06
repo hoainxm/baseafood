@@ -35,7 +35,13 @@ import { syncMonthlyStockLedger } from "@/lib/balancingStockLines";
 import { readDevicePref, writeDevicePref } from "@/lib/devicePrefs";
 import { usePeriodGrid } from "./usePeriodGrid";
 import { MaterialGrid } from "./MaterialGrid";
-import { findUnpricedMaterialRows, getMaterialFamily, isEmptyPulledSalesOutput, salesItemToOutput } from "@/lib/balancingGrid";
+import {
+  findUnpricedMaterialRows,
+  getMaterialFamily,
+  isEmptyPulledSalesOutput,
+  salesExclusionKey,
+  salesItemToOutput,
+} from "@/lib/balancingGrid";
 import type { BalancingResult } from "@/lib/balancingCalc";
 import { WipGrid } from "./WipGrid";
 import {
@@ -628,7 +634,8 @@ function PeriodDetail({
     return allSalesItems
       .filter((b) => {
         const p = salesInvoiceById.get(b.invoiceId);
-        if (!p || daHut.has(b.id)) return false;
+        // Dòng bán đã "Bỏ khỏi kỳ" ⇒ nút Lấy từ sổ bán không hút lại (gỡ bằng "Lấy lại").
+        if (!p || daHut.has(b.id) || grid.excludedSourceKeys.includes(salesExclusionKey(b.id))) return false;
         return (
           !period.startDate ||
           !period.endDate ||
@@ -636,7 +643,7 @@ function PeriodDetail({
         );
       })
       .map((b) => ({ salesItem: b, invoice: salesInvoiceById.get(b.invoiceId)! }));
-  }, [allSalesItems, salesInvoices, grid.outputs, period.startDate, period.endDate]);
+  }, [allSalesItems, salesInvoices, grid.outputs, grid.excludedSourceKeys, period.startDate, period.endDate]);
 
   const pullSalesIntoPeriod = (items: { salesItem: SalesItem; invoice: SalesInvoice }[]) => {
     const repulled = new Set(items.map(({ salesItem }) => salesItem.id));
@@ -646,6 +653,22 @@ function PeriodDetail({
       ...items.map(({ salesItem, invoice }) => salesItemToOutput(salesItem, invoice, period, uid())),
     ]);
     notify.saved(`Đã hút ${items.length} dòng bán vào kỳ này`);
+  };
+
+  /* Dòng bán đã "Bỏ khỏi kỳ": tên để hiện + "Lấy lại" = gỡ khóa rồi hút lại đúng dòng bán đó. */
+  const describeSalesItem = (salesItemId: string) => {
+    const item = allSalesItems.find((b) => b.id === salesItemId);
+    const invoice = item ? salesInvoices.find((p) => p.id === item.invoiceId) : undefined;
+    if (!item) return "Dòng bán (đã xoá ở sổ bán)";
+    const name = products.find((m) => m.id === item.productId)?.name ?? "Dòng bán";
+    return invoice ? `${name} · bán ${formatDateVN(invoice.deliveryDate)}` : name;
+  };
+  const restoreSales = (key: string, label: string) => {
+    grid.restoreExcludedSource(key, label);
+    const salesItemId = key.slice("sales:".length);
+    const item = allSalesItems.find((b) => b.id === salesItemId);
+    const invoice = item ? salesInvoices.find((p) => p.id === item.invoiceId) : undefined;
+    if (item && invoice) pullSalesIntoPeriod([{ salesItem: item, invoice }]);
   };
 
   const { result } = grid;
@@ -778,6 +801,8 @@ function PeriodDetail({
             canEditCustomer={customerEditor.canEdit}
             pendingSales={banChoHut}
             onPullSales={pullSalesIntoPeriod}
+            describeSalesItem={describeSalesItem}
+            onRestoreSales={restoreSales}
             daysCollapsed={hideFinishedGoodDays}
             onToggleDays={() => setHideFinishedGoodDays((v) => !v)}
             daysSlot={finishedGoodDaysSlot}

@@ -33,16 +33,19 @@ import {
   Combobox,
   EmptyState,
   EditableGrid,
+  InlineConfirmDelete,
+  Tag,
   notify,
   type GridColumn,
   type GridRow,
 } from "@/design-system";
+import { describeFinishedGoodLoss, parseExcludedSourceKey } from "@/lib/balancingRemoval";
 import { num, formatDateVN } from "@/lib/format";
 import { useCan } from "@/features/shared/PermissionProvider";
 
 /** Cột tiền của khối BTP — ẩn khi không có quyền `balancing.view-price`. */
 const PRICE_COLUMN_KEYS = new Set(["donGia", "thanhTien"]);
-import { ChevronsLeftRight, Download, EyeOff, Layers, Plus } from "lucide-react";
+import { ChevronsLeftRight, Download, EyeOff, Layers, Plus, RotateCcw } from "lucide-react";
 
 export function WipGrid({
   grid,
@@ -56,6 +59,8 @@ export function WipGrid({
   canEditCustomer,
   pendingSales,
   onPullSales,
+  describeSalesItem,
+  onRestoreSales,
   daysCollapsed: isDateColumnsCollapsed,
   onToggleDays: onToggleDayColumns,
   daysSlot,
@@ -75,6 +80,10 @@ export function WipGrid({
   /** Seam cũ: dòng sổ BÁN trong khoảng ngày, dùng khi output = hàng đã bán ra. */
   pendingSales: { salesItem: SalesItem; invoice: SalesInvoice }[];
   onPullSales: (items: { salesItem: SalesItem; invoice: SalesInvoice }[]) => void;
+  /** Tên dòng bán đã "Bỏ khỏi kỳ" (khóa `sales:<id>`) để hiện kèm nút Lấy lại. */
+  describeSalesItem?: (salesItemId: string) => string;
+  /** "Lấy lại" một dòng bán đã bỏ: gỡ khóa + hút lại dòng bán đó (màn cha giữ sổ bán). */
+  onRestoreSales?: (key: string, label: string) => void;
   /** Ẩn bảng "Thành phẩm theo ngày" (bảng chính Xuất khẩu vẫn hiện). */
   daysCollapsed: boolean;
   onToggleDays: () => void;
@@ -83,7 +92,8 @@ export function WipGrid({
 }) {
   const { date: dates, outputs: finishedGoods, finishedGoodRows, pendingWips, saveOutputs: saveFinishedGoods, pullWips: pullProduction, saveWipDayCells: saveProductionMultiDay, lockedDates, templatePeriod, missingTemplateRows: missingTemplates, suggestTemplate } =
     grid;
-  const canViewPrice = useCan("balancing")["view-price"];
+  const allowed = useCan("balancing");
+  const canViewPrice = allowed["view-price"];
   const [isAdding, setIsAdding] = useState(false);
   const [reasonPrompt, setReasonPrompt] = useState<{ cells: DayCell[]; date: string } | null>(null);
   /** Ẩn dòng chưa có số (dòng mẫu + dòng 0 kg) — MẶC ĐỊNH ẨN, xem gọn như bản in. */
@@ -397,12 +407,63 @@ export function WipGrid({
   const dayColumns = displayColumns.filter((c) => ["tra", "no", "ghiChu"].includes(c.key) || c.group === DAY_COLUMN_GROUPS.days);
 
   const templatePeriodLabel = templatePeriod ? templatePeriod.dateRangeDescription || `${templatePeriod.startDate} – ${templatePeriod.endDate}` : "";
+  /**
+   * Gỡ dòng thành phẩm (rà soát 2026-11-06 — trước đây không có cách xoá, chỉ "Ẩn dòng trống"):
+   * CÙNG nút 🗑 + ô hỏi tại dòng như khối NL. Dòng hút sổ SX / sổ bán = "Bỏ khỏi kỳ" (sổ nguồn giữ
+   * nguyên, kỳ không hút lại); dòng thêm tay = xoá, có số thì ô hỏi nói rõ mất gì. Kỳ chốt ⇒ không có.
+   */
+  const rowRemoveAction = (h: FinishedGoodGridRow) => {
+    if (grid.isLocked || !allowed.delete) return undefined;
+    const original = theoId.get(h.id);
+    if (!original) return undefined;
+    const label = `${productName(h.productId)}${h.spec ? ` · ${h.spec}` : ""}`;
+    const dailyKg = Object.values(h.dailyQuantities).reduce((s, v) => s + (v || 0), 0);
+    if (h.fromProduction || original.autoSource === "sales") {
+      const fromSales = original.autoSource === "sales";
+      return (
+        <InlineConfirmDelete
+          question="Bỏ dòng này khỏi kỳ?"
+          confirmLabel="Bỏ khỏi kỳ"
+          recordDescription={`${label} — ${fromSales ? "dòng sổ Bán hàng" : `${h.sourceIds.length} dòng sổ Sản xuất`} · ${num(h.total)} kg`}
+          note={
+            fromSales
+              ? "Sổ Bán hàng giữ nguyên. Nút “Lấy từ sổ bán” không hút lại dòng này — lấy lại bằng nút “Lấy lại”."
+              : "Sổ Sản xuất giữ nguyên (chỉ gỡ gắn kỳ). Nút “Lấy từ sổ sản xuất” không hút lại — lấy lại bằng nút “Lấy lại”."
+          }
+          title={`Bỏ "${label}" khỏi kỳ — sổ ${fromSales ? "Bán hàng" : "Sản xuất"} giữ nguyên (có Hoàn tác, có nút Lấy lại).`}
+          onConfirm={() => grid.removeFinishedGoodRow(h.id, label)}
+        />
+      );
+    }
+    const loss = describeFinishedGoodLoss(original, dailyKg, num);
+    const isCarryOver = (original.carryOverKg ?? 0) > 0 && dailyKg === 0;
+    return (
+      <InlineConfirmDelete
+        recordDescription={`${label}${loss.length ? ` — sẽ mất: ${loss.join(" · ")}` : " — chưa có số"}`}
+        note={isCarryOver ? "Dòng nhận chuyển từ kỳ trước: xoá thì phần chuyển kỳ trả về kỳ trước (nhận lại được)." : undefined}
+        onConfirm={() => grid.removeFinishedGoodRow(h.id, label)}
+      />
+    );
+  };
+
+  /* Nguồn đã "Bỏ khỏi kỳ" của khối này (sổ SX theo mặt hàng × quy cách, sổ bán theo dòng). */
+  const excludedOutputSources = grid.excludedSourceKeys.flatMap((key): { key: string; kind: "production" | "sales"; label: string }[] => {
+    const parsed = parseExcludedSourceKey(key);
+    if (parsed?.kind === "production") {
+      const [productId, spec = ""] = parsed.value.split("|");
+      return [{ key, kind: "production", label: `${productName(productId)}${spec ? ` · ${spec}` : ""}` }];
+    }
+    if (parsed?.kind === "sales") return [{ key, kind: "sales", label: describeSalesItem?.(parsed.value) ?? "Dòng bán" }];
+    return [];
+  });
+
   const gridRows: GridRow<FinishedGoodGridRow>[] = [
     ...hangThat.map((h) => ({
       id: h.id,
       data: h,
       label: productName(h.productId),
       subLabel: h.spec || undefined,
+      actions: rowRemoveAction(h),
     })),
     ...(hideEmptyRows || templateRows.length === 0
       ? []
@@ -494,6 +555,28 @@ export function WipGrid({
           )}
         </div>
       </div>
+
+      {excludedOutputSources.length > 0 && (
+        <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground xl:w-0 xl:min-w-full">
+          Đã bỏ khỏi kỳ (sổ nguồn giữ nguyên, không hút lại):
+          {excludedOutputSources.map(({ key, kind, label }) => (
+            <span key={key} className="inline-flex max-w-full flex-wrap items-center gap-1">
+              <Tag variant="muted">{label}</Tag>
+              {!grid.isLocked && (kind === "production" || onRestoreSales) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => (kind === "sales" ? onRestoreSales?.(key, label) : grid.restoreExcludedSource(key, label))}
+                  title={`Lấy lại "${label}" vào kỳ từ sổ ${kind === "sales" ? "Bán hàng" : "Sản xuất"} (có Hoàn tác).`}
+                >
+                  <RotateCcw />
+                  Lấy lại
+                </Button>
+              )}
+            </span>
+          ))}
+        </p>
+      )}
 
       {hideEmptyRows && hangThat.length === 0 && finishedGoodRows.length + templateRows.length > 0 && (
         <p className="mb-3 text-sm text-muted-foreground xl:w-0 xl:min-w-full">

@@ -279,11 +279,12 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
 | Dòng vết · gõ thẳng · thao tác dòng | đừng sửa tay dòng Từ SX / Lấy xả đông / Gửi đông; ô = tổng tháng; Gửi kho ngoài không đổi tổng | 36 § Dòng do Cân đối ghi, § Gõ thẳng, § Thao tác một dòng | linked-rows, inline-edit, row-actions |
 | Dồn kỳ | dồn mọi kho, chỉ dòng còn tồn; chạy lại chỉ đổi tồn đầu | 36 § Dồn kỳ | carry-next |
 
-### `/balancing` Cân đối kỳ — 17 bước (5 khi chưa có kỳ) · `balancing/balancingTour.ts` (mở kỳ minh họa)
+### `/balancing` Cân đối kỳ — 18 bước (5 khi chưa có kỳ) · `balancing/balancingTour.ts` (mở kỳ minh họa)
 | Khu vực | Lời phải nói | Nguồn | Bước |
 |---|---|---|---|
 | Tạo kỳ | một kỳ = một họ NL + ngày tiếp nhận; tỉ giá mặc định 26.000 | 31 § Một kỳ | create-period |
 | Khối nguyên liệu | tiền = Σ kg × giá từng chuyến; dòng sổ nhập khóa, sửa qua ✎; dòng giảm gõ dương lưu âm | 31 § Hai khối, (i)/(j) | material, material-checks |
+| Gỡ dòng khỏi kỳ (2026-11-06) | 🗑 cuối tên dòng: dòng hút = Bỏ khỏi kỳ (sổ nguồn giữ nguyên, kỳ không tự lấy lại), dòng tay = Xoá (có số ⇒ kể phần mất); "Đã bỏ khỏi kỳ … Lấy lại"; xoá dòng nhận chuyển kỳ trả về kỳ trước | 31 § Gỡ dòng khỏi kỳ | material, excluded-sources (tùy chọn, chỉ khi có nguồn đã bỏ), finished-goods, carry-over |
 | Dòng kho | Lấy xả đông / Gửi đông ghi thẳng Sổ kho tháng; chặn vượt tồn lô | 31 § Khối 1 hai dòng kho | stock-lines |
 | Khối BTP · kết quả | Tổng = Σ ngày + Trả + Nợ; định mức = NL ÷ TP; lãi / lỗ = giá trị xuất − giá thành | 31 § Công thức | finished-goods, result |
 | Chốt kỳ | Kỳ đang mở / Kỳ đã chốt; chốt khóa mọi ô; mở lại không xóa dấu chốt | 31 § Chốt kỳ | lock-status, lock-action |

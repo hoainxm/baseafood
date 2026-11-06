@@ -1,6 +1,6 @@
 > Load khi: sửa màn Cân đối, lưới theo ngày, công thức định mức/lãi lỗ, hay bảng in A4.
-covers: src/lib/dailyShipments.ts, src/features/balancing/EditImportTripsDialog.tsx, src/features/balancing/TripPriceList.tsx, src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/design-system/patterns/EditableGrid.tsx, src/lib/balancingStockLines.ts, src/lib/domesticSales.ts
-last_verified: 2026-11-02
+covers: src/lib/dailyShipments.ts, src/features/balancing/EditImportTripsDialog.tsx, src/features/balancing/TripPriceList.tsx, src/features/balancing/BalancingScreen.tsx, src/features/balancing/usePeriodGrid.ts, src/features/balancing/MaterialGrid.tsx, src/features/balancing/WipGrid.tsx, src/features/balancing/gridDialogs.tsx, src/features/balancing/BalancingTable.tsx, src/lib/balancingCalc.ts, src/lib/balancingGrid.ts, src/lib/balancingRemoval.ts, src/design-system/patterns/EditableGrid.tsx, src/lib/balancingStockLines.ts, src/lib/domesticSales.ts
+last_verified: 2026-11-06
 <!-- updated: 2026-11-02 (e) — CỘT KHÁCH VỪA TÊN KHÁCH + TÊN CỘT 2 DÒNG (người dùng gửi ảnh: "cột mặt hàng thừa khoảng trắng trong khi tên khách hàng không thấy được đầy đủ"; "hàng tên cột bị kéo dài quá mức… Đơn giá USD/đ nội địa gây ra… chỉ thành 2 dòng thôi"). (1) Cột Khách khai `fitText` (tên khách đang chọn / "Chọn khách") + `fitChrome: "3.25rem"` ⇒ rộng vừa tên dài nhất, bỏ bề rộng tay 112 (`MAIN_COLUMN_WIDTHS` của WipGrid gỡ hẳn). (2) Tên cột "Đơn giá (USD / đ nội địa)" → hai dòng nowrap "Đơn giá" / "(USD/đ)", nghĩa đầy đủ ở tooltip. Đo (demo 1830px, 4 dòng thử có "SEACHEMOT CO., LTD"): Khách 244px (chữ 164 + khung), không tên nào bị cắt; mọi tên cột hai bảng chính ≤ 2 dòng (cao 42px; 130% ⇒ 54px); 130% không ô nào cắt. Luật: README § Lưới GỌN mục 2–3. -->
 <!-- updated: 2026-11-02 (d) — CỘT SỐ VỪA GIÁ TRỊ (người dùng: "chỉ hiển thị chiều ngang bằng hoặc nhiều hơn một chút so với giá trị trong cột, ghi quy tắc để không phá vỡ quy tắc giao diện"): `EditableGrid compact` tự tính bề rộng cột số theo số dài nhất (`patterns/gridFitWidth.ts`, đơn vị ch) — bỏ `MAIN_COLUMN_WIDTHS` của cột số (NL bỏ hẳn; Xuất khẩu còn `khach: 112` cho ô chọn); cột Loại hàng / Mặt hàng ăn phần dư. Đơn giá dòng sổ nhập: `getValue` làm tròn như số đang hiện. Luật ghi ở README design-system § Lưới GỌN. Đo (demo 1830px): Số lượng 66 (sàn = tên cột) · Đơn giá 85 / chữ+đệm 80 · T.tiền 132 / 125 · Tỷ lệ 49 (sàn tên cột) · Loại hàng 247; chữ 130%: 85 · 111/99 · 172/158, không ô nào cắt số; 375px + 130% trang không cuộn ngang. Thay tỷ lệ chia dư của mục 2026-11-02 (đầu tiên) và (c). -->
 <!-- updated: 2026-11-02 (c) — CỘT CỐ ĐỊNH, BỎ KÉO GIÃN + CHỮ GHI CHÚ TO HƠN (người dùng: "không cho phép chỉnh sửa mà fix cố định chiều ngang mấy cột"; "tăng size chữ chỗ ghi chú"). (1) Gỡ `columnWidthsKey` khỏi cả bốn lưới Cân đối ⇒ không còn mép kéo / nút ↺; bề rộng lưu theo máy (`bsf.grid-column-widths.v2.balancing-*`) bị bỏ qua, mọi máy dùng `MAIN_COLUMN_WIDTHS` (Số lượng hẹp, T.tiền rộng — mục 2026-11-02 dưới). Thay mục (e) 2026-10-19. (2) Ghi chú: nhãn text-sm → text-base, số text-base → text-lg, ô nhập (Chi phí CB, Tỉ giá, NL nhận) nhãn text-base + số text-lg; khối 14 → 18rem (`xl:w-72`), trần cặp khối `calc(100%-18rem)`. Đo (demo 1440px, mở thanh bên): Ghi chú 288px, mọi dòng số một hàng (cao 42px), ô nhập không cắt số; bảng NL 518px cuộn trong khung 384px (trước cũng cuộn ở cỡ này); 1830px vừa khung. -->
@@ -111,6 +111,8 @@ Nhận = dựng dòng mới ở kỳ này với `carryOverKg` **dương** bằng
 
 ⇒ Vòng gối đầu khép lại mà không ai phải mở file kỳ cũ ra chép tay — chép tay là chỗ số bắt đầu lệch.
 
+**Xoá dòng đã nhận (2026-11-06):** dòng nhận là dòng tay ⇒ xoá bằng 🗑 tại dòng như mọi dòng tay (khối NL lẫn khối thành phẩm). Xoá thì **trả phần chuyển kỳ về kỳ trước** (bỏ `carryOverPeriodId` của dòng nguồn) ⇒ nút "Nhận N dòng chuyển kỳ" hiện lại. Dòng nhận không lưu id dòng nguồn ⇒ dò theo dòng kỳ khác có `carryOverPeriodId` = kỳ này + cùng tên NL / mặt hàng × quy cách; còn dòng nhận khác cùng tên thì chỉ trả phần dư, ưu tiên nguồn cùng số kg (`lib/balancingRemoval.ts`). Trước đây xoá dòng nhận ở khối NL thì kỳ trước vẫn đánh dấu đã nhận ⇒ không nhận lại được; khối thành phẩm không xoá được.
+
 Chưa có: quy tắc **chia NL cho từng bảng cân đối** (bảng phụ theo ngày là tổng NL nhận cả xưởng, mỗi bảng chỉ lấy phần đưa vào mặt hàng đó — cân riêng hay ước tính? **chưa chốt với xí nghiệp**); tên gọi chính thức của chỉ số ≈ 0,45.
 
 Bảng dùng: `balancing_periods`, `balancing_inputs`, `balancing_outputs`, đọc `products` / `customers` / `material_types`, và **đọc-ghi `material_imports` + `production_wips`** (cột `balancing_period_id`).
@@ -175,6 +177,24 @@ Cùng một cách với mọi nguồn: gán kỳ lên bản ghi gốc, không nh
 
 **Ô khối 2 không khoá** — ô ghi THẲNG về sổ Sản xuất, không giữ bản sao. **Khối 1 (sổ nhập) KHÓA lại từ 2026-10-20**: người dùng muốn "hỏi trước khi xác nhận và lưu log rõ ràng" khi sửa số nhập từ Cân đối ⇒ ô ngày, đơn giá của dòng sổ nhập chỉ đọc (`MaterialGrid.tsx` `lockReason`: "Số của sổ Nhập hàng — sửa bằng nút ✎ Sửa chuyến nhập ở dòng này"); nút ✎ mở `EditImportTripsDialog` xem lại rồi xác nhận mới ghi.
 
+### Gỡ dòng khỏi kỳ — "Bỏ khỏi kỳ" (rà soát 2026-11-06)
+
+Chủ dự án chốt: "thêm thừa / làm nhầm thì phải gỡ được", không mất lặng lẽ thứ đã nhập. Trước đây dòng hút chỉ gỡ được bằng toast Hoàn tác ngay sau khi hút; khối NL từ chối xoá dòng sổ nhập, khối thành phẩm không có nút xoá nào, và kỳ **tự lấy** sổ nhập nên gỡ xong lần mở sau lại vào.
+
+- **Một cách duy nhất**: nút 🗑 cuối ô tên dòng (`InlineConfirmDelete` — cùng nút với xoá dòng tay, chỉ đổi chữ "Bỏ dòng này khỏi kỳ?" / "Bỏ khỏi kỳ" + một câu nói sổ nguồn giữ nguyên). Toast Hoàn tác + Ctrl+Z (ảnh chụp có thêm bảng kỳ). Kỳ chốt ⇒ không có nút. Quyền `balancing.delete`.
+- **Sổ nguồn không đổi**: kg / giá / ngày / ghi chú của chuyến nhập, dòng sản xuất, dòng bán giữ nguyên. Chỉ gỡ liên kết kỳ mà chính lần hút đã gắn (`balancing_period_id` của chuyến tự tick vào kỳ · của dòng sản xuất — dòng SX trả về "chưa gắn kỳ", kỳ khác hút được).
+- **Dòng sổ nhập gỡ theo HỌ**: kỳ lấy sổ nhập theo họ NL ⇒ bỏ cả họ (mọi loại / size). Họ ≥ 2 loại (lưới hiện mỗi loại một dòng) ⇒ nút nằm ở dòng loại đầu, ô hỏi nêu đủ các loại.
+- **Họ khác loại** (chuyến tự tick ở "Chọn dòng nhập"): Bỏ khỏi kỳ chỉ gỡ gắn kỳ của chuyến, KHÔNG ghi "đã bỏ" (họ đó không bao giờ tự lấy) — cần lại thì tick lại ở chính hộp đó.
+- **Kỳ nhớ nguồn đã bỏ**: `balancing_periods.excluded_source_keys` (jsonb, mig 0110) — `imports:<họ viết thường>` · `production:<mặt hàng>|<quy cách>` · `sales:<id dòng bán>`. `filterEligibleImports` / `selectPeriodImports` / `filterEligibleWips` / danh sách "Lấy từ sổ bán" bỏ qua nguồn trong danh sách ⇒ tự lấy và nút "Lấy N dòng" không kéo lại. Hook đọc khóa từ bảng kỳ của chính nó (`livePeriod`), không chờ prop, kẻo effect tự lấy chạy giữa chừng và lấy lại ngay.
+- **Lấy lại**: dòng "Đã bỏ khỏi kỳ: … [Lấy lại]" ở khối NL / khối thành phẩm — gỡ khóa và dựng lại dòng ngay (sổ nhập: cùng id cố định `<kỳ>-imports-<họ>`; sổ SX: hút đúng mặt hàng đó; sổ bán: hút lại đúng dòng bán, đã có trong kỳ thì bỏ qua — bấm hai lần không đếm đôi). Tự tick chuyến của họ đã bỏ ở "Chọn dòng nhập" cũng coi như lấy lại.
+- **Chuyến tự tick bị gỡ gắn kỳ được nhớ** (audit 2026-11-06): bỏ họ của kỳ thì id từng chuyến vừa gỡ `balancingPeriodId` lưu kèm trong cùng mảng (`imports-trip:<id>`, không hiện, không chặn gì) ⇒ "Lấy lại" gắn lại ĐÚNG các chuyến đó (kể cả ngoài khoảng ngày) — kg lấy lại = kg đã bỏ (`planRestoreImportFamily`). Chuyến nay đã thuộc kỳ khác thì để yên, toast báo số chuyến bỏ qua.
+- **Hoàn tác trả khóa bằng mảng, không bằng undefined** (audit 2026-11-06): cột 0110 về `[]` thì app giữ `[]` (không đổi thành undefined) và ảnh chụp kỳ chưa có khóa được ghi `[]` (`normalizeRestoredPeriods`). Trước đây Hoàn tác lần bỏ ĐẦU TIÊN của một kỳ ghi kỳ không có trường ⇒ không gửi cột ⇒ máy chủ giữ khóa, tải lại là họ lại bị bỏ (dòng 0 kg, tổng NL sai).
+- **Dòng hút sổ bán nhận ra bằng `salesItemId`** (`isSalesPulledOutput`): `salesItemToOutput` không đặt `autoSource = "sales"` (dòng cũ cũng vậy) — trước bản vá, dòng bán bị coi là dòng tay: Xoá xong nút "Lấy từ sổ bán" hút lại.
+- **Hộp "Sửa kỳ" không đè nguồn đã bỏ** (audit 2026-11-06): lưu hộp / nháp chỉ ghi các ô hộp sửa (loại NL, ngày, tổng NL nhận, chi phí CB, tỉ giá) lên bản kỳ đang có (`mergePeriodFormEdit`) — bản trong hộp có thể cũ.
+- **Toast "Đã tự lấy N chuyến nhập…" có Hoàn tác**: bỏ các dòng vừa tự lấy VÀ ghi họ vào nguồn đã bỏ (chỉ bỏ dòng thì effect lấy lại ngay vòng sau).
+- **Dòng thêm tay** ("Thêm mặt hàng", "Thêm nhanh mặt hàng", dòng mẫu đã thành dòng thật): xoá; dòng có số ⇒ ô hỏi liệt kê "sẽ mất: kg theo ngày · Trả · Nợ · đơn giá · ghi chú dòng" (`describeFinishedGoodLoss`).
+- Chưa chạy 0110 trên DB thật ⇒ kỳ có "Bỏ khỏi kỳ" không lên được máy chủ (cột chưa có); kỳ khác không ảnh hưởng (cột chỉ gửi khi trường có: đọc về từ cột 0110 hoặc kỳ vừa bỏ nguồn).
+
 ### Màn phải TỰ GIẢI THÍCH khi trống
 
 Kỳ không thấy số có ba nguyên nhân, nhìn màn không đoán ra được cái nào:
@@ -191,7 +211,7 @@ Hộp **"Chọn dòng nhập"** gộp cả nhóm lệch tên và nhóm đang thu
 
 ### Hoàn tác — Ctrl+Z / Ctrl+Y
 
-Người dùng đến từ Excel: ở đó Ctrl+Z lùi **mọi** thứ vừa làm, không riêng ô số. `usePeriodGrid` giữ ngăn xếp **ảnh chụp bốn bảng** mà một kỳ có quyền đụng (`balancing_inputs` · `balancing_outputs` · `material_imports` · `production_wips`), tối đa 100 mốc.
+Người dùng đến từ Excel: ở đó Ctrl+Z lùi **mọi** thứ vừa làm, không riêng ô số. `usePeriodGrid` giữ ngăn xếp **ảnh chụp các bảng** mà một kỳ có quyền đụng (`balancing_inputs` · `balancing_outputs` · `material_imports` · `production_wips` · Sổ kho tháng · `balancing_periods` — bảng kỳ thêm 2026-11-06 vì "Bỏ khỏi kỳ" ghi nguồn đã bỏ lên kỳ), tối đa 100 mốc.
 
 - `luuMoc(nhom)` gọi TRƯỚC mỗi lần ghi. Cùng `nhom` liên tiếp ⇒ **một mốc** — gõ `2` → `20` → `200` vào cùng một ô là một bước lùi, không phải ba. Khoá nhóm là `nhap:<loại>:<ngày>` / `sx:<mặt hàng|quy cách>:<ngày>`.
 - `nhom` **rỗng** = ghi tự động (đồng bộ `quantityKg`), không tạo mốc. Nếu không, mỗi lần đồng bộ lại chèn một bước lùi rác.
@@ -296,7 +316,8 @@ Màn **Tồn kho NL** (`/nxt-material`, [`features/reports/MaterialNxtScreen.tsx
 | File | Việc |
 |---|---|
 | `lib/balancingCalc.ts` | công thức — **bất biến, không sửa** |
-| `lib/balancingGrid.ts` | logic thuần: ngày trong kỳ · họ nguyên liệu · gom theo ngày · dựng dòng lưới · quy tắc ghi ngược. Không React, dễ đọc và (sau này) dễ test |
+| `lib/balancingGrid.ts` | logic thuần: ngày trong kỳ · họ nguyên liệu · gom theo ngày · dựng dòng lưới · quy tắc ghi ngược · khóa nguồn đã bỏ khỏi kỳ. Không React, dễ đọc và (sau này) dễ test |
+| `lib/balancingRemoval.ts` | logic thuần gỡ dòng khỏi kỳ: "Bỏ khỏi kỳ" dòng hút · xoá dòng tay · trả chuyển kỳ về kỳ trước · hoàn tác tự lấy (test cạnh file) |
 | `features/balancing/usePeriodGrid.ts` | tất cả dữ liệu + thao tác của MỘT kỳ: năm nguồn dữ liệu, ghép lại danh sách con, hút, ghi ngược theo lô |
 | `features/balancing/MaterialGrid.tsx` · `WipGrid.tsx` | chỉ dựng cột/dòng và gọi hook — không đụng repo |
 | `features/balancing/gridDialogs.tsx` | bốn hộp thoại phụ |

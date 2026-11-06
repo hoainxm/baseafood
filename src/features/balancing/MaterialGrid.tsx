@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Khối 1 — lưới nguyên liệu vào theo ngày
 // Description: Balancing block 1 — material input day grid
 // ============================================================
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { BalancingInputItem, DailyQuantities, InputGroup, MaterialImportItem, MaterialType } from "@/types";
 import { BSF1_WAREHOUSES, INPUT_GROUPS, calculateImportAmount, sumGridRow } from "@/types";
@@ -12,6 +12,7 @@ import {
   OWN_WAREHOUSE,
   BALANCING_STOCK_LINE_NAMES,
   getMaterialFamily,
+  isSameMaterialFamily,
   getBalancingStockLineKind,
   formatDayLabel,
   findUnpricedMaterialRows,
@@ -58,8 +59,9 @@ import {
   InlineConfirmDelete,
 } from "@/design-system";
 import { num, formatDateVN } from "@/lib/format";
+import { parseExcludedSourceKey } from "@/lib/balancingRemoval";
 import { useCan } from "@/features/shared/PermissionProvider";
-import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus } from "lucide-react";
+import { ChevronDown, ChevronsLeftRight, Combine, Download, ListChecks, Pencil, Plus, RotateCcw } from "lucide-react";
 
 const WORKSHOP_WAREHOUSES = BSF1_WAREHOUSES.filter((w) => w.type === "workshop");
 
@@ -459,12 +461,20 @@ export function MaterialGrid({
     notify.saved(isReduction ? `Đã thêm dòng giảm "${names}"` : `Đã thêm "${names}"`);
   };
 
-  const removeRow = (id: string) => {
-    const prevRows = materialInRows;
-    const d = theoId.get(id);
-    saveMaterials(materialInRows.filter((r) => r.id !== id));
-    notify.deleted(`Đã xóa dòng "${d?.name ?? ""}"`, () => saveMaterials(prevRows));
-  };
+  /* Xoá dòng tay / "Bỏ khỏi kỳ" dòng hút sổ nhập — một chỗ ở usePeriodGrid (lib/balancingRemoval):
+     dòng nhận chuyển kỳ thì trả về kỳ trước, dòng hút thì kỳ nhớ họ đã bỏ; luôn toast Hoàn tác. */
+  const removeRow = (id: string) => grid.removeMaterialRow(id, theoId.get(id)?.name ?? "");
+
+  /* Họ NL đã "Bỏ khỏi kỳ" — hiện kèm nút "Lấy lại" (đường gỡ lâu dài, ngoài toast Hoàn tác). */
+  const excludedFamilies = grid.excludedSourceKeys
+    .map((key) => ({ key, parsed: parseExcludedSourceKey(key) }))
+    .filter((x) => x.parsed?.kind === "imports")
+    .map(({ key, parsed }) => {
+      const value = parsed!.value;
+      // Khóa lưu chữ thường — trùng họ của kỳ thì hiện đúng chữ hoa của kỳ.
+      const periodFamily = getMaterialFamily(grid.periodMaterialType);
+      return { key, label: periodFamily.toLowerCase() === value ? periodFamily : value.charAt(0).toUpperCase() + value.slice(1) };
+    });
 
   /* Các dòng nhập TAY cùng HỌ (2 da lớn + nhỏ) — để bật nút "Gộp cùng loại". */
   const mergeableGroups = useMemo(() => {
@@ -938,12 +948,44 @@ export function MaterialGrid({
    * vẫn toast Hoàn tác. Dòng hút từ sổ nhập không xoá ở đây (sửa ở màn Nhập hàng).
    */
   const rowDeleteAction = (h: MaterialGridRow, label: string) =>
-    grid.isLocked || !allowed.delete || h.fromImports || aoTheoId.has(h.id) ? undefined : (
+    grid.isLocked || !allowed.delete || aoTheoId.has(h.id) ? undefined : h.fromImports ? (
+      importRowRemoveAction(h)
+    ) : (
       <InlineConfirmDelete
         recordDescription={[`${label} — ${num(h.total)} kg`, ...manualRowDetails(h).slice(0, 2)].join(" · ")}
+        note={
+          (getOriginal(h.id)?.carryOverKg ?? 0) > 0
+            ? "Dòng nhận chuyển từ kỳ trước: xoá thì phần chuyển kỳ trả về kỳ trước (nhận lại được)."
+            : undefined
+        }
         onConfirm={() => removeRow(h.id)}
       />
     );
+
+  /**
+   * "BỎ KHỎI KỲ" dòng hút sổ nhập (rà soát 2026-11-06 — trước đây chỉ gỡ được bằng toast Hoàn
+   * tác ngay sau khi lấy): CÙNG nút 🗑 + ô hỏi tại dòng như xoá dòng tay, chỉ đổi chữ. Gỡ cả HỌ
+   * (mọi loại / size của họ) vì kỳ lấy sổ nhập theo họ; sổ Nhập hàng giữ nguyên.
+   */
+  const importRowRemoveAction = (h: MaterialGridRow) => {
+    const trips = importRowsOf(h);
+    const types = groupTripsByType(trips.filter((i) => i.quantityKg !== 0)).map(([t]) => t);
+    const typeText = types.length > 1 ? ` (${types.join(" + ")})` : "";
+    return (
+      <InlineConfirmDelete
+        question="Bỏ dòng này khỏi kỳ?"
+        confirmLabel="Bỏ khỏi kỳ"
+        recordDescription={`${h.name}${typeText} — ${trips.length} chuyến nhập · ${num(h.total)} kg`}
+        note={
+          isSameMaterialFamily(h.name, grid.periodMaterialType)
+            ? "Sổ Nhập hàng giữ nguyên. Kỳ sẽ không tự lấy lại họ này — lấy lại bằng nút “Lấy lại” trên khối Nguyên liệu."
+            : "Sổ Nhập hàng giữ nguyên, chuyến chỉ gỡ gắn kỳ. Cần lại thì tick ở “Chọn dòng nhập”."
+        }
+        title={`Bỏ "${h.name}" khỏi kỳ — sổ Nhập hàng giữ nguyên, kỳ không tự lấy lại (có Hoàn tác, có nút Lấy lại).`}
+        onConfirm={() => removeRow(h.id)}
+      />
+    );
+  };
 
   /**
    * Thông tin nhận diện một dòng (mô tả trong ô hỏi xoá) (người dùng báo 2026-10-20: ba dòng
@@ -1003,6 +1045,17 @@ export function MaterialGrid({
     };
   };
 
+  /** Hai nút cuối ô tên (✎ sửa chuyến + 🗑 bỏ khỏi kỳ) đứng cạnh nhau. */
+  const actionGroup = (first: ReactNode, second: ReactNode) => {
+    if (!first || !second) return first || second || undefined;
+    return (
+      <span className="inline-flex items-center gap-1">
+        {first}
+        {second}
+      </span>
+    );
+  };
+
   const stockGridRows = (items: MaterialGridRow[]): GridRow<MaterialGridRow>[] =>
     items.flatMap((h, i) => {
       const row: GridRow<MaterialGridRow> = {
@@ -1054,7 +1107,7 @@ export function MaterialGrid({
           id: h.id,
           data: h,
           label: h.name,
-          actions: editTripsAction(h.id, h.name, trips) ?? rowDeleteAction(h, h.name),
+          actions: actionGroup(editTripsAction(h.id, h.name, trips), rowDeleteAction(h, h.name)),
         });
       /* Kế toán 2026-10-20: "giá từng ngày nằm đâu… mắc gì ẩn, mở lại cho chị" ⇒ dưới dòng sổ nhập
          (loại, hoặc dòng gộp khi thu / chỉ một loại) LUÔN có hàng "Giá (đ/kg)" chỉ xem ở bảng theo
@@ -1090,7 +1143,8 @@ export function MaterialGrid({
           id: typeId,
           data: tripGroupRow(typeId, typeName, rows),
           label: typeName,
-          actions: editTripsAction(typeId, typeName, rows) ?? undefined,
+          // Dòng loại ĐẦU của họ mang nút "Bỏ khỏi kỳ" của cả họ (dòng kỳ gộp không còn hiện).
+          actions: actionGroup(editTripsAction(typeId, typeName, rows), typeName === types[0][0] ? rowDeleteAction(h, h.name) : undefined),
           subLabel: (
             <span className="block">
               <button
@@ -1221,6 +1275,28 @@ export function MaterialGrid({
       {diffReasons.length > 0 && (
         <p className="mb-3 text-sm text-muted-foreground">
           Sổ nhập trong khoảng ngày còn {diffReasons.join(" · ")} — bấm “Chọn dòng nhập” nếu cần lấy.
+        </p>
+      )}
+      {/* Họ đã "Bỏ khỏi kỳ" — kỳ không tự lấy lại; "Lấy lại" gỡ khóa và dựng lại dòng ngay. */}
+      {excludedFamilies.length > 0 && (
+        <p data-tour="balancing-excluded-sources" className="mb-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          Đã bỏ khỏi kỳ (sổ Nhập hàng giữ nguyên, kỳ không tự lấy):
+          {excludedFamilies.map(({ key, label }) => (
+            <span key={key} className="inline-flex max-w-full flex-wrap items-center gap-1">
+              <Tag variant="muted">{label}</Tag>
+              {!grid.isLocked && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => grid.restoreExcludedSource(key, label)}
+                  title={`Lấy lại "${label}" vào kỳ — dựng lại dòng từ các chuyến nhập trong khoảng ngày (có Hoàn tác).`}
+                >
+                  <RotateCcw />
+                  Lấy lại
+                </Button>
+              )}
+            </span>
+          ))}
         </p>
       )}
       {/* Sổ kho tháng bị sửa / nạp lại ngoài cân đối ⇒ phần lấy-gửi của kỳ không còn khớp. */}

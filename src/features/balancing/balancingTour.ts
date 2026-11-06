@@ -131,6 +131,7 @@ export function buildBalancingTour(ctx: BalancingTourContext): PageTour {
           "• Nguyên liệu Thủy sản tự lấy từ sổ Nhập hàng: cùng họ nguyên liệu, ngày hàng về xưởng nằm trong kỳ. Họ có hai loại thì mỗi loại một dòng (ví dụ 2 da lớn, 2 da nhỏ); n người bán mở các đại lý của loại đó.\n" +
           "• Đơn giá VNĐ của dòng sổ nhập là giá bình quân theo kg; tiền = Σ kg × giá từng chuyến. Số liệu dòng này khóa, sửa bằng nút bút chì Sửa chuyến nhập (xem lại, xác nhận rồi mới ghi vào sổ Nhập hàng).\n" +
           "• Dòng giảm (Bán nội địa, hao hụt, trả lại): gõ số dương, hệ thống lưu số âm và trừ khỏi nguyên liệu vào.\n" +
+          "• Lấy nhầm, thêm thừa: nút thùng rác cuối tên dòng. Dòng sổ nhập là Bỏ khỏi kỳ (cả họ nguyên liệu, sổ Nhập hàng giữ nguyên, kỳ không tự lấy lại); dòng gõ tay là Xoá. Hỏi lại trước, xong vẫn Hoàn tác được. Kỳ đã chốt không có nút này.\n" +
           "Kỳ trùng ngày với kỳ khác cùng loại thì hai kỳ cùng tính chuyến nhập của ngày trùng.",
       }),
       period({
@@ -144,6 +145,16 @@ export function buildBalancingTour(ctx: BalancingTourContext): PageTour {
           "• ⚠ Chưa có đơn giá: giá thành và lãi / lỗ đang tính thiếu; Điền giá gợi ý để điền giá bình quân, sửa lại được.\n" +
           "• ⚠ Sổ kho tháng lệch n chỗ: Sổ kho theo tháng bị sửa hoặc nạp lại Excel đè. Chọn Ghi lại vào sổ kho chỉ khi file Excel chưa tính phần lấy xả đông của kỳ, kẻo cộng đôi.\n" +
           "• Sổ nhập không có chuyến nào ngày …: kiểm lại ngày của kỳ (theo ngày hàng về xưởng, không phải ngày ghi sổ).",
+      }),
+      period({
+        id: "excluded-sources",
+        target: "balancing-excluded-sources",
+        optional: true,
+        title: "Nguồn đã bỏ khỏi kỳ",
+        body:
+          "Dòng \"Đã bỏ khỏi kỳ\" kể các họ nguyên liệu đã Bỏ khỏi kỳ. Kỳ nhớ danh sách này: mở lại kỳ, máy khác mở cùng kỳ cũng không tự lấy lại họ đó. Sổ Nhập hàng không đổi.\n" +
+          "• Lấy lại: dựng lại dòng đủ số như lúc bỏ, gồm cả chuyến từng tự chọn ngoài khoảng ngày (chuyến nay thuộc kỳ khác thì để yên và báo), có Hoàn tác.\n" +
+          "Khối Bán thành phẩm có dòng tương tự cho mặt hàng sổ sản xuất và dòng bán đã bỏ.",
       }),
       period({
         id: "stock-lines",
@@ -184,6 +195,7 @@ export function buildBalancingTour(ctx: BalancingTourContext): PageTour {
           "• Khách bắt buộc; chưa rõ khách thì chọn Khác. Lượng (kg) = tổng các ngày + Trả + Nợ.\n" +
           "• Đơn giá là USD với Xuất khẩu, đồng với Nội địa; T.tiền (USD) không cộng tiền nội địa (ghi riêng dòng \"đ nội địa\").\n" +
           "• Trả, Nợ: gõ số có dấu, ví dụ (2.000) là −2.000.\n" +
+          "• Thùng rác cuối tên dòng: dòng lấy từ sổ sản xuất hoặc sổ bán là Bỏ khỏi kỳ (sổ giữ nguyên, nút Lấy n dòng không kéo lại, lấy lại bằng Lấy lại); dòng thêm tay là Xoá, dòng có số thì ô hỏi kể rõ phần sẽ mất.\n" +
           "Chưa có bán thành phẩm thì định mức và lãi / lỗ hiện \"—\". Ẩn dòng trống để xem gọn như bản in; Thêm mặt hàng khi được cấp quyền.",
       }),
       period({
@@ -219,7 +231,7 @@ export function buildBalancingTour(ctx: BalancingTourContext): PageTour {
           optional: true,
           title: "Nhận chuyển kỳ",
           body:
-            "Khung này hiện khi kỳ trước cùng loại nguyên liệu có dòng đẩy sang chưa ai nhận. Chọn Nhận n dòng chuyển kỳ: dòng hiện ở kỳ này làm số đầu kỳ (nhóm Xả đông, kho mình) và kỳ trước đánh dấu đã nhận, không lấy được hai lần.",
+            "Khung này hiện khi kỳ trước cùng loại nguyên liệu có dòng đẩy sang chưa ai nhận. Chọn Nhận n dòng chuyển kỳ: dòng hiện ở kỳ này làm số đầu kỳ (nhóm Xả đông, kho mình) và kỳ trước đánh dấu đã nhận, không lấy được hai lần. Nhận nhầm thì xoá dòng đã nhận: phần chuyển kỳ trả về kỳ trước, khung này hiện lại để nhận lại.",
         }),
       );
     }

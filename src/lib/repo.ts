@@ -221,6 +221,22 @@ function parseTypeNotes(v: unknown): Record<string, string> | undefined {
   return result;
 }
 
+/** Cột `excluded_source_keys` (jsonb, mig 0110) → mảng khóa nguồn đã bỏ khỏi kỳ. Cột KHÔNG có (DB chưa
+ *  chạy 0110) / hỏng ⇒ undefined (toRow không gửi); có cột thì luôn là mảng, kể cả `[]` — trả undefined cho
+ *  `[]` thì lần ghi sau bỏ cột và máy chủ giữ khóa cũ (Hoàn tác "Bỏ khỏi kỳ" đầu tiên mất tác dụng). */
+function parseExcludedSourceKeys(v: unknown): string[] | undefined {
+  let raw: unknown = v;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!Array.isArray(raw)) return undefined;
+  return raw.filter((k): k is string => typeof k === "string" && k !== "");
+}
+
 /* ---------- Ánh xạ camelCase (app) ↔ snake_case (Postgres) ---------- */
 
 export const SUPPLIER_TABLE: TableMapping<Supplier> = {
@@ -524,6 +540,8 @@ export const BALANCING_PERIOD_TABLE: TableMapping<BalancingPeriod> = {
     locked_at: x.lockedAt || null,
     lock_note: x.lockNote ?? "",
     reopen_reason: x.reopenReason ?? "",
+    // Nguồn đã "Bỏ khỏi kỳ" (mig 0110): CHỈ gửi khi trường có (đọc từ cột 0110, hoặc kỳ vừa bỏ nguồn) — DB chưa chạy 0110 thì kỳ khác vẫn lên.
+    ...(x.excludedSourceKeys != null ? { excluded_source_keys: x.excludedSourceKeys } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -539,6 +557,7 @@ export const BALANCING_PERIOD_TABLE: TableMapping<BalancingPeriod> = {
     lockedAt: s(r.locked_at),
     lockNote: s(r.lock_note),
     reopenReason: s(r.reopen_reason),
+    excludedSourceKeys: parseExcludedSourceKeys(r.excluded_source_keys),
   }),
   // Kỳ ghi trước 0020 chưa có cờ chốt → coi như chưa chốt.
   patchLegacy: (x) => ({

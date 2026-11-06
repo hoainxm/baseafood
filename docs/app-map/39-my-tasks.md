@@ -1,6 +1,7 @@
 > Load khi: sửa màn `/my-tasks` "Việc của tôi", luật hạn / quá hạn, giao việc (`task_assignments`), chuông header, link mở thẳng ngày (`?date=&workshop=`).
-covers: src/features/my-tasks/MyTasksScreen.tsx, src/features/my-tasks/AssignTaskDialog.tsx, src/features/my-tasks/index.ts, src/lib/myTasks.ts, supabase/migrations/0070_task_assignments.sql
-last_verified: 2026-11-03
+covers: src/features/my-tasks/MyTasksScreen.tsx, src/features/my-tasks/AssignTaskDialog.tsx, src/features/my-tasks/TaskDetailDialog.tsx, src/features/my-tasks/index.ts, src/lib/myTasks.ts, supabase/migrations/0070_task_assignments.sql
+last_verified: 2026-11-06
+<!-- updated: 2026-11-06 (gỡ khi nhầm) — việc giao tay báo Xong nhầm MỞ LẠI được: `assignedDone` (đã xong ≤ 7 ngày) hiện lại ở "Được giao cho tôi" khi lọc Tất cả / Để biết; hộp `TaskDetailDialog` → **Mở lại việc** (`canReopenAssignment` · `reopenAssignment`), toast Hoàn tác. -->
 <!-- updated: 2026-11-03 — rà UX đợt 2: bỏ thẻ "Được giao cho tôi" / "Tôi đã giao" (số ở tiêu đề mục; tiêu đề Tôi đã giao ghi thêm số việc người nhận để quá hạn); Việc theo quyền > 10 việc ⇒ nhóm trang thu gọn, chọn từng nhóm (`COLLAPSE_AFTER`). -->
 <!-- updated: 2026-11-03 — rà UX đợt 1: bỏ đoạn giới thiệu đầu trang (đã ở hộp "?" + tour); `FilterBar` lên trước thẻ số, nút "Giao việc mới" ở cuối hàng lọc (`actions`); tour đổi thứ tự lọc → thẻ số. -->
 <!-- updated: 2026-11-02 — ba-spec [59](59-my-tasks-by-role.ba-spec.md) ĐÃ BUILD: việc Kế hoạch (Nhập khẩu · Lệnh SX · Xuất khẩu) + HĐ đại lý vào Việc của tôi theo quyền từng mục; gom theo nhóm trang (`RESOURCE_GROUP_LABELS`); admin mặc định tổng hợp theo nhóm; admin "xem như" vai trò / người dùng (chỉ xem, không ghi). Hạn việc Kế hoạch: 59 R3; quyền: 59 R2. -->
@@ -68,6 +69,7 @@ Bộ lọc "Lọc theo hạn": **Cần làm** (mặc định — bỏ "để bi�
 - **Việc máy phát hiện** (`source = 'system'`, `task_key` = id cảnh báo, vd `ccn|2026-10-12|Đông`): nút **Giao** ở mục "theo quyền". Tự hết khi cảnh báo biến mất. Màn **tự đóng** (ghi `status = done`, `done_at`) các việc máy đã sửa xong — CHỈ khi mọi sổ đã nạp xong từ máy chủ (`useTraceData().isReady` + các bảng chốt / kỳ / giao việc `ready`); đang tải dở thì sổ trống ⇒ tưởng sửa xong ⇒ đóng nhầm. Không toast (không phải thao tác người dùng).
 - **Việc giao tay** (`source = 'manual'`): nút **Giao việc mới** — tiêu đề, người nhận, hạn, màn cần mở (+ ngày / xưởng với `/imports`, `/wip`, `/packaging`), ghi chú. Người nhận bấm **Xong**.
 - **Sửa** (đổi người / hạn / ghi chú) · **Thu hồi** (`status = cancelled`, hỏi trước + toast Hoàn tác — không xóa dòng, quy tắc 6).
+- **Mở lại việc** (2026-11-06, "làm nhầm thì phải gỡ được"): người nhận bấm Xong nhầm ⇒ việc rời danh sách cần làm. Việc giao tay đã xong trong `DONE_VISIBLE_DAYS` (7) ngày nằm ở `assignedDone` (`buildMyTasks`), hiện lại cuối mục "Được giao cho tôi" khi lọc **Tất cả** / **Để biết** (nhãn Đã xong; lọc khác thì một dòng chữ báo số việc và cách xem). Nút **Chi tiết** (xem, không ghi) mở `TaskDetailDialog`; nút **Mở lại việc** nằm TRONG hộp (không đặt nút nhanh trên dòng). Quyền = quyền bấm Xong: chỉ người nhận, chỉ việc tay đã xong, không khi Xem như (`canReopenAssignment`). Ghi `status = open`, `done_at` rỗng, giữ hạn / ghi chú (`reopenAssignment`); toast **Hoàn tác** trả bản đã xong vào bảng MỚI NHẤT. Nhật ký: tự ghi qua `repo.ts` như mọi lần ghi bảng. Việc máy không mở lại tay (tự đóng theo sổ; sổ còn lỗi thì cảnh báo tự hiện lại ở "theo quyền").
 - Hộp giao việc tự lưu nháp (`useDialogDraft`, form `my-tasks-assign`, quy tắc 17); bản gốc khi sửa nằm trong form để mở lại từ nháp vẫn đủ.
 - Người nhận: hồ sơ có vai trò (`useUserProfiles`). **Chế độ demo / chạy chỉ máy này** không có danh sách (hồ sơ là `site` thật) ⇒ chỉ giao được cho chính mình. Chọn người có vẻ thiếu quyền (theo ma trận mặc định) ⇒ gợi ý dưới ô, không chặn.
 - Không khóa ngoại tới `user_profiles`: `assignee_name` / `assigned_by_name` chụp tên lúc giao.
@@ -98,7 +100,7 @@ Tham số gỡ khỏi URL ngay sau khi đọc (`replace`), giữ tham số khác
 
 ## Kiểm
 
-- Test: `lib/myTasks.test.ts` (hạn từng loại, quá hạn, quyền + phạm vi, không trùng khi đã giao, tự hết, đếm chuông) · `lib/dataFlow.test.ts` (`dayPath`/`parseDayLink`, `includeToday`, `approvalWaitDays`, `period-unlocked`) · `nav-access.test.ts` (ai thấy / ai giao) · `writePermissionsSql.test.ts` (ma trận 0070 = code).
+- Test: `lib/myTasks.test.ts` (hạn từng loại, quá hạn, quyền + phạm vi, không trùng khi đã giao, tự hết, đếm chuông, đã xong gần đây + mở lại) · `lib/dataFlow.test.ts` (`dayPath`/`parseDayLink`, `includeToday`, `approvalWaitDays`, `period-unlocked`) · `nav-access.test.ts` (ai thấy / ai giao) · `writePermissionsSql.test.ts` (ma trận 0070 = code).
 - Thử tay 2026-10-19 trên `baseafood-demo` (localStorage): 6 việc quá hạn đúng số ngày · Mở việc → `/imports` sổ chi tiết 06/10 Đông 13.182 kg, "Ghi nhập" mở phiếu 06/10 · giao → "Được giao" 1, "theo quyền" 6→5, chuông + nav = 1 · chốt ngày 06/10 ⇒ việc tự đóng, chuông 0 · `/wip?…Cá` mở sổ ngày Cá, xưởng nhớ theo máy vẫn Đông · việc tay + Xong · 360px + 130% không cuộn ngang trang.
 
 ## Còn để sau

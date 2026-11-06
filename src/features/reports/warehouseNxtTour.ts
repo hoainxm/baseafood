@@ -109,7 +109,17 @@ export function buildWarehouseNxtTour(ctx: WarehouseNxtTourContext): PageTour {
         title: "Ghi nhập/xuất",
         body:
           "Chọn Ghi nhập/xuất để bật lưới gõ Tồn đầu · Nhập · Xuất từng mã; Tồn cuối tự tính. Gõ xong một ô là ghi vào sổ ngay, dán được cả khối số từ Excel, Enter / Tab để sang ô.\n" +
-          "Ở chế độ ghi có thêm Thêm mã (mã mới phát sinh giữa kỳ) và thùng rác cuối dòng để xóa mã (có hỏi lại). Nút đổi thành Xong · xem lại để quay về bảng xem.",
+          "Ở chế độ ghi có thêm Thêm mã (mã mới phát sinh giữa kỳ) và thùng rác cuối dòng để xóa mã (có hỏi lại, xóa xong còn nút Hoàn tác vài giây). Dưới lưới có ô Xóa kỳ này để gỡ cả kỳ tạo nhầm. Nút đổi thành Xong · xem lại để quay về bảng xem.",
+      },
+      {
+        id: "delete-period",
+        target: "nxt-warehouse-delete-period",
+        optional: true,
+        title: "Xóa cả kỳ tạo nhầm",
+        body:
+          "Ô này chỉ hiện ở chế độ Ghi nhập/xuất, dưới lưới. Tạo nhầm kỳ (sai khoảng ngày, sai kho) thì chọn Xóa kỳ này: hộp hỏi lại nêu kỳ, kho, số mã và tổng tồn cuối sắp mất; chọn Xóa kỳ để gỡ MỌI dòng của kỳ (mọi kho lưu, kể cả dòng đang bị lọc ẩn).\n" +
+          "Xóa xong trang về kỳ mới nhất còn lại; thông báo có nút Hoàn tác trong vài giây để trả cả kỳ về như cũ.\n" +
+          "Kỳ đã có kỳ sau của cùng kho thì chưa xóa được: kỳ sau có thể đã kế thừa tồn đầu từ kỳ này. Ô ghi rõ kỳ sau nào đang chặn; xóa kỳ mới nhất trước rồi mới xóa tới kỳ này.",
       },
       {
         id: "next-period",

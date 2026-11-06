@@ -89,6 +89,20 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             <li>Làm xong ở màn đó (chốt ngày, duyệt kho, gắn lô…). Quay lại đây là việc đã tự hết, không cần làm gì.</li>
           </Step>
         </Section>
+        <Section title="Lỡ chọn Xong nhầm">
+          <Step>
+            <li>Ngay lúc đó: chọn <b>Hoàn tác</b> trên thông báo.</li>
+            <li>
+              Thông báo đã tắt: chọn <b>Lọc theo hạn</b> → <b>Tất cả</b>. Việc giao tay đã báo xong trong 7 ngày hiện lại ở{" "}
+              <b>Được giao cho tôi</b> với nhãn <b>Đã xong</b>.
+            </li>
+            <li>
+              Chọn <b>Chi tiết</b> ở dòng đó → <b>Mở lại việc</b>. Việc về lại đang làm, theo hạn cũ; người giao thấy là chưa xong.
+              Mở lại nhầm thì chọn <b>Hoàn tác</b>.
+            </li>
+          </Step>
+          <p>Chỉ người nhận việc mở lại được. Việc máy phát hiện tự đóng khi sổ đã sửa, không mở lại tay.</p>
+        </Section>
         <Section title="Hạn">
           <Y>
             <li>Chốt ngày nhập / sản xuất và gắn lô: trong ngày, sang hôm sau là quá hạn.</li>
@@ -803,6 +817,20 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
               để hiện.
             </li>
             <li>Tick vài dòng ⇒ thấy ngay tổng của đúng mấy dòng đó, in riêng được.</li>
+          </Y>
+        </Section>
+        <Section title="Đồng bộ danh mục">
+          <Y>
+            <li>
+              Chọn <b>Đồng bộ danh mục</b> (số trong ngoặc là số tên chưa có trong danh mục). Mỗi tên chọn đích{" "}
+              <b>Mặt hàng</b>, <b>Loại NL</b> hoặc <b>Bỏ qua</b>, và tên chuẩn để ánh xạ. Lưu xong: tên chưa có được thêm vào
+              danh mục, dòng sổ mang tên cũ đổi sang tên chuẩn.
+            </li>
+            <li>
+              Đồng bộ nhầm: chọn <b>Hoàn tác</b> trên thông báo (vài giây). App gỡ đúng phần lần đó làm: mục vừa thêm (kể cả tên chuẩn gõ mới trong hộp) còn y
+              nguyên thì xóa, tên dòng sổ trả về như cũ. Mục đã sửa sau đồng bộ hoặc đã được dùng (dòng sổ mới, sổ sản xuất, bán,
+              sổ nhập…), và dòng đã đổi tên / xóa sau đó, thì giữ nguyên; thông báo nêu rõ số mục giữ lại.
+            </li>
           </Y>
         </Section>
         <Section title="Cuối tháng">

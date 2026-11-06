@@ -1,6 +1,7 @@
 > Load khi: sửa màn Sổ kho theo tháng (/monthly-stock), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
-covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/NxtImportDialog.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts, src/lib/frozenStockLines.ts, src/lib/nxtStockImport.ts, src/lib/nxtReportFile.ts
+covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/NxtImportDialog.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts, src/lib/frozenStockLines.ts, src/lib/nxtStockImport.ts, src/lib/nxtReportFile.ts, src/lib/monthlyStockCatalogSync.ts, src/lib/nxtPeriods.ts, src/features/monthly-stock/CatalogSyncUsageProbe.tsx
 last_verified: 2026-11-06
+<!-- updated: 2026-11-06 (gỡ khi nhầm) — Đồng bộ danh mục có Hoàn tác gỡ đúng lần đó (`lib/monthlyStockCatalogSync.ts`); /nxt-warehouse xóa cả kỳ tạo nhầm + Hoàn tác xóa một mã (`lib/nxtPeriods.ts`). -->
 <!-- updated: 2026-11-03 — rà UX đợt 3: Nhập xuất tồn kho — Ghi nhập/xuất · Tạo kỳ kế tiếp ra khỏi hàng ô lọc, thành nút trang qua `OverflowActions` (điện thoại: Ghi nhập/xuất + "Thêm"). -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): thêm Nhóm hàng; ô tìm cũ đổi sang SearchField (bỏ dấu). Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->
 <!-- updated: 2026-10-27 (d) — THEO SƯỜN BẢNG KÊ CỦA KẾ TOÁN ("làm ô cá riêng, rồi cộng riêng từng cái"): đối chiếu file "kho 1000 năm 2026" sheet 9 — khối Hàng tạm xếp cá trước, bạch tuộc sau. (1) Đoán loài `inferMaterialCategory` sửa theo tên thật: ưu tiên tên nói thẳng loài (bạch tuộc / B.TUỘC / B TUỘC · mực · cá), rồi dấu bộ phận bạch tuộc `1 DA`/`2DA` · mada · râu · dạt · bao tử · cổ · tuýp/tip · đuôi, rồi ống/nang = mực; ranh giới từ theo chữ Unicode (`\b` của JS không hiểu "ống"). Trước đây BAO TỬ 2DA / BAO TỬ BỘT ra Mực, CỔ / TUÝP / ĐUÔI B TUỘC / TIP / ỐNG ra Khác. Test mốc = tên nguyên văn trong file. (2) Bản in A4 cũng chia ô loài + "Cộng <loài>" trước "Cộng <nhóm>" (`groupBySpecies`, bảng một loài thì khỏi chia) — cùng luật với màn hình. -->
@@ -232,6 +233,25 @@ processingType:""}, category suy từ tên); và **ĐỔI TÊN mọi dòng sổ 
 (đồng bộ sổ + gộp các biến thể trùng cách ghi về một). Nút: "Đồng bộ: {n} → Mặt hàng · {m}
 → Loại NL". Kiểm thật (kho 1000 năm 2026): 144 tên → 73 mã khó + 69 rõ ràng; ô ánh xạ liệt
 kê 171 mặt hàng, gõ tìm map "4 DA RÂU NGẮN" vào tên chuẩn (VD "…cắt râu…") hoặc thêm mới.
+
+**Hoàn tác một lần đồng bộ (2026-11-06)** — `lib/monthlyStockCatalogSync.ts`, có test. `applySync`
+ghi lại "lần đồng bộ" (`CatalogSyncRun`: mục vừa thêm ở hai danh mục — kể cả tên chuẩn gõ thêm
+mới ngay trong hộp ở ô "Ánh xạ … tới" (`addCanonicalName`, lưu ngay lúc gõ) — + từng dòng sổ đã đổi tên
+`{id, from, to}` qua `renameLedgerItems`). Nút **Hoàn tác** trên thông báo gọi `revertCatalogSync`
+trên dữ liệu HIỆN TẠI (không chụp đè cả sổ / danh mục): mục vừa thêm **còn y nguyên** thì xóa,
+mục đã bị sửa sau đồng bộ (bút chì, gắn mã kế toán) thì GIỮ và thông báo nêu tên; dòng sổ còn
+mang đúng tên mới thì trả tên cũ, dòng đã đổi tên tiếp / đã xóa thì để nguyên (đếm, báo). Không
+có Hoàn tác thì vẫn gỡ tay được ở Danh mục (thùng rác trong ô chọn `QuickProductDelete`, kiểm sổ
+đang dùng). Lần ghi trả tên dòng không vào ngăn Ctrl+Z của sổ.
+
+**Mục vừa tạo đã được DÙNG thì giữ** (rà 2026-11-06 mục 7): `buildCatalogSyncUsage` báo "đang
+dùng" khi (a) có dòng sổ kho tháng mang tên mục mà lúc đồng bộ chưa mang (mốc `ledgerAtSync`
+id → tên ngay sau đồng bộ — dòng vốn mang tên đó từ trước, tức tên file = tên chuẩn, không tính);
+(b) mặt hàng: một trong 7 sổ trỏ theo id (`findProductUsage` — cùng nguồn thùng rác
+`QuickProductDelete`); (c) loại NL: tên nằm ở sổ nhập, kỳ cân đối, bán nội địa, tồn đầu NL, hoặc
+có mặt hàng gắn `materialTypeId`. Các sổ (b)(c) nạp bởi `CatalogSyncUsageProbe` — chỉ gắn từ lần
+mở hộp Đồng bộ đầu tiên (đỡ nạp 11 bảng mỗi lần vào màn); sổ nào chưa nạp xong ⇒ giữ HẾT mục.
+Thông báo Hoàn tác nêu số mục giữ vì đang dùng / vì đã sửa.
 - **Trùng cách ghi**: các tên chỉ khác khoảng trắng/hoa thường/dấu câu (chuẩn hoá ngặt
   bỏ hết space+dấu câu), VD `"BẠCH TUỘC 2 DA 250UP"` ≡ `"…250 UP"`, `"200 UP"` ≡ `"200 up"`.
   Đây là nguồn **đếm thành nhiều mặt hàng** khi tổng hợp → liệt kê để sửa tay về một cách ghi.
@@ -260,6 +280,12 @@ Khối nguyên liệu của Cân đối có hai dòng kho ghi THẲNG vào sổ 
 ## Liên quan: `/nxt-warehouse` "Tạo kỳ kế tiếp" (WarehouseNxtScreen, 2026-10-12)
 
 Cùng tinh thần dồn kỳ ở trên: kế thừa từ **mọi dòng của kỳ** (`rowsKy`, không theo chip kho lưu đang lọc — trước dồn thiếu dòng); kỳ đích đã có mã nào thì **chỉ đổi tồn đầu** (kg + giá trị) mã đó, giữ nhập/xuất/kho lưu/ghi chú (trước xoá cả kỳ đích); giá trị đầu kỳ mới = giá trị cuối (đầu + nhập − xuất, trước luôn 0); hộp thoại mặc định "từ ngày" = **ngày sau** ngày cuối kỳ đang xem. Nhập Excel NXT (`lib/nxtExcel.ts`): dòng "Chi nhánh:"/"KHO…" chỉ nhận ở **đầu trang, lần đầu** — chân file do chính màn xuất ra không còn đè thành kho rác.
+
+**Gỡ khi nhầm (2026-11-06)** — `lib/nxtPeriods.ts`, có test. Ở chế độ **Ghi nhập/xuất**: thùng rác
+cuối dòng xóa một mã (hỏi lại + **Hoàn tác** trả đúng dòng về sổ hiện tại, `restoreNxtLines`); ô
+**Xóa kỳ này** dưới lưới gỡ MỌI dòng của kho + kỳ đang xem (mọi kho lưu, không theo lọc) — hộp hỏi
+nêu kỳ, kho, số mã, tồn cuối; có Hoàn tác (`planNxtPeriodRemoval`). Kho đã có **kỳ sau** (kỳ bắt đầu
+muộn hơn, `laterNxtPeriods`) thì chặn: kỳ sau có thể đã kế thừa tồn đầu từ kỳ này ⇒ xóa kỳ mới nhất trước.
 
 ## Cross-references
 

@@ -3,7 +3,7 @@
 // Tên tiếng Việt: Màn hình Báo cáo Xuất – Nhập – Tồn kho (sổ sống, số thật)
 // Description: Warehouse Import-Export-Inventory — live ledger from real data
 // ============================================================
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { NxtSnapshotLine, StorageLocation } from "@/types";
 import { DEFAULT_STORAGE_LOCATION, STORAGE_KIND_LABELS } from "@/types";
 import { useNxtSnapshots, useStorageLocations } from "@/lib/catalogRepo";
@@ -57,6 +57,7 @@ import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { num, formatDateVN } from "@/lib/format";
 import { newId } from "@/lib/store";
+import { planNxtPeriodRemoval, restoreNxtLines } from "@/lib/nxtPeriods";
 import { activeFilterCount, matchesSearch } from "@/lib/recordFilters";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildWarehouseNxtTour } from "./warehouseNxtTour";
@@ -262,9 +263,55 @@ export default function WarehouseNxtScreen() {
     setSnapshots(snapshots.map((l) => (l.id === id ? { ...l, ...patch } : l)));
   };
 
+  /* Sổ MỚI NHẤT cho Hoàn tác: toast sống 5 giây, trong lúc đó có thể đã gõ thêm ô khác —
+     hoàn tác chỉ trả lại đúng dòng đã gỡ vào sổ hiện tại, không chụp đè cả sổ. */
+  const latestSnapshots = useRef(snapshots);
+  useEffect(() => {
+    latestSnapshots.current = snapshots;
+  });
+
   const removeRow = (id: string, name: string) => {
-    setSnapshots(snapshots.filter((l) => l.id !== id));
-    notify.deleted(`Đã xóa dòng ${name}`);
+    const removed = snapshots.filter((l) => l.id === id);
+    if (!setSnapshots(snapshots.filter((l) => l.id !== id))) return;
+    notify.deleted(`Đã xóa dòng ${name}`, () => {
+      setSnapshots(restoreNxtLines(latestSnapshots.current, removed));
+      notify.saved(`Đã khôi phục dòng ${name}`);
+    });
+  };
+
+  // ---------- Xóa cả kỳ (tạo nhầm) ----------
+  /** Kỳ đang xem có bị kỳ sau chặn xóa không (kỳ sau có thể đã kế thừa tồn từ kỳ này). */
+  const periodRemoval = useMemo(
+    () =>
+      selectedWarehouse && fromDate && toDate
+        ? planNxtPeriodRemoval(snapshots, { warehouseCode: selectedWarehouse, periodFrom: fromDate, periodTo: toDate })
+        : null,
+    [snapshots, selectedWarehouse, fromDate, toDate]
+  );
+  const periodLabel = `${formatDateVN(fromDate)}–${formatDateVN(toDate)}`;
+  const removePeriod = () => {
+    if (!periodRemoval || !periodRemoval.removed.length) return;
+    if (periodRemoval.blockers.length) return;
+    const { kept, removed } = periodRemoval;
+    const key = selectedPeriod;
+    const label = periodLabel;
+    if (!setSnapshots(kept)) return;
+    setIsEditMode(false);
+    setSelected(new Set());
+    setPeriod("");
+    notify.deleted(`Đã xóa kỳ ${label} · ${selectedWarehouse} · ${removed.length} mã`, () => {
+      setSnapshots(restoreNxtLines(latestSnapshots.current, removed));
+      setPeriod(key);
+      notify.saved(`Đã khôi phục kỳ ${label} · ${removed.length} mã`);
+    });
+  };
+  const warnPeriodBlocked = () => {
+    const later = periodRemoval?.blockers ?? [];
+    notify.warning(
+      `Chưa xóa được kỳ ${periodLabel}: kho ${selectedWarehouse} đã có kỳ sau (${later
+        .map((b) => `${formatDateVN(b.from)}–${formatDateVN(b.to)}`)
+        .join(", ")}) có thể đã kế thừa tồn từ kỳ này. Xóa kỳ mới nhất trước.`
+    );
   };
 
   // ---------- Tick dòng: cộng tổng + gán kho lưu theo lô ----------
@@ -849,6 +896,47 @@ export default function WarehouseNxtScreen() {
                   </tr>
                 }
               />
+              {/* Xóa cả kỳ tạo nhầm — nằm trong chế độ Ghi của kỳ (như mọi nút xóa của hệ thống), không ở thanh đầu trang. */}
+              <div
+                data-tour="nxt-warehouse-delete-period"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 p-3"
+              >
+                <p className="min-w-0 flex-1 basis-64 text-sm text-muted-foreground">
+                  {periodRemoval?.blockers.length
+                    ? `Kỳ này đã có kỳ sau (${periodRemoval.blockers
+                        .map((b) => `${formatDateVN(b.from)}–${formatDateVN(b.to)}`)
+                        .join(", ")}) — muốn xóa kỳ này thì xóa kỳ mới nhất trước.`
+                    : "Tạo nhầm kỳ? Xóa cả kỳ một lần — có hỏi lại và có Hoàn tác."}
+                </p>
+                {periodRemoval?.blockers.length ? (
+                  <Button
+                    variant="danger"
+                    onClick={warnPeriodBlocked}
+                    title="Kỳ này đã có kỳ sau cùng kho — chọn để xem vì sao chưa xóa được."
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Xóa kỳ này
+                  </Button>
+                ) : (
+                  <ConfirmDelete
+                    title="Xóa cả kỳ này?"
+                    confirmLabel="Xóa kỳ"
+                    recordDescription={`Kỳ ${periodLabel} · kho ${selectedWarehouse} · ${periodRows.length} mã hàng · tồn cuối ${num(
+                      periodRows.reduce((t, r) => t + r.closingKg, 0)
+                    )} kg (mọi kho lưu, kể cả dòng đang bị lọc ẩn)`}
+                    onConfirm={removePeriod}
+                    trigger={
+                      <Button
+                        variant="danger"
+                        title="Xóa MỌI dòng của kỳ đang xem (kỳ tạo nhầm). Có hỏi lại nêu số mã, xóa xong vẫn Hoàn tác được."
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Xóa kỳ này
+                      </Button>
+                    }
+                  />
+                )}
+              </div>
             </div>
           ) : (
             <SummaryTable rows={rows} columns={columns} getKey={(r) => r.id} selection={tableSelection} stickyHeader rowMarkKey="nxt-kho" />

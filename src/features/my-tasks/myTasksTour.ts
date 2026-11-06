@@ -67,7 +67,8 @@ export function buildMyTasksTour(ctx: MyTasksTourContext): PageTour {
       body:
         "Việc người khác giao riêng cho bạn, làm theo hạn người giao đặt. Dòng phụ ghi Giao bởi ai và ghi chú của người giao.\n" +
         "• Việc máy phát hiện đã giao cho bạn (ngày chưa chốt, chưa gắn lô…): tự hết khi sổ đã sửa xong, không cần chọn gì thêm.\n" +
-        "• Việc giao (việc giao tay): làm xong thì chọn Xong ở dòng đó, người giao sẽ thấy.",
+        "• Việc giao (việc giao tay): làm xong thì chọn Xong ở dòng đó, người giao sẽ thấy. Việc rời khỏi danh sách cần làm; thông báo có Hoàn tác vài giây.\n" +
+        "• Lỡ chọn Xong nhầm mà thông báo đã tắt: chọn Lọc theo hạn → Tất cả (hoặc Để biết). Việc đã báo xong trong " + DONE_VISIBLE_DAYS + " ngày hiện lại ở mục này với nhãn Đã xong; chọn Chi tiết rồi Mở lại việc. Việc về lại trạng thái đang làm, theo hạn cũ, người giao thấy là chưa xong. Chỉ người nhận việc mở lại được; việc máy phát hiện tự đóng theo sổ nên không mở lại tay.",
     },
     {
       id: "mine",

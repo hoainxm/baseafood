@@ -2,7 +2,7 @@
 
 > Load khi: sửa giao diện phần gắn hóa đơn đại lý vào chuyến (tab "Hóa đơn" của Nhập hàng, nhãn trạng thái HĐ trên chuyến, ánh xạ mã kế toán). Hành vi ở ba-spec [51](51-supplier-invoice-matching.ba-spec.md).
 covers: src/features/imports/SupplierInvoicePanel.tsx, src/features/imports/supplierInvoiceParts.tsx, src/features/imports/MaterialImportScreen.tsx, src/features/imports/importsTour.ts
-last_verified: 2026-11-03
+last_verified: 2026-11-06
 <!-- updated: 2026-11-03 — rà UX đợt 1: tab Hóa đơn của Nhập hàng nằm trong `Tabs` chung (Ghi nhập · Báo cáo · Hóa đơn), đặt trái, bỏ emoji 🧾; `data-tour="imports-invoice-tab"` giữ trên tab. -->
 <!-- updated: 2026-11-02 — mở PDF hóa đơn qua `openInNewTab` (mở tab trống trước khi chờ link — Safari iPhone / iPad từng chặn); `/imports?tab=invoices` mở thẳng tab Hóa đơn (ba-spec 55). -->
 <!-- updated: 2026-10-31 (bộ lọc) — khối đầu tab Hóa đơn thành `FilterBar` (ba-spec 53): Ngày hàng về · Đại lý (tên danh mục, chưa ánh xạ thì "(mã …)") · Phân xưởng (theo chuyến đã gắn) · Trạng thái dòng (8 trạng thái, kèm số dòng, ẩn trạng thái 0 dòng) · ô Tra số HĐ, ký hiệu, số phiếu nhập (PHIEU), mã đại lý / vật tư, MST, biển số, tài xế. Bốn thẻ đếm theo bộ lọc ("theo bộ lọc"); bảng Chuyến chờ HĐ lọc theo đại lý / xưởng / ô tra; Bỏ hết bộ lọc bỏ cả thẻ đang chọn. -->
@@ -31,10 +31,13 @@ Từ trên xuống, một cột:
 | Lệch giá / Lệch kg | "Cập nhật theo HĐ" · "Giữ số xưởng" (hộp nhỏ bắt lý do, `useDialogDraft`) | `edit` · `outline` |
 | Không có chuyến | "Tạo chuyến từ HĐ" (hộp chọn phân xưởng, ngày hàng về + lý do xem trước) · "Không thuộc chuyến" | `save` · `outline` |
 | Không thuộc chuyến | "Bỏ xếp" | `ghost` |
+| Dòng đầu mỗi HĐ (mọi người có Xem) | "Chi tiết" ⇒ hộp `InvoiceDetailDialog`: thông tin HĐ (đại lý, số + ký hiệu, ngày hạch toán, phiếu kế toán, MST, số dòng + kg [+ tiền nếu Xem giá], dòng chuyến đang gắn, file) · "Mở file" · "Đóng"; có quyền Xóa `imports.invoices` thì thêm khối "Gỡ hóa đơn gắn nhầm" + nút **Gỡ hóa đơn** (ba-spec 51 NV7) | `outline` · nút gỡ `danger` |
 | Có file | "Mở file" | `ghost` |
 | Chưa có file | ghi "Chưa có file — nạp PDF ở khối trên" | — |
 
 Cập nhật theo HĐ ⇒ `notify.saved` + Hoàn tác (luật 13). Tạo chuyến ⇒ `notify.saved` có link "Xem chuyến".
+
+Gỡ hóa đơn (chỉ trong hộp Chi tiết, KHÔNG đặt nút trên dòng bảng): `ConfirmDelete` nêu "HĐ ‹số› — ‹đại lý› — N dòng sổ chi tiết — ‹kg› — file ‹tên›" ⇒ `notify.deleted` + Hoàn tác. Hộp báo trước: số dòng chuyến về Chờ HĐ; dòng đã Cập nhật theo HĐ giữ số mới (nhãn "Lưu ý"). HĐ đã tạo chuyến ghi bù ⇒ nhãn "Chưa gỡ được", bấm Gỡ hóa đơn (không `disabled`) chỉ hiện `ErrorSummary` "xóa chuyến đó ở sổ Nhập hàng trước", không mở hộp xác nhận.
 
 ## 3. Nhãn HĐ trên chuyến (mọi người xem Nhập hàng)
 `Tag` nhỏ ở đầu chuyến trong **Sổ chi tiết các chuyến** và **cột "Đã ghi ngày"**: "Chờ HĐ" (muted) · "HĐ 936" (thành công) · "HĐ 936 · lệch" (cảnh báo) · "Thiếu HĐ một phần". Người không có `imports.invoices` chỉ thấy chữ, không có link mở file.
@@ -58,4 +61,5 @@ Thẻ số 2×2; bảng cuộn ngang trong `HorizontalScroll` (bảng chuẩn t�
 Thêm mốc `data-tour` cho tab "Hóa đơn", ô nạp file, bảng xem trước, bảng đã gắn. Hộp "?" giải thích **đủ 8 trạng thái §4**, điều kiện "xong" của một khoảng ngày (bốn thẻ số về 0), và nói rõ: hệ thống không tự đổi số chuyến; ghép theo "Ngày HĐ" = ngày hàng về.
 
 ## History
+- v1.1 (2026-11-06): nút "Chi tiết" + hộp chi tiết hóa đơn chứa "Gỡ hóa đơn" (audit gỡ được, ba-spec 51 NV7).
 - v1 (2026-10-30): khởi tạo cùng build P1. Nhãn HĐ hiện ở **Sổ chi tiết các chuyến**; cột "Đã ghi ngày" của Ghi nhập CHƯA có nhãn (đợt sau). Ô chọn file là `Input type=file` nhiều file (chưa kéo thả).

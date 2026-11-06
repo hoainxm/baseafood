@@ -71,7 +71,7 @@ import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildImportsTour } from "./importsTour";
 import { ImportSlipOcr } from "./ImportSlipOcr";
 import { hasOcr, type OcrCatalog, type OcrResult } from "@/lib/ocr";
-import { hasImageStorage, getPhotoUrl } from "@/lib/storage";
+import { hasImageStorage, getPhotoUrl, uploadImage } from "@/lib/storage";
 import { getViewPeriodRange, type ViewPeriod } from "@/lib/periodUtils";
 import { matchesSearch } from "@/lib/recordFilters";
 import {
@@ -93,6 +93,7 @@ import {
   Warehouse,
   X,
   Replace,
+  Trash2,
 } from "lucide-react";
 import DailyImportInvoice from "@/features/imports/DailyImportInvoice";
 import ImportReport from "@/features/imports/ImportReport";
@@ -104,7 +105,7 @@ import { ImportLinesTable } from "./ImportLinesTable";
 import { DayShipmentList } from "./ImportSteps";
 import { SupplierInvoicePanel } from "./SupplierInvoicePanel";
 import { useSupplierInvoiceStore } from "@/lib/catalogRepo";
-import { TRIP_INVOICE_STATUS_LABELS, buildCodeMaps, indexLinesByTripLine, tripInvoiceInfo, type TripInvoiceStatus } from "@/lib/supplierInvoice";
+import { TRIP_INVOICE_STATUS_LABELS, buildCodeMaps, indexLinesByTripLine, tripInvoiceInfo, unlinkRemovedTripLines, type TripInvoiceStatus } from "@/lib/supplierInvoice";
 import { DailyScrapSection } from "./DailyScrapSection";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useFormDraft } from "@/lib/formDraft";
@@ -160,6 +161,8 @@ export default function MaterialImportScreen() {
   const [shipments, persistShipments] = useImportShipments();
   const [locks, persistLocks, { status: lockStatus }] = useDailyLocks();
   const [scraps, persistScraps] = useScraps();
+  // Hóa đơn đại lý: nhãn HĐ trên chuyến + bỏ liên kết dòng HĐ khi xóa dòng chuyến (R14).
+  const invoiceStore = useSupplierInvoiceStore();
 
   const [period, setPeriod] = useState<ViewPeriod>("day");
   const [date, setDate] = useState(todayISO()); // ngày neo cho ngày/tuần/tháng/năm
@@ -838,6 +841,50 @@ export default function MaterialImportScreen() {
     else if (result === "blocked") notify.error(NEW_TAB_BLOCKED_MESSAGE);
   };
 
+  /** Sửa chuyến của ngày đã chốt ⇒ không gỡ / thay ảnh (đường sửa là Mở lại ngày). */
+  const scanLockedMessage = () =>
+    session && isEditingShipment && isLocked(session.deliveryDate, session.workshop)
+      ? `Ngày ${formatDateVN(session.deliveryDate)} xưởng ${session.workshop} đã chốt — Mở lại ngày rồi mới gỡ / thay ảnh phiếu.`
+      : null;
+
+  /** Gỡ ảnh phiếu đính nhầm khỏi phiếu đang mở (vào sổ khi Lưu chuyến). File ảnh giữ trên kho ⇒ Hoàn tác được. */
+  const removeScanImage = () => {
+    const locked = scanLockedMessage();
+    if (locked) {
+      notify.warning(locked);
+      return;
+    }
+    const prev = session?.scanPath ?? "";
+    if (!prev) return;
+    setSessionField("scanPath", "");
+    notify.deleted(`Đã gỡ ảnh phiếu khỏi chuyến — chọn ${isEditingShipment ? "Lưu thay đổi chuyến" : "Lưu chuyến vào sổ"} để ghi vào sổ`, () => setSessionField("scanPath", prev));
+  };
+
+  const scanInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingScan, setIsUploadingScan] = useState(false);
+  /** Thay ảnh phiếu (không đọc lại số): tải ảnh mới lên, phiếu trỏ sang ảnh mới; Hoàn tác trả ảnh cũ. */
+  const replaceScanImage = async (file: File | undefined) => {
+    if (!file || !session) return;
+    const locked = scanLockedMessage();
+    if (locked) {
+      notify.warning(locked);
+      return;
+    }
+    const prev = session.scanPath ?? "";
+    setIsUploadingScan(true);
+    try {
+      const path = await uploadImage(file);
+      if (!path) {
+        notify.error("Chưa tải được ảnh lên (cần đăng nhập máy chủ) — ảnh cũ vẫn giữ.");
+        return;
+      }
+      setSessionField("scanPath", path);
+      notify.saved(`Đã thay ảnh phiếu — chọn ${isEditingShipment ? "Lưu thay đổi chuyến" : "Lưu chuyến vào sổ"} để ghi vào sổ`, () => setSessionField("scanPath", prev));
+    } finally {
+      setIsUploadingScan(false);
+    }
+  };
+
   /**
    * Lưu cả chuyến MỘT LẦN: tạo/ghi chuyến + mọi dòng hợp lệ trong bảng, một lần
    * persist. Giữ nguyên bất biến "đầu chuyến áp cho mọi dòng", "chuyến chỉ tạo
@@ -917,6 +964,13 @@ export default function MaterialImportScreen() {
     }));
     persistShipments(nextShipments);
     persist([...keptRows, ...shipmentRows]);
+    // Dòng bị bỏ khỏi chuyến đang sửa ⇒ dòng HĐ gắn vào nó về "Không có chuyến" (R14).
+    if (editRowIds) {
+      const keptIds = new Set(shipmentRows.map((r) => r.id));
+      unlinkInvoiceLines(editRowIds.filter((id) => !keptIds.has(id)));
+    }
+    const prevScan = sessionShipmentId ? (shipments.find((c) => c.id === sessionShipmentId)?.scanPath ?? "") : "";
+    const scanNote = !isEditingShipment || prevScan === (session.scanPath ?? "") ? "" : !session.scanPath ? " · gỡ ảnh phiếu" : prevScan ? " · thay ảnh phiếu" : " · đính ảnh phiếu";
 
     const newTotal = validRows.reduce((s, d) => s + d.quantityKg, 0);
     const savedShipment = shipmentId ? nextShipments.find((c) => c.id === shipmentId) : undefined;
@@ -925,7 +979,7 @@ export default function MaterialImportScreen() {
       session.deliveryDate,
       session.workshop,
       isEditingShipment ? "update" : "create",
-      `${isEditingShipment ? "Sửa" : "Ghi"} chuyến ${session.supplierName}${savedShipment?.lotCode ? ` (lô ${savedShipment.lotCode})` : ""} — ${validRows.length} loại · ${kg(newTotal)}${session.licensePlate ? ` · xe ${session.licensePlate}` : ""}${lockAtSave?.isLocked ? " · ghi bù sau chốt" : ""}`
+      `${isEditingShipment ? "Sửa" : "Ghi"} chuyến ${session.supplierName}${savedShipment?.lotCode ? ` (lô ${savedShipment.lotCode})` : ""} — ${validRows.length} loại · ${kg(newTotal)}${session.licensePlate ? ` · xe ${session.licensePlate}` : ""}${lockAtSave?.isLocked ? " · ghi bù sau chốt" : ""}${scanNote}`
     );
     notify.saved(
       `Đã lưu chuyến ${session.supplierName} — ${validRows.length} loại · ${kg(newTotal)}`,
@@ -976,6 +1030,20 @@ export default function MaterialImportScreen() {
 
   /* ---- Xóa cả chuyến đang sửa (nút trong dialog) ---- */
 
+  /**
+   * Dòng chuyến bị xóa ⇒ dòng HĐ đang gắn vào nó về "Không có chuyến" như trước khi ghép (R14). Chỉ người có
+   * quyền ghi `imports.invoices` (RLS mig 0090) — người khác thì tab Hóa đơn vẫn coi liên kết treo là "Không có
+   * chuyến" và lần nạp lại ghép mới (planLedgerImport). Trả hàm khôi phục cho Hoàn tác, null = không đổi gì.
+   */
+  const unlinkInvoiceLines = (removedTripLineIds: Iterable<string>): (() => void) | null => {
+    if (!(invoiceAllowed.create || invoiceAllowed.update) || !invoiceStore.isAvailable) return null;
+    const prev = invoiceStore.lines;
+    const r = unlinkRemovedTripLines(prev, removedTripLineIds);
+    if (!r.changed) return null;
+    invoiceStore.setLines([...r.lines]);
+    return () => invoiceStore.setLines(prev);
+  };
+
   const deleteEditingShipment = () => {
     if (!editRowIds) return;
     const prevRows = rows;
@@ -984,6 +1052,7 @@ export default function MaterialImportScreen() {
     persist(rows.filter((r) => !ids.has(r.id)));
     if (sessionShipmentId)
       persistShipments(shipments.filter((c) => c.id !== sessionShipmentId));
+    const restoreInvoiceLinks = unlinkInvoiceLines(ids);
     const what = `Xóa chuyến ${session?.supplierName || ""} — ${editRowIds.length} dòng`;
     const dayOf = session ? { date: session.deliveryDate, ws: session.workshop } : null;
     if (dayOf) logDay(dayOf.date, dayOf.ws, "delete", what);
@@ -992,6 +1061,7 @@ export default function MaterialImportScreen() {
       () => {
         persist(prevRows);
         persistShipments(prevShipment);
+        restoreInvoiceLinks?.();
         if (dayOf) logDay(dayOf.date, dayOf.ws, "undo", `Hoàn tác: ${what}`);
       }
     );
@@ -1326,7 +1396,7 @@ export default function MaterialImportScreen() {
                 </Button>
               )}
               {session.scanPath && (
-                <span className="flex items-center gap-1">
+                <span data-tour="imports-scan-photo" className="flex flex-wrap items-center gap-1">
                   <Tag variant="done">Đã đính ảnh phiếu</Tag>
                   {hasImageStorage && (
                     <Button
@@ -1334,6 +1404,34 @@ export default function MaterialImportScreen() {
                       Xem
                     </Button>
                   )}
+                  {hasImageStorage && (
+                    <Button
+                      title="Chọn ảnh phiếu khác thay ảnh đang đính (không đọc lại số). Có Hoàn tác; vào sổ khi lưu chuyến."
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      onClick={() => {
+                        const locked = scanLockedMessage();
+                        if (locked) notify.warning(locked);
+                        else scanInputRef.current?.click();
+                      }}
+                    >
+                      {isUploadingScan ? "Đang tải…" : "Thay ảnh"}
+                    </Button>
+                  )}
+                  <input ref={scanInputRef} type="file" accept="image/*" className="hidden" aria-label="Chọn ảnh phiếu thay" onChange={(e) => { void replaceScanImage(e.target.files?.[0]); e.target.value = ""; }} />
+                  <ConfirmDelete
+                    title="Gỡ ảnh phiếu khỏi chuyến?"
+                    confirmLabel="Gỡ ảnh"
+                    recordDescription={`Ảnh phiếu tay của chuyến ${session.supplierName || "(chưa có đại lý)"} — ${formatDateVN(session.deliveryDate)} — xưởng ${session.workshop}`}
+                    onConfirm={removeScanImage}
+                    trigger={
+                      <Button type="button" variant="danger" size="sm" title="Gỡ ảnh phiếu đính nhầm khỏi chuyến (số đã ghi không đổi). Có hỏi xác nhận và có Hoàn tác; vào sổ khi lưu chuyến.">
+                        <Trash2 />
+                        Gỡ ảnh
+                      </Button>
+                    }
+                  />
                 </span>
               )}
             </div>
@@ -1696,7 +1794,6 @@ export default function MaterialImportScreen() {
   );
 
   // Nhãn HĐ trên chuyến (ba-spec 51 R11) — chỉ đọc; xưởng không thấy file / tiền.
-  const invoiceStore = useSupplierInvoiceStore();
   const tripInvoiceOf = useMemo(() => {
     const byTrip = indexLinesByTripLine(invoiceStore.lines);
     const invById = new Map(invoiceStore.invoices.map((x) => [x.id, x]));

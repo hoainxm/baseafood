@@ -23,6 +23,7 @@ const WAVE1: Record<string, readonly string[]> = {
 const EXEMPT: { pattern: RegExp; reason: string }[] = [
   { pattern: /vào danh mục|Đã thêm (mặt hàng|thành phẩm|khách hàng|loại nguyên liệu|đại lý)/, reason: "thêm nhanh danh mục — /audit đã có, không thuộc hồ sơ nào" },
   { pattern: /Đã nhớ mã kế toán/, reason: "ánh xạ mã kế toán (danh mục)" },
+  { pattern: /(gỡ|thay) ảnh phiếu/, reason: "gỡ / thay ảnh phiếu chỉ sửa phiếu đang mở — nhật ký ghi khi Lưu chuyến (\"· gỡ / thay ảnh phiếu\")" },
 ];
 
 const LOG_CALL = /\b(logDay|logOrder|logImport|logged|logTripDays|dayLog|onLog|planningLog\.log|importsLog\.log|productionLog\.log)\(/;

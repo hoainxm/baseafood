@@ -522,13 +522,19 @@ export function planLedgerImport(args: {
     if (!codeMaps.supplierByCode.has(row.supplierCode) || !materialName)
       return { line: { ...line, tripLineId: "" }, invoiceId: inv.id, state: "unmapped", change, tripKg: null, tripPrice: null, materialName };
     const m = matches.get(line.id)!;
-    const linked = { ...line, tripLineId: m.tripLineId };
+    // Quyết định cũ (Cập nhật theo HĐ / Giữ số xưởng) chỉ theo đúng dòng chuyến đã quyết — chuyến cũ đã xóa,
+    // dòng ghép sang chuyến khác ⇒ quyết lại từ đầu.
+    const sameLink = Boolean(old?.tripLineId) && old?.tripLineId === m.tripLineId;
+    const linked = sameLink ? { ...line, tripLineId: m.tripLineId } : { ...line, tripLineId: m.tripLineId, ...NO_DECISION };
     return { line: linked, invoiceId: inv.id, state: displayState(m.state, linked.resolution), change, tripKg: m.tripKg, tripPrice: m.tripPrice, materialName };
   });
   for (const l of missing)
     lines.push({ line: l, invoiceId: l.invoiceId, state: "no-trip", change: "missing", tripKg: null, tripPrice: null, materialName: codeMaps.materialByCode.get(l.materialCode) ?? "" });
   return { invoices: [...invoices.values()], lines, unmapped: unmappedCodes(args.ledgerRows, codeMaps) };
 }
+
+/** Dòng HĐ chưa có quyết định của kế toán. */
+const NO_DECISION = { resolution: "", resolutionReason: "", resolvedBy: "", resolvedAt: "" } as const satisfies Partial<SupplierInvoiceLine>;
 
 /** Trạng thái hiển thị khi đã có quyết định của kế toán. */
 function displayState(raw: InvoiceLineState, resolution: SupplierInvoiceLine["resolution"]): InvoiceLineState {
@@ -683,6 +689,20 @@ export interface TripFromInvoice {
   links: Map<string, string>;
 }
 
+/** Lý do ghi bù điền sẵn của chuyến tạo từ HĐ (R13). */
+export const tripFromInvoiceReason = (inv: Pick<SupplierInvoice, "invoiceNo" | "voucherNo">) =>
+  `Theo HĐ ${inv.invoiceNo}${inv.voucherNo ? ` (phiếu kế toán ${inv.voucherNo})` : ""}`;
+
+/**
+ * Chuyến ghi bù chỗ "Tạo chuyến từ HĐ" của hóa đơn này còn trong sổ: cùng đại lý, lý do ghi bù bắt đầu
+ * "Theo HĐ <số>" (số đứng riêng — HĐ 93 không bắt chuyến của HĐ 936).
+ */
+export function tripsCreatedFromInvoice(inv: SupplierInvoice, shipments: readonly ImportShipment[]): ImportShipment[] {
+  if (!inv.invoiceNo || !inv.supplierName) return [];
+  const head = `Theo HĐ ${inv.invoiceNo}`;
+  return shipments.filter((s) => s.supplierName === inv.supplierName && s.backdateReason.startsWith(head) && !/[0-9A-Za-z]/.test(s.backdateReason.charAt(head.length)));
+}
+
 /**
  * Chuyến ghi bù từ các dòng HĐ chưa có chuyến — mỗi (ngày hàng về + biển số) một chuyến.
  * Lý do ghi bù điền sẵn "Theo HĐ <số> (phiếu kế toán <PHIEU>)" (R13).
@@ -705,7 +725,7 @@ export function buildTripsFromInvoice(args: {
     groups.set(k, [...(groups.get(k) ?? []), l]);
   }
   const perDate = new Map<string, number>();
-  const reason = `Theo HĐ ${args.invoice.invoiceNo}${args.invoice.voucherNo ? ` (phiếu kế toán ${args.invoice.voucherNo})` : ""}`;
+  const reason = tripFromInvoiceReason(args.invoice);
   return [...groups.values()]
     .sort((a, b) => a[0].deliveryDate.localeCompare(b[0].deliveryDate))
     .map((ls) => {
@@ -750,4 +770,69 @@ export function buildTripsFromInvoice(args: {
       });
       return { shipment, items, links };
     });
+}
+
+// ---------- 10. Gỡ hóa đơn gắn nhầm · dòng chuyến bị xóa ----------
+
+export interface InvoiceRemovalPlan {
+  invoice: SupplierInvoice;
+  /** Dòng HĐ sẽ gỡ cùng hóa đơn. */
+  lines: SupplierInvoiceLine[];
+  /** Chuyến "Tạo chuyến từ HĐ" của HĐ này còn trong sổ ⇒ chặn gỡ: xóa chuyến đó trước. */
+  blockingShipments: ImportShipment[];
+  /** Dòng chuyến (còn trong sổ) đang gắn HĐ này ⇒ gỡ xong về Chờ HĐ. */
+  linkedTripLineIds: string[];
+  /** Dòng chuyến đã "Cập nhật theo HĐ" — gỡ HĐ KHÔNG trả số cũ (dòng vết "[Sửa theo HĐ …]" ghi số cũ). */
+  updatedTripLineIds: string[];
+  nextInvoices: SupplierInvoice[];
+  nextLines: SupplierInvoiceLine[];
+}
+
+/**
+ * Gỡ một hóa đơn gắn nhầm: bỏ bản ghi HĐ (kèm thông tin file PDF) và mọi dòng sổ chi tiết của nó. Sổ Nhập hàng
+ * không đổi — chuyến đang gắn về Chờ HĐ như trước khi ghép. HĐ đã sinh chuyến ghi bù ⇒ `blockingShipments`
+ * khác rỗng, màn hình không được gỡ (xóa chuyến trước, khỏi để chuyến "Theo HĐ …" mồ côi).
+ */
+export function planInvoiceRemoval(
+  invoiceId: string,
+  data: {
+    invoices: readonly SupplierInvoice[];
+    lines: readonly SupplierInvoiceLine[];
+    trips: readonly MaterialImportItem[];
+    shipments: readonly ImportShipment[];
+  },
+): InvoiceRemovalPlan | null {
+  const invoice = data.invoices.find((i) => i.id === invoiceId);
+  if (!invoice) return null;
+  const tripIds = new Set(data.trips.map((t) => t.id));
+  const own = data.lines.filter((l) => l.invoiceId === invoiceId);
+  const live = own.filter((l) => l.tripLineId && tripIds.has(l.tripLineId));
+  return {
+    invoice,
+    lines: own,
+    blockingShipments: tripsCreatedFromInvoice(invoice, data.shipments),
+    linkedTripLineIds: [...new Set(live.map((l) => l.tripLineId))],
+    updatedTripLineIds: [...new Set(live.filter((l) => l.resolution === "updated").map((l) => l.tripLineId))],
+    nextInvoices: data.invoices.filter((i) => i.id !== invoiceId),
+    nextLines: data.lines.filter((l) => l.invoiceId !== invoiceId),
+  };
+}
+
+/**
+ * Dòng chuyến bị xóa (xóa chuyến, bỏ dòng khi sửa chuyến) ⇒ dòng HĐ đang gắn vào nó về "Không có chuyến"
+ * như trước khi ghép (R14): bỏ liên kết và quyết định cũ. Không có gì đổi ⇒ trả lại đúng mảng cũ (`changed` = 0).
+ */
+export function unlinkRemovedTripLines(
+  lines: readonly SupplierInvoiceLine[],
+  removedTripLineIds: Iterable<string>,
+): { lines: readonly SupplierInvoiceLine[]; changed: number } {
+  const removed = new Set(removedTripLineIds);
+  if (!removed.size) return { lines, changed: 0 };
+  let changed = 0;
+  const next = lines.map((l) => {
+    if (!l.tripLineId || !removed.has(l.tripLineId)) return l;
+    changed++;
+    return { ...l, tripLineId: "", ...NO_DECISION };
+  });
+  return changed ? { lines: next, changed } : { lines, changed: 0 };
 }

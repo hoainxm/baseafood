@@ -65,6 +65,7 @@ describe("buildImportsTour", () => {
       "Chưa khớp, chọn tay",
       "Lệch",
       "Không ghi xe",
+      "Đã đính ảnh phiếu",
     ];
     // Nhãn phải thật sự có trên trang (khỏi test xanh vì lời tour nói nhãn đã bỏ).
     expect(pageLabels.filter((l) => !screenSource.includes(l))).toEqual([]);

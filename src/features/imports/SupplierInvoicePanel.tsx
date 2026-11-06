@@ -3,7 +3,8 @@
 // Tên tiếng Việt: Tab "Hóa đơn" của Nhập hàng — nạp sổ chi tiết NL + PDF, gắn hóa đơn vào chuyến
 // Description: UI of ba-spec 51 / design-spec 52: load the accounting ledger + VAT-invoice PDFs,
 //              map accounting codes, preview matches, attach, then follow up (mismatch → update from
-//              invoice / keep workshop figures, invoice without trip → create trip / not a trip).
+//              invoice / keep workshop figures, invoice without trip → create trip / not a trip), and
+//              remove a wrongly attached invoice from its detail box (Gỡ hóa đơn — confirm + Hoàn tác).
 //              Rules live in lib/supplierInvoice.ts; files in lib/supplierInvoiceFiles.ts.
 // ============================================================
 import { useMemo, useState, type ReactNode } from "react";
@@ -49,6 +50,7 @@ import {
   matchLinesToTrips,
   matchPdfToInvoice,
   normalizePlateKey,
+  planInvoiceRemoval,
   planLedgerImport,
   suggestSupplierForCode,
   tripInvoiceInfo,
@@ -70,7 +72,7 @@ import {
 } from "@/lib/supplierInvoiceFiles";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { DEFAULT_CATEGORY, WORKSHOPS, generateLotCode } from "./importHelpers";
-import { CreateTripDialog, ExplainMismatchDialog, type CreateTripTarget, type ExplainTarget } from "./supplierInvoiceParts";
+import { CreateTripDialog, ExplainMismatchDialog, InvoiceDetailDialog, type CreateTripTarget, type ExplainTarget } from "./supplierInvoiceParts";
 import { NEW_TAB_BLOCKED_MESSAGE, openInNewTab } from "@/lib/openInNewTab";
 
 const STATE_TAG: Record<InvoiceLineState, TagVariant> = {
@@ -158,6 +160,8 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [explainTarget, setExplainTarget] = useState<ExplainTarget | null>(null);
   const [tripTarget, setTripTarget] = useState<CreateTripTarget | null>(null);
+  /** Hóa đơn đang mở hộp Chi tiết (id — dữ liệu tính lại mỗi lần vẽ, Hoàn tác xong vẫn đúng). */
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const tripById = useMemo(() => new Map(p.trips.map((t) => [t.id, t])), [p.trips]);
   /** Một dòng nhật ký cho mỗi ngày × xưởng có dòng chuyến bị chạm. */
@@ -463,6 +467,35 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
     });
   };
 
+  /** Gỡ HĐ gắn nhầm (hộp Chi tiết): bỏ HĐ + dòng sổ chi tiết, chuyến về Chờ HĐ; chặn nếu HĐ đã sinh chuyến ghi bù. */
+  const removeInvoice = (invoiceId: string) => {
+    if (!guardWrite()) return;
+    const r = planInvoiceRemoval(invoiceId, { invoices, lines, trips: p.trips, shipments: p.shipments });
+    if (!r) return;
+    const inv = r.invoice;
+    if (r.blockingShipments.length) {
+      notify.error(`HĐ ${inv.invoiceNo} đã tạo chuyến ghi bù — xóa chuyến đó ở sổ Nhập hàng trước rồi mới gỡ hóa đơn.`);
+      return;
+    }
+    const prevInv = invoices;
+    const prevLines = lines;
+    store.setInvoices(r.nextInvoices);
+    store.setLines(r.nextLines);
+    const what = `Gỡ hóa đơn ${inv.invoiceNo} (${supplierOf(inv)}) gắn nhầm — ${r.lines.length} dòng sổ chi tiết${r.linkedTripLineIds.length ? `, ${r.linkedTripLineIds.length} dòng chuyến về Chờ HĐ` : ""}${inv.fileName ? ` · bỏ file ${inv.fileName}` : ""}`;
+    const log = (action: ExportActivityAction, prefix: string) => {
+      p.onLog([{ recordType: "supplier-invoice", recordId: inv.id, action, summary: `${prefix}${what}` }]);
+      logTripDays(r.linkedTripLineIds, action, () => `${prefix}${what}`);
+    };
+    log("delete", "");
+    notify.deleted(`Đã gỡ HĐ ${inv.invoiceNo} — ${r.lines.length} dòng sổ chi tiết${r.linkedTripLineIds.length ? ` · ${r.linkedTripLineIds.length} dòng chuyến về Chờ HĐ` : ""}`, () => {
+      store.setInvoices(prevInv);
+      store.setLines(prevLines);
+      log("undo", "Hoàn tác: ");
+    });
+    setDetailId(null);
+  };
+  const detailPlan = detailId ? planInvoiceRemoval(detailId, { invoices, lines, trips: p.trips, shipments: p.shipments }) : null;
+
   const openFile = async (inv: SupplierInvoice) => {
     const result = await openInNewTab(() => getSupplierInvoiceFileUrl(inv.filePath));
     if (result === "no-url")
@@ -569,6 +602,12 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
       out.push(
         <Button key="b" size="sm" variant="ghost" title="Bỏ xếp Không thuộc chuyến, ghép lại hóa đơn vào chuyến." onClick={() => setClassification(r.invoice, "trip")}>
           Bỏ xếp
+        </Button>,
+      );
+    if (allowed.view && r.firstOfInvoice)
+      out.push(
+        <Button key="d" size="sm" variant="outline" title="Xem đủ thông tin hóa đơn; gỡ hóa đơn gắn nhầm ở đây." onClick={() => setDetailId(r.invoice.id)}>
+          Chi tiết
         </Button>,
       );
     if (allowed.view && r.firstOfInvoice)
@@ -757,6 +796,12 @@ export function SupplierInvoicePanel(p: SupplierInvoicePanelProps) {
 
       <ExplainMismatchDialog target={explainTarget} onClose={() => setExplainTarget(null)} onSave={explain} />
       <CreateTripDialog target={tripTarget} onClose={() => setTripTarget(null)} onCreate={createTrips} />
+      <InvoiceDetailDialog
+        target={detailPlan ? { plan: detailPlan, supplierLabel: supplierOf(detailPlan.invoice), canViewPrice: p.canViewPrice, canRemove: allowed.delete } : null}
+        onClose={() => setDetailId(null)}
+        onRemove={removeInvoice}
+        onOpenFile={() => detailPlan && void openFile(detailPlan.invoice)}
+      />
     </div>
   );
 }

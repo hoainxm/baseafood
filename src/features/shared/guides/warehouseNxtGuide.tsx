@@ -61,6 +61,21 @@ export const warehouseNxtGuide: PageGuide = {
           dùng <b>Xuất Excel</b> hoặc <b>In A4</b>.
         </p>
       </GuideSection>
+      <GuideSection title="Gỡ khi làm nhầm">
+        <GuideList>
+          <li>
+            Xóa một mã: ở <b>Ghi nhập/xuất</b>, thùng rác cuối dòng → hỏi lại → xóa. Thông báo có <b>Hoàn tác</b> vài giây để
+            trả dòng về.
+          </li>
+          <li>
+            Tạo nhầm cả kỳ: ở <b>Ghi nhập/xuất</b>, ô dưới lưới → <b>Xóa kỳ này</b>. Hộp hỏi lại nêu kỳ, kho, số mã, tổng tồn cuối;
+            xóa trọn mọi dòng của kỳ (kể cả dòng đang lọc ẩn), có <b>Hoàn tác</b>.
+          </li>
+          <li>
+            Kỳ đã có <b>kỳ sau</b> cùng kho thì chưa xóa được (kỳ sau có thể đã kế thừa tồn từ kỳ này) — xóa kỳ mới nhất trước.
+          </li>
+        </GuideList>
+      </GuideSection>
       <p className="text-muted-foreground">
         Sổ này chưa tự nối với sổ Nhập hàng, Sản xuất, Bán hàng (cần bảng ánh xạ mã kế toán) — số chỉ đổi khi nạp file hoặc
         gõ ở lưới.

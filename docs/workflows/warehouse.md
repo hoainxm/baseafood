@@ -1,7 +1,7 @@
 # Kho — sơ đồ workflow
 
 > Load khi: review / kiểm lại các trang Kho dự trữ (`/warehouse`), Sổ kho theo tháng (`/monthly-stock`), Mã lô QR (`/qr`), Nhập xuất tồn kho (`/nxt-warehouse`). Trước khi sửa luật duyệt nhập kho, tồn theo lô, dồn tồn tháng, tem QR. Bản đọc nhanh — luật đầy đủ ở ba-spec [34](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [36](../app-map/36-so-kho-thang.md) · [spec qr-truy-xuat-lo](../spec/qr-truy-xuat-lo.md).
-covers: src/features/warehouse/*, src/features/monthly-stock/*, src/features/qr/*, src/features/reports/WarehouseNxtScreen.tsx, src/lib/inventory.ts, src/lib/lotTraceability.ts, src/lib/monthlyStock*.ts, src/lib/frozenStockLines.ts, src/lib/nxtExcel.ts, src/lib/nxtStockImport.ts, src/lib/nxtReportFile.ts
+covers: src/features/warehouse/*, src/features/monthly-stock/*, src/features/qr/*, src/features/reports/WarehouseNxtScreen.tsx, src/lib/inventory.ts, src/lib/lotTraceability.ts, src/lib/monthlyStock*.ts, src/lib/frozenStockLines.ts, src/lib/nxtExcel.ts, src/lib/nxtStockImport.ts, src/lib/nxtReportFile.ts, src/lib/nxtPeriods.ts
 tours: src/features/warehouse/warehouseTour.ts, src/features/monthly-stock/monthlyStockTour.ts, src/features/qr/qrTour.ts, src/features/reports/warehouseNxtTour.ts
 guides: src/features/shared/guideContent.tsx, src/features/shared/guides/warehouseNxtGuide.tsx
 last_verified: 2026-11-06
@@ -52,6 +52,7 @@ flowchart LR
   W -. hàng đông lạnh .-> M["3 · Sổ kho theo tháng<br/>/monthly-stock"]
   M --> M2["Dồn sang tháng sau"]
   N["4 · Nhập xuất tồn kho<br/>/nxt-warehouse"] --> N2["Tạo kỳ kế tiếp"]
+  N2 -. tạo nhầm, chưa có kỳ sau .-> N3["Xóa kỳ này · Hoàn tác"]
   Q["/qr · tem, hộ chiếu, thu hồi"] -. quét tem .-> A
 ```
 
@@ -64,7 +65,9 @@ flowchart LR
 | 3b · Thao tác dòng | Hộp: Lấy ra sử dụng · Nhập thêm · Gửi kho ngoài | Lấy ra bị chặn khi vượt tồn cuối. Gửi kho ngoài không đổi tổng tháng (`applyLotAction`) | Kế toán |
 | 3c · Nạp Excel | "Nhập Excel bảng kê", mỗi sheet một tháng | Nạp lại cùng file và cùng kho chỉ cập nhật. Phải chọn đúng kho: mã kho nằm trong id dòng (`loadedRowId`), nhầm kho là cộng đôi | Kế toán |
 | 3d · Nạp báo cáo XNT | "Nạp báo cáo XNT": file PDF / Excel "Báo cáo xuất nhập tồn" của phần mềm kế toán, một kho · trọn một tháng | File phải tự đúng (đủ số mã, tổng khớp "SL mặt hàng", dòng cân) mới nạp (`checkNxtReport`). Từng mã so với dòng sổ cùng tháng + kho (`buildNxtPlan`): **Khớp** điền nhập/xuất · **Mã mới** thêm dòng · **Lệch tồn đầu** / **Chưa có dòng sổ** / **File không cân** PHẢI chọn Theo file · Giữ sổ · Bỏ mã này, còn chỗ chưa chọn hoặc tồn cuối âm thì không ghi (`listNxtBlockers`). Nhập/xuất ghi THAY theo file; mã kế toán lưu trên dòng (`accountingCode`, mig 0107), dồn tháng mang theo. Theo file + file nhiều hơn ⇒ dòng điều chỉnh `nxt-adj|…`; sổ nhiều hơn ⇒ xuất điều chỉnh trên lô (`applyNxtPlan`) | Kế toán (quyền Nhập `monthly-stock`) |
+| 3e · Đồng bộ danh mục | "Đồng bộ danh mục": mỗi tên trong sổ chọn đích Mặt hàng · Loại NL · Bỏ qua và tên chuẩn | Tên chuẩn chưa có ⇒ thêm vào danh mục; dòng sổ mang tên file đổi sang tên chuẩn (`renameLedgerItems`). **Hoàn tác** trên thông báo gỡ đúng lần đó (`revertCatalogSync`): mục vừa thêm (kể cả tên chuẩn gõ thêm mới trong hộp) còn y nguyên thì xóa, mục đã sửa sau đồng bộ giữ lại và nêu tên; dòng còn mang tên mới thì trả tên cũ, dòng đã đổi / xóa sau đó để nguyên. Không chụp đè cả sổ | Kế toán (quyền Sửa `monthly-stock`) |
 | 4 · Nhập xuất tồn kho | "Nhập Excel báo cáo" (mẫu 10 cột), lọc Kho / chi nhánh · Kỳ báo cáo · Kho lưu | Tồn cuối = tồn đầu + nhập − xuất, tính ra từng mã. **Tạo kỳ kế tiếp** lấy tồn cuối kỳ này làm tồn đầu kỳ mới; kỳ mới phải có khoảng ngày, đến ngày không trước từ ngày, khác kỳ đang xem (`saveNewPeriod`) | Người có quyền Nhập (`nxt-warehouse`) |
+| 4a · Gỡ khi nhầm (NXT) | Chế độ **Ghi nhập/xuất**: thùng rác cuối dòng (một mã) · ô **Xóa kỳ này** dưới lưới (cả kỳ) | Xóa một mã: hỏi lại + Hoàn tác. Xóa kỳ: hỏi lại nêu kỳ, kho, số mã, tồn cuối; gỡ MỌI dòng của kho + kỳ (không theo lọc), có Hoàn tác (`planNxtPeriodRemoval` · `restoreNxtLines`). Kho đã có **kỳ sau** (bắt đầu muộn hơn) thì chặn — kỳ sau có thể đã kế thừa tồn; xóa kỳ mới nhất trước (`laterNxtPeriods`) | Người có quyền Nhập (`nxt-warehouse`) |
 
 Hàng đông lạnh do xưởng ghi ở `/wip` vào sổ tháng ở nhóm "Hàng tạm" (id bắt đầu `wip|`, `TEMPORARY_GOODS_CATEGORY`). Dòng hiện nhãn "Từ SX · ‹xưởng›". Đừng ghi trùng với "Gửi đông" của Cân đối: cùng một lô vào hai nơi là cộng đôi.
 
@@ -163,3 +166,4 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 ## Lịch sử
 
 - 2026-11-03 — tạo.
+- 2026-11-06 — gỡ khi nhầm: Sổ NXT xóa cả kỳ (chặn khi đã có kỳ sau) + Hoàn tác khi xóa một mã; Đồng bộ danh mục có Hoàn tác gỡ đúng lần đó.

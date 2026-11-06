@@ -13,6 +13,7 @@ import { NxtImportDialog, useNxtImportForm } from "./NxtImportDialog";
 import { NXT_FILE_ACCEPT, readNxtReportFile } from "@/lib/nxtReportFile";
 import { warehouseOfReport } from "@/lib/nxtStockImport";
 import { uid } from "@/lib/db";
+import { renameLedgerItems, revertCatalogSync, type CatalogSyncRun } from "@/lib/monthlyStockCatalogSync";
 import { chuan0, num, formatDateVN } from "@/lib/format";
 import {
   parseStockStatementFile,
@@ -946,7 +947,11 @@ export default function MonthlyStockScreen() {
   });
   const materialTypeEditor = useQuickCatalogEdit("materialType", mtypes, setMtypes, { matchBy: "name" });
 
+  /* Mục gõ thêm mới NGAY trong hộp (ô "Ánh xạ … tới", `addCanonicalName`) — tính vào cùng
+     lần đồng bộ để một Hoàn tác gỡ được cả chúng. Chỉ đọc/ghi trong xử lý sự kiện. */
+  const syncDialogCreated = useRef<{ products: Product[]; materials: MaterialType[] }>({ products: [], materials: [] });
   const openSyncDialog = () => {
+    syncDialogCreated.current = { products: [], materials: [] };
     setSavedTargets({}); // rỗng = dùng đích GỢI Ý mỗi dòng
     setMapDB({}); // rỗng = giữ nguyên tên file (chưa ánh xạ)
     setIsSyncOpen(true);
@@ -993,11 +998,42 @@ export default function MonthlyStockScreen() {
     }
     if (materialsToAdd.length) setMtypes([...mtypes, ...materialsToAdd]);
     if (productsToAdd.length) setProducts([...products, ...productsToAdd]);
-    if (renames.size) writeLines(lines.map((l) => (renames.has(l.itemName) ? { ...l, itemName: renames.get(l.itemName)! } : l)));
+    const renamed = renameLedgerItems(lines, renames);
+    if (renamed.renamed.length) writeLines(renamed.lines);
     setIsSyncOpen(false);
+    // Một Hoàn tác gỡ ĐÚNG phần lần này làm (mục vừa tạo còn y nguyên thì xóa, tên dòng sổ trả lại).
+    const fromDialog = syncDialogCreated.current;
+    syncDialogCreated.current = { products: [], materials: [] };
+    const run = {
+      createdProducts: [...fromDialog.products, ...productsToAdd],
+      createdMaterials: [...fromDialog.materials, ...materialsToAdd],
+      renamedLines: renamed.renamed,
+    };
     notify.saved(
-      `Đồng bộ: +${productsToAdd.length} mặt hàng · +${materialsToAdd.length} loại NL · đổi tên ${renames.size} mã trong sổ`
+      `Đồng bộ: +${run.createdProducts.length} mặt hàng · +${run.createdMaterials.length} loại NL · đổi tên ${renames.size} mã trong sổ`,
+      () => undoSync(run)
     );
+  };
+
+  /* Bản MỚI NHẤT của sổ + hai danh mục cho Hoàn tác (toast sống vài giây, trong lúc đó có thể đã ghi tiếp). */
+  const latestSyncState = useRef({ lines, products, mtypes });
+  useEffect(() => {
+    latestSyncState.current = { lines, products, mtypes };
+  });
+  const undoSync = (run: CatalogSyncRun<Product, MaterialType>) => {
+    const cur = latestSyncState.current;
+    const r = revertCatalogSync({ lines: cur.lines, products: cur.products, materials: cur.mtypes }, run);
+    if (r.removedMaterials) setMtypes(r.materials);
+    if (r.removedProducts) setProducts(r.products);
+    // Ghi thẳng (không chụp vào Ctrl+Z): hàm này chạy từ toast của lần vẽ cũ, `lines` trong writeLines đã cũ.
+    if (r.revertedLines) writeLinesRaw(r.lines);
+    const kept = [...r.keptProducts, ...r.keptMaterials];
+    const message =
+      `Đã hoàn tác đồng bộ: gỡ ${r.removedProducts} mặt hàng · ${r.removedMaterials} loại NL · trả tên ${r.revertedLines} dòng sổ` +
+      (kept.length ? ` · giữ ${kept.length} mục đã sửa sau đồng bộ (${kept.join(", ")})` : "") +
+      (r.skippedLines ? ` · ${r.skippedLines} dòng đã đổi/xóa sau đồng bộ nên để nguyên` : "");
+    if (kept.length || r.skippedLines) notify.warning(message);
+    else notify.saved(message);
   };
 
   /** Đặt đích cho một NHÓM dòng (bulk theo section). */
@@ -1022,15 +1058,16 @@ export default function MonthlyStockScreen() {
     if (d === "product") {
       const existing = products.find((p) => normalize(p.name) === normalize(name));
       if (existing) return existing.name;
-      setProducts([
-        ...products,
-        { id: uid(), code: "", name, finishedGoodCode: "", category: inferMaterialCategory(name), processingType: "" },
-      ]);
+      const created: Product = { id: uid(), code: "", name, finishedGoodCode: "", category: inferMaterialCategory(name), processingType: "" };
+      setProducts([...products, created]);
+      if (isSyncOpen) syncDialogCreated.current.products.push(created);
       notify.saved(`Đã thêm mặt hàng "${name}" vào danh mục`);
     } else if (d === "material") {
       const existing = mtypes.find((m) => normalize(m.name) === normalize(name));
       if (existing) return existing.name;
-      setMtypes([...mtypes, { id: uid(), name, category: inferMaterialCategory(name), note: "Từ sổ kho theo tháng" }]);
+      const created: MaterialType = { id: uid(), name, category: inferMaterialCategory(name), note: "Từ sổ kho theo tháng" };
+      setMtypes([...mtypes, created]);
+      if (isSyncOpen) syncDialogCreated.current.materials.push(created);
       notify.saved(`Đã thêm loại nguyên liệu "${name}" vào danh mục`);
     }
     return name;

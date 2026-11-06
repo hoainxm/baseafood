@@ -708,6 +708,20 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             <li>Tick vài dòng ⇒ thấy ngay tổng của đúng mấy dòng đó, in riêng được.</li>
           </Y>
         </Section>
+        <Section title="Đồng bộ danh mục">
+          <Y>
+            <li>
+              Chọn <b>Đồng bộ danh mục</b> (số trong ngoặc là số tên chưa có trong danh mục). Mỗi tên chọn đích{" "}
+              <b>Mặt hàng</b>, <b>Loại NL</b> hoặc <b>Bỏ qua</b>, và tên chuẩn để ánh xạ. Lưu xong: tên chưa có được thêm vào
+              danh mục, dòng sổ mang tên cũ đổi sang tên chuẩn.
+            </li>
+            <li>
+              Đồng bộ nhầm: chọn <b>Hoàn tác</b> trên thông báo (vài giây). App gỡ đúng phần lần đó làm: mục vừa thêm (kể cả tên chuẩn gõ mới trong hộp) còn y
+              nguyên thì xóa, tên dòng sổ trả về như cũ. Mục đã sửa sau đồng bộ, hoặc dòng đã đổi tên / xóa sau đó, thì giữ
+              nguyên và thông báo nêu rõ.
+            </li>
+          </Y>
+        </Section>
         <Section title="Cuối tháng">
           <p>
             Soát xong chọn <b>Dồn sang tháng sau</b>: tồn cuối tháng này thành tồn đầu tháng sau

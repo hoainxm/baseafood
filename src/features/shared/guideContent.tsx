@@ -709,7 +709,16 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
               <b>Chưa có dòng sổ</b> · <b>File không cân</b>. Ba tình trạng sau phải chọn <b>Theo file</b>, <b>Giữ sổ</b> hoặc <b>Bỏ mã này</b>.
             </li>
             <li>Mã ghép theo gợi ý (nhãn <b>gợi ý theo số</b>) thì kiểm lại; sai thì đổi ở ô <b>Ghép mã … với dòng sổ</b>.</li>
-            <li>Chọn <b>Nạp</b>. Còn chỗ chưa chọn thì app liệt kê, chưa ghi. Có ghi đè số cũ thì bấm Nạp lần nữa để xác nhận.</li>
+            <li>
+              Soát các ô sẽ ghi (mặt hàng, size, ngày nhập, invoice, KG/kiện). Chấm xanh = lấy từ file vì sổ trống; dấu cảnh báo = sổ khác file, giữ sổ.
+            </li>
+            <li>
+              Sổ nhiều hơn file: chọn <b>Sổ đã tính trước nhập</b> (khi sổ đã ghi phần nhập vào tồn đầu) hoặc <b>Xuất điều chỉnh</b>.
+            </li>
+            <li>
+              Chọn <b>Nạp dòng</b> để ghi riêng từng dòng (dòng chuyển <b>Đã nạp</b>), hoặc <b>Nạp tất cả</b> cho mọi dòng sẵn sàng. Dòng chưa chọn được
+              bỏ qua và liệt kê. Có ghi đè số cũ thì chọn lần nữa để xác nhận.
+            </li>
           </Step>
           <p>
             Nhập, xuất ghi thay theo file nên nạp lại cùng file không nhân đôi. Mã kế toán lưu trên dòng sổ, dồn tháng mang theo, tháng

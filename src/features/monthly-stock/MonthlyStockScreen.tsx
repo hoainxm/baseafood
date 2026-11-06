@@ -1156,13 +1156,15 @@ export default function MonthlyStockScreen() {
     try {
       const report = await readNxtReportFile(file);
       const fromFile = warehouseOfReport(report.warehouseText);
-      nxtImport.open(file.name, report, fromFile || (warehouse !== ALL_WAREHOUSES ? warehouse : DEFAULT_WAREHOUSE), TEMPORARY_GOODS_CATEGORY);
+      // Nhóm cho dòng mới: file "… NHẬP KHẨU …" ⇒ Nguyên liệu nhập khẩu; còn lại ⇒ Hàng tạm (đổi được ở hộp).
+      const category = /NH[ẬA]P\s*KH[ẨA]U/i.test(file.name.normalize("NFC")) ? "Nguyên liệu nhập khẩu" : TEMPORARY_GOODS_CATEGORY;
+      nxtImport.open(file.name, report, fromFile || (warehouse !== ALL_WAREHOUSES ? warehouse : DEFAULT_WAREHOUSE), category);
     } catch (err) {
       notify.error(`Không đọc được báo cáo: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
   const commitNxtImport = (next: MonthlyStockLine[], message: string, toMonth: string, toWarehouse: string) => {
-    writeLines(next, "nxt-import");
+    writeLines(next, `nxt-import-${uid()}`); // mỗi lần nạp (một dòng / tất cả) một mục Hoàn tác
     setMonth(toMonth);
     setWarehouse(toWarehouse);
     notify.saved(message);

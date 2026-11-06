@@ -71,7 +71,9 @@ export function buildMonthlyStockTour(ctx: MonthlyStockTourContext): PageTour {
         "• Chưa có dòng sổ: file có tồn đầu nhưng chưa ghép được dòng sổ nào (không dòng nào có đúng số đó). Sổ có lô này thì chọn ở ô Ghép mã với dòng sổ (cảnh báo gợi ý các dòng tên gần giống); chưa có thì chọn Theo file để thêm dòng, hoặc Bỏ mã này.\n" +
         "• File không cân: chỉ được Bỏ mã này, sửa file rồi nạp lại.\n" +
         "Lần đầu, hệ thống gợi ý ghép theo số tồn đầu trùng nhau (nhãn gợi ý theo số), kiểm lại rồi đổi nếu sai. Nạp xong, mã kế toán lưu trên dòng sổ và đi theo khi dồn tháng, nên tháng sau tự khớp.\n" +
-        "Còn chỗ chưa chọn thì nút Nạp liệt kê ra, không ghi. Có ghi đè số đang có thì chọn Nạp lần nữa để xác nhận. Ghi xong vẫn Hoàn tác được.",
+        "Mỗi dòng hiện đúng các ô sẽ ghi vào sổ: mặt hàng, size, ngày nhập, invoice, KG/kiện (đọc từ tên hàng trên file), tồn đầu, nhập, xuất. Ô có chấm xanh là lấy từ file vì sổ đang trống; ô có dấu cảnh báo là sổ khác file, hệ thống giữ số của sổ.\n" +
+        "Sổ nhiều hơn file mà phần thừa không quá lượng nhập của file thì có thêm Sổ đã tính trước nhập (trừ phần thừa vào nhập, xuất đúng file); Xuất điều chỉnh thì ghi phần thừa thành xuất.\n" +
+        "Dòng sẵn sàng có Nạp dòng để ghi riêng dòng đó, dòng chuyển Đã nạp. Nạp tất cả ghi mọi dòng sẵn sàng một lần, dòng còn lệch chưa chọn được bỏ qua và liệt kê lại. Có ghi đè số đang có thì chọn lần nữa để xác nhận. Ghi xong vẫn Hoàn tác được.",
     });
   }
 

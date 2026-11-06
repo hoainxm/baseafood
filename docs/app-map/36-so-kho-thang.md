@@ -182,6 +182,15 @@ Nút **"Nạp báo cáo XNT"** (quyền Nhập) đọc "Báo cáo xuất nhập 
 - **Cảnh báo thêm**: ghi đè nhập/xuất đang có (cũ → mới) · lô có xuất do Cân đối ghi (vết ⟦CĐ⟧ — báo cáo đã tính chưa?) · dòng sổ mang mã mà file không có · tổng tồn cuối sau nạp ≠ file. Có ghi đè hoặc điều chỉnh ⇒ bấm Nạp lần hai để xác nhận; ghi xong có Hoàn tác (Ctrl+Z).
 - **Ghi** (`applyNxtPlan`): nhập/xuất **THAY** theo file (nạp lại cùng file không đổi gì) và lưu `accountingCode` lên dòng. Nhiều dòng cùng mã: nhập vào dòng chính, xuất trừ theo tồn có từng dòng. **Theo file khi lệch**: file nhiều hơn ⇒ dòng điều chỉnh `nxt-adj|<kho>|<tháng>|<mã>` tồn đầu = phần chênh (dồn kỳ mang theo); sổ nhiều hơn ⇒ KHÔNG đẻ dòng âm, ghi thành **xuất điều chỉnh** trên dòng chính + ghi chú. Dòng mới id `nxt|<kho>|<tháng>|<mã>`.
 
+### Xem trước dữ liệu từng dòng · nạp từng dòng / tất cả (ba-spec [75](75-nxt-import-row-review.ba-spec.md))
+
+- Mỗi mã hiện thành DÒNG SẼ GHI theo ô của sổ: mặt hàng · size · ngày nhập · invoice · kg/kiện · tồn đầu (file / sổ) · nhập · xuất · tồn cuối. Mô tả lô tách từ tên hàng (`parseLotDescription`: `SIZE …` / cụm size trước ngày · ngày d/m (không hợp lệ mà hợp lệ m/d ⇒ đổi + báo) · `INVOICE: a/b` · `(nKG/CTN|PP)`).
+- Ô mô tả: dòng sổ đã có ⇒ CHỈ điền ô trống (chấm xanh); ô khác file ⇒ giữ sổ + cảnh báo. KG/kiện = 1 coi như trống. Dòng mới: tên hàng trùng loài có sẵn trong sổ ⇒ dùng đúng tên đó.
+- Ghép lần đầu: mã đã lưu → ghi chú "mã KT" → **invoice + size + loài** (`suggestByInvoice`, luật chi tiết ba-spec 75 A6) → tồn đầu trùng số (cùng loài).
+- Sổ nhiều hơn file, phần thừa ≤ nhập file ⇒ thêm lựa chọn **Sổ đã tính trước nhập** (nhập ghi = nhập file − phần thừa, xuất đúng file); "Theo file" khi sổ nhiều hơn mang nhãn **Xuất điều chỉnh**. Cả hai: tồn cuối = file. Lần sau nạp lại nhớ lựa chọn nhờ ghi chú trên lô.
+- **Nạp dòng** (mỗi mã sẵn sàng) ghi ngay mã đó, dòng thành **Đã nạp**, hộp còn mở; **Nạp tất cả** ghi mọi mã sẵn sàng một lần, mã chưa sẵn sàng bỏ qua + liệt kê. Có ghi đè / điều chỉnh ⇒ bấm lần hai xác nhận. Mỗi lần nạp một mục Hoàn tác.
+- PDF: số dài bị ngắt sang dòng dưới cùng cột (`303,526.` / `5`) được ghép (`mergeWrappedNumbers`). Tên file có "NHẬP KHẨU" ⇒ nhóm dòng mới mặc định "Nguyên liệu nhập khẩu".
+
 ## Cờ lệch dồn kỳ + Đối chiếu (SOI + sửa tay, KHÔNG tự ghi đè)
 
 Sau khi nạp cả năm, mỗi tháng vẫn giữ số theo file. Module **gắn cờ** khi tồn đầu

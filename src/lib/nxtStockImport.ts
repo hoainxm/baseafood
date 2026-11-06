@@ -140,6 +140,31 @@ function phrases(l: Line, gap = 8): { text: string; left: number; right: number 
 }
 
 /**
+ * Số dài bị ngắt sang dòng dưới trong cùng cột ("303,526." + "5" ⇒ "303,526.5"): mẩu số tận cùng
+ * bằng dấu phân cách, mẩu dưới (≤ 14pt) toàn chữ số, mép phải gần nhau ⇒ ghép làm một.
+ */
+export function mergeWrappedNumbers(pieces: PdfTextPiece[]): PdfTextPiece[] {
+  const used = new Set<PdfTextPiece>();
+  const out: PdfTextPiece[] = [];
+  for (const p of pieces) {
+    if (used.has(p)) continue;
+    if (/^\d[\d,]*[.,]$/.test(p.str.trim())) {
+      const tail = pieces.find(
+        (q) => !used.has(q) && q !== p && /^\d+$/.test(q.str.trim()) && p.y - q.y > 0 && p.y - q.y <= 14 && Math.abs(q.x + q.width - (p.x + p.width)) <= 8
+      );
+      if (tail) {
+        used.add(tail);
+        // Số canh giữa theo hàng ⇒ hai mẩu nằm trên / dưới hàng: đặt số ghép ở giữa.
+        out.push({ ...p, str: p.str.trim() + tail.str.trim(), y: (p.y + tail.y) / 2, width: Math.max(p.width, tail.x + tail.width - p.x) });
+        continue;
+      }
+    }
+    out.push(p);
+  }
+  return out;
+}
+
+/**
  * Đọc báo cáo XNT từ chữ PDF. Mẫu "Báo cáo xuất nhập tồn" (phần mềm kế toán xí nghiệp): mỗi trang
  * lặp tiêu đề cột + dòng "SL mặt hàng"; số canh phải theo cột; tên hàng (và đôi khi mã) xuống nhiều
  * dòng, canh giữa theo dòng số ⇒ gom chữ cột mã / tên thành KHỐI (khoảng cách dòng) rồi gán khối cho
@@ -155,7 +180,7 @@ export function parseNxtPdfItems(pieces: PdfTextPiece[]): NxtReport {
   const rows: NxtReportRow[] = [];
 
   for (const page of pages) {
-    const lines = groupLines(pieces.filter((p) => p.page === page && p.str.trim()));
+    const lines = groupLines(mergeWrappedNumbers(pieces.filter((p) => p.page === page && p.str.trim())));
     const headerIdx = lines.findIndex((l) => phrases(l).filter((ph) => columnOfHeader(ph.text)).length >= 6);
     if (headerIdx < 0) continue;
     // Phần đầu trang (trên tiêu đề cột): ngày lập · khoảng ngày · chi nhánh — lấy ở trang đầu có.
@@ -370,7 +395,7 @@ export type NxtStatus =
   | "unbalanced" // dòng file tự không cân (đầu + nhập − xuất ≠ cuối) — PHẢI chọn
   | "skipped";
 
-export type NxtChoice = "file" | "ledger" | "skip";
+export type NxtChoice = "prior-in" | "file" | "ledger" | "skip";
 
 export interface NxtDecision {
   /** Dòng sổ ghép với mã (id dòng · MAP_NEW · MAP_SKIP). Bỏ trống = theo gợi ý / mã đã lưu. */
@@ -400,7 +425,25 @@ export interface NxtPlanItem {
   resultCloseKg: number;
   /** Lời giải thích chỗ lệch, hiện ngay dưới dòng. */
   warnings: string[];
+  /** Mô tả lô đọc từ tên hàng của file. */
+  lot: LotDescription;
+  /** Ô mô tả SẼ GHI (dòng chính) + ô nào lấy từ file + ô nào khác file (R4). */
+  fields: NxtFieldPreview;
 }
+
+export interface NxtFieldPreview {
+  itemName: string;
+  size: string;
+  importDate: string;
+  origin: string;
+  kgPerCtn: number | null;
+  /** Ô điền từ file (sổ đang trống hoặc dòng mới). */
+  filled: NxtField[];
+  /** Ô sổ có giá trị khác file — giữ sổ, cảnh báo. */
+  conflicts: { field: NxtField; ledger: string; file: string }[];
+}
+export type NxtField = "size" | "importDate" | "origin" | "kgPerCtn";
+export const FIELD_LABEL: Record<NxtField, string> = { size: "Size", importDate: "Ngày nhập", origin: "Invoice", kgPerCtn: "KG/kiện" };
 
 export interface NxtPlan {
   month: string;
@@ -430,6 +473,90 @@ export function codeFromNote(note: string): string {
 export function tidyItemName(name: string): string {
   const t = name.replace(/\(\s*kg\s*\)/gi, "").replace(/\s+/g, " ").trim().toLowerCase();
   return t ? t[0].toUpperCase() + t.slice(1) : "";
+}
+
+/** Mô tả lô đọc từ tên hàng của báo cáo (file cá: "CÁ SABA … SIZE 450-UP 28/7/2026 INVOICE: SBT2026009 (15KG/CTN)"). */
+export interface LotDescription {
+  /** Loài / tên hàng phần chữ đầu (bỏ "NGUYÊN LIỆU"), VD "CÁ SABA". */
+  species: string;
+  size: string;
+  /** yyyy-mm-dd */
+  importDate: string;
+  /** Nhiều invoice nối "/". */
+  invoice: string;
+  kgPerCtn: number | null;
+  /** Đọc có thì có ít nhất một ô (size / ngày / invoice / kg/kiện). */
+  structured: boolean;
+  warnings: string[];
+}
+
+const validDate = (y: number, m: number, d: number) => m >= 1 && m <= 12 && d >= 1 && d <= lastDayOfMonth(y, m);
+const iso = (y: number, m: number, d: number) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+const SIZE_TOKEN_RE = /^\d{2,4}(?:\s*[-/]\s*\d{2,4}|\s*-?\s*UP)?(?:GR)?$/i;
+
+/** Tách ngày nhập · size · invoice · kg/kiện từ tên hàng (R2 ba-spec 75). Ô không đọc được để trống, không đoán. */
+export function parseLotDescription(name: string): LotDescription {
+  const warnings: string[] = [];
+  let text = name.replace(/\(\s*kg\s*\)\s*$/i, " ").replace(/\s+/g, " ").trim();
+  // Quy cách "(15KG/CTN)" · "(15KG)" · "(15 KG/CTN)" · "(14.5KG/PP)" · "(6KG/CTN" (thiếu ngoặc).
+  let kgPerCtn: number | null = null;
+  const pack = text.match(/\(\s*(\d+(?:[.,]\d+)?)\s*KG\s*(?:\/\s*[A-ZÀ-Ỹ]+)?\s*\)?/i);
+  if (pack) {
+    kgPerCtn = Number(pack[1].replace(",", "."));
+    text = text.replace(pack[0], " ");
+  }
+  let invoice = "";
+  const inv = text.match(/INVOICE\s*:?\s*(.+)$/i);
+  if (inv) {
+    invoice = inv[1].replace(/\s+/g, "").replace(/[()]/g, "").toUpperCase();
+    text = text.slice(0, inv.index).trim();
+  }
+  let importDate = "";
+  let datePos = -1;
+  const dm = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dm) {
+    datePos = dm.index ?? -1;
+    const [a, b, y] = [Number(dm[1]), Number(dm[2]), Number(dm[3])];
+    if (validDate(y, b, a)) importDate = iso(y, b, a);
+    else if (validDate(y, a, b)) {
+      importDate = iso(y, a, b);
+      warnings.push(`Ngày nhập "${dm[0]}" ghi kiểu tháng/ngày — đọc là ${b}/${a}/${y}.`);
+    } else warnings.push(`Ngày nhập "${dm[0]}" không hợp lệ — để trống.`);
+  }
+  const head = datePos >= 0 ? text.slice(0, datePos).trim() : text;
+  let size = "";
+  const sizeKw = head.match(/\bSIZE\s+([0-9][0-9A-Z/+.-]*(?:\s*-\s*UP)?)/i);
+  if (sizeKw) size = sizeKw[1].toUpperCase();
+  else if (datePos >= 0) {
+    const last = head.split(" ").pop() ?? "";
+    if (SIZE_TOKEN_RE.test(last)) size = last.toUpperCase();
+  }
+  const species = head
+    .split(/\bNGUY[ÊE]N\s+LI[ỆE]U\b|\bSIZE\b/i)[0]
+    .replace(/\s+/g, " ")
+    .trim();
+  const structured = !!(size || importDate || invoice || kgPerCtn != null);
+  return { species: structured ? species : "", size, importDate, invoice, kgPerCtn, structured, warnings };
+}
+
+/** Khóa so size: viết hoa, "/" = "-", bỏ "GR" / khoảng trắng ("50/90" ≡ "50-90", "450-UP" ≡ "450UP"). */
+export const sizeKey = (s: string) => (s ?? "").toUpperCase().replace(/GR\b/g, "").replace(/\s+/g, "").replace(/\//g, "-").replace(/-?UP$/, "UP");
+const invoiceKey = (s: string) => (s ?? "").toUpperCase().replace(/\s+/g, "");
+/** Invoice sổ khớp một invoice của file: bằng nhau, hoặc một bên là tiền tố bên kia (≥ 8 ký tự, VD "BF2606ACM180" ↔ "BF2606ACM180-03"). */
+export function invoiceMatches(ledgerOrigin: string, fileInvoice: string): boolean {
+  const a = invoiceKey(ledgerOrigin);
+  if (a.length < 4) return false;
+  return invoiceKey(fileInvoice)
+    .split("/")
+    .filter(Boolean)
+    .some((b) => a === b || (Math.min(a.length, b.length) >= 8 && (a.startsWith(b) || b.startsWith(a))));
+}
+const speciesWords = (s: string) => new Set(foldWords(s).filter((w) => w !== "ca"));
+/** Cùng loài: chung ít nhất một chữ có nghĩa (bỏ dấu, bỏ "cá"). */
+export function sameSpecies(itemName: string, species: string): boolean {
+  const a = speciesWords(itemName);
+  for (const w of speciesWords(species)) if (a.has(w)) return true;
+  return false;
 }
 
 const lineLabel = (l: MonthlyStockLine) => [l.itemName, l.size, l.origin].filter(Boolean).join(" · ");
@@ -500,6 +627,9 @@ export function buildNxtPlan(lines: MonthlyStockLine[], report: NxtReport, opts:
     let rows: MonthlyStockLine[] = [];
     /** Số dòng chưa ghép có tồn đầu trùng đúng số file (> 1 ⇒ không đoán). */
     let sameCount = 0;
+    const lot = parseLotDescription(file.name);
+    let byInvoice: MonthlyStockLine[] = [];
+    let suggestBy: "invoice" | "number" = "number";
 
     if (d.target === MAP_SKIP) {
       // bỏ mã
@@ -520,9 +650,16 @@ export function buildNxtPlan(lines: MonthlyStockLine[], report: NxtReport, opts:
       } else if (owned(byNote).length) {
         rows = owned(byNote);
         mapSource = "note";
+      } else if (lot.invoice && (byInvoice = suggestByInvoice(scope.filter((l) => !claimed.has(l.id)), lot, file)).length) {
+        // Gợi ý theo invoice + size + loài (R3) — nhiều dòng cùng lô ⇒ ghép cả nhóm.
+        rows = byInvoice;
+        mapSource = "suggest";
+        suggestBy = "invoice";
+        for (const l of byInvoice) claimed.add(l.id);
       } else if (file.openKg > EPS) {
         // Gợi ý: dòng chưa ghép có tồn đầu trùng đúng số (và duy nhất).
-        const same = scope.filter((l) => !claimed.has(l.id) && near(l.openKg, file.openKg));
+        // Có mô tả lô ⇒ phải cùng loài (tránh ghép cá sardine vào lô cá sòng chỉ vì trùng số).
+        const same = scope.filter((l) => !claimed.has(l.id) && near(l.openKg, file.openKg) && (!lot.species || sameSpecies(l.itemName, lot.species)));
         sameCount = same.length;
         if (same.length === 1) {
           rows = same;
@@ -541,9 +678,17 @@ export function buildNxtPlan(lines: MonthlyStockLine[], report: NxtReport, opts:
     else status = near(ledgerOpenKg, file.openKg) ? "match" : "opening-diff";
 
     // Lần nạp trước đã "Theo file" với đúng cặp số này (ghi chú xuất điều chỉnh còn trên lô) ⇒ nhớ lựa chọn.
-    const adjustedBefore =
-      status === "opening-diff" && rows.some((l) => (l.note ?? "").includes(negativeAdjustmentNote(file.openKg - ledgerOpenKg, ledgerOpenKg, file.openKg)));
-    const choice = d.choice ?? (adjustedBefore ? "file" : undefined);
+    const signature = (note: string) => rows.some((l) => (l.note ?? "").includes(note));
+    const rememberedChoice: NxtChoice | undefined =
+      status !== "opening-diff"
+        ? undefined
+        : signature(negativeAdjustmentNote(file.openKg - ledgerOpenKg, ledgerOpenKg, file.openKg))
+          ? "file"
+          : signature(priorInNote(file.openKg - ledgerOpenKg, ledgerOpenKg, file.openKg))
+            ? "prior-in"
+            : undefined;
+    const adjustedBefore = rememberedChoice != null;
+    const choice = d.choice ?? rememberedChoice;
     const warnings: string[] = [];
     const diff = file.openKg - ledgerOpenKg;
     if (status === "opening-diff")
@@ -563,11 +708,27 @@ export function buildNxtPlan(lines: MonthlyStockLine[], report: NxtReport, opts:
     }
     if (status === "unbalanced")
       warnings.push(`Dòng trên file không cân: ${fmt(file.openKg)} + ${fmt(file.inKg)} − ${fmt(file.outKg)} ≠ ${fmt(file.closeKg)} (tồn cuối in trên file).`);
-    if (adjustedBefore && !d.choice) warnings.push("Lần nạp trước đã chọn Theo file cho đúng chỗ lệch này — giữ lựa chọn đó.");
-    if (mapSource === "suggest") warnings.push("Ghép theo số tồn đầu trùng nhau — kiểm lại đúng lô chưa.");
+    if (adjustedBefore && !d.choice) warnings.push(`Lần nạp trước đã chọn "${choiceLabelFor(rememberedChoice!, file.openKg - ledgerOpenKg)}" cho đúng chỗ lệch này — giữ lựa chọn đó.`);
+    if (mapSource === "suggest")
+      warnings.push(
+        suggestBy === "invoice"
+          ? `Ghép theo invoice ${lot.invoice}${
+              lot.size && rows.every((l) => sizeKey(l.size) === sizeKey(lot.size)) ? ` + size ${lot.size}` : lot.size ? " (dòng sổ chưa ghi size — sẽ điền " + lot.size + ")" : ""
+            } · ${rows.length} dòng sổ — kiểm lại đúng lô chưa.`
+          : "Ghép theo số tồn đầu trùng nhau — kiểm lại đúng lô chưa."
+      );
+    if (suggestBy === "invoice" && mapSource === "suggest") {
+      const sameLotLeft = scope.filter(
+        (l) => !claimed.has(l.id) && invoiceMatches(l.origin, lot.invoice) && sameSpecies(l.itemName, lot.species || file.name)
+      );
+      if (sameLotLeft.length)
+        warnings.push(`Sổ còn ${sameLotLeft.length} dòng cùng invoice chưa ghép: ${sameLotLeft.map((l) => `${lineLabel(l)} (${fmt(l.openKg)} kg)`).join("; ")}.`);
+    }
+    for (const w of lot.warnings) warnings.push(w);
     // Tồn cuối sau khi ghi + nhập/xuất sẽ ghi (để báo ghi đè).
     const acting = isActing(status, choice);
     const extraOut = status === "opening-diff" && choice === "file" && diff < 0 ? -diff : 0;
+    const expectedIn = status === "opening-diff" && choice === "prior-in" ? file.inKg + diff : file.inKg;
     const effectiveOpen = status === "opening-diff" && choice === "ledger" ? ledgerOpenKg : file.openKg;
     const currentClose = ledgerOpenKg + rows.reduce((s, l) => s + l.inKg - l.outKg, 0);
     const resultCloseKg = acting ? effectiveOpen + file.inKg - file.outKg : currentClose;
@@ -575,13 +736,15 @@ export function buildNxtPlan(lines: MonthlyStockLine[], report: NxtReport, opts:
     const curIn = rows.reduce((s, l) => s + l.inKg, 0);
     const curOut = rows.reduce((s, l) => s + l.outKg, 0);
     const overwrite =
-      acting && (curIn > EPS || curOut > EPS) && (!near(curIn, file.inKg) || !near(curOut, file.outKg + extraOut)) ? { inKg: curIn, outKg: curOut } : null;
+      acting && (curIn > EPS || curOut > EPS) && (!near(curIn, expectedIn) || !near(curOut, file.outKg + extraOut)) ? { inKg: curIn, outKg: curOut } : null;
     if (overwrite) warnings.push(`Sổ đang có nhập ${fmt(curIn)} · xuất ${fmt(curOut)} — sẽ THAY bằng số của file.`);
     const balancingOutKg = rows.reduce((s, l) => s + balancingOutOf(l.note), 0);
     if (balancingOutKg > EPS)
       warnings.push(`Cân đối đã ghi xuất ${fmt(balancingOutKg)} kg từ lô này (lấy xả đông). Nếu báo cáo kế toán đã tính phần đó thì đúng; chưa tính thì sẽ thiếu.`);
 
-    items.push({ code: file.code, fileName: file.name, file, mapSource, rowIds: rows.map((l) => l.id), ledgerOpenKg, status, choice, overwrite, balancingOutKg, resultCloseKg, warnings });
+    const fields = previewFields(rows, lot, file.name, d.newName, scope);
+    for (const c of fields.conflicts) warnings.push(`${FIELD_LABEL[c.field]} trên sổ "${c.ledger}" khác file "${c.file}" — giữ sổ (sửa tay nếu file đúng).`);
+    items.push({ code: file.code, fileName: file.name, file, mapSource, rowIds: rows.map((l) => l.id), ledgerOpenKg, status, choice, overwrite, balancingOutKg, resultCloseKg, warnings, lot, fields });
   }
 
   const usedRowIds = new Set(items.flatMap((i) => i.rowIds));
@@ -622,29 +785,109 @@ function similarRows(rows: MonthlyStockLine[], fileName: string): MonthlyStockLi
     .map((x) => x.l);
 }
 
+/** Dòng sổ cùng lô theo invoice + size + loài (R3). Không có dòng đúng size ⇒ dòng trống size; trong đó một dòng đúng tồn đầu ⇒ chỉ dòng đó. */
+function suggestByInvoice(free: MonthlyStockLine[], lot: LotDescription, file: Pick<NxtReportRow, "openKg" | "inKg">): MonthlyStockLine[] {
+  const sameLot = free.filter((l) => invoiceMatches(l.origin, lot.invoice) && (!lot.species || sameSpecies(l.itemName, lot.species)));
+  if (!sameLot.length) return [];
+  const sum = (xs: MonthlyStockLine[]) => xs.reduce((s, l) => s + l.openKg, 0);
+  const only = (xs: MonthlyStockLine[], kg: number) => {
+    const hit = xs.filter((l) => near(l.openKg, kg));
+    return hit.length === 1 ? hit : [];
+  };
+  const want = sizeKey(lot.size);
+  const exact = want ? sameLot.filter((l) => sizeKey(l.size) === want) : [];
+  if (exact.length) {
+    // Cả nhóm khi: tổng = tồn đầu file, hoặc một dòng = tồn đầu file và phần còn lại = nhập file (sổ đã tính trước nhập).
+    if (exact.length === 1 || near(sum(exact), file.openKg)) return exact;
+    const one = only(exact, file.openKg);
+    if (one.length && near(sum(exact) - file.openKg, file.inKg)) return exact;
+    if (one.length) return one;
+    const prior = only(exact, file.inKg);
+    if (file.openKg <= EPS && prior.length) return prior;
+    return exact;
+  }
+  // Không dòng đúng size: chỉ xét dòng sổ trống size; phải chỉ ra ĐÚNG một dòng, không đoán cả nhóm.
+  const pool = want ? sameLot.filter((l) => !l.size.trim()) : sameLot;
+  if (pool.length === 1) return pool;
+  const one = only(pool, file.openKg);
+  if (one.length && file.openKg > EPS) return one;
+  return file.openKg <= EPS ? only(pool, file.inKg) : [];
+}
+
+const fieldText = (f: NxtField, v: string | number | null) => (v == null || v === "" ? "" : f === "importDate" ? String(v).split("-").reverse().join("/") : String(v));
+
+/** Tên dòng mới (R5): trùng loài với tên hàng sẵn có của sổ (cùng kho, tháng) ⇒ dùng đúng tên đó; không ⇒ tên gọn. */
+function newItemName(lot: LotDescription, fileName: string, scope: MonthlyStockLine[]): string {
+  if (!lot.structured || !lot.species) return tidyItemName(fileName);
+  const want = [...speciesWords(lot.species)].sort().join(" ");
+  const same = scope.find((l) => [...speciesWords(l.itemName)].sort().join(" ") === want);
+  return same?.itemName ?? tidyItemName(lot.species);
+}
+
+/** Ô mô tả sẽ ghi cho dòng chính (R4): sổ trống ⇒ lấy file; sổ khác file ⇒ giữ sổ + báo. */
+function previewFields(rows: MonthlyStockLine[], lot: LotDescription, fileName: string, newName: string | undefined, scope: MonthlyStockLine[]): NxtFieldPreview {
+  const fromFile = { size: lot.size, importDate: lot.importDate, origin: lot.invoice, kgPerCtn: lot.kgPerCtn };
+  if (!rows.length) {
+    const filled = (Object.keys(fromFile) as NxtField[]).filter((f) => fromFile[f] != null && fromFile[f] !== "");
+    return { itemName: (newName ?? "").trim() || newItemName(lot, fileName, scope), ...fromFile, filled, conflicts: [] };
+  }
+  const r = rows[0];
+  const filled: NxtField[] = [];
+  const conflicts: NxtFieldPreview["conflicts"] = [];
+  const out = { size: r.size, importDate: r.importDate, origin: r.origin, kgPerCtn: r.kgPerCtn };
+  for (const f of Object.keys(fromFile) as NxtField[]) {
+    const fv = fromFile[f];
+    if (fv == null || fv === "") continue;
+    const lv = out[f];
+    if (lv == null || lv === "" || (f === "kgPerCtn" && near(Number(lv), 1))) {
+      filled.push(f);
+      (out as Record<NxtField, string | number | null>)[f] = fv;
+      continue;
+    }
+    const same =
+      f === "size" ? sizeKey(String(lv)) === sizeKey(String(fv)) : f === "origin" ? invoiceMatches(String(lv), String(fv)) : f === "kgPerCtn" ? near(Number(lv), Number(fv)) : lv === fv;
+    if (!same) conflicts.push({ field: f, ledger: fieldText(f, lv), file: fieldText(f, fv) });
+  }
+  return { itemName: r.itemName, ...out, filled, conflicts };
+}
+
 const fmt = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString("vi-VN");
 
 /** Ghi chú trên lô khi sổ nhiều hơn file và chọn Theo file — cũng là dấu để lần nạp sau nhớ lựa chọn. */
 const negativeAdjustmentNote = (diff: number, ledgerOpenKg: number, fileOpenKg: number) =>
   `Xuất gồm ${fmt(-diff)} kg điều chỉnh tồn đầu theo XNT (sổ ${fmt(ledgerOpenKg)}, file ${fmt(fileOpenKg)}).`;
 
+/** Ghi chú trên lô khi chọn "Sổ đã tính trước nhập" — dấu để lần nạp sau nhớ lựa chọn. */
+const priorInNote = (diff: number, ledgerOpenKg: number, fileOpenKg: number) =>
+  `Nhập giảm ${fmt(-diff)} kg: sổ đã tính phần này vào tồn đầu (sổ ${fmt(ledgerOpenKg)}, file ${fmt(fileOpenKg)}).`;
+
 /** Trạng thái cần người dùng chọn trước khi nạp. */
 export const needsChoice = (s: NxtStatus) => s === "opening-diff" || s === "missing" || s === "unbalanced";
 
-/** Lựa chọn mỗi trạng thái được phép (dòng file không cân chỉ có thể bỏ — sửa file rồi nạp lại). */
-export const CHOICES_OF: Record<NxtStatus, NxtChoice[]> = {
-  match: [],
-  new: [],
-  "opening-diff": ["file", "ledger", "skip"],
-  missing: ["file", "skip"],
-  unbalanced: ["skip"],
-  skipped: [],
-};
+/**
+ * Lựa chọn được phép cho một mã (R6, R7). Dòng file không cân chỉ bỏ được (sửa file rồi nạp lại).
+ * Sổ nhiều hơn file mà phần thừa ≤ nhập của file ⇒ thêm "Sổ đã tính trước nhập".
+ */
+export function choicesOf(it: Pick<NxtPlanItem, "status" | "ledgerOpenKg" | "file">): NxtChoice[] {
+  if (it.status === "opening-diff") {
+    const extra = it.ledgerOpenKg - it.file.openKg;
+    return extra > EPS && extra <= it.file.inKg + EPS ? ["prior-in", "file", "ledger", "skip"] : ["file", "ledger", "skip"];
+  }
+  if (it.status === "missing") return ["file", "skip"];
+  if (it.status === "unbalanced") return ["skip"];
+  return [];
+}
+
+/** Nhãn lựa chọn theo ngữ cảnh: sổ nhiều hơn file ⇒ "Theo file" chính là xuất điều chỉnh. */
+export function choiceLabelFor(c: NxtChoice, diff: number): string {
+  if (c === "file" && diff < -EPS) return "Xuất điều chỉnh";
+  return CHOICE_LABEL[c];
+}
 
 /** Mã này có được ghi không (theo trạng thái + lựa chọn). */
 export function isActing(status: NxtStatus, choice?: NxtChoice): boolean {
   if (status === "match" || status === "new") return true;
-  if (status === "opening-diff") return choice === "file" || choice === "ledger";
+  if (status === "opening-diff") return choice === "file" || choice === "ledger" || choice === "prior-in";
   if (status === "missing") return choice === "file";
   return false;
 }
@@ -653,9 +896,11 @@ export function isActing(status: NxtStatus, choice?: NxtChoice): boolean {
 export function listNxtBlockers(plan: NxtPlan, reportIssues: NxtReportIssue[]): string[] {
   const out = reportIssues.filter((i) => i.level === "error").map((i) => i.text);
   for (const it of plan.items) {
-    const allowedChoices = CHOICES_OF[it.status];
+    const allowedChoices = choicesOf(it);
     if (needsChoice(it.status) && (!it.choice || !allowedChoices.includes(it.choice)))
-      out.push(`${it.code}: ${STATUS_LABEL[it.status].toLowerCase()} — chọn ${allowedChoices.map((c) => `"${CHOICE_LABEL[c]}"`).join(" / ")}.`);
+      out.push(
+        `${it.code}: ${STATUS_LABEL[it.status].toLowerCase()} — chọn ${allowedChoices.map((c) => `"${choiceLabelFor(c, it.file.openKg - it.ledgerOpenKg)}"`).join(" / ")}.`
+      );
     if (isActing(it.status, it.choice) && it.resultCloseKg < -EPS) out.push(`${it.code}: tồn cuối sẽ âm ${fmt(it.resultCloseKg)} kg — đổi lựa chọn hoặc bỏ mã này.`);
   }
   const owner = new Map<string, string>();
@@ -670,7 +915,7 @@ export function listNxtBlockers(plan: NxtPlan, reportIssues: NxtReportIssue[]): 
   return [...new Set(out)];
 }
 
-export const CHOICE_LABEL: Record<NxtChoice, string> = { file: "Theo file", ledger: "Giữ sổ", skip: "Bỏ mã này" };
+export const CHOICE_LABEL: Record<NxtChoice, string> = { "prior-in": "Sổ đã tính trước nhập", file: "Theo file", ledger: "Giữ sổ", skip: "Bỏ mã này" };
 
 export const STATUS_LABEL: Record<NxtStatus, string> = {
   match: "Khớp",
@@ -687,6 +932,8 @@ export interface NxtApplyOptions {
   decisions?: Record<string, NxtDecision>;
   /** Ghi chú gắn vào dòng mới / dòng điều chỉnh, VD "Nạp XNT 'file.pdf' (lập 02/11/2026)". */
   sourceNote: string;
+  /** Chỉ nạp các mã này (nạp từng dòng). Bỏ trống ⇒ mọi mã đã sẵn sàng. */
+  codes?: string[];
 }
 
 export interface NxtApplyResult {
@@ -695,11 +942,12 @@ export interface NxtApplyResult {
   added: number;
   adjusted: number;
   skipped: number;
+  /** Mã không nạp lần này (chưa chọn / vướng / bỏ). */
+  skippedCodes: string[];
 }
 
 /** Ghi kế hoạch vào sổ: THAY nhập/xuất theo file, lưu mã kế toán, thêm dòng mới / dòng điều chỉnh. */
 export function applyNxtPlan(plan: NxtPlan, opts: NxtApplyOptions): NxtApplyResult {
-  const decisions = opts.decisions ?? {};
   const byId = new Map(plan.baseLines.map((l) => [l.id, l]));
   const changed = new Map<string, MonthlyStockLine>();
   const added: MonthlyStockLine[] = [];
@@ -730,27 +978,39 @@ export function applyNxtPlan(plan: NxtPlan, opts: NxtApplyOptions): NxtApplyResu
     accountingCode: code,
   });
 
+  const only = opts.codes ? new Set(opts.codes) : null;
+  const blocked = itemBlockers(plan);
+  const skippedCodes: string[] = [];
   for (const it of plan.items) {
-    const d = decisions[it.code] ?? {};
-    if (!isActing(it.status, it.choice)) {
+    if (only && !only.has(it.code)) continue;
+    if (!isActing(it.status, it.choice) || blocked.has(it.code)) {
       skipped++;
+      skippedCodes.push(it.code);
       continue;
     }
     const code = normalizeCode(it.code);
     const rows = it.rowIds.map((id) => changed.get(id) ?? byId.get(id)!).filter(Boolean);
-    const name = (d.newName ?? "").trim() || tidyItemName(it.fileName) || code;
+    const name = it.fields.itemName || code;
+    const lotFields = { size: it.fields.size, importDate: it.fields.importDate, origin: it.fields.origin, kgPerCtn: it.fields.kgPerCtn };
 
     if (!rows.length) {
-      // Mã mới (tồn đầu 0) hoặc sổ thiếu dòng + "Theo file": một dòng mới mang luôn tồn đầu của file.
+      // Mã mới (tồn đầu 0) hoặc sổ thiếu dòng + "Theo file": một dòng mới mang luôn tồn đầu + mô tả lô của file.
       const line = template(code, name, newRowId(plan.warehouse, plan.month, code));
-      added.push({ ...line, openKg: it.file.openKg, inKg: it.file.inKg, outKg: it.file.outKg });
+      added.push({ ...line, ...lotFields, openKg: it.file.openKg, inKg: it.file.inKg, outKg: it.file.outKg });
       continue;
     }
 
     let working = rows;
     let extraOut = 0;
+    let inKg = it.file.inKg;
+    let inNote = "";
     const diff = it.file.openKg - it.ledgerOpenKg;
-    if (it.status === "opening-diff" && it.choice === "file") {
+    if (it.status === "opening-diff" && it.choice === "prior-in") {
+      // Sổ đã tính trước phần nhập vào tồn đầu ⇒ nhập ghi = nhập file − phần thừa; xuất đúng file.
+      adjusted++;
+      inKg = it.file.inKg + diff;
+      inNote = priorInNote(diff, it.ledgerOpenKg, it.file.openKg);
+    } else if (it.status === "opening-diff" && it.choice === "file") {
       adjusted++;
       if (diff > 0) {
         // Phần thiếu: dòng điều chỉnh riêng mang tồn đầu = phần chênh (dồn kỳ mang theo như lô thường).
@@ -763,14 +1023,29 @@ export function applyNxtPlan(plan: NxtPlan, opts: NxtApplyOptions): NxtApplyResu
         extraOut = -diff;
       }
     }
-    const split = distribute(working, it.file.inKg, it.file.outKg);
+    const split = distribute(working, inKg, it.file.outKg);
     for (const r of working) {
       const s = split.get(r.id)!;
       const isNew = added.some((a) => a.id === r.id);
       const outKg = s.outKg + (r.id === working[0].id ? extraOut : 0);
-      const adjNote = r.id === working[0].id && extraOut > EPS ? negativeAdjustmentNote(diff, it.ledgerOpenKg, it.file.openKg) : "";
+      const adjNote =
+        r.id === working[0].id ? (extraOut > EPS ? negativeAdjustmentNote(diff, it.ledgerOpenKg, it.file.openKg) : inNote) : "";
       const note = adjNote && !(r.note ?? "").includes(adjNote) ? [r.note, adjNote].filter(Boolean).join("\n") : r.note;
-      const next = { ...r, inKg: s.inKg, outKg, accountingCode: code, note };
+      // R4: chỉ điền ô mô tả đang trống bằng giá trị file.
+      const fill = (v: string | number | null, fv: string | number | null) => (v == null || v === "" ? (fv ?? v) : v);
+      // KG/kiện = 1 là giá trị mặc định khi nạp bảng kê (chưa có quy cách) ⇒ coi như trống.
+      const kgOf = (v: number | null) => (v != null && near(v, 1) && it.lot.kgPerCtn != null ? it.lot.kgPerCtn : (fill(v, it.lot.kgPerCtn) as number | null));
+      const next = {
+        ...r,
+        size: String(fill(r.size, it.lot.size) ?? ""),
+        importDate: String(fill(r.importDate, it.lot.importDate) ?? ""),
+        origin: String(fill(r.origin, it.lot.invoice) ?? ""),
+        kgPerCtn: kgOf(r.kgPerCtn) ?? null,
+        inKg: s.inKg,
+        outKg,
+        accountingCode: code,
+        note,
+      };
       if (isNew) added[added.findIndex((a) => a.id === r.id)] = next;
       else changed.set(r.id, next);
     }
@@ -779,5 +1054,28 @@ export function applyNxtPlan(plan: NxtPlan, opts: NxtApplyOptions): NxtApplyResu
   const addedIds = new Set(added.map((a) => a.id));
   const lines = plan.baseLines.filter((l) => !addedIds.has(l.id)).map((l) => changed.get(l.id) ?? l).concat(added);
   const updated = [...changed.values()].filter((l) => JSON.stringify(l) !== JSON.stringify(byId.get(l.id))).length;
-  return { lines, updated, added: added.length, adjusted, skipped };
+  return { lines, updated, added: added.length, adjusted, skipped, skippedCodes };
+}
+
+/** Lý do chưa nạp được TỪNG mã (cùng luật `listNxtBlockers`, không gồm lỗi file). */
+export function itemBlockers(plan: NxtPlan): Map<string, string[]> {
+  const m = new Map<string, string[]>();
+  for (const text of listNxtBlockers(plan, [])) {
+    const it = plan.items.find((x) => text.startsWith(`${x.code}: `)) ?? plan.items.find((x) => text.includes(` ${x.code}`));
+    if (!it) continue;
+    m.set(it.code, [...(m.get(it.code) ?? []), text]);
+  }
+  return m;
+}
+
+/** Mã đã sẵn sàng (không vướng gì) và nạp thì sổ có đổi. Dùng để hiện "Đã nạp" / đếm "Nạp tất cả". */
+export function pendingCodes(plan: NxtPlan, opts: Omit<NxtApplyOptions, "codes">): Set<string> {
+  const blocked = itemBlockers(plan);
+  const out = new Set<string>();
+  for (const it of plan.items) {
+    if (!isActing(it.status, it.choice) || blocked.has(it.code)) continue;
+    const r = applyNxtPlan(plan, { ...opts, codes: [it.code] });
+    if (r.updated || r.added) out.add(it.code);
+  }
+  return out;
 }

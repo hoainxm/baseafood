@@ -11,6 +11,9 @@ import {
   monthOfReport,
   parseNxtPdfItems,
   parseReportNumber,
+  parseLotDescription,
+  choicesOf,
+  pendingCodes,
   tidyItemName,
   warehouseOfReport,
   type NxtReport,
@@ -313,5 +316,136 @@ describe("đối chiếu file ↔ sổ", () => {
     expect(listNxtBlockers(plan, []).join(" ")).toMatch(/Bỏ mã này/);
     const ok = buildNxtPlan([line("a", { openKg: 100, accountingCode: "A" })], rep, { ...opts, decisions: { A: { choice: "skip" } } });
     expect(listNxtBlockers(ok, [])).toEqual([]);
+  });
+});
+
+/* ---------- ba-spec 75: xem trước dữ liệu từng dòng, nạp từng dòng / tất cả ---------- */
+describe("ba-spec 75 — đọc mô tả lô + đối chiếu file cá", () => {
+  it("AC-1: số bị ngắt dòng ở dòng tổng (\"300,000.\" / \"5\") được ghép lại", () => {
+    const head = pageHead(1, 467).filter((p) => !(Math.abs(p.y - 437) < 0.5 && p.x > 250));
+    const out = [
+      ...head,
+      ...numbers([1000, 0, 300000, 0, "", 0, 700999.5, 0].map((v) => (v === "" ? "0" : v)), 437, 1).filter((p) => p.x + p.width !== NUM_RIGHT[4]),
+      { str: "299,000.", x: NUM_RIGHT[4] - 40, y: 442, width: 40, page: 1 },
+      { str: "5", x: NUM_RIGHT[4] - 5, y: 432, width: 5, page: 1 },
+      ...words("PXC-CNL NK 0007", 55, 408.6, 1),
+      ...words("CÁ SÒNG NGUYÊN LIỆU", 164, 408.6, 1),
+      ...numbers([1000, 0, 300000, 0, "299,000.5", 0, "1,999.5", 0], 408.6, 1),
+      ...footer(1),
+    ].map((p) => (p.str === "SL" || p.str === "mặt" || p.str === "hàng:" || p.str === "4" ? (p.str === "4" ? { ...p, str: "1" } : p) : p));
+    const r = parseNxtPdfItems(out);
+    expect(r.declared?.outKg).toBe(299000.5);
+    expect(r.rows[0].outKg).toBe(299000.5);
+    expect(checkNxtReport({ ...r, declared: { ...r.declared!, openKg: 1000, inKg: 300000, closeKg: 1999.5 } })).toEqual([]);
+  });
+
+  it("AC-2: tách loài · size · ngày · invoice · kg/kiện; ngày tháng/ngày được đổi + báo", () => {
+    const a = parseLotDescription("CÁ SABA NGUYÊN LIỆU SIZE 450-UP 28/7/2026 INVOICE: SBT2026009/SBT202601 1 (15KG/CTN) (KG)");
+    expect(a).toMatchObject({ species: "CÁ SABA", size: "450-UP", importDate: "2026-07-28", invoice: "SBT2026009/SBT2026011", kgPerCtn: 15, warnings: [] });
+    const b = parseLotDescription("CÁ SÒNG NGUYÊN LIỆU SIZE 40-70 10/14/2026 INVOICE: SBT2026016 (14KG/PP) (KG)");
+    expect(b.importDate).toBe("2026-10-14");
+    expect(b.warnings).toHaveLength(1);
+    expect(parseLotDescription("CÁ SARDINE NGUYÊN LIỆU 220/235 1/7/2026 INVOICE: MTO2026034 (15KG) (KG)")).toMatchObject({ size: "220/235", importDate: "2026-07-01", kgPerCtn: 15 });
+    expect(parseLotDescription("CÁ SÒNG NGUYÊN LIỆU SIZE 50-UP 13/10/2026 INVOICE: SBT2026017 (14.5KG/PP) (KG)").kgPerCtn).toBe(14.5);
+    // tên không có mô tả lô (bạch tuộc) ⇒ không đoán gì
+    expect(parseLotDescription("BAO TỬ 2DA NHẬP 100-200")).toMatchObject({ size: "", importDate: "", invoice: "", kgPerCtn: null, structured: false });
+  });
+
+  const nhm = () => [
+    line("r1", { category: "Nguyên liệu nhập khẩu", itemName: "Cá sòng", size: "50-90", origin: "NHM2026010", openKg: 20535 }),
+    line("r2", { category: "Nguyên liệu nhập khẩu", itemName: "Cá sòng", size: "50-90", origin: "NHM2026010", openKg: 2250 }),
+    line("x", { category: "Nguyên liệu nhập khẩu", itemName: "Saba", size: "50-90", origin: "NHM2026010", openKg: 999 }),
+  ];
+  const nhmReport = (): NxtReport => ({
+    ...report([]),
+    rows: [{ code: "PXC-CNL NK 2026 4", name: "CÁ SÒNG NGUYÊN LIỆU 50/90 29/6/2026 INVOICE : NHM2026010 (15KG) (KG)", openKg: 2250, inKg: 20535, outKg: 22785, closeKg: 0 }],
+  });
+
+  it("AC-3: gợi ý theo invoice + size + loài, ghép cả nhóm (loài khác thì không)", () => {
+    const it0 = buildNxtPlan(nhm(), nhmReport(), opts).items[0];
+    expect(it0.mapSource).toBe("suggest");
+    expect(it0.rowIds.sort()).toEqual(["r1", "r2"]);
+    expect(it0.ledgerOpenKg).toBe(22785);
+    expect(it0.status).toBe("opening-diff");
+  });
+
+  it("AC-4: 'Sổ đã tính trước nhập' trừ vào nhập; 'Xuất điều chỉnh' phồng xuất — cả hai tồn cuối = file", () => {
+    const sum = (ls: MonthlyStockLine[], k: "inKg" | "outKg") => ls.filter((l) => l.id === "r1" || l.id === "r2").reduce((s, l) => s + l[k], 0);
+    const close = (ls: MonthlyStockLine[]) => ls.filter((l) => l.id === "r1" || l.id === "r2").reduce((s, l) => s + l.openKg + l.inKg - l.outKg, 0);
+    const code = "PXC-CNL NK 2026 4";
+    const prior = { [code]: { choice: "prior-in" as const } };
+    const a = applyNxtPlan(buildNxtPlan(nhm(), nhmReport(), { ...opts, decisions: prior }), { category: "x", sourceNote: "XNT", decisions: prior });
+    expect([sum(a.lines, "inKg"), sum(a.lines, "outKg"), close(a.lines)]).toEqual([0, 22785, 0]);
+    const adj = { [code]: { choice: "file" as const } };
+    const b = applyNxtPlan(buildNxtPlan(nhm(), nhmReport(), { ...opts, decisions: adj }), { category: "x", sourceNote: "XNT", decisions: adj });
+    expect([sum(b.lines, "inKg"), sum(b.lines, "outKg"), close(b.lines)]).toEqual([20535, 43320, 0]);
+    // nạp lại: nhớ "Sổ đã tính trước nhập" từ ghi chú, không đổi gì
+    const again = buildNxtPlan(a.lines, nhmReport(), opts);
+    expect(again.items[0].choice).toBe("prior-in");
+    expect(applyNxtPlan(again, { category: "x", sourceNote: "XNT" }).updated).toBe(0);
+  });
+
+  it("AC-5: phần thừa lớn hơn nhập ⇒ không có 'Sổ đã tính trước nhập'", () => {
+    const plan = buildNxtPlan([line("h", { openKg: 11424, accountingCode: "1008" })], report([["1008", 11064, 0, 11064]]), opts);
+    expect(choicesOf(plan.items[0])).toEqual(["file", "ledger", "skip"]);
+    expect(choicesOf(buildNxtPlan(nhm(), nhmReport(), opts).items[0])).toContain("prior-in");
+  });
+
+  it("AC-6: ô mô tả chỉ điền chỗ trống, ô khác file giữ sổ + báo", () => {
+    const lines = [line("s", { category: "Nguyên liệu nhập khẩu", itemName: "Saba", size: "", origin: "MTO2026035", importDate: "2026-07-22", kgPerCtn: 12, openKg: 5100 })];
+    const rep: NxtReport = { ...report([]), rows: [{ code: "PXC-CNL NK 2026 0", name: "CÁ SABA NGUYÊN LIỆU 250-450 22/7/2026 INVOICE : MTO2026035 (15KG) (KG)", openKg: 5100, inKg: 4500, outKg: 3600, closeKg: 6000 }] };
+    const plan = buildNxtPlan(lines, rep, opts);
+    expect(plan.items[0]).toMatchObject({ status: "match", mapSource: "suggest" });
+    expect(plan.items[0].fields.conflicts).toHaveLength(1);
+    expect(plan.items[0].fields.conflicts[0].field).toBe("kgPerCtn");
+    const r = applyNxtPlan(plan, { category: "x", sourceNote: "XNT" });
+    expect(r.lines[0]).toMatchObject({ size: "250-450", importDate: "2026-07-22", kgPerCtn: 12, inKg: 4500, outKg: 3600, accountingCode: "PXC-CNL NK 2026 0" });
+    // KG/kiện = 1 (mặc định khi nạp bảng kê) coi như trống ⇒ điền 15 từ file, không báo khác
+    const one = buildNxtPlan([{ ...lines[0], kgPerCtn: 1 }], rep, opts);
+    expect(one.items[0].fields.conflicts).toHaveLength(0);
+    expect(applyNxtPlan(one, { category: "x", sourceNote: "XNT" }).lines[0].kgPerCtn).toBe(15);
+  });
+
+  it("ghép theo số phải cùng loài; nhóm trống size chỉ ghép khi chỉ ra đúng một dòng", () => {
+    const ledger = [
+      line("song", { itemName: "Cá sòng", origin: "SBT2026010", openKg: 5250 }),
+      line("e1", { itemName: "Cá sòng", origin: "SBT2026012", openKg: 12840 }),
+      line("e2", { itemName: "Cá sòng", origin: "SBT2026012", openKg: 10863 }),
+      line("e3", { itemName: "Cá sòng", origin: "SBT2026012", openKg: 750 }),
+    ];
+    const rep: NxtReport = {
+      ...report([]),
+      rows: [
+        { code: "SAR", name: "CÁ SARDINE NGUYÊN LIỆU 220/235 1/7/2026 INVOICE: MTO2026034 (15KG) (KG)", openKg: 5250, inKg: 0, outKg: 0, closeKg: 5250 },
+        { code: "S9", name: "CÁ SÒNG NGUYÊN LIỆU SIZE 110-115 21/7/2026 INVOICE: SBT2026012 (17KG/PP) (KG)", openKg: 0, inKg: 10863, outKg: 10863, closeKg: 0 },
+        { code: "S0", name: "CÁ SÒNG NGUYÊN LIỆU SIZE 80-100 21/7/2026 INVOICE: SBT2026012 (15KG/PP) (KG)", openKg: 750, inKg: 0, outKg: 750, closeKg: 0 },
+      ],
+    };
+    const plan = buildNxtPlan(ledger, rep, opts);
+    expect(plan.items[0].status).toBe("missing");
+    expect(plan.items[1].rowIds).toEqual(["e2"]);
+    expect(plan.items[2].rowIds).toEqual(["e3"]);
+  });
+
+  const three = () => [line("a", { openKg: 10, accountingCode: "A" }), line("b", { openKg: 20, accountingCode: "B" }), line("c", { openKg: 30, accountingCode: "C" })];
+
+  it("AC-7: nạp một dòng chỉ đổi dòng của mã đó; mã đó thành 'đã nạp', mã khác còn chờ", () => {
+    const rep = report([["A", 10, 5, 1], ["B", 20, 0, 2], ["C", 30, 0, 3]]);
+    const plan = buildNxtPlan(three(), rep, opts);
+    expect([...pendingCodes(plan, { category: "x", sourceNote: "XNT" })].sort()).toEqual(["A", "B", "C"]);
+    const r = applyNxtPlan(plan, { category: "x", sourceNote: "XNT", codes: ["A"] });
+    expect(r.updated).toBe(1);
+    expect(r.lines.find((l) => l.id === "b")).toMatchObject({ inKg: 0, outKg: 0 });
+    const after = buildNxtPlan(r.lines, rep, opts);
+    expect([...pendingCodes(after, { category: "x", sourceNote: "XNT" })].sort()).toEqual(["B", "C"]);
+  });
+
+  it("AC-8: nạp tất cả bỏ qua mã còn lệch chưa chọn và kể tên", () => {
+    const rep = report([["A", 10, 5, 1], ["B", 20, 0, 2], ["C", 99, 0, 3]]);
+    const r = applyNxtPlan(buildNxtPlan(three(), rep, opts), { category: "x", sourceNote: "XNT" });
+    expect(r.skipped).toBe(1);
+    expect(r.skippedCodes).toEqual(["C"]);
+    expect(r.lines.find((l) => l.id === "c")).toMatchObject({ inKg: 0, outKg: 0 });
+    expect(r.lines.find((l) => l.id === "a")).toMatchObject({ inKg: 5, outKg: 1 });
   });
 });

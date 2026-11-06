@@ -4,7 +4,7 @@
 covers: src/features/my-tasks/*, src/features/dashboard/*, src/features/documents/*, src/lib/myTasks.ts, src/lib/dataFlow.ts, src/lib/dashboardAttention.ts, src/lib/documents.ts, src/lib/documentStorage.ts, src/features/workflows/*, src/lib/companyProfile.ts, src/lib/companyAssets.ts
 tours: src/features/my-tasks/myTasksTour.ts, src/features/dashboard/dashboardTour.ts, src/features/documents/documentsTour.ts, src/features/workflows/workflowsTour.ts
 guides: src/features/shared/guideContent.tsx, src/features/shared/guides/dashboardGuide.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-06
 ttl_days: 90
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ). Cả ba trang là màn xem / điều phối: số liệu do module khác ghi, ở đây chỉ đọc (trừ giao việc và tài liệu).
@@ -44,6 +44,7 @@ stateDiagram-v2
   open --> done: Xong (người nhận)
   open --> done: sổ đã sửa (việc máy, tự đóng)
   open --> cancelled: Thu hồi (người giao)
+  done --> open: Mở lại việc (người nhận, việc tay)
   state "open (đang mở)" as open
   state "Đã xong" as done
   state "Đã thu hồi" as cancelled
@@ -52,7 +53,7 @@ stateDiagram-v2
 | Trạng thái | Nghĩa | Sang bước sau khi | Ai làm | Code |
 |---|---|---|---|---|
 | `open` (đang mở — tên trong code, app không có nhãn riêng) | Đã giao cho một người, có hạn. Người khác không thấy ở "Việc theo quyền" | Người nhận bấm **Xong**; hoặc việc máy được sửa xong ở sổ | Người có quyền giao (`my-tasks` Thêm) | `buildMyTasks` · `findResolvedAssignments` |
-| Đã xong | Hiện ở "Tôi đã giao" thêm `DONE_VISIBLE_DAYS` (7) ngày | — | Người nhận | `TaskAssignment.status` |
+| Đã xong | Hiện ở "Tôi đã giao" thêm `DONE_VISIBLE_DAYS` (7) ngày. Việc tay: cũng hiện lại ở "Được giao cho tôi" của người nhận (lọc **Tất cả** / **Để biết**, nhãn Đã xong) cùng 7 ngày (`assignedDone`) | Người nhận chọn **Chi tiết** → **Mở lại việc** (báo Xong nhầm) ⇒ về `open`, xóa ngày xong, giữ hạn / ghi chú; có Hoàn tác. Việc máy không mở lại tay (tự đóng theo sổ) | Người nhận (cùng quyền với Xong; không khi Xem như) | `canReopenAssignment` · `reopenAssignment` · `TaskDetailDialog` |
 | Đã thu hồi | Việc máy quay về danh sách chung theo quyền | — (hỏi trước, có Hoàn tác) | Người giao | `TaskAssignment.status` |
 
 Màn tự đóng việc máy chỉ khi mọi sổ đã nạp xong từ máy chủ (tránh đóng nhầm khi sổ còn trống).
@@ -201,3 +202,4 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 ## Lịch sử
 
 - 2026-11-03 — tạo.
+- 2026-11-06 — Việc của tôi: việc giao tay báo Xong nhầm mở lại được (hộp Chi tiết → Mở lại việc, có Hoàn tác).

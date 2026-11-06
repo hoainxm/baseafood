@@ -89,6 +89,20 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             <li>Làm xong ở màn đó (chốt ngày, duyệt kho, gắn lô…). Quay lại đây là việc đã tự hết, không cần làm gì.</li>
           </Step>
         </Section>
+        <Section title="Lỡ chọn Xong nhầm">
+          <Step>
+            <li>Ngay lúc đó: chọn <b>Hoàn tác</b> trên thông báo.</li>
+            <li>
+              Thông báo đã tắt: chọn <b>Lọc theo hạn</b> → <b>Tất cả</b>. Việc giao tay đã báo xong trong 7 ngày hiện lại ở{" "}
+              <b>Được giao cho tôi</b> với nhãn <b>Đã xong</b>.
+            </li>
+            <li>
+              Chọn <b>Chi tiết</b> ở dòng đó → <b>Mở lại việc</b>. Việc về lại đang làm, theo hạn cũ; người giao thấy là chưa xong.
+              Mở lại nhầm thì chọn <b>Hoàn tác</b>.
+            </li>
+          </Step>
+          <p>Chỉ người nhận việc mở lại được. Việc máy phát hiện tự đóng khi sổ đã sửa, không mở lại tay.</p>
+        </Section>
         <Section title="Hạn">
           <Y>
             <li>Chốt ngày nhập / sản xuất và gắn lô: trong ngày, sang hôm sau là quá hạn.</li>

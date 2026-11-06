@@ -6,9 +6,11 @@ import {
   addDays,
   buildMyTasks,
   canDoTask,
+  canReopenAssignment,
   countMyOpenAssignments,
   defaultDueDate,
   findResolvedAssignments,
+  reopenAssignment,
   urgencyOf,
 } from "./myTasks";
 
@@ -127,6 +129,30 @@ describe("buildMyTasks", () => {
     const done = assignment({ id: "m2", source: "manual", status: "done", doneAt: "2026-10-19T09:00:00.000Z" });
     const r = buildMyTasks({ ...base, warnings: [], assignments: [m, done], userId: "u-keeper" });
     expect(r.assigned.map((x) => [x.id, x.kind, x.urgency])).toEqual([["m1", "manual", "upcoming"]]);
+    // Đã bấm Xong ⇒ rời "cần làm", sang danh sách đã xong gần đây (để mở lại nếu nhầm), không đếm quá hạn.
+    expect(r.assignedDone.map((x) => [x.id, x.urgency])).toEqual([["m2", "info"]]);
+  });
+
+  it("mở lại việc bấm Xong nhầm: chỉ người nhận, chỉ việc giao tay đã xong; về lại danh sách cần làm", () => {
+    const done = assignment({ id: "m2", source: "manual", status: "done", doneAt: "2026-10-19T09:00:00.000Z", dueDate: "2026-10-17", note: "gấp" });
+    expect(canReopenAssignment(done, "u-keeper")).toBe(true);
+    expect(canReopenAssignment(done, "u-boss")).toBe(false); // người giao không bấm Xong ⇒ không mở lại thay
+    expect(canReopenAssignment({ ...done, source: "system" }, "u-keeper")).toBe(false);
+    expect(canReopenAssignment({ ...done, status: "cancelled" }, "u-keeper")).toBe(false);
+    expect(canReopenAssignment(done, "")).toBe(false);
+
+    const reopened = reopenAssignment(done);
+    expect(reopened).toEqual({ ...done, status: "open", doneAt: "" });
+    const r = buildMyTasks({ ...base, warnings: [], assignments: [reopened], userId: "u-keeper" });
+    expect(r.assigned.map((x) => [x.id, x.urgency])).toEqual([["m2", "overdue"]]);
+    expect(r.assignedDone).toEqual([]);
+    expect(r.overdueCount).toBe(1);
+  });
+
+  it("việc xong quá 7 ngày không còn trong danh sách đã xong gần đây", () => {
+    const old = assignment({ id: "m3", source: "manual", status: "done", doneAt: "2026-10-01T09:00:00.000Z" });
+    const r = buildMyTasks({ ...base, warnings: [], assignments: [old], userId: "u-keeper" });
+    expect(r.assignedDone).toEqual([]);
   });
 
   it("tôi đã giao: việc mở + việc xong trong 7 ngày; việc máy đã sửa thì đánh dấu đã xong", () => {

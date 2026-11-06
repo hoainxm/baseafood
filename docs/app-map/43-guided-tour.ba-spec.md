@@ -3,6 +3,7 @@
 > Load khi: thêm / sửa hướng dẫn từng bước của một trang (đi qua các nút và luồng việc ngay trên trang), THÊM TRANG MỚI (quy tắc 18 — trang mới phải có tour + hộp "?"), hoặc một trang đổi bố cục / trạng thái / luồng làm tour lệch.
 covers: src/lib/exportPlanning.ts, src/lib/guidedTour.ts, src/design-system/patterns/GuidedTour.tsx, src/design-system/patterns/GuideButton.tsx, src/features/shared/PageTourProvider.tsx, src/features/shared/guideContent.tsx, src/features/shared/guides/**, src/features/shared/pageTourCoverage.test.ts, src/features/**/*Tour.ts
 last_verified: 2026-11-06
+<!-- updated: 2026-11-06 (gỡ khi nhầm) — tour + hộp "?" Nhập xuất tồn kho thêm bước Xóa cả kỳ tạo nhầm (mốc `nxt-warehouse-delete-period`) + Hoàn tác xóa mã; Sổ kho tháng kể Hoàn tác Đồng bộ danh mục; Việc của tôi kể Mở lại việc (Chi tiết → Mở lại việc). -->
 <!-- updated: 2026-11-06 (ba-spec 74) — Xuất khẩu: bước "Chuyến theo ngày xuất" kể thêm Có thể trùng lần xuất / Gộp / Giữ riêng / Đi chung (không thêm bước — giữ ≤ 22) + mục hộp "?". -->
 <!-- updated: 2026-11-03 (ba-spec 69 v2) — tour + hộp "?" Lập hợp đồng nhập thêm Hạn hợp đồng. -->
 <!-- updated: 2026-11-03 (ba-spec 69) — tour + hộp "?" Lập hợp đồng (Xuất khẩu) thêm Hạn hợp đồng: nghĩa, không bắt buộc, nhắc lệch hạn giao, nhãn Còn n ngày / Đã hết hạn ở hồ sơ. -->

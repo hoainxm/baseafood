@@ -57,12 +57,15 @@ import { buildChainWarnings, type DataFlowInput } from "@/lib/dataFlow";
 import { buildDocumentWarnings, documentViewerFor } from "@/lib/documents";
 import { hasDocumentStorage } from "@/lib/documentStorage";
 import {
+  DONE_VISIBLE_DAYS,
   TASKS_START_DATE,
   buildMyTasks,
+  canReopenAssignment,
   findResolvedAssignments,
   groupTasks,
   parseViewAs,
   planningTaskWarnings,
+  reopenAssignment,
   viewAsContext,
   viewAsParam,
   type MyTaskItem,
@@ -75,6 +78,7 @@ import { recordName } from "@/lib/personName";
 import type { TaskAssignment } from "@/types";
 import { AlarmClock, ArrowRight, CalendarCheck, CheckCircle2, Eye, LogOut, Pencil, Send, UserPlus, XCircle } from "lucide-react";
 import { AssignTaskDialog, type AssignTarget } from "./AssignTaskDialog";
+import { TaskDetailDialog } from "./TaskDetailDialog";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildMyTasksTour } from "./myTasksTour";
 
@@ -270,6 +274,23 @@ export default function MyTasksScreen() {
     notify.saved(message, () => saveAssignments(prev));
   };
   const markDone = (a: TaskAssignment) => upsert({ ...a, status: "done", doneAt: new Date().toISOString() }, `Đã xong: ${a.title}`);
+  /* Bảng giao việc MỚI NHẤT cho Hoàn tác (toast sống vài giây; trong lúc đó việc khác có thể đã đổi). */
+  const latestAssignments = useRef(assignments);
+  useEffect(() => {
+    latestAssignments.current = assignments;
+  });
+  /** Việc đã xong đang mở hộp chi tiết (Mở lại nằm trong hộp này, không trên dòng). */
+  const [detail, setDetail] = useState<TaskAssignment | null>(null);
+  /** Mở lại việc bấm Xong nhầm — cùng quyền với Xong (người nhận việc); nhật ký ghi qua repo. */
+  const reopen = (a: TaskAssignment) => {
+    if (readOnly || !canReopenAssignment(a, userId)) return;
+    const reopened = reopenAssignment(a);
+    if (!saveAssignments(assignments.map((x) => (x.id === a.id ? reopened : x)))) return;
+    setDetail(null);
+    notify.saved(`Đã mở lại: ${a.title}`, () =>
+      saveAssignments(latestAssignments.current.map((x) => (x.id === a.id ? a : x)))
+    );
+  };
   const revoke = (a: TaskAssignment) => {
     const prev = assignments;
     if (!saveAssignments(prev.map((x) => (x.id === a.id ? { ...x, status: "cancelled", doneAt: new Date().toISOString() } : x)))) return;
@@ -342,6 +363,12 @@ export default function MyTasksScreen() {
                 Xong
               </Button>
             )}
+            {bucket === "assigned" && a?.source === "manual" && a.status === "done" && (
+              <Button title="Xem lại việc đã báo xong; lỡ chọn Xong nhầm thì Mở lại việc ở trong hộp này." variant="outline" size="sm" onClick={() => setDetail(a)}>
+                <Eye className="mr-1 h-4 w-4" aria-hidden />
+                Chi tiết
+              </Button>
+            )}
             {bucket === "delegated" && a && isOpen && canAssign.update && (
               <Button title="Sửa người nhận, hạn hoặc ghi chú của việc đã giao." variant="edit" size="sm" onClick={() => setAssignTarget({ kind: "edit", assignment: a })}>
                 <Pencil className="mr-1 h-4 w-4" aria-hidden />
@@ -361,7 +388,13 @@ export default function MyTasksScreen() {
   ];
 
   const matchesQuery = (x: MyTaskItem) => matchesSearch(query, x.kindLabel, x.title, x.detail, x.assignment?.assigneeName, x.assignment?.assignedByName);
-  const assigned = tasks.assigned.filter((x) => matchesFilter(x, filter) && matchesQuery(x));
+  // Việc đã xong gần đây hiện ở bộ lọc "Để biết" / "Tất cả" (để xem lại, mở lại nếu bấm Xong nhầm).
+  const showAssignedDone = filter === "all" || filter === "info";
+  const assignedDone = tasks.assignedDone.filter((x) => matchesQuery(x));
+  const assigned = [
+    ...tasks.assigned.filter((x) => matchesFilter(x, filter) && matchesQuery(x)),
+    ...(showAssignedDone ? assignedDone : []),
+  ];
   const mine = tasks.mine.filter((x) => matchesFilter(x, filter) && matchesQuery(x));
   const delegated = tasks.delegated.filter((x) => matchesFilter(x, filter) && matchesQuery(x));
   const openDelegated = tasks.delegated.filter((x) => x.assignment?.status === "open" && !x.isResolved);
@@ -510,6 +543,12 @@ export default function MyTasksScreen() {
       {viewAs?.kind !== "role" && (
       <Section id="assigned" tour="my-tasks-assigned" title={`Được giao cho tôi (${assigned.length})`} description="Việc người khác giao riêng cho bạn — làm theo hạn người giao đặt.">
         {table("assigned", assigned, "Không có việc nào được giao cho bạn.")}
+        {!showAssignedDone && assignedDone.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            Có {assignedDone.length} việc bạn đã báo xong trong {DONE_VISIBLE_DAYS} ngày qua. Chọn Lọc theo hạn → Tất cả để xem lại;
+            lỡ chọn Xong nhầm thì mở Chi tiết → Mở lại việc.
+          </p>
+        )}
       </Section>
       )}
 
@@ -553,6 +592,13 @@ export default function MyTasksScreen() {
           upsert(row, message);
           setAssignTarget(null);
         }}
+      />
+
+      <TaskDetailDialog
+        assignment={detail}
+        canReopen={!readOnly && !!detail && canReopenAssignment(detail, userId)}
+        onClose={() => setDetail(null)}
+        onReopen={reopen}
       />
 
       <ConfirmAction

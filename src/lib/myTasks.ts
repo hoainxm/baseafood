@@ -344,6 +344,11 @@ export interface MyTasksInput {
 
 export interface MyTasksResult {
   assigned: MyTaskItem[];
+  /**
+   * Việc giao TAY cho tôi đã bấm Xong trong `DONE_VISIBLE_DAYS` ngày — để xem lại và
+   * Mở lại khi bấm Xong nhầm (rà 2026-11-06). Không đếm vào quá hạn / hôm nay.
+   */
+  assignedDone: MyTaskItem[];
   mine: MyTaskItem[];
   delegated: MyTaskItem[];
   /** Đếm trên "được giao" + "theo quyền" (việc của chính tôi). */
@@ -445,6 +450,19 @@ function fromAssignment(a: TaskAssignment, bucket: TaskBucket, today: string, wa
   };
 }
 
+/**
+ * Mở lại việc giao tay đã bấm Xong nhầm — CÙNG người được bấm Xong (người nhận việc).
+ * Việc máy phát hiện tự đóng theo sổ nên không mở lại tay; việc đã thu hồi cũng không.
+ */
+export function canReopenAssignment(a: Pick<TaskAssignment, "source" | "status" | "assigneeId">, userId: string): boolean {
+  return a.source === "manual" && a.status === "done" && !!userId && a.assigneeId === userId;
+}
+
+/** Bản mở lại: về "đang mở", xóa ngày xong; mọi ô khác (hạn, ghi chú, người giao) giữ nguyên. */
+export function reopenAssignment(a: TaskAssignment): TaskAssignment {
+  return { ...a, status: "open", doneAt: "" };
+}
+
 /** Việc máy đã giao mà sổ đã sửa xong — cảnh báo không còn trong danh sách hiện tại. */
 export function findResolvedAssignments(assignments: readonly TaskAssignment[], warnings: readonly TaskWarning[]): TaskAssignment[] {
   const live = new Set(warnings.map((w) => w.id));
@@ -474,9 +492,16 @@ export function buildMyTasks({ warnings, assignments, userId, permissions, scope
     .filter((a) => a.status === "open" || (a.doneAt || a.createdAt).slice(0, 10) >= recent)
     .map((a) => fromAssignment(a, "delegated", today, a.source === "system" && a.status === "open" ? byKey.get(a.taskKey) : undefined));
 
+  const assignedDone = assignments
+    .filter((a) => a.assigneeId === userId && a.source === "manual" && a.status === "done")
+    .filter((a) => (a.doneAt || a.createdAt).slice(0, 10) >= recent)
+    .sort((a, b) => (b.doneAt || "").localeCompare(a.doneAt || ""))
+    .map((a) => fromAssignment(a, "assigned", today));
+
   const own = [...assigned, ...mine];
   return {
     assigned: assigned.sort(compareTasks),
+    assignedDone,
     mine: mine.sort(compareTasks),
     delegated: delegated.sort(compareTasks),
     overdueCount: own.filter((x) => x.urgency === "overdue").length,

@@ -192,11 +192,14 @@ export const exportPlanningGuide: PageGuide = {
           </li>
           <li>
             <b>Có thể trùng lần xuất</b>: một khách có từ 2 chuyến đang mở cùng booking, hoặc cùng ngày đóng mà một chuyến chưa có booking.
-            Một lần xuất thì chọn <b>Gộp thành một lần xuất</b>: còn một chuyến, file, mục chứng từ, lệnh sản xuất, booking, thông tin xe
-            về chuyến giữ; ô hai chuyến ghi khác nhau thì chọn giá trị đúng; Hoàn tác được. Không gộp được khi đã gửi chứng từ / tiền về, cùng
-            một mục đã làm ở hai chuyến, hoặc chuyến có file mà hợp đồng thiếu hồ sơ. Hai lần xuất khác nhau thì chọn <b>Giữ riêng</b>. Lập
-            lịch hợp đồng mới trùng ngày đóng với chuyến có sẵn ⇒ dòng đó chọn sẵn <b>Đi chung chuyến</b> (hoặc <b>Tạo chuyến riêng</b>).
-            Chuyến nhiều hợp đồng: bước 2 Xong khi mọi hợp đồng có lệnh sản xuất đã phát hành gắn chuyến.
+            Một lần xuất thì chọn <b>Gộp thành một lần xuất</b>: còn một chuyến chung, hàng, file, mục chứng từ, lệnh sản xuất, booking,
+            thông tin xe dùng chung; làm các bước một lần. <b>Không mất gì</b>: chuyến của hợp đồng kia giữ nguyên bản ghi (Đã gộp vào lần
+            xuất, mở xem được); ô hai chuyến ghi khác nhau giữ cả hai, chuyến chung ghi rõ ở khối Lần xuất gồm, chọn <b>Dùng giá trị này</b>
+            để đổi. Cần tách lại thì chọn <b>Tách ra chuyến riêng</b> ở hợp đồng đó (mở lại đúng bản ghi cũ, hàng / file / lệnh của hợp đồng
+            đi theo). Không gộp được khi đã gửi chứng từ / tiền về, cùng một mục đã làm ở hai chuyến, hoặc chuyến có file mà hợp đồng thiếu
+            hồ sơ. Hai lần xuất khác nhau thì chọn <b>Giữ riêng</b>. Lập lịch hợp đồng mới trùng ngày đóng với chuyến có sẵn ⇒ dòng đó chọn
+            sẵn <b>Đi chung chuyến</b> (hoặc <b>Tạo chuyến riêng</b>). Chuyến nhiều hợp đồng: bước 2 Xong khi mọi hợp đồng có lệnh sản xuất
+            đã phát hành gắn chuyến.
           </li>
           <li>
             <b>Chuyến nhiều cont</b> (một booking, VD 40HC-RF + 20RF): cont 1 là Loại chuyến + Số container của chuyến, cont 2, 3… thêm ở

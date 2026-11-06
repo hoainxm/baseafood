@@ -21,12 +21,19 @@ import {
   jointShipmentsFor,
   keepSeparateOffTag,
   keepSeparateTag,
-  mergedInto,
   mergedTag,
+  visibleActivitySummary,
   mergeGate,
   mergeShipments,
   MERGE_FIELD_LABELS,
+  fieldDifferences,
+  mergeConflicts,
+  mergedIntoId,
+  plannedKgByContract,
   sameExportShipments,
+  splitContract,
+  splitGate,
+  withFieldValue,
   type DuplicateGroup,
 } from "@/lib/exportMergeShipments";
 import { MergeExportDialog, mergeGateText, type MergeExportChoice, type MergeExportTarget } from "./MergeExportDialog";
@@ -577,20 +584,22 @@ export default function ExportPlanningScreen() {
       return;
     }
     const prev = { s: d.shipments, i: d.items, f: d.files, l: d.shipmentLines ?? [], c: d.shipmentContainers ?? [], o: store.orderLinks };
-    const out = mergeShipments(d, c.keep, c.drops, { choices: c.choices, mode: c.mode, orderLinks: store.orderLinks, newId, now: new Date().toISOString() });
+    const out = mergeShipments(d, c.keep, c.drops, { mode: c.mode, orderLinks: store.orderLinks, newId, now: new Date().toISOString(), keepLabel: exportShipLabel(c.keep) });
     if (!store.saveShipmentLines(out.shipmentLines)) return;
     if (JSON.stringify(out.shipmentContainers) !== JSON.stringify(prev.c)) store.saveShipmentContainers(out.shipmentContainers);
     store.saveFiles(out.files);
     store.saveItems(out.items);
     if (JSON.stringify(out.orderLinks) !== JSON.stringify(prev.o)) store.saveOrderLinks(out.orderLinks);
     store.saveShipments(out.shipments);
-    const picked = Object.entries(c.choices)
-      .filter(([, id]) => id !== c.keep.id)
-      .map(([k, id]) => `${MERGE_FIELD_LABELS[k] ?? k} theo HĐ ${contractNo(c.drops.find((x) => x.id === id)?.contractId ?? "")}`);
+    // Nhật ký ghi đủ các ô ghi khác nhau (giá trị nào của HĐ nào) — tra soát được cả khi bản ghi đổi sau này.
+    const differing = mergeConflicts(c.keep, c.drops, c.mode).map(
+      (x) => `${x.label}: ${x.options.map((o) => `${o.value} (HĐ ${contractNo(d.shipments.find((sh) => sh.id === o.shipmentId)?.contractId ?? "")})`).join(" / ")}`,
+    );
     const what =
       `Gộp ${c.drops.length + 1} chuyến thành một lần xuất: ${c.drops.map(exportShipLabel).join(", ")} vào chuyến ${exportShipLabel(c.keep)}` +
       (c.mode === "separate-containers" ? " (mỗi chuyến một cont)" : "") +
-      (picked.length ? ` · ${picked.join(", ")}` : "");
+      ` — chuyến của HĐ kia giữ bản ghi (Đã gộp)` +
+      (differing.length ? ` · ô ghi khác nhau, giữ cả hai: ${differing.join("; ")}` : "");
     const tagged = `${what} ${mergedTag(c.drops.map((x) => x.id), c.keep.id)}`.slice(0, 1000);
     for (const cid of new Set([c.keep.contractId, ...c.drops.map((x) => x.contractId)])) track(cid, c.keep.id, "update", tagged);
     notify.saved(
@@ -618,15 +627,48 @@ export default function ExportPlanningScreen() {
       for (const cid of new Set(ships.map((s) => s.contractId))) track(cid, ships[0]?.id ?? "", "undo", `Hoàn tác: ${what} ${keepSeparateOffTag(g.shipmentIds)}`);
     });
   };
-  // R12: mở link chuyến đã gộp (Zalo, Việc của tôi) ⇒ sang chuyến giữ.
-  useEffect(() => {
-    if (!shipmentParam || d.shipments.some((s) => s.id === shipmentParam)) return;
-    const hit = mergedInto(d, shipmentParam);
-    const keep = hit && d.shipments.find((s) => s.id === hit.shipmentId);
-    if (!keep) return;
-    notify.warning(`Chuyến này đã gộp vào chuyến ${exportShipLabel(keep)} ngày ${formatDateVN(hit.mergedAt.slice(0, 10))}`);
-    setParam({ contract: keep.contractId, shipment: keep.id }, true);
-  }, [shipmentParam, d.shipments, d.activities]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** R17: tách HĐ ra chuyến riêng — mở lại bản ghi cũ của HĐ (nếu có), hàng / file / lệnh của HĐ đi theo. */
+  const splitExport = (keep: ExportShipment, cid: string) => {
+    const gate = splitGate(d, keep, cid);
+    if (!gate.ok) {
+      notify.error(gate.reason === "sent-or-paid" ? "Lần xuất đã ghi gửi chứng từ / tiền về — không tách được." : "Không tách được hợp đồng này khỏi lần xuất.");
+      return;
+    }
+    const prev = { s: d.shipments, i: d.items, f: d.files, l: d.shipmentLines ?? [], o: store.orderLinks };
+    const out = splitContract(d, keep, cid, { orderLinks: store.orderLinks, orderContractOf: store.orderContractOf, newId, now: new Date().toISOString() });
+    if (!store.saveShipmentLines(out.shipmentLines)) return;
+    store.saveFiles(out.files);
+    if (JSON.stringify(out.orderLinks) !== JSON.stringify(prev.o)) store.saveOrderLinks(out.orderLinks);
+    store.saveShipments(out.shipments);
+    // Chuyến mới (HĐ đi chung từ lịch) cần mục chứng từ của HĐ; bản ghi mở lại đã có mục của nó.
+    const add = out.reopened ? [] : missingDocumentItems(out.child.id, termsOf(d, cid), prev.i, newId);
+    if (add.length) store.saveItems([...prev.i, ...add]);
+    const what = `Tách HĐ ${contractNo(cid)} khỏi lần xuất ${exportShipLabel(keep)} ra chuyến riêng${out.reopened ? " (mở lại bản ghi chuyến cũ của HĐ)" : ""}`;
+    track(cid, out.child.id, "update", what);
+    track(keep.contractId, keep.id, "update", what);
+    notify.saved(
+      `Đã tách HĐ ${contractNo(cid)} ra chuyến riêng`,
+      undoTracked(keep.contractId, keep.id, what, () => {
+        store.saveShipments(prev.s);
+        store.saveItems(prev.i);
+        store.saveFiles(prev.f);
+        store.saveShipmentLines(prev.l);
+        store.saveOrderLinks(prev.o);
+      }),
+    );
+    setParam({ contract: cid, shipment: out.child.id }, true);
+  };
+  /** R6 v1.1: chuyến chung dùng giá trị của HĐ khác cho một ô — giá trị đang dùng vẫn còn ở bản ghi gốc. */
+  const applyDifferentValue = (keep: ExportShipment, sourceId: string, key: string) => {
+    const src = d.shipments.find((x) => x.id === sourceId);
+    if (!src) return;
+    const prev = d.shipments;
+    const next = withFieldValue(keep, src, key);
+    if (!store.saveShipments(prev.map((x) => (x.id === keep.id ? next : x)))) return;
+    const what = `Lần xuất ${exportShipLabel(keep)}: dùng ${MERGE_FIELD_LABELS[key] ?? key} theo HĐ ${contractNo(src.contractId)}`;
+    track(keep.contractId, keep.id, "update", what);
+    notify.saved(`Đã dùng ${MERGE_FIELD_LABELS[key] ?? key} theo HĐ ${contractNo(src.contractId)}`, undoTracked(keep.contractId, keep.id, what, () => store.saveShipments(prev)));
+  };
 
   const saveShipment = (s: ExportShipment, isNew: boolean, bookingFiles: ExportFile[] = [], extras: ExportShipmentContainer[] | null = null): boolean => {
     // Ghi chuyến MỚI chỉ sau khi HĐ đã duyệt + đủ hồ sơ (mig 0079) — nút đã ẩn, chặn thêm ở đây.
@@ -947,6 +989,11 @@ export default function ExportPlanningScreen() {
   };
 
   const doRestoreShipment = (s: ExportShipment) => {
+    // Bản ghi đã gộp vào lần xuất khác: mở lại bằng Tách ra chuyến riêng ở chuyến chung (hàng / file đi theo).
+    if (mergedIntoId(s)) {
+      notify.error("Chuyến này đã gộp vào lần xuất khác — mở lần xuất rồi chọn Tách ra chuyến riêng.");
+      return;
+    }
     const prev = d.shipments;
     if (!store.saveShipments(prev.map((x) => (x.id === s.id ? { ...x, status: "open" as const, cancelReason: "" } : x)))) return;
     const what = `Khôi phục chuyến ${shipName(s)}`;
@@ -1480,6 +1527,42 @@ export default function ExportPlanningScreen() {
               onRestore={() => dossier.selected && doRestoreShipment(dossier.selected)}
               onDelete={() => dossier.selected && setDeletingShipment(dossier.selected)}
               onMerge={dossier.selected && store.containersAvailable && mergeCandidates(dossier.selected).length ? () => dossier.selected && openMerge(dossier.selected) : undefined}
+              mergedRecord={(() => {
+                const sel = dossier.selected;
+                const into = sel ? mergedIntoId(sel) : "";
+                if (!sel || !into) return undefined;
+                const keep = d.shipments.find((x) => x.id === into);
+                return {
+                  text: visibleActivitySummary(sel.cancelReason) + " — bản ghi giữ nguyên thông tin lúc trước khi gộp",
+                  onOpen: keep ? () => setParam({ contract: keep.contractId, shipment: keep.id }) : undefined,
+                };
+              })()}
+              exportGroup={(() => {
+                const sel = dossier.selected;
+                if (!sel || sel.status !== "open") return undefined;
+                const per = plannedKgByContract(d, sel);
+                const diffs = fieldDifferences(d, sel);
+                if (per.length < 2 && !diffs.length) return undefined;
+                return {
+                  contracts: per.map((x) => ({
+                    contractNo: contractNo(x.contractId),
+                    isMain: x.contractId === sel.contractId,
+                    kg: x.kg,
+                    onSplit: canMergeExport && splitGate(d, sel, x.contractId).ok ? () => splitExport(sel, x.contractId) : undefined,
+                  })),
+                  differences: diffs.map((f) => ({
+                    key: f.key,
+                    label: f.label,
+                    values: f.values.map((v) => ({
+                      value: v.value,
+                      contractNo: contractNo(v.contractId),
+                      inUse: v.inUse,
+                      original: v.original,
+                      onUse: can.update && !v.inUse ? () => applyDifferentValue(sel, v.shipmentId, f.key) : undefined,
+                    })),
+                  })),
+                };
+              })()}
               sameExport={(() => {
                 const g = dossier.selected && duplicateGroups.find((x) => x.shipmentIds.includes(dossier.selected!.id));
                 if (!g || !dossier.selected) return undefined;

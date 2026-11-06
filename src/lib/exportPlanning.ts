@@ -1901,6 +1901,8 @@ export function searchShipments(d: ExportData, query: string, customers: readonl
   const contractById = new Map(d.contracts.map((c) => [c.id, c]));
   const customerName = new Map(customers.map((c) => [c.id, c.name]));
   return d.shipments.filter((s) => {
+    // ba-spec 74 R7: bản ghi chuyến đã gộp vào lần xuất khác không ra riêng — tra ra chuyến chung.
+    if (s.status === "cancelled" && s.cancelReason.includes("⟦merged-into:")) return false;
     const c = contractById.get(s.contractId);
     const docNos = d.items.filter((i) => i.shipmentId === s.id && i.step === "document").map((i) => i.number);
     // ba-spec 74 GC4: chuyến nhiều HĐ ra khi tra số HĐ phụ.

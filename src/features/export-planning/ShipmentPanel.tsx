@@ -144,6 +144,8 @@ export function ShipmentPanel({
   onMerge,
   onConsolidate,
   sameExport,
+  mergedRecord,
+  exportGroup,
   onOpenItem,
   onUploadLoading,
   onPayment,
@@ -181,6 +183,13 @@ export function ShipmentPanel({
   onConsolidate?: () => void;
   /** ba-spec 74 GC1: chuyến này có thể cùng một lần xuất với chuyến khác cùng khách. `onMerge` trống ⇒ không có quyền gộp. */
   sameExport?: { text: string; onMerge?: () => void };
+  /** ba-spec 74 R7: chuyến này là bản ghi đã gộp vào lần xuất khác — giữ nguyên để tra, mở được lần xuất. */
+  mergedRecord?: { text: string; onOpen?: () => void };
+  /** ba-spec 74 R6, R17: chuyến chung của nhiều HĐ — HĐ trên chuyến (tách được), ô các HĐ ghi khác nhau. */
+  exportGroup?: {
+    contracts: { contractNo: string; isMain: boolean; kg: number; onSplit?: () => void }[];
+    differences: { key: string; label: string; values: { value: string; contractNo: string; inUse: boolean; original?: boolean; onUse?: () => void }[] }[];
+  };
   onOpenItem: (t: StepItemTarget) => void;
   onUploadLoading: (t: LoadingUploadTarget) => void;
   onPayment: (t: PaymentTarget) => void;
@@ -579,7 +588,9 @@ export function ShipmentPanel({
           <div className="grid min-w-0 flex-1 basis-64 grid-cols-[minmax(0,1fr)] gap-1">
             <p className="font-semibold break-words">{label || "Chuyến chưa có mã lô"}</p>
             <div className="flex min-w-0 flex-wrap gap-1 [&>*]:max-w-full [&>*]:whitespace-normal">
-              {isCancelled ? (
+              {mergedRecord ? (
+                <Tag variant="muted">{mergedRecord.text}</Tag>
+              ) : isCancelled ? (
                 <Tag variant="muted">Đã hủy: {shipment.cancelReason}</Tag>
               ) : progress.next === null ? (
                 <Tag variant="done">Đủ hồ sơ</Tag>
@@ -593,7 +604,13 @@ export function ShipmentPanel({
               )}
             </div>
           </div>
-          {isCancelled && can.update && contract.status === "open" && (
+          {mergedRecord?.onOpen && (
+            <Button size="sm" variant="outline" onClick={mergedRecord.onOpen} title="Mở chuyến chung của lần xuất — các bước làm ở đó. Bản ghi này giữ nguyên thông tin của hợp đồng lúc trước khi gộp.">
+              <Layers className="mr-1 h-4 w-4" aria-hidden />
+              Mở lần xuất
+            </Button>
+          )}
+          {isCancelled && !mergedRecord && can.update && contract.status === "open" && (
             <Button size="sm" variant="edit" onClick={onRestore} title="Khôi phục chuyến đã hủy về đang làm (mục dùng chung ở chuyến khác không tự quay lại).">
               <RotateCcw className="mr-1 h-4 w-4" aria-hidden />
               Khôi phục chuyến
@@ -630,6 +647,49 @@ export function ShipmentPanel({
                   <Trash2 className="mr-1 h-4 w-4" aria-hidden />
                   Xóa chuyến
                 </Button>
+              )}
+            </div>
+          )}
+          {exportGroup && !isCancelled && (
+            <div className="grid min-w-0 gap-2 rounded-lg border border-border px-4 py-3 text-sm">
+              <span className="font-semibold">Lần xuất gồm {exportGroup.contracts.length} hợp đồng</span>
+              <ul className="grid min-w-0 gap-1.5">
+                {exportGroup.contracts.map((c) => (
+                  <li key={c.contractNo} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="tnum">
+                      HĐ {c.contractNo}
+                      {c.isMain ? " (hợp đồng chính)" : ""} · {formatNumber(c.kg)} kg
+                    </span>
+                    {c.onSplit && (
+                      <Button size="sm" variant="outline" onClick={c.onSplit} title={`Tách HĐ ${c.contractNo} ra chuyến riêng: hàng, file đính cho hợp đồng này, lệnh sản xuất của nó đi theo; có bản ghi chuyến cũ thì mở lại đúng bản ghi đó. Hoàn tác được.`}>
+                        Tách ra chuyến riêng
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {exportGroup.differences.length > 0 && (
+                <div className="grid min-w-0 gap-1.5 border-t border-border pt-2">
+                  <span className="font-semibold">Ô các hợp đồng ghi khác nhau — giữ đủ, chuyến chung đang dùng giá trị có dấu ✓</span>
+                  {exportGroup.differences.map((f) => (
+                    <div key={f.key} className="grid min-w-0 gap-1">
+                      <span className="text-muted-foreground">{f.label}</span>
+                      {f.values.map((v) => (
+                        <span key={`${f.key}-${v.contractNo}-${v.value}`} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="break-words">
+                            {v.inUse ? "✓ " : ""}
+                            {v.value} <span className="text-muted-foreground">· HĐ {v.contractNo}{v.original ? " (bản ghi gốc trước khi gộp)" : ""}</span>
+                          </span>
+                          {!v.inUse && v.onUse && (
+                            <Button size="sm" variant="edit" onClick={v.onUse} title={`Chuyến chung dùng ${f.label} theo HĐ ${v.contractNo}. Giá trị đang dùng vẫn còn trong danh sách này. Hoàn tác được.`}>
+                              Dùng giá trị này
+                            </Button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

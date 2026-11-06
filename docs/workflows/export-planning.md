@@ -5,6 +5,7 @@ covers: src/features/export-planning/*, src/lib/exportConsolidate.ts, src/lib/ex
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-06
+<!-- re-verified: 2026-11-06 (ba-spec 74 v1.1, chủ dự án: "gộp nhưng thông tin khác nhau vẫn giữ nguyên") — gộp KHÔNG mất gì: chuyến của HĐ kia giữ bản ghi (Đã gộp vào lần xuất), ô khác nhau giữ cả hai (+ bản ghi gốc của chuyến HĐ chính), Dùng giá trị này, Tách ra chuyến riêng. -->
 <!-- re-verified: 2026-11-06 (ba-spec 74) — §2d: dò chuyến có thể trùng lần xuất (cùng booking / cùng ngày đóng, cùng khách), Gộp thành một lần xuất (mang file, mục, lệnh SX, booking, xe; ô lệch chọn; Hoàn tác), Giữ riêng, lịch HĐ mới Đi chung chuyến có sẵn; bước 2 chuyến nhiều HĐ xét từng HĐ; Lịch xuất hàng một dòng ghi mọi HĐ. -->
 <!-- re-verified: 2026-11-05 — SI: ô Gross mỗi kiện, Tổng gross tự nhân với số kiện; luật không đổi. -->
 <!-- re-verified: 2026-11-05 — chuyến Đóng ghép có nút Đưa vào cont (một cont nhiều HĐ, §2b): hàng sang chuyến cont thành dòng của HĐ đó. -->
@@ -170,12 +171,14 @@ flowchart LR
 |---|---|---|
 | Dò trùng | Chuyến **mở**, cùng khách; cùng booking (bỏ khoảng trắng, không phân biệt hoa thường) **hoặc** cùng ngày đóng mà một bên chưa booking; bắc cầu. Cùng ngày khác booking ⇒ không báo. Báo ở Lịch xuất hàng (thẻ Có thể trùng ở ngày, khung vàng trong ngày) + hồ sơ chuyến | `duplicateShipmentGroups` · `sameExport` |
 | Giữ riêng | Ghi nhật ký (dấu máy đọc, không cột mới); không báo nữa cho đúng tập chuyến đó; thêm chuyến mới vào nhóm ⇒ báo lại | `keptSeparateSets` |
-| Chuyến giữ | Mặc định: nhiều file → nhiều mục Xong → nhiều ô đã điền → tạo sớm; đổi được trong hộp | `defaultKeeper` |
+| HĐ chính của lần xuất | Chuyến của HĐ chính thành chuyến chung. Mặc định: nhiều file → nhiều mục Xong → nhiều ô đã điền → tạo sớm; đổi được trong hộp | `defaultKeeper` |
 | Cổng gộp | Mở; cùng khách; không có gửi chứng từ / tiền về (cả hai chuyến); không có mục cùng loại đã làm ở **cả hai**; chuyến bỏ đã có file / mục Xong ⇒ HĐ của nó qua cổng thêm HĐ (không còn Thiếu); chuyến chỉ là kế hoạch ⇒ chỉ cần HĐ mở + có bản | `mergeGate` |
-| Ô lệch | Ô hai bên có mà khác ⇒ chọn; ô trống lấy bù; thông tin xe lấy nguyên khối; ghi chú nối | `mergeConflicts` · `mergeShipments` |
+| Không mất gì (v1.1) | Chuyến của HĐ kia **không xóa**: giữ nguyên bản ghi (booking, xe, kg, ngày như lúc nhập), trạng thái "Đã gộp vào lần xuất …" (hủy + dấu chuyến chung ⇒ mọi luật bỏ chuyến hủy vẫn đúng), mở xem được, có nút Mở lần xuất; không Khôi phục / Xóa được. Mục bước trống của nó nằm lại bản ghi | `mergedIntoId` · `mergedChildren` |
+| Ô ghi khác nhau | Không bắt chọn: chuyến chung dùng giá trị của HĐ chính, trống thì bù từ HĐ kia; giá trị kia còn ở bản ghi và hiện ở khối **Lần xuất gồm** (✓ = đang dùng), **Dùng giá trị này** để đổi. Có ô khác nhau ⇒ giữ thêm **bản ghi gốc của chuyến HĐ chính** (đổi giá trị không làm mất giá trị cũ). Nhật ký gộp ghi đủ các giá trị | `fieldDifferences` · `withFieldValue` |
+| Tách ra chuyến riêng | HĐ không phải HĐ chính, có hàng trên chuyến, chưa gửi chứng từ / tiền về. Có bản ghi chuyến cũ ⇒ mở lại đúng bản ghi đó; HĐ đi chung từ lịch ⇒ chuyến mới chép booking / ngày (không chép số cont, xe). Đi theo: dòng hàng của HĐ, file đính cho HĐ đó, lệnh sản xuất của HĐ; mục chứng từ đã làm chung ở lại chuyến chung | `splitGate` · `splitContract` |
 | Đi theo | Dòng hàng (chưa có ⇒ dựng từ kg như Đưa vào cont), kg cộng, file (trùng tên giữ cả hai + báo), mục bước (mục có tiến độ thắng mục trống), mục "dùng chung" trỏ lại, lệnh SX gắn chuyến, cont thêm. Loại: chuyến giữ Đóng ghép + chuyến bỏ cont lạnh ⇒ cont lạnh | `mergeShipments` |
 | Cách gộp | Cùng một cont (mặc định) · Mỗi chuyến một cont (chuyến bỏ thành cont thêm — 73 R13 cho cả HĐ khác) | `MergeMode` |
-| Sau gộp | Một Hoàn tác; nhật ký mọi HĐ ghi một dòng gộp; mở link chuyến đã gộp ⇒ sang chuyến giữ | `mergedInto` |
+| Sau gộp | Một Hoàn tác; nhật ký mọi HĐ ghi một dòng gộp; link chuyến đã gộp mở bản ghi đó + nút Mở lần xuất; tra cứu ra chuyến chung | `mergedInto` |
 | Lập lịch HĐ mới | Dòng lịch trùng ngày đóng / booking với chuyến mở của HĐ khác cùng khách ⇒ chọn sẵn **Đi chung chuyến**: thêm dòng hàng HĐ vào chuyến đó, không tạo chuyến mới; **Tạo chuyến riêng** vẫn được | `jointShipmentsFor` · `applyScheduleRows` |
 | Ghi booking / chuyến | Booking hoặc ngày trùng chuyến khác cùng khách ⇒ lưu được, thông báo mời gộp | `sameExportShipments` |
 | Lịch xuất hàng | Chuyến nhiều HĐ một dòng: "HĐ BD-008/26 + BD-007/26", kg từng HĐ; tra số HĐ phụ ra chuyến | `plannedKgByContract` · `searchShipments` |

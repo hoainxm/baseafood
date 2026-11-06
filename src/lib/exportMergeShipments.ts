@@ -33,23 +33,38 @@ import {
   type ScheduleRow,
 } from "./exportPlanning";
 
-/* ---------- Dấu máy đọc trong nhật ký (R3, R12) — không thêm cột ---------- */
+/* ---------- Dấu máy đọc (R3, R12) — không thêm cột ---------- */
 
-const TAG = /⟦(keep|keep-off|merged):([^⟧]*)⟧/g;
-/** Dấu "Giữ riêng" của một nhóm chuyến. */
+const TAG = /⟦(keep|keep-off|merged|merged-into):([^⟧]*)⟧/g;
+/** Dấu "Giữ riêng" của một nhóm chuyến (dòng nhật ký). */
 export const keepSeparateTag = (ids: readonly string[]) => `⟦keep:${[...ids].sort().join(",")}⟧`;
 export const keepSeparateOffTag = (ids: readonly string[]) => `⟦keep-off:${[...ids].sort().join(",")}⟧`;
-/** Dấu "chuyến … đã gộp vào chuyến …". */
+/** Dấu "chuyến … đã gộp vào chuyến …" ở dòng nhật ký gộp (tra soát). */
 export const mergedTag = (dropIds: readonly string[], keepId: string) => `⟦merged:${dropIds.join(",")}>${keepId}⟧`;
-/** Chữ nhật ký cho người đọc — bỏ dấu máy đọc. */
+/** Chữ cho người đọc (nhật ký, lý do) — bỏ dấu máy đọc. */
 export const visibleActivitySummary = (summary: string) => summary.replace(TAG, "").replace(/\s{2,}/g, " ").trim();
+
+/**
+ * R7 (v1.1): chuyến bị gộp KHÔNG xóa — giữ nguyên bản ghi (booking, xe, kg, ngày… như lúc nhập), trạng thái hủy với lý do
+ * "Đã gộp vào lần xuất …" + dấu chuyến chung. Mọi luật đang bỏ qua chuyến hủy (kỳ xem, độ phủ, khép HĐ) vẫn đúng.
+ */
+export const mergedIntoReason = (keepLabel: string, keepId: string) => `Đã gộp vào lần xuất ${keepLabel} ⟦merged-into:${keepId}⟧`;
+const MERGED_INTO = /⟦merged-into:([^⟧]+)⟧/;
+/** Lý do của bản ghi gốc chuyến HĐ chính (giữ giá trị trước khi gộp). */
+export const ORIGINAL_RECORD_TEXT = "Bản ghi gốc của chuyến trước khi gộp";
+/** Bản ghi gốc của chuyến HĐ chính (không phải chuyến của HĐ khác đã gộp vào) — không tách / mở lại được. */
+export const isOriginalRecord = (s: Pick<ExportShipment, "cancelReason">) => s.cancelReason.startsWith(ORIGINAL_RECORD_TEXT);
+/** Id chuyến chung mà chuyến này đã gộp vào ("" = không phải chuyến đã gộp). */
+export const mergedIntoId = (s: Pick<ExportShipment, "status" | "cancelReason">) => (s.status === "cancelled" ? (MERGED_INTO.exec(s.cancelReason)?.[1] ?? "") : "");
+/** Chuyến đã gộp vào chuyến `keepId` (bản ghi gốc của từng HĐ, giữ để tra + tách lại). */
+export const mergedChildren = (d: Pick<ExportData, "shipments">, keepId: string) => d.shipments.filter((s) => mergedIntoId(s) === keepId);
 
 /** R3: các tập chuyến U1 đã chọn Giữ riêng (theo thứ tự nhật ký; "keep-off" gỡ lại). */
 export function keptSeparateSets(activities: readonly Pick<ExportActivity, "summary" | "createdAt">[]): string[][] {
   const sets = new Map<string, string[]>();
   for (const a of [...activities].sort((x, y) => x.createdAt.localeCompare(y.createdAt))) {
     for (const m of a.summary.matchAll(TAG)) {
-      if (m[1] === "merged") continue;
+      if (m[1] !== "keep" && m[1] !== "keep-off") continue;
       const ids = m[2].split(",").filter(Boolean).sort();
       const key = ids.join(",");
       if (m[1] === "keep") sets.set(key, ids);
@@ -59,20 +74,17 @@ export function keptSeparateSets(activities: readonly Pick<ExportActivity, "summ
   return [...sets.values()];
 }
 
-/** R12: chuyến đã bị gộp ⇒ chuyến giữ + ngày gộp (lần gộp mới nhất). Chuyến còn tồn tại (đã Hoàn tác) ⇒ null. */
-export function mergedInto(d: Pick<ExportData, "activities" | "shipments">, shipmentId: string): { shipmentId: string; mergedAt: string } | null {
-  if (d.shipments.some((s) => s.id === shipmentId)) return null;
-  let hit: { shipmentId: string; mergedAt: string } | null = null;
-  for (const a of [...d.activities].sort((x, y) => x.createdAt.localeCompare(y.createdAt))) {
-    for (const m of a.summary.matchAll(TAG)) {
-      if (m[1] !== "merged") continue;
-      const [drops, keep] = m[2].split(">");
-      if (keep && drops.split(",").includes(shipmentId)) hit = { shipmentId: keep, mergedAt: a.createdAt };
-    }
+/** R12: chuyến đã gộp ⇒ chuyến chung đang mở (đi theo chuỗi nếu chuyến chung lại gộp tiếp). Không phải chuyến đã gộp ⇒ null. */
+export function mergedInto(d: Pick<ExportData, "shipments">, shipmentId: string): { shipmentId: string } | null {
+  let cur = d.shipments.find((s) => s.id === shipmentId);
+  const seen = new Set<string>();
+  let target = "";
+  while (cur && mergedIntoId(cur) && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    target = mergedIntoId(cur);
+    cur = d.shipments.find((s) => s.id === target);
   }
-  // Chuyến giữ cũng có thể đã gộp tiếp vào chuyến khác.
-  if (hit && !d.shipments.some((s) => s.id === hit!.shipmentId)) return mergedInto(d, hit.shipmentId) ?? hit;
-  return hit;
+  return target ? { shipmentId: target } : null;
 }
 
 /* ---------- GC1: dò chuyến cùng một lần xuất (R1–R3) ---------- */
@@ -151,8 +163,9 @@ type MergeData = Pick<
   "contracts" | "revisions" | "approvals" | "shipments" | "items" | "files" | "payments" | "shipmentLines" | "shipmentContainers"
 >;
 
+/** Mục đã có gì đó (trạng thái, số, ngày, ghi chú, lý do, file) — không bao giờ bị thay bằng mục trống. */
 const hasProgress = (d: Pick<ExportData, "files">, i: ExportStepItem) =>
-  i.state !== "not-started" || !!i.number.trim() || d.files.some((f) => f.stepItemId === i.id);
+  i.state !== "not-started" || !!i.number.trim() || !!i.issuedOn || !!i.note?.trim() || !!i.naReason?.trim() || d.files.some((f) => f.stepItemId === i.id);
 const itemKey = (i: Pick<ExportStepItem, "step" | "docKind">) => (i.step === "document" ? `document:${i.docKind}` : i.step);
 const transportFilled = (t: ExportTransportInfo | undefined) => !!t && [t.haulier, t.emptyPickupPlace, t.stuffingPlace, t.returnYard].every((v) => v.trim());
 const BOOKING_KEYS: (keyof ExportBookingDetails)[] = ["forwarder", "placeOfReceipt", "portOfLoading", "placeOfDelivery", "returnYard", "emptyPickupYard", "docCutoff", "vgmCutoff", "cargoCutoff"];
@@ -291,41 +304,36 @@ export interface MergeResult {
 }
 
 /**
- * R6–R10: gộp các chuyến `drops` vào `keep` (đã qua `mergeGate`). `choices[key]` = id chuyến có giá trị được chọn cho
- * ô lệch; không chọn ⇒ chuyến giữ. Ô trống của chuyến giữ lấy bù từ chuyến bỏ (theo thứ tự).
+ * R6–R10 (v1.1 — không mất gì): gộp các chuyến `drops` vào `keep` (đã qua `mergeGate`).
+ *  • ô của chuyến chung: giá trị của chuyến HĐ chính; ô trống lấy bù từ chuyến kia. Ô hai bên ghi khác nhau KHÔNG bỏ:
+ *    giá trị kia còn nguyên ở bản ghi chuyến đã gộp và hiện ở `fieldDifferences`;
+ *  • chuyến bỏ giữ bản ghi (trạng thái "Đã gộp vào lần xuất …"); mục bước trống của nó nằm lại bản ghi đó;
+ *  • dòng hàng, file, mục có tiến độ, lệnh sản xuất, cont thêm sang chuyến chung — không xóa dòng nào.
  */
 export function mergeShipments(
   d: MergeData,
   keep: ExportShipment,
   drops: readonly ExportShipment[],
-  opts: { choices?: Record<string, string>; mode?: MergeMode; orderLinks?: readonly ProductionOrderShipment[]; newId: () => string; now: string },
+  opts: { mode?: MergeMode; orderLinks?: readonly ProductionOrderShipment[]; newId: () => string; now: string; keepLabel?: string },
 ): MergeResult {
   const mode = opts.mode ?? "same-container";
-  const choices = opts.choices ?? {};
   const all = [keep, ...drops];
-  const byId = new Map(all.map((s) => [s.id, s]));
   const dropIds = new Set(drops.map((s) => s.id));
-  const pickFor = (key: string): ExportShipment | undefined => {
-    const chosen = choices[key] ? byId.get(choices[key]) : undefined;
-    if (chosen && fieldValue(chosen, key)) return chosen;
-    return all.find((s) => fieldValue(s, key));
-  };
+  const firstFilled = (key: string) => all.find((s) => fieldValue(s, key));
 
-  /* Ô của chuyến (R6). */
+  /* Ô của chuyến chung (R6): HĐ chính trước, trống thì bù. */
   const merged: ExportShipment = { ...keep };
   for (const key of SHIPMENT_KEYS) {
     if (mode === "separate-containers" && (CONTAINER_KEYS.has(key) || key === "loadingDate")) continue;
-    const src = pickFor(key);
+    const src = firstFilled(key);
     if (src) merged[key] = src[key];
   }
   if (all.some((s) => s.booking)) {
     const booking = { ...(keep.booking ?? ({} as ExportBookingDetails)) };
-    for (const key of BOOKING_KEYS) booking[key] = pickFor(key)?.booking?.[key] ?? booking[key] ?? "";
+    for (const key of BOOKING_KEYS) booking[key] = firstFilled(key)?.booking?.[key] ?? booking[key] ?? "";
     merged.booking = booking;
   }
-  const transportSrc = (choices.transport && byId.get(choices.transport)?.transport && transportFilled(byId.get(choices.transport)!.transport) ? byId.get(choices.transport) : undefined) ??
-    all.find((s) => transportFilled(s.transport)) ??
-    all.find((s) => s.transport && Object.values(s.transport).some((v) => v.trim()));
+  const transportSrc = all.find((s) => transportFilled(s.transport)) ?? all.find((s) => s.transport && Object.values(s.transport).some((v) => v.trim()));
   if (transportSrc?.transport) merged.transport = { ...transportSrc.transport };
   merged.note = [...new Set(all.map((s) => s.note.trim()).filter(Boolean))].join(" · ");
   merged.kind = mergedKind(keep, drops);
@@ -383,54 +391,56 @@ export function mergeShipments(
     }
     lineSort = added.reduce((m, l) => Math.max(m, l.sortOrder), lineSort);
   }
-  // Dòng dựng mới không mang `containerId` rỗng (cont 1 = để trống).
   const cleanLine = (l: ExportShipmentLine): ExportShipmentLine => {
     if (l.containerId) return l;
     const { containerId: _c, ...rest } = l;
     return rest as ExportShipmentLine;
   };
 
-  /* Mục bước (R8). */
+  /* Mục bước (R8): không xóa mục nào — mục có tiến độ (hoặc loại chuyến chung chưa có) sang chuyến chung; mục trống của
+     chuyến bỏ nằm lại bản ghi của nó; mục trống của chuyến chung bị mục có tiến độ thế chỗ thì đổi sang bản ghi đó. */
   const keepItems = d.items.filter((i) => i.shipmentId === keep.id);
-  const removed = new Map<string, string>(); // id mục bị bỏ → id mục thay thế
-  const movedItems: ExportStepItem[] = [];
-  const replaced = new Set<string>();
-  const taken = new Map(keepItems.map((i) => [itemKey(i), i]));
+  const newShipmentOf = new Map<string, string>(); // id mục → chuyến mới
+  const replacedBy = new Map<string, string>(); // id mục (không còn ở chuyến chung) → mục cùng loại ở chuyến chung
+  const slot = new Map(keepItems.map((i) => [itemKey(i), i]));
   for (const s of drops) {
     for (const i of d.items.filter((x) => x.shipmentId === s.id)) {
-      // Mục dùng chung trỏ về chuyến giữ / chuyến cùng gộp ⇒ thừa.
-      if (i.sharedFromId && (d.items.find((x) => x.id === i.sharedFromId)?.shipmentId === keep.id || dropIds.has(d.items.find((x) => x.id === i.sharedFromId)?.shipmentId ?? ""))) {
-        const twin = taken.get(itemKey(i));
-        if (twin) {
-          removed.set(i.id, twin.id);
-          continue;
-        }
-      }
-      const twin = taken.get(itemKey(i));
+      const twin = slot.get(itemKey(i));
       if (!twin) {
-        const moved = { ...i, shipmentId: keep.id };
-        movedItems.push(moved);
-        taken.set(itemKey(i), moved);
-      } else if (hasProgress(d, i) && !hasProgress(d, twin)) {
-        replaced.add(twin.id);
-        removed.set(twin.id, i.id);
-        const moved = { ...i, shipmentId: keep.id };
-        movedItems.push(moved);
-        taken.set(itemKey(i), moved);
+        newShipmentOf.set(i.id, keep.id);
+        slot.set(itemKey(i), i);
+      } else if (hasProgress(d, i) && !hasProgress(d, twin) && twin.shipmentId === keep.id && !newShipmentOf.has(twin.id)) {
+        newShipmentOf.set(i.id, keep.id);
+        newShipmentOf.set(twin.id, s.id);
+        replacedBy.set(twin.id, i.id);
+        slot.set(itemKey(i), i);
       } else {
-        removed.set(i.id, twin.id);
+        replacedBy.set(i.id, twin.id);
       }
     }
   }
-  const resolve = (id: string): string => (removed.has(id) ? resolve(removed.get(id)!) : id);
-  const items = [
-    ...d.items
-      .filter((i) => !dropIds.has(i.shipmentId) && !replaced.has(i.id))
-      .map((i) => (i.sharedFromId && removed.has(i.sharedFromId) ? { ...i, sharedFromId: resolve(i.sharedFromId) } : i)),
-    ...movedItems,
-  ].map((i) => (i.shipmentId === keep.id && i.sharedFromId && pointsToKeepItself(i, keep.id, d.items, removed) ? { ...i, sharedFromId: "" } : i));
+  const resolve = (id: string): string => {
+    const seen = new Set<string>();
+    let cur = id;
+    while (replacedBy.has(cur) && !seen.has(cur)) {
+      seen.add(cur);
+      cur = replacedBy.get(cur)!;
+    }
+    return cur;
+  };
+  const items = d.items.map((i) => {
+    let next = newShipmentOf.has(i.id) ? { ...i, shipmentId: newShipmentOf.get(i.id)! } : i;
+    // Mục "dùng chung" ở chuyến khác trỏ tới mục nay không ở chuyến chung ⇒ trỏ mục cùng loại của chuyến chung.
+    if (next.sharedFromId && replacedBy.has(next.sharedFromId) && next.shipmentId !== keep.id) next = { ...next, sharedFromId: resolve(next.sharedFromId) };
+    // Mục của chuyến chung "dùng chung" từ chuyến vừa gộp vào ⇒ thành mục của chính chuyến đó, bỏ dùng chung.
+    if (next.shipmentId === keep.id && next.sharedFromId) {
+      const src = d.items.find((x) => x.id === next.sharedFromId);
+      if (src && (src.shipmentId === keep.id || dropIds.has(src.shipmentId))) next = { ...next, sharedFromId: "" };
+    }
+    return next;
+  });
 
-  /* File (R7). */
+  /* File (R7): mọi file của chuyến bỏ sang chuyến chung, giữ người đính / ngày / HĐ gốc (`contractId` — tách lại theo đó). */
   const files = d.files.map((f) => {
     let next = f;
     if (dropIds.has(f.shipmentId)) {
@@ -438,7 +448,7 @@ export function mergeShipments(
       const cont = containerOfDrop.get(f.shipmentId);
       if (cont && !f.containerId && (f.step === "container-seal-photos" || f.step === "loading-photos")) next = { ...next, containerId: cont };
     }
-    if (next.stepItemId && removed.has(next.stepItemId)) next = { ...next, stepItemId: resolve(next.stepItemId) };
+    if (next.stepItemId && replacedBy.has(next.stepItemId)) next = { ...next, stepItemId: resolve(next.stepItemId) };
     return next;
   });
   const seen = new Map<string, number>();
@@ -449,16 +459,21 @@ export function mergeShipments(
   const duplicateFileNames = [...seen.values()].filter((n) => n > 1).reduce((t, n) => t + n, 0);
 
   /* Lệnh sản xuất gắn chuyến (R8). */
-  const links = opts.orderLinks ?? [];
   const orderLinks: ProductionOrderShipment[] = [];
-  for (const l of links) {
+  for (const l of opts.orderLinks ?? []) {
     const next = dropIds.has(l.shipmentId) ? { ...l, shipmentId: keep.id } : l;
     if (orderLinks.some((x) => x.orderId === next.orderId && x.shipmentId === next.shipmentId)) continue;
     orderLinks.push(next);
   }
 
+  const reason = mergedIntoReason(opts.keepLabel ?? "", keep.id);
+  // Có ô ghi khác nhau ⇒ giữ thêm bản ghi gốc của chuyến HĐ chính: sau này dùng giá trị của HĐ kia thì giá trị cũ của HĐ
+  // chính vẫn còn (không ô nào của HĐ nào bị mất).
+  const snapshot: ExportShipment[] = mergeConflicts(keep, drops, mode).length
+    ? [{ ...keep, id: opts.newId(), status: "cancelled", cancelReason: `${ORIGINAL_RECORD_TEXT} ⟦merged-into:${keep.id}⟧` }]
+    : [];
   return {
-    shipments: d.shipments.filter((s) => !dropIds.has(s.id)).map((s) => (s.id === keep.id ? merged : s)),
+    shipments: [...d.shipments.map((s) => (s.id === keep.id ? merged : dropIds.has(s.id) ? { ...s, status: "cancelled" as const, cancelReason: reason } : s)), ...snapshot],
     items,
     files,
     shipmentLines: [...lines.filter((l) => !dropIds.has(l.shipmentId)), ...added].map(cleanLine),
@@ -469,12 +484,104 @@ export function mergeShipments(
   };
 }
 
-/** Mục của chuyến giữ "dùng chung" trỏ về chính một mục của chuyến giữ (sau gộp) ⇒ bỏ dùng chung. */
-function pointsToKeepItself(i: ExportStepItem, keepId: string, before: readonly ExportStepItem[], removed: ReadonlyMap<string, string>): boolean {
-  let src = i.sharedFromId;
-  while (removed.has(src)) src = removed.get(src)!;
-  const target = before.find((x) => x.id === src);
-  return !!target && (target.shipmentId === keepId || target.id === i.id);
+/* ---------- Ô ghi khác nhau giữa các HĐ của một lần xuất (R6 v1.1) ---------- */
+
+export interface FieldDifference {
+  key: string;
+  label: string;
+  /** Mỗi giá trị kèm chuyến (HĐ) đã ghi; `inUse` = giá trị chuyến chung đang dùng. */
+  values: { shipmentId: string; contractId: string; value: string; inUse: boolean; original?: boolean }[];
+}
+
+/** Ô mà chuyến chung và bản ghi các chuyến đã gộp vào nó ghi khác nhau — để thấy đủ, chọn lại khi cần. */
+export function fieldDifferences(d: Pick<ExportData, "shipments">, keep: ExportShipment): FieldDifference[] {
+  const children = mergedChildren(d, keep.id);
+  if (!children.length) return [];
+  const out: FieldDifference[] = [];
+  for (const key of [...SHIPMENT_KEYS, ...BOOKING_KEYS, "transport"]) {
+    const values: FieldDifference["values"] = [];
+    const current = fieldValue(keep, key);
+    // Giá trị đang dùng ghi theo HĐ đã nhập nó (chuyến của HĐ khác trước, rồi bản ghi gốc của HĐ chính), không mặc định HĐ chính.
+    const source = current ? (children.find((c) => !isOriginalRecord(c) && sameValue(key, fieldValue(c, key), current)) ?? children.find((c) => sameValue(key, fieldValue(c, key), current))) : undefined;
+    if (current) values.push({ shipmentId: keep.id, contractId: source?.contractId ?? keep.contractId, value: current, inUse: true });
+    for (const c of children) {
+      const v = fieldValue(c, key);
+      if (v && !values.some((x) => sameValue(key, x.value, v))) values.push({ shipmentId: c.id, contractId: c.contractId, value: v, inUse: false, original: isOriginalRecord(c) });
+    }
+    if (values.length > 1) out.push({ key, label: MERGE_FIELD_LABELS[key] ?? key, values });
+  }
+  return out;
+}
+
+/** Dùng giá trị của bản ghi `sourceId` cho ô `key` của chuyến chung (khối xe: cả khối). */
+export function withFieldValue(keep: ExportShipment, source: ExportShipment, key: string): ExportShipment {
+  if (key === "transport") return source.transport ? { ...keep, transport: { ...source.transport } } : keep;
+  if ((SHIPMENT_KEYS as readonly string[]).includes(key)) return { ...keep, [key]: source[key as (typeof SHIPMENT_KEYS)[number]] };
+  const k = key as keyof ExportBookingDetails;
+  return { ...keep, booking: { ...(keep.booking ?? ({} as ExportBookingDetails)), [k]: source.booking?.[k] ?? "" } };
+}
+
+/* ---------- Tách HĐ ra khỏi lần xuất (R17) ---------- */
+
+export type SplitGate = { ok: true } | { ok: false; reason: "not-open" | "main-contract" | "not-carried" | "sent-or-paid" };
+
+/** Tách HĐ `contractId` khỏi chuyến chung `keep`: chuyến mở, HĐ không phải HĐ chính, có hàng trên chuyến, chưa gửi chứng từ / tiền về. */
+export function splitGate(d: Pick<ExportData, "shipments" | "shipmentLines" | "payments">, keep: ExportShipment, contractId: string): SplitGate {
+  if (!isOpen(keep)) return { ok: false, reason: "not-open" };
+  if (keep.contractId === contractId) return { ok: false, reason: "main-contract" };
+  if (!(d.shipmentLines ?? []).some((l) => l.shipmentId === keep.id && l.contractId === contractId)) return { ok: false, reason: "not-carried" };
+  if (d.payments.some((p) => p.shipmentId === keep.id)) return { ok: false, reason: "sent-or-paid" };
+  return { ok: true };
+}
+
+/**
+ * R17: HĐ `contractId` ra chuyến riêng. Có bản ghi chuyến gốc của HĐ đã gộp vào đây ⇒ mở lại đúng bản ghi đó (booking, xe,
+ * ngày… như lúc nhập); không có (HĐ đi chung từ lịch) ⇒ chuyến mới chép booking / ngày của chuyến chung. Đi theo: dòng hàng
+ * của HĐ, file đính cho HĐ đó (`contractId`), lệnh sản xuất của HĐ gắn chuyến. Mục chứng từ đã làm chung ở lại chuyến chung.
+ */
+export function splitContract(
+  d: Pick<ExportData, "shipments" | "files" | "shipmentLines">,
+  keep: ExportShipment,
+  contractId: string,
+  opts: { orderLinks?: readonly ProductionOrderShipment[]; orderContractOf?: (orderId: string) => string; newId: () => string; now: string },
+): { shipments: ExportShipment[]; files: ExportFile[]; shipmentLines: ExportShipmentLine[]; orderLinks: ProductionOrderShipment[]; child: ExportShipment; reopened: boolean } {
+  const lines = d.shipmentLines ?? [];
+  const moving = lines.filter((l) => l.shipmentId === keep.id && l.contractId === contractId);
+  const movedKg = moving.reduce((t, l) => t + lineKg(l), 0);
+  const original = [...mergedChildren(d, keep.id)].reverse().find((s) => s.contractId === contractId && !isOriginalRecord(s));
+  const child: ExportShipment = original
+    ? { ...original, status: "open", cancelReason: "", plannedKg: movedKg > 0 ? movedKg : original.plannedKg }
+    : {
+        ...keep,
+        id: opts.newId(),
+        contractId,
+        plannedKg: movedKg > 0 ? movedKg : null,
+        lotCode: "",
+        containerNo: "",
+        sealNo: "",
+        transport: undefined,
+        goodsSummary: "",
+        note: "",
+        status: "open",
+        cancelReason: "",
+        createdAt: opts.now,
+      };
+  if (!child.transport) delete child.transport;
+  const keepKg = keep.plannedKg == null ? null : Math.max(0, keep.plannedKg - movedKg);
+  const shipments = original ? d.shipments.map((s) => (s.id === keep.id ? { ...s, plannedKg: keepKg } : s.id === child.id ? child : s)) : [...d.shipments.map((s) => (s.id === keep.id ? { ...s, plannedKg: keepKg } : s)), child];
+  const movingIds = new Set(moving.map((l) => l.id));
+  const shipmentLines = lines.map((l) => {
+    if (!movingIds.has(l.id)) return l;
+    const { containerId: _c, ...rest } = l;
+    return { ...(rest as ExportShipmentLine), shipmentId: child.id };
+  });
+  const files = d.files.map((f) => (f.shipmentId === keep.id && f.contractId === contractId ? { ...f, shipmentId: child.id, containerId: undefined } : f)).map((f) => {
+    if (f.containerId !== undefined) return f;
+    const { containerId: _c, ...rest } = f;
+    return rest as ExportFile;
+  });
+  const orderLinks = (opts.orderLinks ?? []).map((l) => (l.shipmentId === keep.id && opts.orderContractOf?.(l.orderId) === contractId ? { ...l, shipmentId: child.id } : l));
+  return { shipments, files, shipmentLines, orderLinks, child, reopened: !!original };
 }
 
 /* ---------- GC3: dòng lịch của HĐ mới đi chung chuyến có sẵn (R13) ---------- */

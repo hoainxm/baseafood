@@ -21,7 +21,6 @@ export interface MergeExportChoice {
   keep: ExportShipment;
   drops: ExportShipment[];
   mode: MergeMode;
-  choices: Record<string, string>;
 }
 
 const contractNoOf = (d: ExportData, id: string) => d.contracts.find((c) => c.id === id)?.contractNo ?? "";
@@ -68,11 +67,9 @@ export function MergeExportDialog({
 }) {
   const [keepId, setKeepId] = useState("");
   const [mode, setMode] = useState<MergeMode>("same-container");
-  const [choices, setChoices] = useState<Record<string, string>>({});
   useEffect(() => {
     setKeepId(target ? (defaultKeeper(data, target.shipments)?.id ?? "") : "");
     setMode("same-container");
-    setChoices({});
   }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const list = target?.shipments ?? [];
@@ -100,7 +97,7 @@ export function MergeExportDialog({
           </Button>
           <Button
             variant="save"
-            onClick={() => keep && onConfirm({ keep, drops, mode, choices })}
+            onClick={() => keep && onConfirm({ keep, drops, mode })}
             title="Gộp các chuyến này thành một chuyến (một lần xuất). Hoàn tác được ngay sau khi gộp."
           >
             <Layers className="mr-2 h-4 w-4" aria-hidden />
@@ -112,18 +109,16 @@ export function MergeExportDialog({
       {target && keep && (
         <div className="grid min-w-0 gap-4 py-2">
           <p className="text-sm text-muted-foreground">
-            Gộp xong: hàng của mỗi hợp đồng thành dòng hàng (mỗi hợp đồng vẫn tự tính đã giao); file, mục chứng từ, lệnh sản xuất, booking,
-            thông tin xe về chuyến giữ; từ Lệnh sản xuất tới Tiền về làm một lần.
+            Gộp xong: một chuyến chung cho cả lần xuất — hàng của mỗi hợp đồng thành dòng hàng (mỗi hợp đồng vẫn tự tính đã giao); file,
+            mục chứng từ, lệnh sản xuất, booking, thông tin xe dùng chung; từ Lệnh sản xuất tới Tiền về làm một lần. Không mất gì: chuyến
+            của từng hợp đồng giữ nguyên bản ghi (Đã gộp vào lần xuất), tách lại được từng hợp đồng.
           </p>
           <ChoiceGroup
-            label="Chuyến giữ lại"
+            label="Hợp đồng chính của lần xuất"
             required
             value={keep.id}
-            onChange={(v) => {
-              setKeepId(v);
-              setChoices({});
-            }}
-            hint="Chọn sẵn chuyến đã làm nhiều nhất (nhiều file, nhiều mục xong). Hợp đồng của chuyến giữ là hợp đồng chính."
+            onChange={setKeepId}
+            hint="Chọn sẵn chuyến đã làm nhiều nhất. Chuyến chung dùng thông tin của hợp đồng chính trước; chuyến của hợp đồng kia vẫn giữ bản ghi riêng."
             options={list.map((s) => ({
               value: s.id,
               label: shipmentLabel(s),
@@ -135,28 +130,27 @@ export function MergeExportDialog({
             <ChoiceGroup
               label="Hàng đóng vào"
               value={mode}
-              onChange={(v) => {
-                setMode(v as MergeMode);
-                setChoices({});
-              }}
+              onChange={(v) => setMode(v as MergeMode)}
               options={[
                 { value: "same-container", label: "Cùng một cont", description: "Booking 1 cont (VD 1X20RF): số cont, seal, ảnh seal là của một cont." },
-                { value: "separate-containers", label: "Mỗi chuyến một cont", description: "Booking nhiều cont: mỗi chuyến bỏ thành một cont thêm của chuyến giữ." },
+                { value: "separate-containers", label: "Mỗi chuyến một cont", description: "Booking nhiều cont: chuyến của hợp đồng kia thành một cont thêm của chuyến chung." },
               ]}
               columns={2}
             />
           )}
-          {conflicts.map((c) => (
-            <ChoiceGroup
-              key={c.key}
-              label={`${c.label} — hai chuyến ghi khác nhau`}
-              value={choices[c.key] ?? c.options[0].shipmentId}
-              onChange={(v) => setChoices((x) => ({ ...x, [c.key]: v }))}
-              options={c.options.map((o) => ({ value: o.shipmentId, label: o.value, description: `theo ${shipmentLabel(list.find((s) => s.id === o.shipmentId)!)}` }))}
-              columns={2}
-            />
-          ))}
-          {!conflicts.length && <p className="text-sm text-muted-foreground">Không có ô nào ghi khác nhau — ô trống của chuyến giữ lấy theo chuyến kia.</p>}
+          {conflicts.length > 0 ? (
+            <div className="grid gap-1 rounded-lg bg-muted px-4 py-3 text-sm">
+              <span className="font-semibold">Ô ghi khác nhau — giữ đủ, không bỏ giá trị nào:</span>
+              {conflicts.map((c) => (
+                <span key={c.key}>
+                  {c.label}: {c.options.map((o, i) => `${o.value} (${shipmentLabel(list.find((s) => s.id === o.shipmentId)!).split(" · ")[0]}${i === 0 ? ", chuyến chung dùng" : ""})`).join(" · ")}
+                </span>
+              ))}
+              <span className="text-muted-foreground">Sau gộp, chuyến chung ghi rõ các giá trị này; chọn Dùng giá trị này để đổi khi cần.</span>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Không có ô nào ghi khác nhau — ô trống của chuyến chung lấy theo chuyến kia.</p>
+          )}
           <p className="tnum text-sm">
             Sau gộp: 1 chuyến · {formatNumber(totalKg)} kg kế hoạch · {list.reduce((t, s) => t + fileCount(s), 0)} file
           </p>

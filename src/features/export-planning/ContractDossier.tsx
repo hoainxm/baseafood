@@ -4,6 +4,7 @@
 // Description: Contract dossier page: header + state, terms, lines, revision / approval history,
 //              deadline extensions, tolerance closure, shipments (1 shipment ⇒ shown inline).
 // ============================================================
+import { visibleActivitySummary } from "@/lib/exportMergeShipments";
 import {
   Button,
   InlineConfirmDelete,
@@ -881,7 +882,9 @@ function ShipmentRow({
         </span>
         <span className="tnum text-sm text-muted-foreground">
           {shipment.status === "cancelled"
-            ? `Đã hủy · ${shipment.cancelReason}`
+            ? shipment.cancelReason.includes("⟦merged-into:")
+              ? visibleActivitySummary(shipment.cancelReason)
+              : `Đã hủy · ${shipment.cancelReason}`
             : [shipment.loadingDate && `Đóng ${formatDateVN(shipment.loadingDate)}`, shipment.etd && `ETD ${formatDateVN(shipment.etd)}`, shipment.bookingNo || "chờ booking"]
                 .filter(Boolean)
                 .join(" · ")}

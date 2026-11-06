@@ -25,7 +25,13 @@ import {
   joinShipment,
   keepSeparateOffTag,
   keepSeparateTag,
+  fieldDifferences,
+  isOriginalRecord,
   mergeConflicts,
+  mergedIntoId,
+  splitContract,
+  splitGate,
+  withFieldValue,
   mergedInto,
   mergedTag,
   mergeGate,
@@ -123,17 +129,29 @@ describe("GC1 — dò chuyến cùng một lần xuất", () => {
 });
 
 describe("GC2 — gộp thành một lần xuất", () => {
-  it("AC-5: gộp cặp 06/11 ⇒ giữ B, 1 chuyến 7.000 kg, 2 HĐ, 4 file, khối xe của B, 1 ô lệch (forwarder), 2 file booking trùng tên", () => {
+  it("AC-5: gộp cặp 06/11 ⇒ HĐ chính BD-008, 1 chuyến chung 7.000 kg, 2 HĐ, 4 file, khối xe của B; bản ghi chuyến A còn nguyên (Đã gộp)", () => {
     const d = base();
     const keep = defaultKeeper(d, [A, B])!;
     expect(keep.id).toBe("B");
     expect(mergeGate(d, B, A)).toEqual({ ok: true });
     const conflicts = mergeConflicts(B, [A]);
     expect(conflicts.map((c) => c.key)).toEqual(["forwarder"]);
-    const out = mergeShipments(d, B, [A], { choices: { forwarder: "B" }, newId, now: NOW });
+    const out = mergeShipments(d, B, [A], { newId, now: NOW, keepLabel: "HĐ BD-008/26" });
     const after = { ...d, ...out };
-    expect(after.shipments.filter((s) => s.loadingDate === "2026-11-06")).toHaveLength(1);
-    const m = after.shipments[0];
+    expect(after.shipments.filter((s) => s.status === "open" && s.loadingDate === "2026-11-06")).toHaveLength(1);
+    const m = after.shipments.find((s) => s.id === "B")!;
+    // Không mất: bản ghi chuyến A giữ nguyên booking / forwarder / kg, trạng thái Đã gộp vào B.
+    const a = after.shipments.find((s) => s.id === "A")!;
+    expect(a.status).toBe("cancelled");
+    expect(mergedIntoId(a)).toBe("B");
+    expect(a.booking?.forwarder).toBe("Phương Anh Phạm");
+    expect(a.plannedKg).toBe(4000);
+    expect(visibleActivitySummary(a.cancelReason)).toBe("Đã gộp vào lần xuất HĐ BD-008/26");
+    // Có ô khác nhau ⇒ thêm bản ghi gốc của chuyến B (forwarder NYD) — đổi sang giá trị của A thì NYD vẫn còn.
+    const snap = after.shipments.filter((s) => isOriginalRecord(s));
+    expect(snap).toHaveLength(1);
+    expect(snap[0].booking?.forwarder).toBe("NYD LINE COMPANY LIMITED");
+    expect(after.shipments.filter((s) => s.status === "open")).toHaveLength(1);
     expect(m.id).toBe("B");
     expect(m.plannedKg).toBe(7000);
     expect(shipmentContractIds(after, m)).toEqual(["c8", "c7"]);
@@ -141,15 +159,25 @@ describe("GC2 — gộp thành một lần xuất", () => {
     expect(m.booking?.forwarder).toBe("NYD LINE COMPANY LIMITED");
     expect(m.transport?.driverName).toBe("Nguyễn Xuân Huy");
     expect(out.duplicateFileNames).toBe(2);
-    expect(after.items.filter((i) => i.shipmentId === "A")).toHaveLength(0);
+    // Mục trống của A nằm lại bản ghi A (không xóa mục nào).
+    expect(after.items).toHaveLength(d.items.length);
     expect(after.items.filter((i) => i.shipmentId === "B")).toHaveLength(3);
+    // Ô ghi khác nhau: cả hai giá trị còn, giá trị đang dùng là của HĐ chính.
+    const diff = fieldDifferences(after, m);
+    expect(diff.map((x) => x.key)).toEqual(["forwarder"]);
+    expect(diff[0].values.map((v) => [v.contractId, v.value, v.inUse])).toEqual([["c8", "NYD LINE COMPANY LIMITED", true], ["c7", "Phương Anh Phạm", false]]);
   });
 
-  it("AC-5b: ô trống của chuyến giữ lấy bù; chọn giá trị của chuyến bỏ cho ô lệch", () => {
+  it("AC-5b: ô trống của chuyến chung lấy bù; dùng lại giá trị của HĐ kia khi cần (giá trị cũ vẫn còn ở bản ghi)", () => {
     const d = base({ shipments: [A, { ...B, vesselVoyage: "" }] });
-    const out = mergeShipments(d, d.shipments[1], [A], { choices: { forwarder: "A" }, newId, now: NOW });
-    expect(out.shipments[0].vesselVoyage).toBe("NYK FUTAGO 0109E(JTI)");
-    expect(out.shipments[0].booking?.forwarder).toBe("Phương Anh Phạm");
+    const out = mergeShipments(d, d.shipments[1], [A], { newId, now: NOW });
+    const m = out.shipments.find((s) => s.id === "B")!;
+    expect(m.vesselVoyage).toBe("NYK FUTAGO 0109E(JTI)");
+    const switched = withFieldValue(m, out.shipments.find((s) => s.id === "A")!, "forwarder");
+    expect(switched.booking?.forwarder).toBe("Phương Anh Phạm");
+    const after = { ...d, ...out, shipments: out.shipments.map((s) => (s.id === "B" ? switched : s)) };
+    // Giá trị đang dùng ghi theo HĐ đã nhập nó (BD-007); giá trị cũ của HĐ chính còn ở bản ghi gốc.
+    expect(fieldDifferences(after, switched)[0].values.map((v) => [v.value, v.contractId, v.inUse, !!v.original])).toEqual([["Phương Anh Phạm", "c7", true, false], ["NYD LINE COMPANY LIMITED", "c8", false, true]]);
   });
 
   it("AC-6: kg kế hoạch từng HĐ không đổi sau gộp (10 kg / kiện ⇒ BD-007 400 kiện)", () => {
@@ -160,7 +188,7 @@ describe("GC2 — gộp thành một lần xuất", () => {
     expect(contractCoverage(after, "c7").plannedKg).toBe(before.c7);
     expect(contractCoverage(after, "c8").plannedKg).toBe(before.c8);
     expect(out.shipmentLines.find((l) => l.contractId === "c7")?.plannedUnits).toBe(400);
-    expect(plannedKgByContract(after, after.shipments[0])).toEqual([{ contractId: "c8", kg: 3000 }, { contractId: "c7", kg: 4000 }]);
+    expect(plannedKgByContract(after, after.shipments.find((s) => s.id === "B")!)).toEqual([{ contractId: "c8", kg: 3000 }, { contractId: "c7", kg: 4000 }]);
   });
 
   it("AC-7: chặn nêu đích danh — cùng mục đã làm ở hai chuyến · đã gửi chứng từ · HĐ thiếu hồ sơ · khác khách", () => {
@@ -197,8 +225,10 @@ describe("GC2 — gộp thành một lần xuất", () => {
     expect(hc[0].state).toBe("done");
     expect(out.items.find((i) => i.id === "C-pl")?.sharedFromId).toBe("B-pl");
     expect(out.orderLinks.filter((l) => l.orderId === "L1" && l.shipmentId === "B")).toHaveLength(1);
-    const pointsToA = out.items.filter((i) => i.shipmentId === "A").length + out.files.filter((f) => f.shipmentId === "A").length + out.orderLinks.filter((l) => l.shipmentId === "A").length;
-    expect(pointsToA).toBe(0);
+    expect(out.files.filter((f) => f.shipmentId === "A").length + out.orderLinks.filter((l) => l.shipmentId === "A").length).toBe(0);
+    // Mục trống của A còn ở bản ghi A; HC trống của B đổi chỗ sang bản ghi A; không mục nào bị xóa.
+    expect(out.items.filter((i) => i.shipmentId === "A").map((i) => i.id).sort()).toEqual(["A-ci", "A-pl", "B-hc"]);
+    expect(out.items).toHaveLength(d.items.length);
   });
 
   it("AC-10: loại chuyến — giữ Đóng ghép bỏ 20RF ⇒ 20RF; mọi chuyến Đóng ghép ⇒ vẫn Đóng ghép", () => {
@@ -219,9 +249,11 @@ describe("GC2 — gộp thành một lần xuất", () => {
     const drops = list.filter((s) => s.id !== keep.id);
     expect(drops.every((s) => mergeGate(d, keep, s).ok)).toBe(true);
     const out = mergeShipments(d, keep, drops, { newId, now: NOW });
-    expect(out.shipments).toHaveLength(1);
-    expect(shipmentContractIds({ ...d, ...out }, out.shipments[0])).toHaveLength(4);
-    expect(out.shipments[0].plannedKg).toBe(15300);
+    const open = out.shipments.filter((s) => s.status === "open");
+    expect(open).toHaveLength(1);
+    expect(out.shipments).toHaveLength(4);
+    expect(shipmentContractIds({ ...d, ...out }, open[0])).toHaveLength(4);
+    expect(open[0].plannedKg).toBe(15300);
     expect(JSON.stringify({ s: d.shipments, l: d.shipmentLines ?? [] })).toBe(snapshot);
   });
 
@@ -233,14 +265,52 @@ describe("GC2 — gộp thành một lần xuất", () => {
     expect(cont.containerNo).toBe("TGHU1234567");
     expect(out.files.filter((f) => f.step === "container-seal-photos").every((f) => f.containerId === cont.id)).toBe(true);
     expect(out.shipmentLines.filter((l) => l.contractId === "c8").every((l) => l.containerId === cont.id)).toBe(true);
-    expect(out.shipments[0].containerNo).toBe("");
+    expect(out.shipments.find((s) => s.id === "A")!.containerNo).toBe("");
   });
 
-  it("AC-17: mở chuyến đã gộp ⇒ ra chuyến giữ + ngày gộp; đã Hoàn tác (chuyến còn) ⇒ null", () => {
-    const act: ExportActivity = { id: "a", contractId: "c8", shipmentId: "B", action: "update", summary: `Gộp ${mergedTag(["A"], "B")}`, actor: "KH", createdAt: NOW };
-    const d = { ...base(), shipments: [B], activities: [act] };
-    expect(mergedInto(d, "A")).toEqual({ shipmentId: "B", mergedAt: NOW });
-    expect(mergedInto({ ...d, shipments: [A, B] }, "A")).toBeNull();
+  it("AC-17: mở chuyến đã gộp ⇒ ra chuyến chung (theo chuỗi); chuyến thường / đã Hoàn tác ⇒ null", () => {
+    const d = base();
+    const after = { ...d, ...mergeShipments(d, B, [A], { newId, now: NOW }) };
+    expect(mergedInto(after, "A")).toEqual({ shipmentId: "B" });
+    expect(mergedInto(d, "A")).toBeNull();
+    expect(mergedTag(["A"], "B")).toBe("⟦merged:A>B⟧");
+  });
+
+  it("AC-20: tách BD-007 khỏi lần xuất 06/11 ⇒ mở lại đúng bản ghi A (booking, forwarder như lúc nhập), hàng + file của BD-007 về A", () => {
+    const d = base({ files: [...base().files, file("fNew", "c8", "B", "loading-photos", "dong-cont.jpg")] });
+    const links: ProductionOrderShipment[] = [{ id: "k7", orderId: "L7", shipmentId: "A", createdAt: T0 }, { id: "k8", orderId: "L8", shipmentId: "B", createdAt: T0 }];
+    const m = mergeShipments(d, B, [A], { orderLinks: links, newId, now: NOW });
+    const after = { ...d, ...m };
+    const keep = after.shipments.find((s) => s.id === "B")!;
+    expect(splitGate(after, keep, "c8")).toEqual({ ok: false, reason: "main-contract" });
+    expect(splitGate(after, keep, "c7")).toEqual({ ok: true });
+    const out = splitContract(after, keep, "c7", { orderLinks: m.orderLinks, orderContractOf: (id) => (id === "L7" ? "c7" : "c8"), newId, now: NOW });
+    expect(out.reopened).toBe(true);
+    const a = out.shipments.find((s) => s.id === "A")!;
+    expect(a.status).toBe("open");
+    expect(a.booking?.forwarder).toBe("Phương Anh Phạm");
+    expect(a.plannedKg).toBe(4000);
+    expect(out.shipments.find((s) => s.id === "B")!.plannedKg).toBe(3000);
+    expect(out.shipmentLines.filter((l) => l.contractId === "c7").every((l) => l.shipmentId === "A")).toBe(true);
+    expect(out.files.filter((f) => f.shipmentId === "A").map((f) => f.id)).toEqual(["fA1"]);
+    expect(out.files.filter((f) => f.shipmentId === "B")).toHaveLength(4);
+    expect(out.orderLinks.find((l) => l.orderId === "L7")?.shipmentId).toBe("A");
+    expect(out.orderLinks.find((l) => l.orderId === "L8")?.shipmentId).toBe("B");
+  });
+
+  it("AC-21: tách HĐ đi chung từ lịch (không có bản ghi gốc) ⇒ chuyến mới chép booking / ngày, không chép số cont / xe", () => {
+    const host = { ...B, containerNo: "TGHU1234567" };
+    const d = base({ shipments: [host], items: [] });
+    const j = joinShipment(d, host, "c7", { plannedKg: 2000, loadingDate: "2026-11-06" }, newId);
+    const after = { ...d, shipments: [j.shipment], shipmentLines: j.shipmentLines };
+    const out = splitContract(after, j.shipment, "c7", { newId, now: NOW });
+    expect(out.reopened).toBe(false);
+    expect(out.child.contractId).toBe("c7");
+    expect(out.child.bookingNo).toBe(host.bookingNo);
+    expect(out.child.containerNo).toBe("");
+    expect(out.child.transport).toBeUndefined();
+    expect(out.child.plannedKg).toBe(2000);
+    expect(out.shipments.find((s) => s.id === "B")!.plannedKg).toBe(3000);
   });
 });
 
@@ -287,6 +357,8 @@ describe("GC4 — một lần xuất một dòng: tra theo số HĐ phụ", () =
     const d = base();
     const after = { ...d, ...mergeShipments(d, B, [A], { newId, now: NOW }) };
     expect(searchShipments(after, "BD-007/26").map((s) => s.id)).toEqual(["B"]);
+    // GC4: lịch xếp chuyến mở — bản ghi đã gộp không thành dòng riêng.
+    expect(after.shipments.filter((s) => s.status === "open")).toHaveLength(1);
   });
 });
 

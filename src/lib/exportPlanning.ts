@@ -500,11 +500,32 @@ export const termsOf = (d: Pick<ExportData, "revisions" | "approvals">, contract
 
 /** R15 + NV6: hạn giao hiệu lực = gia hạn mới nhất, không có thì hạn của bản đang dùng. */
 export function effectiveDeadline(d: Pick<ExportData, "revisions" | "approvals" | "extensions">, contractId: string): string {
-  const ext = d.extensions
-    .filter((e) => e.contractId === contractId && e.newDeadline)
-    .sort((a, b) => (a.confirmedOn + a.createdAt).localeCompare(b.confirmedOn + b.createdAt));
+  const ext = extensionsOf(d, contractId);
   if (ext.length) return ext[ext.length - 1].newDeadline;
   return termsOf(d, contractId).latestShipmentDate;
+}
+
+/** Lần gia hạn của HĐ theo thứ tự hiệu lực (ngày khách xác nhận, rồi lúc ghi) — lần cuối là hạn đang dùng. */
+export function extensionsOf(d: Pick<ExportData, "extensions">, contractId: string): ExportDeadlineExtension[] {
+  return d.extensions
+    .filter((e) => e.contractId === contractId && e.newDeadline)
+    .sort((a, b) => (a.confirmedOn + a.createdAt).localeCompare(b.confirmedOn + b.createdAt));
+}
+
+export type ExtensionChangeGate = { ok: true; fallback: string } | { ok: false; reason: "not-found" | "not-latest" };
+
+/**
+ * Audit 2026-11-06 (B3): sửa / xóa một lần gia hạn ghi nhầm. Chỉ lần MỚI NHẤT — các lần trước là chuỗi khách đã xác nhận
+ * (lần sau dựa trên lần trước); muốn gỡ lần cũ thì gỡ dần từ lần mới nhất. `fallback` = hạn giao sau khi xóa (lần trước,
+ * không có thì hạn của bản HĐ đang dùng).
+ */
+export function extensionChangeGate(d: Pick<ExportData, "revisions" | "approvals" | "extensions">, extensionId: string): ExtensionChangeGate {
+  const ext = d.extensions.find((e) => e.id === extensionId);
+  if (!ext) return { ok: false, reason: "not-found" };
+  const chain = extensionsOf(d, ext.contractId);
+  if (chain.length && chain[chain.length - 1].id !== ext.id) return { ok: false, reason: "not-latest" };
+  const before = chain.filter((e) => e.id !== ext.id);
+  return { ok: true, fallback: before.length ? before[before.length - 1].newDeadline : termsOf(d, ext.contractId).latestShipmentDate };
 }
 
 /* ---------- R1 + R8: tháng của chuyến, thứ tự ngày ---------- */
@@ -1891,41 +1912,49 @@ export function mergeShipmentGate(d: Pick<ExportData, "files" | "items">, into: 
   return { ok: true };
 }
 
+/* ---------- Audit 2026-11-06 (B4, B5): hàng của chuyến đã vào chứng từ ---------- */
+
+export type ShipmentGoodsLock = "paid" | "invoice-done" | "si-done";
+
 /**
- * Kết quả gộp (R13): `from` thành cont thêm cuối của `into` (loại, số, seal, ngày đóng của `from`); dòng hàng của `from`
- * sang `into`, gán cont mới, xếp sau dòng của `into`; chuyến `from` + mục bước của nó bị bỏ. Màn ghi một lần + Hoàn tác.
+ * Hàng của chuyến đã in vào chứng từ ⇒ không bớt dòng / tách cont được nữa (invoice, SI đang có sẽ sai):
+ *  • đã ghi gửi chứng từ / tiền về (bước 6);  • Commercial Invoice của chuyến Xong;  • đã đính SI (Shipping Instruction).
+ * Mở lại Commercial Invoice (Cập nhật → Đang làm) / gỡ file SI rồi làm lại. `null` = bớt được.
  */
-export function mergeShipmentInto(
-  d: Pick<ExportData, "shipments" | "items" | "shipmentLines" | "shipmentContainers">,
-  into: ExportShipment,
-  from: ExportShipment,
-  newContainerId: string,
-  now: string,
-): { shipments: ExportShipment[]; items: ExportStepItem[]; shipmentLines: ExportShipmentLine[]; shipmentContainers: ExportShipmentContainer[] } {
-  const extras = (d.shipmentContainers ?? []).filter((c) => c.shipmentId === into.id);
-  const container: ExportShipmentContainer = {
-    id: newContainerId,
-    shipmentId: into.id,
-    sortOrder: extras.reduce((m, c) => Math.max(m, c.sortOrder), 0) + 1,
-    kind: from.kind === "20RF" || from.kind === "40RF" || from.kind === "40HC-RF" ? from.kind : "20RF",
-    containerNo: from.containerNo,
-    sealNo: from.sealNo,
-    loadingDate: from.loadingDate === into.loadingDate ? "" : from.loadingDate,
-    note: from.note,
-    createdAt: now,
-  };
-  const lines = d.shipmentLines ?? [];
-  const base = lines.filter((l) => l.shipmentId === into.id).reduce((m, l) => Math.max(m, l.sortOrder), 0);
-  return {
-    shipments: d.shipments.filter((s) => s.id !== from.id),
-    items: d.items.filter((i) => i.shipmentId !== from.id),
-    shipmentLines: lines.map((l) => (l.shipmentId === from.id ? { ...l, shipmentId: into.id, containerId: newContainerId, sortOrder: base + 1 + l.sortOrder } : l)),
-    // Cont thêm của `from` (nếu có) đi theo, xếp sau cont mới.
-    shipmentContainers: [
-      ...(d.shipmentContainers ?? []).map((c) => (c.shipmentId === from.id ? { ...c, shipmentId: into.id, sortOrder: container.sortOrder + c.sortOrder } : c)),
-      container,
-    ],
-  };
+export function shipmentGoodsLock(d: Pick<ExportData, "payments" | "items" | "files">, shipmentId: string): ShipmentGoodsLock | null {
+  if (d.payments.some((p) => p.shipmentId === shipmentId)) return "paid";
+  if (d.items.some((i) => i.shipmentId === shipmentId && i.step === "document" && i.docKind === "commercial-invoice" && !i.sharedFromId && i.state === "done")) return "invoice-done";
+  if (shipmentFilesOf(d, shipmentId, "shipping-instruction").length) return "si-done";
+  return null;
+}
+
+export const SHIPMENT_GOODS_LOCK_TEXT: Record<ShipmentGoodsLock, string> = {
+  paid: "Chuyến đã ghi gửi bộ chứng từ / tiền về — hàng đã vào chứng từ gửi khách, không bớt được.",
+  "invoice-done": "Commercial Invoice của chuyến đã Xong — invoice đang in theo hàng này. Mở Commercial Invoice → Cập nhật → Đang làm, rồi làm lại.",
+  "si-done": "Đã đính SI (Shipping Instruction) cho chuyến — SI đang ghi số kiện / gross theo hàng này. Gỡ file SI ở bước 4, rồi làm lại.",
+};
+
+export type RemoveShipmentLineGate = { ok: true } | { ok: false; reason: "not-found" | "not-open" | ShipmentGoodsLock };
+
+/** B5: Phòng KH xóa một dòng hàng của chuyến (kể cả dòng bộ phận đóng cont thêm nhầm). */
+export function removeShipmentLineGate(d: Pick<ExportData, "shipments" | "shipmentLines" | "payments" | "items" | "files">, lineId: string): RemoveShipmentLineGate {
+  const line = (d.shipmentLines ?? []).find((l) => l.id === lineId);
+  const s = line && d.shipments.find((x) => x.id === line.shipmentId);
+  if (!line || !s) return { ok: false, reason: "not-found" };
+  if (s.status !== "open") return { ok: false, reason: "not-open" };
+  const lock = shipmentGoodsLock(d, s.id);
+  return lock ? { ok: false, reason: lock } : { ok: true };
+}
+
+/* ---------- Audit 2026-11-06 (B6): bỏ gắn lệnh sản xuất ngay ở chuyến ---------- */
+
+/**
+ * Bỏ gắn lệnh `orderId` khỏi chuyến `shipmentId` (mọi trạng thái lệnh, kể cả Đã hủy — link cũ của lệnh hủy vẫn gỡ được).
+ * Chỉ gỡ link; lệnh, mã số lô chuyến đã nhận từ lệnh giữ nguyên. `removed` rỗng = không có gì để gỡ.
+ */
+export function unlinkShipmentOrder<L extends { orderId: string; shipmentId: string }>(links: readonly L[], shipmentId: string, orderId: string): { links: L[]; removed: L[] } {
+  const hit = (l: L) => l.shipmentId === shipmentId && l.orderId === orderId;
+  return { links: links.filter((l) => !hit(l)), removed: links.filter(hit) };
 }
 
 /* ---------- Tra cứu (NV11) ---------- */

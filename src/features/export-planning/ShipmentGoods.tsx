@@ -56,6 +56,8 @@ interface LinesForm {
   /** HĐ đang có dòng trong hộp — thêm HĐ khác ⇒ thêm nhóm (ba-spec 70). */
   groups: ContractLineGroup[];
   rows: LineDraft[];
+  /** Id dòng đã lưu bấm Xóa trong hộp (audit B5) — Lưu mới xóa thật, có Hoàn tác. */
+  removed: string[];
   initial: string;
 }
 const linesSnap = (rows: readonly LineDraft[]) => JSON.stringify(rows);
@@ -79,9 +81,9 @@ export function ShipmentLinesDialog({
   useEffect(() => {
     if (!target) return;
     const rows = draftRows(target);
-    const fresh: LinesForm = { key: target.shipment.id, tg: target, groups: [...target.groups], rows, initial: linesSnap(rows) };
+    const fresh: LinesForm = { key: target.shipment.id, tg: target, groups: [...target.groups], rows, removed: [], initial: linesSnap(rows) };
     const kept = draft.takeKept();
-    setForm(kept && kept.key === fresh.key ? kept : fresh);
+    setForm(kept && kept.key === fresh.key ? { ...kept, removed: kept.removed ?? [] } : fresh);
     setErrors([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi mở hộp
   }, [target]);
@@ -98,6 +100,15 @@ export function ShipmentLinesDialog({
   const contOptions = conts.map((c) => ({ value: c.id || "first", label: c.label }));
   const split = (i: number) => setForm((f) => (f ? { ...f, rows: splitRow(f.rows, i, conts.map((c) => c.id)) } : f));
   const removeRow = (i: number) => setForm((f) => (f ? { ...f, rows: f.rows.filter((_, k) => k !== i) } : f));
+  /** Xóa dòng đã lưu (audit B5): hàng đầu của dòng HĐ thành ô trống (dòng HĐ vẫn chọn lại được), bản chia thì bỏ hẳn. */
+  const removeSaved = (i: number, isSplit: boolean) =>
+    setForm((f) => {
+      if (!f) return f;
+      const r = f.rows[i];
+      if (!r?.lineId) return f;
+      const rows = isSplit ? f.rows.filter((_, k) => k !== i) : f.rows.map((x, k) => (k === i ? { ...x, lineId: "", plannedUnits: null, grossKgPerUnit: null, expiry: "" } : x));
+      return { ...f, rows, removed: [...f.removed, r.lineId] };
+    });
 
   const save = () => {
     if (!form || !tg) return;
@@ -108,7 +119,7 @@ export function ShipmentLinesDialog({
     // Dòng đóng cont đã điền số thực đóng: để trống kế hoạch vẫn GIỮ dòng (linesFromDraft, ba-spec 63 R4 — đóng cont
     // có thể tự tạo dòng không kế hoạch, mig 0098). Chỉ chặn khi dòng không còn trong hộp (dòng HĐ đã bị bỏ khỏi bản HĐ).
     for (const l of tg.lines) {
-      if (l.loadedUnits != null && !form.rows.some((x) => x.lineId === l.id))
+      if (l.loadedUnits != null && !form.rows.some((x) => x.lineId === l.id) && !form.removed.includes(l.id))
         errs.push({ field: lineTitle(l), message: "Đóng cont đã điền số thực đóng cho dòng này nhưng dòng hàng không còn trong hợp đồng — báo người lập HĐ" });
     }
     setErrors(errs);
@@ -150,6 +161,14 @@ export function ShipmentLinesDialog({
       {form && tg && (
         <div className="grid gap-4 py-2">
           <ErrorSummary errors={errors} />
+          {tg.removeLines?.blockedText && tg.lines.length > 0 && (
+            <p className="rounded-lg bg-muted px-4 py-2 text-sm text-muted-foreground">Không xóa được dòng hàng: {tg.removeLines.blockedText}</p>
+          )}
+          {form.removed.length > 0 && (
+            <p className="rounded-lg bg-warning-surface px-4 py-2 text-sm">
+              {form.removed.length} dòng hàng sẽ bị xóa khi Lưu (cả số thực đóng của dòng đó). Lưu xong vẫn Hoàn tác được; chọn Hủy để giữ nguyên.
+            </p>
+          )}
           {!form.rows.length && <p className="rounded-lg bg-warning-surface px-4 py-2 text-sm">Hợp đồng chưa có dòng hàng — thêm dòng hàng ở hồ sơ hợp đồng trước.</p>}
           {form.rows.map((r, i) => {
             const cl = allLines.find((c) => c.id === r.contractLineId);
@@ -163,6 +182,8 @@ export function ShipmentLinesDialog({
             const left = cl.quantity != null ? cl.quantity - other - here : null;
             // Bản chia (không phải hàng đầu của dòng HĐ) bỏ được; hàng đầu thì để trống số kiện như cũ.
             const isSplit = sameLine.indexOf(r) > 0;
+            const saved = r.lineId ? tg.lines.find((l) => l.id === r.lineId) : undefined;
+            const canRemoveSaved = !!saved && !!tg.removeLines && !tg.removeLines.blockedText;
             return (
               <section key={`${r.contractLineId}-${r.lineId || i}`} className="grid min-w-0 gap-3 rounded-lg border border-border p-3">
                 {multi && firstOfGroup && group && (
@@ -172,11 +193,21 @@ export function ShipmentLinesDialog({
                   <p className="min-w-0 font-medium break-words">
                     {i + 1}. {[cl.description, cl.size].filter(Boolean).join(" · ")}
                   </p>
-                  <p className="tnum text-sm text-muted-foreground">
-                    HĐ {cl.quantity != null ? `${formatNumber(cl.quantity)} ${unit}` : "chưa ghi số lượng"}
-                    {other ? ` · chuyến khác ${formatNumber(other)}` : ""}
-                    {left != null ? ` · còn ${formatNumber(left)}` : ""}
-                  </p>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p className="tnum text-sm text-muted-foreground">
+                      HĐ {cl.quantity != null ? `${formatNumber(cl.quantity)} ${unit}` : "chưa ghi số lượng"}
+                      {other ? ` · chuyến khác ${formatNumber(other)}` : ""}
+                      {left != null ? ` · còn ${formatNumber(left)}` : ""}
+                      {saved?.loadedUnits != null ? ` · thực đóng ${formatNumber(saved.loadedUnits)}` : ""}
+                    </p>
+                    {canRemoveSaved && saved && (
+                      <InlineConfirmDelete
+                        recordDescription={`${lineTitle(saved)}${saved.loadedUnits != null ? ` — thực đóng ${formatNumber(saved.loadedUnits)} ${unit}` : ""}`}
+                        title="Xóa dòng hàng này khỏi chuyến (ghi nhầm, kể cả dòng bộ phận đóng cont thêm nhầm) — số thực đóng của dòng cũng bỏ. Hỏi lại trước; bấm Lưu mới xóa, có Hoàn tác."
+                        onConfirm={() => removeSaved(i, isSplit)}
+                      />
+                    )}
+                  </div>
                 </div>
                 {multiCont && (
                   <div className="flex min-w-0 flex-wrap items-end gap-2" data-tour="export-shipment-line-container">
@@ -193,7 +224,7 @@ export function ShipmentLinesDialog({
                       <Plus className="mr-1 h-4 w-4" aria-hidden />
                       Chia sang cont khác
                     </Button>
-                    {isSplit && <InlineConfirmDelete recordDescription={`${cl.description} (bản chia)`} title="Bỏ dòng chia này (số kiện của dòng này cũng bỏ)." onConfirm={() => removeRow(i)} />}
+                    {isSplit && !canRemoveSaved && <InlineConfirmDelete recordDescription={`${cl.description} (bản chia)`} title="Bỏ dòng chia này (số kiện của dòng này cũng bỏ)." onConfirm={() => removeRow(i)} />}
                   </div>
                 )}
                 <div className="grid gap-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))]">

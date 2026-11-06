@@ -146,6 +146,7 @@ export function ShipmentPanel({
   onConsolidate,
   sameExport,
   mergedRecord,
+  mergedContainers,
   exportGroup,
   onOpenItem,
 
@@ -186,7 +187,9 @@ export function ShipmentPanel({
   /** ba-spec 74 GC1: chuyến này có thể cùng một lần xuất với chuyến khác cùng khách. `onMerge` trống ⇒ không có quyền gộp. */
   sameExport?: { text: string; onMerge?: () => void };
   /** ba-spec 74 R7: chuyến này là bản ghi đã gộp vào lần xuất khác — giữ nguyên để tra, mở được lần xuất. */
-  mergedRecord?: { text: string; onOpen?: () => void };
+  mergedRecord?: { text: string; onOpen?: () => void; onSplit?: () => void };
+  /** ba-spec 73 R13 v1.1: cont thêm gộp từ chuyến khác — tách lại được (`onSplit`), không thì `blockedText` nói vì sao. */
+  mergedContainers?: { label: string; onSplit?: () => void; blockedText: string }[];
   /** ba-spec 74 R6, R17: chuyến chung của nhiều HĐ — HĐ trên chuyến (tách được), ô các HĐ ghi khác nhau. */
   exportGroup?: {
     contracts: { contractNo: string; isMain: boolean; kg: number; onSplit?: () => void }[];
@@ -615,6 +618,12 @@ export function ShipmentPanel({
               Mở lần xuất
             </Button>
           )}
+          {mergedRecord?.onSplit && (
+            <Button size="sm" variant="edit" onClick={mergedRecord.onSplit} title="Gộp nhầm: mở lại chuyến này thành chuyến riêng — cont, dòng hàng của cont đó, ảnh cont / seal, lệnh sản xuất đã chuyển sang đều quay về. Hoàn tác được.">
+              <RotateCcw className="mr-1 h-4 w-4" aria-hidden />
+              Tách ra chuyến riêng
+            </Button>
+          )}
           {isCancelled && !mergedRecord && can.update && contract.status === "open" && (
             <Button size="sm" variant="edit" onClick={onRestore} title="Khôi phục chuyến đã hủy về đang làm (mục dùng chung ở chuyến khác không tự quay lại).">
               <RotateCcw className="mr-1 h-4 w-4" aria-hidden />
@@ -653,6 +662,25 @@ export function ShipmentPanel({
                   Xóa chuyến
                 </Button>
               )}
+            </div>
+          )}
+          {mergedContainers && !isCancelled && (
+            <div className="grid min-w-0 gap-2 rounded-lg border border-border px-4 py-3 text-sm">
+              <span className="font-semibold">Cont thêm gộp từ chuyến khác — chuyến đó giữ bản ghi, tách lại được</span>
+              <ul className="grid min-w-0 gap-1.5">
+                {mergedContainers.map((c) => (
+                  <li key={c.label} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="break-words">{c.label}</span>
+                    {c.onSplit ? (
+                      <Button size="sm" variant="outline" onClick={c.onSplit} title="Gộp nhầm: cont này ra lại chuyến riêng (mở lại đúng bản ghi cũ) — dòng hàng của cont, ảnh cont / seal, lệnh sản xuất đã chuyển sang đi theo. Hoàn tác được.">
+                        Tách ra chuyến riêng
+                      </Button>
+                    ) : (
+                      c.blockedText && <span className="text-muted-foreground break-words">{c.blockedText}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
           {exportGroup && !isCancelled && (

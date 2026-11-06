@@ -27,6 +27,8 @@ import {
   effectiveRevision,
   isContainerKind,
   shipmentContractIds,
+  shipmentGoodsLock,
+  type ShipmentGoodsLock,
   workingRevision,
   type EvidenceOptions,
   type ExportData,
@@ -35,7 +37,7 @@ import {
 
 /* ---------- Dấu máy đọc (R3, R12) — không thêm cột ---------- */
 
-const TAG = /⟦(keep|keep-off|merged|merged-into):([^⟧]*)⟧/g;
+const TAG = /⟦(keep|keep-off|merged|merged-into|as-container|orders):([^⟧]*)⟧/g;
 /** Dấu "Giữ riêng" của một nhóm chuyến (dòng nhật ký). */
 export const keepSeparateTag = (ids: readonly string[]) => `⟦keep:${[...ids].sort().join(",")}⟧`;
 export const keepSeparateOffTag = (ids: readonly string[]) => `⟦keep-off:${[...ids].sort().join(",")}⟧`;
@@ -505,6 +507,8 @@ export function fieldDifferences(d: Pick<ExportData, "shipments">, keep: ExportS
     const source = current ? (children.find((c) => !isOriginalRecord(c) && sameValue(key, fieldValue(c, key), current)) ?? children.find((c) => sameValue(key, fieldValue(c, key), current))) : undefined;
     if (current) values.push({ shipmentId: keep.id, contractId: source?.contractId ?? keep.contractId, value: current, inUse: true });
     for (const c of children) {
+      // Bản ghi gộp làm cont thêm (73 R13): số cont / seal / ngày đóng của nó là của cont thêm, không phải ô khác nhau.
+      if ((CONTAINER_KEYS.has(key) || key === "loadingDate") && mergedContainerIds(c).length) continue;
       const v = fieldValue(c, key);
       if (v && !values.some((x) => sameValue(key, x.value, v))) values.push({ shipmentId: c.id, contractId: c.contractId, value: v, inUse: false, original: isOriginalRecord(c) });
     }
@@ -697,3 +701,125 @@ export function plannedKgByContract(d: Pick<ExportData, "shipmentLines">, s: Exp
   if (!own.length) return [{ contractId: s.contractId, kg: s.plannedKg ?? 0 }];
   return shipmentContractIds(d, s).map((cid) => ({ contractId: cid, kg: own.filter((l) => (l.contractId || s.contractId) === cid).reduce((t, l) => t + lineKg(l), 0) }));
 }
+
+/* ---------- ba-spec 73 R13 v1.1 (audit 2026-11-06 B4): gộp làm cont thêm không mất gì, tách lại được ---------- */
+
+const AS_CONTAINER = /⟦as-container:([^⟧]*)⟧/;
+const MOVED_ORDERS = /⟦orders:([^⟧]*)⟧/;
+const idList = (re: RegExp, text: string) => (re.exec(text)?.[1] ?? "").split(",").filter(Boolean);
+
+/**
+ * Lý do của bản ghi chuyến đã gộp làm cont thêm: dấu chuyến chung (như R7 ba-spec 74) + cont của chuyến chung đến từ chuyến
+ * này (đầu = cont mới, sau = cont thêm vốn của chuyến này) + lệnh sản xuất đã chuyển sang ⇒ tách lại trả đúng chỗ.
+ */
+export const mergedAsContainerReason = (keepLabel: string, keepId: string, containerIds: readonly string[], movedOrderIds: readonly string[] = []) =>
+  `Đã gộp làm cont thêm của chuyến ${keepLabel} ⟦merged-into:${keepId}⟧ ⟦as-container:${containerIds.join(",")}⟧${movedOrderIds.length ? ` ⟦orders:${movedOrderIds.join(",")}⟧` : ""}`;
+/** Cont của chuyến chung đến từ bản ghi này ([] = không phải chuyến gộp làm cont thêm). */
+export const mergedContainerIds = (s: Pick<ExportShipment, "status" | "cancelReason">) => (mergedIntoId(s) ? idList(AS_CONTAINER, s.cancelReason) : []);
+
+/**
+ * R13 v1.1: `from` thành cont thêm cuối của `into` (loại, số, seal, ngày đóng của `from`); dòng hàng + cont thêm của `from`
+ * sang `into`, lệnh sản xuất gắn `from` chuyển sang `into`. Chuyến `from` KHÔNG xóa: giữ nguyên bản ghi (kg, booking, ngày,
+ * mục bước như lúc nhập), trạng thái hủy + dấu chuyến chung ⇒ mọi luật bỏ chuyến hủy vẫn đúng; `splitMergedContainer` mở lại.
+ */
+export function mergeShipmentInto(
+  d: Pick<ExportData, "shipments" | "items" | "shipmentLines" | "shipmentContainers">,
+  into: ExportShipment,
+  from: ExportShipment,
+  opts: { containerId: string; now: string; keepLabel?: string; orderLinks?: readonly ProductionOrderShipment[] },
+): { shipments: ExportShipment[]; items: ExportStepItem[]; shipmentLines: ExportShipmentLine[]; shipmentContainers: ExportShipmentContainer[]; orderLinks: ProductionOrderShipment[] } {
+  const all = d.shipmentContainers ?? [];
+  const extras = all.filter((c) => c.shipmentId === into.id);
+  const container: ExportShipmentContainer = {
+    id: opts.containerId,
+    shipmentId: into.id,
+    sortOrder: extras.reduce((m, c) => Math.max(m, c.sortOrder), 0) + 1,
+    kind: from.kind === "20RF" || from.kind === "40RF" || from.kind === "40HC-RF" ? from.kind : "20RF",
+    containerNo: from.containerNo,
+    sealNo: from.sealNo,
+    loadingDate: from.loadingDate === into.loadingDate ? "" : from.loadingDate,
+    note: from.note,
+    createdAt: opts.now,
+  };
+  const fromExtras = all.filter((c) => c.shipmentId === from.id).sort((a, b) => a.sortOrder - b.sortOrder);
+  const lines = d.shipmentLines ?? [];
+  const base = lines.filter((l) => l.shipmentId === into.id).reduce((m, l) => Math.max(m, l.sortOrder), 0);
+  // Lệnh chỉ gắn `from` ⇒ chuyển sang `into`; lệnh gắn cả hai thì link của `from` nằm lại bản ghi (không trùng).
+  const links = opts.orderLinks ?? [];
+  const intoOrders = new Set(links.filter((l) => l.shipmentId === into.id).map((l) => l.orderId));
+  const moved = links.filter((l) => l.shipmentId === from.id && !intoOrders.has(l.orderId));
+  const movedIds = new Set(moved.map((l) => l.id));
+  const reason = mergedAsContainerReason(opts.keepLabel ?? "", into.id, [container.id, ...fromExtras.map((c) => c.id)], moved.map((l) => l.orderId));
+  return {
+    shipments: d.shipments.map((s) => (s.id === from.id ? { ...s, status: "cancelled" as const, cancelReason: reason } : s)),
+    // Mục bước của `from` nằm lại bản ghi của nó (chuyến hủy ⇒ không tính) — tách lại thì có lại đúng như cũ.
+    items: [...d.items],
+    shipmentLines: lines.map((l) => (l.shipmentId === from.id ? { ...l, shipmentId: into.id, containerId: l.containerId || container.id, sortOrder: base + 1 + l.sortOrder } : l)),
+    shipmentContainers: [...all.map((c) => (c.shipmentId === from.id ? { ...c, shipmentId: into.id, sortOrder: container.sortOrder + c.sortOrder } : c)), container],
+    orderLinks: links.map((l) => (movedIds.has(l.id) ? { ...l, shipmentId: into.id } : l)),
+  };
+}
+
+export type SplitContainerGate = { ok: true } | { ok: false; reason: "not-open" | "not-merged-container" | "container-removed" | ShipmentGoodsLock };
+
+/** Tách cont thêm (gộp từ chuyến `child`) khỏi chuyến chung `keep`: chuyến mở, cont còn, hàng chưa vào chứng từ. */
+export function splitContainerGate(d: Pick<ExportData, "shipments" | "shipmentContainers" | "payments" | "items" | "files">, keep: ExportShipment, child: ExportShipment): SplitContainerGate {
+  if (!isOpen(keep)) return { ok: false, reason: "not-open" };
+  const ids = mergedContainerIds(child);
+  if (mergedIntoId(child) !== keep.id || !ids.length) return { ok: false, reason: "not-merged-container" };
+  if (!(d.shipmentContainers ?? []).some((c) => c.id === ids[0] && c.shipmentId === keep.id)) return { ok: false, reason: "container-removed" };
+  const lock = shipmentGoodsLock(d, keep.id);
+  return lock ? { ok: false, reason: lock } : { ok: true };
+}
+
+/**
+ * Tách cont thêm ra lại chuyến riêng: mở lại đúng bản ghi `child` (số cont, seal, loại, ngày đóng lấy theo cont trên chuyến
+ * chung — có thể đã điền sau khi gộp); dòng hàng của các cont đó, ảnh cont / seal của cont đó, cont thêm vốn của `child`, lệnh
+ * sản xuất đã chuyển sang ⇒ về `child`. Cont mới tạo lúc gộp bị bỏ khỏi chuyến chung.
+ */
+export function splitMergedContainer(
+  d: Pick<ExportData, "shipments" | "files" | "shipmentLines" | "shipmentContainers">,
+  keep: ExportShipment,
+  child: ExportShipment,
+  opts: { orderLinks?: readonly ProductionOrderShipment[] } = {},
+): { shipments: ExportShipment[]; files: ExportFile[]; shipmentLines: ExportShipmentLine[]; shipmentContainers: ExportShipmentContainer[]; orderLinks: ProductionOrderShipment[]; child: ExportShipment } {
+  const [firstId, ...restIds] = mergedContainerIds(child);
+  const all = d.shipmentContainers ?? [];
+  const first = all.find((c) => c.id === firstId);
+  const rest = new Set(restIds);
+  const reopened: ExportShipment = {
+    ...child,
+    status: "open",
+    cancelReason: "",
+    ...(first
+      ? {
+          kind: first.kind,
+          containerNo: first.containerNo,
+          sealNo: first.sealNo,
+          loadingDate: first.loadingDate || keep.loadingDate,
+          note: first.note,
+        }
+      : {}),
+  };
+  const ours = new Set([firstId, ...restIds]);
+  const dropCont = <T extends { containerId?: string }>(x: T): T => {
+    if (x.containerId !== firstId) return x;
+    const { containerId: _c, ...other } = x;
+    return other as T;
+  };
+  const movedOrders = new Set(idList(MOVED_ORDERS, child.cancelReason));
+  let order = 0;
+  return {
+    shipments: d.shipments.map((s) => (s.id === child.id ? reopened : s)),
+    files: d.files.map((f) => (f.shipmentId === keep.id && f.containerId && ours.has(f.containerId) ? dropCont({ ...f, shipmentId: child.id }) : f)),
+    shipmentLines: (d.shipmentLines ?? []).map((l) => (l.shipmentId === keep.id && l.containerId && ours.has(l.containerId) ? dropCont({ ...l, shipmentId: child.id }) : l)),
+    shipmentContainers: all
+      .filter((c) => c.id !== firstId)
+      .map((c) => (rest.has(c.id) && c.shipmentId === keep.id ? { ...c, shipmentId: child.id, sortOrder: ++order } : c)),
+    orderLinks: (opts.orderLinks ?? []).map((l) => (l.shipmentId === keep.id && movedOrders.has(l.orderId) ? { ...l, shipmentId: child.id } : l)),
+    child: reopened,
+  };
+}
+
+/** Bản ghi chuyến đã gộp làm cont thêm vào `keep` (để hiện "Tách ra chuyến riêng" ở cont đó). */
+export const mergedContainerChildren = (d: Pick<ExportData, "shipments">, keep: ExportShipment) => mergedChildren(d, keep.id).filter((s) => mergedContainerIds(s).length > 0);

@@ -3,6 +3,7 @@
 > Load khi: xây hoặc sửa Lệnh sản xuất của Phòng Kế hoạch: lập lệnh từ dòng hàng hợp đồng xuất, gắn nguyên liệu nhập khẩu dự kiến, phát hành tới phân xưởng / kho, gắn chuyến xuất (bước 2 của chuyến), in mẫu QTI-KH-01-04.
 covers: src/features/production-orders/**, src/lib/productionOrder.ts, src/lib/productionOrderDemo.ts, supabase/migrations/0088_production_orders.sql, src/lib/exportPlanning.ts
 last_verified: 2026-11-06
+<!-- updated: 2026-11-06 (audit B6) — bỏ gắn lệnh ngay ở bước 2 của chuyến xuất: hộp Gắn / bỏ gắn lệnh → Bỏ gắn, mọi trạng thái lệnh kể cả Đã hủy (ba-spec 41 R50, `unlinkShipmentOrder`); trang lệnh vẫn bỏ tick ở Gắn chuyến như cũ. -->
 <!-- updated: 2026-11-06 (ba-spec 74 R14) — R6 mở rộng: chuyến nhiều HĐ ⇒ bước 2 Xong khi MỌI HĐ trên chuyến có lệnh đã phát hành gắn chuyến (`issuedOrderContracts`); chuyến một HĐ giữ nguyên. -->
 <!-- updated: 2026-11-04 (chuyến gộp) — LS3: gắn LSX được vào chuyến gộp có hàng của HĐ của lệnh (`openShipmentsOf`), cả từ bước Lệnh sản xuất của chuyến (Lập lệnh / Gắn lệnh có sẵn theo từng HĐ trên chuyến). R6 không đổi (chuyến gắn ≥ 1 LSX phát hành ⇒ bước 2 Xong). Lệnh xuất dùng LSX theo từng HĐ + số lượng theo chuyến: ba-spec 72 R2b, R3b. -->
 <!-- updated: 2026-11-04 (lỗi quyền) — R9 trên DB thật: Phòng KH (vai đã chỉnh planner / planning-deputy) không có ô `production-orders` vì 0088 chỉ thay ma trận mặc định ⇒ chỉ admin thấy "Lập lệnh sản xuất". Sửa bằng mig 0105 (bù 9 ô); luật R9 không đổi. -->

@@ -14,6 +14,7 @@ import {
   ErrorSummary,
   Field,
   FormDialog,
+  InlineConfirmDelete,
   Input,
   NumberField,
   Textarea,
@@ -24,6 +25,7 @@ import {
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useDialogDraft } from "@/lib/formDraft";
 import { newId } from "@/lib/store";
+import { formatDateVN } from "@/lib/format";
 import { CONTRACT_ATTACHMENT_LABELS, FINAL_REVIEW_LABELS } from "@/lib/exportPlanning";
 import { checkExportFile, exportFilePath, hasExportStorage, removeExportFiles, uploadExportFile, type ExportFileArea } from "@/lib/exportFileStorage";
 import type {
@@ -388,6 +390,12 @@ export interface ExtensionTarget {
   contractId: string;
   contractNo: string;
   currentDeadline: string;
+  /** Mở lần gia hạn đã ghi (Cập nhật — audit B3). Không có = ghi lần mới. */
+  existing?: ExportDeadlineExtension;
+  /** Lần gia hạn cũ (không phải lần mới nhất) ⇒ chỉ xem, câu giải thích vì sao. */
+  lockedReason?: string;
+  /** Hạn giao sau khi xóa lần này (lần trước / hạn HĐ) — hiện ở câu hỏi xóa. */
+  fallback?: string;
 }
 
 interface ExtensionForm {
@@ -407,12 +415,15 @@ export function ExtensionDialog({
   recordedBy,
   onClose,
   onSave,
+  onDelete,
 }: {
   target: ExtensionTarget | null;
   recordedBy: string;
   onClose: () => void;
-  /** `extraFiles`: file thứ 2 trở đi (thư bổ sung) ⇒ hồ sơ đính kèm cấp HĐ. */
+  /** `extraFiles`: file thứ 2 trở đi (thư bổ sung) ⇒ hồ sơ đính kèm cấp HĐ. Sửa lần đã ghi: cùng `id`. */
   onSave: (e: ExportDeadlineExtension, extraFiles: ExportFile[]) => boolean;
+  /** Xóa lần gia hạn đang mở (chỉ lần mới nhất, có quyền) — màn bắn toast Hoàn tác. */
+  onDelete?: (e: ExportDeadlineExtension) => void;
 }) {
   const today = todayIso();
   const [form, setForm] = useState<ExtensionForm | null>(null);
@@ -423,7 +434,17 @@ export function ExtensionDialog({
 
   useEffect(() => {
     if (!target) return;
-    const f: ExtensionForm = { key: target.contractId, ...target, newDeadline: "", confirmedOn: today, note: "", initial: "" };
+    const ex = target.existing;
+    const f: ExtensionForm = {
+      key: ex ? `${target.contractId}:${ex.id}` : target.contractId,
+      contractId: target.contractId,
+      contractNo: target.contractNo,
+      currentDeadline: target.currentDeadline,
+      newDeadline: ex?.newDeadline ?? "",
+      confirmedOn: ex?.confirmedOn ?? today,
+      note: ex?.note ?? "",
+      initial: "",
+    };
     const fresh = { ...f, initial: extSnap(f) };
     const kept = draft.takeKept();
     setForm(kept && kept.key === fresh.key ? kept : fresh);
@@ -433,14 +454,17 @@ export function ExtensionDialog({
   }, [target]);
 
   const set = <K extends keyof ExtensionForm>(k: K, v: ExtensionForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
+  const existing = target?.existing;
+  const readOnly = !!target?.lockedReason;
 
   const save = async () => {
     if (!form || busy) return;
+    if (readOnly) return onClose();
     const errs: FieldError[] = [];
     if (!form.newDeadline) errs.push({ field: "Hạn giao mới", message: "Chọn hạn giao mới" });
     else if (form.currentDeadline && form.newDeadline <= form.currentDeadline)
       errs.push({ field: "Hạn giao mới", message: "Hạn mới phải sau hạn đang có" });
-    if (!form.note.trim() && !file[0]) errs.push({ field: "Xác nhận của khách", message: "Đính email / thư khách xác nhận, hoặc ghi chú nội dung xác nhận" });
+    if (!form.note.trim() && !file[0] && !existing?.filePath) errs.push({ field: "Xác nhận của khách", message: "Đính email / thư khách xác nhận, hoặc ghi chú nội dung xác nhận" });
     for (const f of file) {
       const fe = checkExportFile(f);
       if (fe) errs.push({ field: f.name, message: fe });
@@ -448,14 +472,16 @@ export function ExtensionDialog({
     setErrors(errs);
     if (errs.length) return;
     setBusy(true);
-    const id = newId();
+    const id = existing?.id ?? newId();
     const done: string[] = [];
     try {
-      const up = await uploadOne(file[0], form.contractId, "contract", id);
+      // Sửa lần đã ghi mà đã có file xác nhận: giữ file đó; file mới chọn vào Hồ sơ đính kèm của HĐ (không thay, không mất).
+      const keepFile = !!existing?.filePath;
+      const up = keepFile ? null : await uploadOne(file[0], form.contractId, "contract", id);
       if (up && "error" in up) throw new Error(up.error);
       if (up) done.push(up.path);
-      const extras = await uploadExtraContractFiles(
-        file.slice(1),
+      const extraFiles = await uploadExtraContractFiles(
+        keepFile ? file : file.slice(1),
         form.contractId,
         `Gia hạn giao hàng tới ${form.newDeadline.split("-").reverse().join("/")} — xác nhận của khách (file thêm)`,
         recordedBy,
@@ -467,11 +493,11 @@ export function ExtensionDialog({
         newDeadline: form.newDeadline,
         confirmedOn: form.confirmedOn,
         note: form.note.trim(),
-        filePath: up?.path ?? "",
-        fileName: up?.fileName ?? "",
-        recordedBy,
-        createdAt: new Date().toISOString(),
-      }, extras);
+        filePath: keepFile ? existing!.filePath : (up?.path ?? ""),
+        fileName: keepFile ? existing!.fileName : (up?.fileName ?? ""),
+        recordedBy: existing?.recordedBy ?? recordedBy,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      }, extraFiles);
       if (!ok) {
         void removeExportFiles(done);
         return;
@@ -493,13 +519,27 @@ export function ExtensionDialog({
         draft.dismiss();
         onClose();
       }}
-      title={`Gia hạn giao hàng · HĐ ${form?.contractNo ?? ""}`}
-      description="Khách đã đồng ý kéo hạn (quy trình KH-R11). Không cần duyệt lại; trễ hạn tính theo hạn mới."
+      title={`${existing ? "Lần gia hạn" : "Gia hạn giao hàng"} · HĐ ${form?.contractNo ?? ""}`}
+      description={
+        existing
+          ? "Sửa lần gia hạn ghi nhầm, hoặc xóa nếu khách không gia hạn (hạn giao quay về lần trước / hạn hợp đồng). Chỉ lần mới nhất sửa / xóa được."
+          : "Khách đã đồng ý kéo hạn (quy trình KH-R11). Không cần duyệt lại; trễ hạn tính theo hạn mới."
+      }
       icon={CalendarClock}
       size="md"
-      hasRequiredFields
+      hasRequiredFields={!readOnly}
       footer={
         <>
+          {existing && onDelete && !readOnly && (
+            <InlineConfirmDelete
+              recordDescription={`Gia hạn tới ${formatDateVN(existing.newDeadline)}${target?.fallback ? ` — hạn giao quay về ${formatDateVN(target.fallback)}` : ""}`}
+              title="Xóa lần gia hạn này (khách không gia hạn / ghi nhầm): hạn giao quay về lần gia hạn trước, không có thì hạn của hợp đồng. Hỏi lại trước, có Hoàn tác; nhật ký ghi lại."
+              onConfirm={() => {
+                draft.cancel();
+                onDelete(existing);
+              }}
+            />
+          )}
           <Button
             variant="outline"
             onClick={() => {
@@ -508,17 +548,28 @@ export function ExtensionDialog({
               onClose();
             }}
           >
-            Hủy
+            {readOnly ? "Đóng" : "Hủy"}
           </Button>
-          <Button variant="save" onClick={() => void save()} title="Ghi hạn giao mới khách đã xác nhận.">
-            <Save className="mr-2 h-4 w-4" aria-hidden />
-            {busy ? "Đang tải file…" : "Lưu gia hạn"}
-          </Button>
+          {!readOnly && (
+            <Button variant="save" onClick={() => void save()} title={existing ? "Lưu sửa lần gia hạn này." : "Ghi hạn giao mới khách đã xác nhận."}>
+              <Save className="mr-2 h-4 w-4" aria-hidden />
+              {busy ? "Đang tải file…" : existing ? "Lưu" : "Lưu gia hạn"}
+            </Button>
+          )}
         </>
       }
     >
       <DraftRestoredNotice savedAt={draft.restoredAt} onDiscard={draft.cancel} />
-      {form && (
+      {form && readOnly && existing && (
+        <div className="grid gap-2 py-2 text-sm">
+          <p>
+            Gia hạn tới <span className="tnum font-semibold">{formatDateVN(existing.newDeadline)}</span> · khách xác nhận {formatDateVN(existing.confirmedOn)}
+            {existing.note ? ` · ${existing.note}` : ""}
+          </p>
+          <p className="rounded-lg bg-muted px-3 py-2 text-muted-foreground">{target?.lockedReason}</p>
+        </div>
+      )}
+      {form && !readOnly && (
         <div className="grid gap-4 py-2">
           <ErrorSummary errors={errors} />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -529,7 +580,14 @@ export function ExtensionDialog({
             <Textarea rows={2} value={form.note} onChange={(e) => set("note", e.target.value)} />
           </Field>
           {hasExportStorage && (
-            <Field label="Email / thư xác nhận của khách" hint="Chọn được nhiều file; file thứ 2 trở đi lưu vào Hồ sơ đính kèm của hợp đồng.">
+            <Field
+              label="Email / thư xác nhận của khách"
+              hint={
+                existing?.filePath
+                  ? `Đã có file ${existing.fileName} (giữ nguyên). File chọn thêm lưu vào Hồ sơ đính kèm của hợp đồng.`
+                  : "Chọn được nhiều file; file thứ 2 trở đi lưu vào Hồ sơ đính kèm của hợp đồng."
+              }
+            >
               <FilePicker files={file} onChange={setFile} />
             </Field>
           )}

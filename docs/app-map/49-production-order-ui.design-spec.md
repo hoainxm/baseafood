@@ -2,7 +2,7 @@
 
 > Load khi: chỉnh giao diện Lệnh sản xuất `/planning-production` (danh sách lệnh, hồ sơ lệnh, hộp lập / sửa / phát hành / hủy, NL nhập khẩu dự kiến, bản in QTI-KH-01-04, phần nơi nhận) hoặc chỗ lệnh hiện ở Xuất khẩu (dòng hàng HĐ, bước 2 của chuyến).
 covers: src/features/production-orders/**, src/features/export-planning/ShipmentPanel.tsx, src/features/export-planning/ContractDossier.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-06
 <!-- updated: 2026-11-03 — soát: `ShipmentPanel.tsx` đổi ở hàng Số lượng thực đóng (ba-spec 63 R11) — không đụng phần lập Lệnh sản xuất từ chuyến. -->
 <!-- updated: 2026-11-02 (b) — thanh tab chặn `max-w-full` + xuống dòng ở iPad dọc; "Phát hành" hiện "người · dd/mm/yyyy HH:mm"; lịch sử xuất file LSX hiện "dd/mm/yyyy HH:mm". -->
 <!-- updated: 2026-11-02 — hồ sơ lệnh: nút `outline` "File Word / PDF" cạnh "In lệnh" (mốc `order-file`, mọi người xem được lệnh đều thấy; Phòng KH soạn, nơi nhận chỉ xem / tải bản đã xuất). Trang soạn `&file=1` = `features/document-composer/DocumentComposerView` (ô theo nhóm của mẫu + nhãn nguồn từng ô, xem trước Word bên phải ở màn rộng / bên dưới ở màn hẹp, Lưu · Xuất Word · Xuất PDF, Lịch sử xuất file, khối Khuôn Word chỉ quản trị). -->
@@ -77,7 +77,7 @@ Một trang cho mọi vai trò: ai không có `production-orders:create` thì kh
 - Không in giá. In từ chế độ in của trình duyệt, không toast.
 
 **Ở Xuất khẩu.**
-- Bước 2 của chuyến: hàng "Lệnh sản xuất" liệt kê lệnh đã gắn (số · trạng thái · link). Không có lệnh thì giữ hàng file như cũ (R6 / Q6 = A). Nút `default` "Lập lệnh sản xuất" + `outline` "Gắn lệnh có sẵn" (người có `production-orders:create`).
+- Bước 2 của chuyến: hàng "Lệnh sản xuất" liệt kê lệnh đã gắn (số · trạng thái · link). Không có lệnh thì giữ hàng file như cũ (R6 / Q6 = A). Nút `default` "Lập lệnh sản xuất" + `outline` "Gắn / bỏ gắn lệnh" (người có `production-orders:create`; từ 2026-11-06 hộp này có mục "Đang gắn chuyến này" — mỗi lệnh, cả lệnh Đã hủy, một nút 🗑 `InlineConfirmDelete` "Bỏ gắn" cho quyền Sửa, toast Hoàn tác; hàng lệnh đã gắn ghi thêm "n lệnh đã hủy vẫn gắn chuyến này" khi có — ba-spec 41 R50).
 - Hồ sơ HĐ, khối Dòng hàng: cột "Đã ra lệnh" (kg, dòng phụ "còn x kg"; vượt dung sai ⇒ chữ cảnh báo).
 
 ## Ma trận trạng thái

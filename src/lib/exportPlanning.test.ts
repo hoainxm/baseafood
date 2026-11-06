@@ -40,6 +40,9 @@ import {
   contractState,
   contractTotals,
   effectiveDeadline,
+  extensionChangeGate,
+  unlinkShipmentOrder,
+  extensionsOf,
   effectiveRevision,
   findDuplicateContract,
   isShipmentClosed,
@@ -411,6 +414,21 @@ describe("NV6 · gia hạn (AC-11)", () => {
     expect(effectiveDeadline(d, "c1")).toBe("2026-09-30");
     expect(isShipmentLate(d, d.shipments[0])).toBe(false);
     expect(d.revisions).toHaveLength(1);
+  });
+
+  it("audit B3: chỉ sửa / xóa lần gia hạn mới nhất; xóa ⇒ hạn quay về lần trước, rồi về hạn HĐ", () => {
+    const ext = (id: string, newDeadline: string, confirmedOn: string) => ({ id, contractId: "c1", newDeadline, confirmedOn, note: "", filePath: "", fileName: "", recordedBy: "", createdAt: T0 });
+    const base = data({ contracts: [contract("c1")], revisions: [revision("r0", "c1", 0)], approvals: [approval("r0", "c1", "approved")] });
+    const contractDeadline = effectiveDeadline(base, "c1");
+    // Ghi sau mà ngày khách xác nhận sớm hơn vẫn xếp theo ngày xác nhận (như effectiveDeadline).
+    const d = { ...base, extensions: [ext("e2", "2026-10-31", "2026-10-01"), ext("e1", "2026-09-30", "2026-09-01")] };
+    expect(extensionsOf(d, "c1").map((e) => e.id)).toEqual(["e1", "e2"]);
+    expect(extensionChangeGate(d, "e1")).toEqual({ ok: false, reason: "not-latest" });
+    expect(extensionChangeGate(d, "e2")).toEqual({ ok: true, fallback: "2026-09-30" });
+    const one = { ...d, extensions: d.extensions.filter((e) => e.id !== "e2") };
+    expect(effectiveDeadline(one, "c1")).toBe("2026-09-30");
+    expect(extensionChangeGate(one, "e1")).toEqual({ ok: true, fallback: contractDeadline });
+    expect(extensionChangeGate(one, "zz")).toEqual({ ok: false, reason: "not-found" });
   });
 });
 
@@ -1192,5 +1210,19 @@ describe("gợi ý mặt hàng gần đúng (2026-11-03)", () => {
     expect(suggestProductMatch(d, "Octopus", "k", products)).toBeNull();
     // Hai mặt hàng cùng khớp gần đúng ⇒ không đoán.
     expect(suggestProductMatch(d, "frozen raw octopus, tip", "k", [...products, { id: "p3", tradeName: "Frozen raw octopus - tip" }])).toBeNull();
+  });
+});
+
+describe("audit B6 · bỏ gắn lệnh sản xuất ở chuyến", () => {
+  it("gỡ đúng link lệnh ↔ chuyến, link khác giữ nguyên", () => {
+    const links = [
+      { id: "1", orderId: "o1", shipmentId: "s1", createdAt: T0 },
+      { id: "2", orderId: "o1", shipmentId: "s2", createdAt: T0 },
+      { id: "3", orderId: "o2", shipmentId: "s1", createdAt: T0 },
+    ];
+    const out = unlinkShipmentOrder(links, "s1", "o1");
+    expect(out.removed.map((l) => l.id)).toEqual(["1"]);
+    expect(out.links.map((l) => l.id)).toEqual(["2", "3"]);
+    expect(unlinkShipmentOrder(links, "s9", "o1").removed).toEqual([]);
   });
 });

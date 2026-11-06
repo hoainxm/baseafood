@@ -29,7 +29,7 @@ export function buildProductionOrderTour(ctx: ProductionOrderTourContext): PageT
       body: ctx.can.write
         ? "Phòng Kế hoạch ra lệnh sản xuất từ dòng hàng hợp đồng xuất, theo mẫu QTI-KH-01-04.\n" +
           "Trình tự: lập lệnh (Nháp) → gắn NL nhập khẩu dự kiến → phát hành và gắn chuyến xuất → in lệnh cho Phòng Kỹ thuật. Không có bước duyệt.\n" +
-          "Chuyến xuất chở hàng của nhiều hợp đồng: mỗi hợp đồng một lệnh, cùng gắn chuyến; bước Lệnh sản xuất của chuyến Xong khi mọi hợp đồng trên chuyến có lệnh đã phát hành.\n" +
+          "Chuyến xuất chở hàng của nhiều hợp đồng: mỗi hợp đồng một lệnh, cùng gắn chuyến; bước Lệnh sản xuất của chuyến Xong khi mọi hợp đồng trên chuyến có lệnh đã phát hành. Gắn nhầm: bỏ tick ở Gắn chuyến, hoặc ngay ở chuyến xuất chọn Gắn / bỏ gắn lệnh → Bỏ gắn (cả lệnh đã hủy; có Hoàn tác).\n" +
           "Trong lúc xem hướng dẫn, các nút trên trang tạm khóa và dữ liệu không thay đổi. Chọn Tiếp theo (phím →) để sang bước sau, Esc để thoát."
         : "Trang này hiện các lệnh sản xuất Phòng Kế hoạch đã phát hành: làm mặt hàng gì, bao nhiêu thùng, ngày sản xuất, mã số lô, yêu cầu bao bì.\n" +
           "Lệnh nháp chưa hiện ở đây. Lệnh đã sửa có dấu Đã sửa lần n.\n" +

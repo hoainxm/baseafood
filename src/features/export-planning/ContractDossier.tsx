@@ -23,6 +23,7 @@ import {
   FINAL_REVIEW_LABELS,
   PAYMENT_METHODS,
   activitiesOf,
+  extensionsOf,
   contractAttachments,
   finalReviewGate,
   finalReviewsOf,
@@ -71,7 +72,7 @@ import { goodsTypeName } from "@/lib/goodsTypes";
 import { useNavigate } from "react-router-dom";
 import { useOrderCoverage } from "@/features/production-orders/useOrderCoverage";
 import { useCan } from "@/features/shared/PermissionProvider";
-import type { ExportContract, ExportContractAttachmentKind, ExportContractLine, ExportFile, ExportPayment, ExportShipment, Product } from "@/types";
+import type { ExportContract, ExportContractAttachmentKind, ExportContractLine, ExportDeadlineExtension, ExportFile, ExportPayment, ExportShipment, Product } from "@/types";
 import { containerCountOf } from "@/lib/exportContainers";
 import {
   ArrowLeft,
@@ -121,6 +122,7 @@ export function ContractDossier({
   onEditContract,
   onRevise,
   onExtend,
+  onOpenExtension,
   onAddShipment,
   onSchedule,
   onCancelContract,
@@ -156,6 +158,8 @@ export function ContractDossier({
   onEditContract: () => void;
   onRevise: () => void;
   onExtend: () => void;
+  /** Mở hộp Cập nhật của một lần gia hạn (sửa / xóa lần mới nhất — audit B3). Không quyền sửa ⇒ không truyền. */
+  onOpenExtension?: (e: ExportDeadlineExtension) => void;
   onAddShipment: () => void;
   /** Mở hộp tạo lịch xuất hàng (NV19) — HĐ còn mở, chưa có chuyến còn mở; không cần đủ hồ sơ (R40). */
   onSchedule: () => void;
@@ -204,7 +208,8 @@ export function ContractDossier({
   const coverage = contractCoverage(data, contract.id);
   const deadline = effectiveDeadline(data, contract.id);
   const revisions = revisionsOf(data, contract.id);
-  const extensions = data.extensions.filter((e) => e.contractId === contract.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  // Thứ tự hiệu lực (lần cuối = hạn đang dùng) — cùng thứ tự với effectiveDeadline / extensionChangeGate.
+  const extensions = extensionsOf(data, contract.id);
   const shipments = data.shipments.filter((s) => s.contractId === contract.id).sort((a, b) => (a.loadingDate || a.etd || a.planMonth).localeCompare(b.loadingDate || b.etd || b.planMonth));
   // Chuyến gộp của HĐ khác có hàng của HĐ này (ba-spec 70): chỉ xem, các bước theo dõi ở hồ sơ HĐ chính của chuyến.
   const carried = data.shipments.filter((s) => s.contractId !== contract.id && s.status === "open" && carriesContract(data, s, contract.id));
@@ -808,6 +813,11 @@ export function ContractDossier({
             {e.filePath && (
               <Button size="sm" variant="ghost" onClick={() => onPreview({ path: e.filePath, name: e.fileName, caption: `Gia hạn · HĐ ${contract.contractNo}` })} title="Xem xác nhận của khách.">
                 Xác nhận
+              </Button>
+            )}
+            {onOpenExtension && (
+              <Button size="sm" variant="edit" onClick={() => onOpenExtension(e)} title="Mở lần gia hạn: sửa ngày / ghi chú, hoặc xóa nếu ghi nhầm (chỉ lần mới nhất; hạn giao quay về lần trước).">
+                Cập nhật
               </Button>
             )}
           </div>

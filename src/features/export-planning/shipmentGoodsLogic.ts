@@ -38,6 +38,11 @@ export interface ShipmentLinesTarget {
   otherShipmentUnits: Record<string, number>;
   /** Cont của chuyến (ba-spec 73) — có khi máy chủ đã chạy 0106; ≥ 2 cont ⇒ mỗi dòng chọn cont, chia dòng sang cont khác. */
   containers?: readonly { id: string; label: string }[];
+  /**
+   * Audit B5: Phòng KH (quyền Xóa) xóa dòng hàng đã lưu — kể cả dòng bộ phận đóng cont thêm nhầm. Không truyền = không quyền;
+   * `blockedText` khác rỗng = hàng đã vào chứng từ (invoice Xong / SI / tiền về), nút ẩn và hộp nói vì sao.
+   */
+  removeLines?: { blockedText: string };
 }
 
 /** Một dòng trong hộp: dòng HĐ + giá trị đang sửa (số kiện trống = không đóng vào chuyến này). */

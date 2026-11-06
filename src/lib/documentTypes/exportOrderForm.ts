@@ -5,6 +5,7 @@
 //              line rows from the issued production orders of a shipment (fallback: the shipment's goods lines),
 //              delivery block from the booking (ba-spec 71), Có / Không notes that need detail when "Có".
 // ============================================================
+import { isoDatesOf } from "../productionOrderFile";
 import type {
   ComposedDocument,
   DocumentRow,
@@ -64,6 +65,11 @@ export function buildExportOrderLines(input: {
   shipmentLines: readonly ExportShipmentLine[];
   /** Cont của chuyến (ba-spec 73). ≥ 2 cont ⇒ bảng hàng dựng theo từng cont, mỗi dòng mang nhãn cont. */
   containers?: readonly ContainerView[];
+  /**
+   * ba-spec 72 R2c — lệnh dựng từ file LSX đã đính (chưa lập trong app): hạn dùng ghi trên file (id lệnh ⇒ yyyy-mm-dd) và
+   * ngày ISO của từng dòng (id dòng lệnh ⇒ ngày) thay cho tính theo cả lệnh.
+   */
+  overrides?: { expiry?: ReadonlyMap<string, string>; productionDates?: ReadonlyMap<string, readonly string[]> };
 }): { rows: ExportOrderRow[]; notices: string[] } {
   const shipLines = input.shipmentLines.filter((l) => l.shipmentId === input.shipment.id).sort((a, b) => a.sortOrder - b.sortOrder);
   const containers = input.containers ?? [];
@@ -136,7 +142,11 @@ function buildOrderLinesFor(
     let shared = false;
     for (const { o, l } of lsxLines) {
       const cl = byLine.get(l.contractLineId);
-      const exp = expiryDate(o.productionDates, o.shelfLifeMonths);
+      const exp = input.overrides?.expiry?.get(o.id) || expiryDate(o.productionDates, o.shelfLifeMonths);
+      // Ngày SX theo dòng: file LSX đính ở chuyến (R2c) ⇒ ngày ISO của dòng; lệnh trong app có ngày ISO ở Ghi chú dòng
+      // (đọc từ file LSX — ba-spec 48 R21) ⇒ ngày đó; không có ⇒ mọi ngày của lệnh như cũ.
+      const noteDates = isoDatesOf(l.note ?? "").filter((d) => !o.productionDates.length || o.productionDates.includes(d));
+      const lineDates = input.overrides?.productionDates?.get(l.id) ?? (noteDates.length ? noteDates : undefined);
       let cartons = lineCartons(l);
       let kg: number | null = orderLineKg(l) || null;
       const onShip = goods.filter((g) => g.contractLineId === l.contractLineId);
@@ -154,7 +164,7 @@ function buildOrderLinesFor(
         cartons,
         kg,
         lotCode: o.lotCode,
-        productionDates: formatProductionDates(o.productionDates),
+        productionDates: formatProductionDates(lineDates?.length ? [...lineDates] : o.productionDates),
         expiry: exp ? formatDateVN(exp) : "",
         hsCode: cl?.hsCode ?? "",
       });

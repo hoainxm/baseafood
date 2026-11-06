@@ -3,7 +3,8 @@
 // 23.26/BSF-SCM.2026, 2026-11-06) + 13 dòng bản 3 của HĐ đó (tên danh mục tiếng Việt).
 import { describe, expect, it } from "vitest";
 import type { ExportContractLine } from "@/types";
-import { fillOrderForm, isoDatesOf, matchOrderLines, parseOrderRows, parseLocalNumber, sizesOf, type OrderFillTarget } from "./productionOrderFile";
+import { buildExportOrderLines } from "./documentTypes/exportOrderForm";
+import { fillOrderForm, orderFromFile, isoDatesOf, matchOrderLines, parseOrderRows, parseLocalNumber, sizesOf, type OrderFillTarget } from "./productionOrderFile";
 
 const ROWS: string[][] = [
   ["LỆNH SẢN XUẤT"],
@@ -166,5 +167,39 @@ describe("đọc file lệnh sản xuất", () => {
     expect(out.report.warnings.some((w) => w.includes("SEACHEMOT") && w.includes("DAIREI"))).toBe(true);
     expect(out.report.warnings.some((w) => w.includes("Số lệnh 18.10 đã có"))).toBe(true);
     expect(out.report.warnings.filter((w) => w.includes("chưa có dòng đó")).length).toBe(12);
+  });
+
+  it("Lệnh xuất (ba-spec 72 R2c): file LSX đính ở chuyến ⇒ 13 dòng tên danh mục, MSL 201, ngày SX theo ISO từng dòng, hạn 01/10/2028", () => {
+    const f = parseOrderRows(ROWS)!;
+    expect(f.expiryDate).toBe("2028-10-01");
+    const v = orderFromFile(f, { id: "file:lsx", contractId: "c23", contractNo: "23.26/BSF-SCM.2026", contractLines, productName });
+    expect(v.matched).toBe(13);
+    expect(v.unmatched).toBe(0);
+    const built = buildExportOrderLines({
+      shipment: { id: "s1", lotCode: "", contractId: "c23" },
+      orders: [v.order],
+      orderLines: v.lines,
+      contractLines,
+      shipmentLines: [],
+      overrides: { expiry: new Map([[v.order.id, v.expiry]]), productionDates: v.datesByLine },
+    });
+    expect(built.rows).toHaveLength(13);
+    expect(built.rows[0]).toMatchObject({ productName: "Bạch tuộc cắt luộc 1gr under", size: "1-under gr/pc", cartons: 100, kg: 1000, lotCode: "201", productionDates: "27/10/2026", expiry: "01/10/2028" });
+    expect(built.rows[1].productionDates).toBe("28, 29/10/2026");
+    expect(built.rows[6]).toMatchObject({ productName: "Bạch tuộc 2 da tẩm bột 10-15gr", cartons: 400, kg: 2400 });
+    // Chuyến chưa nhập Hàng của chuyến ⇒ số theo cả lệnh + nhắc.
+    expect(built.notices.some((n) => n.includes("17.10") && n.includes("cả lệnh"))).toBe(true);
+  });
+
+  it("Lệnh xuất từ lệnh trong app (lập bằng Đọc file): ngày SX của dòng theo ngày ISO trong Ghi chú dòng", () => {
+    const f = parseOrderRows(ROWS)!;
+    const v = orderFromFile(f, { id: "o17", contractId: "c23", contractNo: "23.26", contractLines, productName });
+    // Như lệnh 17.10 thật: lệnh trong app, Ghi chú dòng = quy cách đóng gói của file, không có override.
+    const built = buildExportOrderLines({ shipment: { id: "s1", lotCode: "201", contractId: "c23" }, orders: [v.order], orderLines: v.lines, contractLines, shipmentLines: [] });
+    expect(built.rows[0].productionDates).toBe("27/10/2026");
+    expect(built.rows[9].productionDates).toBe("20, 28/10/2026");
+    // Ghi chú không có ISO ⇒ mọi ngày của lệnh.
+    const plain = buildExportOrderLines({ shipment: { id: "s1", lotCode: "201", contractId: "c23" }, orders: [v.order], orderLines: v.lines.map((l) => ({ ...l, note: "" })), contractLines, shipmentLines: [] });
+    expect(plain.rows[0].productionDates).toBe("20, 27, 28, 29, 30/10/2026");
   });
 });

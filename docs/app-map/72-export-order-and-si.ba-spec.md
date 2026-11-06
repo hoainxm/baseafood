@@ -2,7 +2,8 @@
 
 > Load khi: sửa mục Lệnh xuất (lập + xuất file Word theo mẫu QTI-KH-01-07), ảnh cont / seal ở hàng Số cont + seal, hoặc mục SI (lập + xuất file Excel theo mẫu SI FORM) ở bước 4 Đóng cont của chuyến xuất.
 covers: src/lib/exportPlanning.ts, src/lib/shippingInstruction.ts, src/lib/shippingInstructionExcel.ts, src/lib/documentTypes/exportOrderForm.ts, src/lib/documentTypes/exportOrderTemplate.ts, src/features/export-planning/ExportOrderComposer.tsx, src/features/export-planning/ShippingInstructionDialog.tsx, src/features/export-planning/ShipmentPanel.tsx, supabase/migrations/0103_export_si_container_photos.sql
-last_verified: 2026-11-05
+last_verified: 2026-11-06
+<!-- updated: 2026-11-06 — R2c + AC-17: Lệnh xuất đọc file LSX đính ở chuyến khi chưa có LSX trong app; ngày SX theo dòng (ISO ở Ghi chú dòng). -->
 ttl_days: 90
 status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ảnh cont / seal + nới check thêm `shipping-instruction`, `container-seal-photos`; ⏳ CHƯA chạy DB thật; PGlite chạy 2 lần không lỗi). Lệnh xuất = loại văn bản `export-order-form` của bộ soạn (ba-spec 54) + khuôn gốc dựng bằng code; SI = `lib/shippingInstruction.ts` + điền chính file mẫu `src/lib/templates/si-form.xlsx` bằng exceljs. Test: `exportOrderForm.test.ts` (AC-1…AC-3, AC-5), `shippingInstruction.test.ts` (AC-4, AC-6, AC-8…AC-12), `exportTour.test.ts` (AC-13), `repo.test.ts` (bước file mới). AC-7 kiểm tay sau khi chạy 0103.
 
@@ -99,6 +100,7 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 | R3 | Số lượng = số thùng (bó) + kg; điền sẵn theo LSX (hoặc kế hoạch của Hàng của chuyến), sửa được. Dòng Tổng cộng = tổng thùng + tổng kg. | 0 dòng ⇒ không xuất file, báo "chưa có hàng" |
 | R2b | **Theo từng HĐ trên chuyến** (2026-11-04, chuyến gộp ba-spec 70): HĐ có LSX đã phát hành gắn chuyến ⇒ dòng của HĐ đó lấy từ LSX (R2); HĐ chưa có LSX ⇒ dòng của HĐ đó lấy từ Hàng của chuyến. Không bỏ dòng của HĐ nào. Thứ tự: HĐ chính trước, rồi HĐ khác theo thứ tự dòng Hàng của chuyến. Dòng Hàng của chuyến của HĐ có LSX nhưng không có dòng LSX cùng dòng HĐ ⇒ thêm từ Hàng của chuyến (MSL = mã lô chuyến) | chuyến gộp HĐ A có LSX + HĐ B chưa có ⇒ dòng A theo LSX + dòng B theo Hàng của chuyến |
 | R3b | **Số lượng theo chuyến** (2026-11-04): một LSX gắn được nhiều chuyến ⇒ số thùng + kg của dòng LSX lấy theo **Hàng của chuyến cùng dòng HĐ** (thực đóng; chưa có ⇒ kế hoạch; bó ⇒ × thùng / bó; kg = thùng × kg tịnh / thùng, thiếu kg tịnh ⇒ chia theo kg / thùng của dòng LSX). HĐ đã có Hàng của chuyến mà dòng LSX không có dòng cùng dòng HĐ ⇒ dòng LSX đó không đi chuyến này, bỏ. HĐ chưa nhập Hàng của chuyến ⇒ giữ số của cả lệnh + cảnh báo "số lượng lấy theo cả lệnh — nhập Hàng của chuyến hoặc sửa tay". Hai dòng LSX cùng một dòng HĐ ⇒ giữ số từng dòng LSX + cảnh báo | LSX 1.000 thùng gắn 2 chuyến, chuyến 1 kế hoạch 400 ⇒ Lệnh xuất chuyến 1 ghi 400 thùng |
+| R2c | **Lệnh sản xuất mới là file / ngày SX theo dòng** (2026-11-06, HĐ 23.26 SEACHEMOT). (a) HĐ trên chuyến chưa có LSX đã phát hành trong app mà có file LSX (.doc / .docx / PDF có chữ) đính ở mục Lệnh sản xuất của chuyến ⇒ bộ soạn đọc file trước khi mở (`readOrderFile` → `orderFromFile`, file khớp nhiều dòng HĐ nhất), dựng dòng như R2: tên theo danh mục của dòng HĐ khớp, size + HS theo HĐ, MSL + ngày ISO từng dòng + **hạn ghi trên file** ("Ghi ngày hết hạn 2028.10.01"; không ghi ⇒ ngày SX + HSD); số lượng theo R3b; báo "Hàng của HĐ … lấy theo file lệnh sản xuất "…"" + số dòng file không khớp HĐ. Không ghi vào sổ Lệnh sản xuất. LSX trong app luôn thắng file. (b) Ngày SX của dòng: dòng LSX có ngày ISO trong **Ghi chú dòng** (đọc từ file — 48 R21) ⇒ in đúng ngày của dòng (chỉ ngày thuộc ngày SX của lệnh); không có ⇒ mọi ngày của lệnh như cũ | LSX 17.10 (app, ghi chú từ file): dòng 1 "27/10/2026", dòng 2 "28, 29/10/2026", Sashimi "20, 28/10/2026" |
 | R4 | Thông tin giao hàng lấy theo chuyến lúc xuất file, chỉ xem: Số lượng × Loại container = "1 × 20RF" (loại chuyến); Doc cut-off, VGM cut-off, Thời hạn hạ bãi (71); Cảng hạ = Cảng đến; ETD, ETA. Ngày đóng hàng: mặc định ngày đóng cont của chuyến, sửa được trong lệnh (không ghi ngược vào chuyến). | ô chưa có ⇒ in "…" để điền tay |
 | R5 | Lưu ý đóng hàng (theo size · theo ngày sản xuất · hàng mẫu) và Yêu cầu chứng từ (vi sinh · hóa học · khác): mỗi mục Không / Có; Có ⇒ phải ghi rõ. | Có mà trống ⇒ không lưu, báo đúng mục |
 | R6 | Lưu & xuất ⇒ file `.docx` đúng mẫu QTI-KH-01-07 lưu làm file mục Lệnh xuất (`step = export-order`) ⇒ mục Xong (luật file sẵn có). Xuất lại ⇒ thêm file mới, bản mới nhất đầu. Bản ký tay đính thêm như cũ. | không có kho file ⇒ tải file về máy + ghi chú thay file (như luật sẵn có) |
@@ -224,7 +226,13 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 - **Then** 1.000 thùng, 12.000 kg, 1 cảnh báo
 - **Assert** `rows[0].cartons == 1000` · `notices.length == 1`
 
-### AC-16 — Chuyến gộp: HĐ chưa có LSX vẫn có dòng · R2b · Test: unit
+#### AC-17 — LSX mới là file / ngày SX theo dòng · R2c · Test: unit
+- **Given** chuyến của HĐ 23.26 có file LSX 17.10 đính ở mục Lệnh sản xuất (a: chưa có LSX trong app; b: LSX 17.10 trong app, Ghi chú dòng chứa "ISO 27 10 2026")
+- **When** dựng bảng hàng Lệnh xuất
+- **Then** (a) 13 dòng tên danh mục, MSL 201, hạn 01/10/2028; (b) ngày SX theo dòng; ghi chú không có ISO ⇒ mọi ngày của lệnh
+- **Assert:** rows.length == 13 · rows[0].productionDates == "27/10/2026" · rows[1] == "28, 29/10/2026" · rows[9] == "20, 28/10/2026" · expiry == "01/10/2028" (`productionOrderFile.test.ts`)
+
+## AC-16 — Chuyến gộp: HĐ chưa có LSX vẫn có dòng · R2b · Test: unit
 - **Given** chuyến HĐ chính A gắn LSX của A (1 dòng); Hàng của chuyến có 1 dòng của A + 2 dòng của HĐ B; B chưa có LSX
 - **When** dựng dòng
 - **Then** 3 dòng: dòng A theo LSX (MSL LSX) rồi 2 dòng B theo Hàng của chuyến (MSL chuyến, size + HS theo dòng HĐ B)
@@ -239,6 +247,7 @@ status: v1 ĐÃ BUILD 2026-11-04 — mig `0103` (🔴 RLS `export_files` cho ả
 
 ## History
 
+- 2026-11-06 — R2c (Phòng KH, HĐ 23.26): Lệnh xuất lấy hàng từ file LSX đính ở chuyến khi chưa lập LSX trong app; ngày SX theo từng dòng.
 - v1 (2026-11-04): khởi tạo từ yêu cầu chị Thảo + 2 file mẫu; chốt 8 câu.
 - v1.1 (2026-11-04): ĐÃ BUILD — xem status + "Đã khác đặc tả lúc build".
 - v1.2 (2026-11-04): chị Thảo góp ý "chỗ SI là sau bước có cont / seal" ⇒ hàng SI chuyển lên ngay sau Số cont + seal (R10). Migration 0101–0103 người dùng báo đã chạy DB thật.

@@ -179,7 +179,7 @@ export const exportPlanningGuide: PageGuide = {
           <li>Hai hàng Booking và Thông tin xe không có trạng thái — không làm bước nào tự xong.</li>
           <li>
             <b>Lập lệnh xuất</b> (hàng Lệnh xuất): soạn Lệnh xuất hàng mẫu QTI-KH-01-07. Hàng, MSL, ngày sản xuất, hạn dùng lấy từ Lệnh sản xuất
-            đã phát hành (hợp đồng chưa có lệnh thì lấy từ Hàng của chuyến); số thùng / kg theo Hàng của chuyến, chưa nhập thì lấy số cả lệnh và báo để sửa; size, HS code từ hợp đồng;
+            đã phát hành, ngày sản xuất theo từng dòng; hợp đồng chưa lập lệnh trong app mà đã đính file lệnh ở bước Lệnh sản xuất thì đọc file đó; không có cả hai thì lấy từ Hàng của chuyến; số thùng / kg theo Hàng của chuyến, chưa nhập thì lấy số cả lệnh và báo để sửa; size, HS code từ hợp đồng;
             cut-off, ETD, ETA từ booking. Ghi số lệnh (STT/tháng-năm, VD 01/10-26), phân xưởng nhận, các lưu ý Có / Không (Có thì ghi rõ). Xuất Word là mục Lệnh xuất Xong.
           </li>
           <li>

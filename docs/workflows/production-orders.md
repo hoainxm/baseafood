@@ -5,6 +5,7 @@ covers: src/features/production-orders/*, src/lib/productionOrder.ts, src/lib/pr
 tours: src/features/production-orders/productionOrderTour.ts
 guides: src/features/shared/guides/productionOrderGuide.tsx
 last_verified: 2026-11-06
+<!-- re-verified: 2026-11-06 (HĐ 23.26) — ngày ISO ở Ghi chú dòng của lệnh ⇒ Lệnh xuất in ngày SX theo dòng; file LSX đính ở chuyến mà chưa lập lệnh ⇒ Lệnh xuất đọc thẳng file (ba-spec 72 R2c, `orderFromFile`). Không đổi luật lệnh. -->
 <!-- re-verified: 2026-11-06 (Phòng KH, HĐ 23.26 SEACHEMOT) — Lập lệnh: Đọc file lệnh sản xuất điền sẵn hộp (R21); Ghi chú dòng sửa được trên lệnh. Không đổi trạng thái, không đổi quyền. -->
 <!-- re-verified: 2026-11-06 (audit "làm nhầm phải gỡ được") — bỏ gắn lệnh ngay ở chuyến xuất: bước 2 của chuyến → Gắn / bỏ gắn lệnh → Bỏ gắn, mọi trạng thái lệnh kể cả Đã hủy (`unlinkShipmentOrder`); có Hoàn tác, nhật ký HĐ + nhật ký lệnh. -->
 <!-- re-verified: 2026-11-06 (ba-spec 74 R14) — chuyến nhiều HĐ: bước 2 của chuyến Xong khi MỌI HĐ trên chuyến có lệnh đã phát hành gắn chuyến (`issuedOrderContracts`); gộp chuyến chuyển lệnh gắn sang chuyến giữ. -->

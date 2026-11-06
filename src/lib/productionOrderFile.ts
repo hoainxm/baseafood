@@ -9,7 +9,7 @@
 // ============================================================
 // Phòng KH 2026-11-06 (HĐ 23.26/BSF-SCM.2026 · SEACHEMOT): đã đính file LSX 17.10 ở bước 2 của chuyến mà hộp Lập lệnh
 // sản xuất vẫn trống ⇒ gõ lại lần nữa 13 dòng hàng, ngày ISO, MSL, ngày giao.
-import type { ExportContractLine } from "@/types";
+import type { ExportContractLine, ProductionOrder, ProductionOrderLine } from "@/types";
 
 export interface OrderFileLine {
   /** STT trên file. */
@@ -38,6 +38,8 @@ export interface OrderFile {
   productionDates: string[];
   shelfLifeMonths: number | null;
   processNote: string;
+  /** "Ghi ngày hết hạn 2028.10.01" ⇒ yyyy-mm-dd ("" = file không ghi) — Lệnh xuất in đúng hạn này (ba-spec 72 R2c). */
+  expiryDate: string;
   /** Dòng lưu ý chép vào ô Các lưu ý khác (ngày hết hạn ghi trên thùng, ngày có bao bì…). */
   notes: string[];
   lines: OrderFileLine[];
@@ -116,7 +118,7 @@ export function parseOrderRows(rows: readonly (readonly string[])[]): OrderFile 
   const titled = all.some((t) => /^lenh\s+san\s+xuat\b/.test(plainText(t)));
   if (headerAt < 0 && !titled) return null;
 
-  const out: OrderFile = { orderNo: "", orderDate: "", deliveryDate: "", market: "", customer: "", lotCode: "", productionDates: [], shelfLifeMonths: null, processNote: "", notes: [], lines: [] };
+  const out: OrderFile = { orderNo: "", orderDate: "", deliveryDate: "", market: "", customer: "", lotCode: "", productionDates: [], shelfLifeMonths: null, processNote: "", expiryDate: "", notes: [], lines: [] };
   for (const t of all.slice(0, headerAt < 0 ? all.length : headerAt)) {
     // Dò từ khóa trên chữ đã bỏ dấu — "SỐ" / "Số lệnh" viết hoa, viết thường, dựng sẵn hay tách dấu đều bắt.
     const no = plainText(t).match(/^so\s*(?:lenh)?\s*:?\s*([\w./-]+)/);
@@ -149,7 +151,12 @@ export function parseOrderRows(rows: readonly (readonly string[])[]): OrderFile 
       out.market = squash(v.replace(/\(.*$/, ""));
       out.customer = squash(v.match(/kh(?:a|á|\u0061\u0301)ch\s*:?\s*([^)]+)/i)?.[1] ?? "");
     } else if (/^quy trinh san xuat/.test(p)) out.processNote = squash(t.replace(/^[^:]*:\s*/, ""));
-    else if (/^du kien co (day du )?bao bi/.test(p) || /^ghi ngay het han/.test(p) || /^dong ngay iso/.test(p)) out.notes.push(t.replace(/\s*:\s*/, ": ").replace(/\s+([.,])/g, "$1"));
+    else if (/^du kien co (day du )?bao bi/.test(p) || /^ghi ngay het han/.test(p) || /^dong ngay iso/.test(p)) {
+      out.notes.push(t.replace(/\s*:\s*/, ": ").replace(/\s+([.,])/g, "$1"));
+      const e = /^ghi ngay het han/.test(p) ? t.match(/(\d{4})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{1,2})/) : null;
+      if (e) out.expiryDate = iso(Number(e[1]), Number(e[2]), Number(e[3]));
+      else if (/^ghi ngay het han/.test(p)) out.expiryDate = dmy(t);
+    }
   }
   const dates = [...new Set(out.lines.flatMap((l) => l.isoDates))].sort();
   out.productionDates = dates;
@@ -367,6 +374,84 @@ export function fillOrderForm(form: OrderFillTarget, file: OrderFile, ctx: FillC
     report.warnings.push(`Số lệnh ${next.orderNo} đã có ở lệnh khác — đổi số trước khi lưu.`);
   if (file.orderDate && file.productionDates.some((d) => d < file.orderDate)) report.warnings.push(`Có ngày ISO trước ngày lệnh ${vnDate(file.orderDate)} — soát ngày sản xuất.`);
   return { form: next, report };
+}
+
+
+/* ---------- Lệnh sản xuất "ảo" từ file — cho Lệnh xuất (ba-spec 72 R2c) ---------- */
+
+export interface OrderFromFile {
+  order: ProductionOrder;
+  lines: ProductionOrderLine[];
+  /** Hạn dùng ghi trên file (yyyy-mm-dd) — "" ⇒ tính từ ngày SX + HSD như lệnh trong app. */
+  expiry: string;
+  /** Ngày ISO của từng dòng (id dòng ⇒ ngày) — Lệnh xuất in ngày SX theo dòng. */
+  datesByLine: Map<string, string[]>;
+  matched: number;
+  unmatched: number;
+}
+
+/**
+ * File LSX ⇒ một lệnh "đã phát hành" chỉ dùng để dựng bảng hàng Lệnh xuất (không ghi vào sổ Lệnh sản xuất): mỗi dòng
+ * file khớp được một dòng HĐ ⇒ một dòng lệnh (tên theo danh mục, số thùng / kiện theo file, kg theo HĐ). Dòng không khớp
+ * ⇒ bỏ, đếm ở `unmatched`.
+ */
+export function orderFromFile(
+  file: OrderFile,
+  ctx: { id: string; contractId: string; contractNo: string; contractLines: readonly ExportContractLine[]; productName: (productId: string) => string },
+): OrderFromFile {
+  const match = matchOrderLines(file.lines, ctx.contractLines, ctx.productName);
+  const lines: ProductionOrderLine[] = [];
+  const datesByLine = new Map<string, string[]>();
+  for (const fl of file.lines) {
+    const cl = ctx.contractLines.find((c) => c.id === match.get(fl.no));
+    if (!cl) continue;
+    const id = `${ctx.id}:${fl.no}`;
+    const perUnit = cl.netKgPerCarton == null ? null : cl.netKgPerCarton * (cl.unitKind === "bundle" ? Math.max(1, cl.cartonsPerUnit || 1) : 1);
+    lines.push({
+      id,
+      orderId: ctx.id,
+      lineNo: fl.no,
+      contractLineId: cl.id,
+      productId: cl.productId ?? "",
+      productName: ctx.productName(cl.productId ?? "") || cl.description,
+      description: cl.description,
+      spec: "",
+      unitKind: cl.unitKind,
+      cartonsPerUnit: cl.cartonsPerUnit,
+      netKgPerCarton: cl.netKgPerCarton,
+      units: fl.units,
+      kg: perUnit != null && fl.units != null ? Math.round(perUnit * fl.units * 1000) / 1000 : fl.kg,
+      note: squash(fl.spec),
+    });
+    if (fl.isoDates.length) datesByLine.set(id, fl.isoDates);
+  }
+  const order = {
+    id: ctx.id,
+    orderNo: file.orderNo,
+    orderDate: file.orderDate,
+    contractId: ctx.contractId,
+    contractRevisionId: "",
+    contractNo: ctx.contractNo,
+    customerName: file.customer,
+    market: file.market,
+    lotCode: file.lotCode,
+    productionDates: file.productionDates,
+    deliveryDate: file.deliveryDate,
+    shelfLifeMonths: file.shelfLifeMonths ?? 0,
+    requirements: { packagingReady: "", cartonLayers: "", strapNote: "", peBagNote: "", cartonMarking: "", bagMarking: "", nafiTests: [], nafiNote: "", processNote: file.processNote },
+    note: file.notes.join("\n"),
+    status: "issued",
+    issuedAt: "",
+    issuedBy: "",
+    revisionNo: 0,
+    revisionReason: "",
+    cancelReason: "",
+    staleAckRevisionId: "",
+    staleAckReason: "",
+    createdBy: "",
+    createdAt: "",
+  } as ProductionOrder;
+  return { order, lines, expiry: file.expiryDate, datesByLine, matched: lines.length, unmatched: file.lines.length - lines.length };
 }
 
 /* ---------- Mở file (không ghi gì) ---------- */

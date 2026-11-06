@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { ExportContract, ExportContractLine, ExportContractRevision, ExportContractTerms, ExportFile, ExportShipment, ExportShipmentContainer, ExportShipmentLine } from "@/types";
+import type { ExportContract, ExportContractLine, ExportPayment, ExportContractRevision, ExportContractTerms, ExportFile, ExportShipment, ExportShipmentContainer, ExportShipmentLine } from "@/types";
 import {
   EMPTY_EXPORT_DATA,
   blankItem,
@@ -10,11 +10,13 @@ import {
   contractActuals,
   contractCoverage,
   mergeShipmentGate,
-  mergeShipmentInto,
+  removeShipmentLineGate,
+  shipmentGoodsLock,
   shippingProgressText,
   validateExtraContainers,
   type ExportData,
 } from "./exportPlanning";
+import { fieldDifferences, mergeShipmentInto, mergedContainerChildren, mergedIntoId, splitContainerGate, splitMergedContainer, visibleActivitySummary } from "./exportMergeShipments";
 import { containerCountOf, containerQuantityText, linesByContainer, removeContainerGate, shipmentContainerSummary, shipmentContainers } from "./exportContainers";
 import { buildInvoiceDocument, shipmentLineFromContract } from "./exportInvoice";
 import { buildExportOrderLines, exportOrderSourceValues } from "./documentTypes/exportOrderForm";
@@ -276,24 +278,81 @@ describe("ba-spec 73 — chuyến nhiều cont", () => {
     expect(String(ws.getCell("C35").value)).toContain("12960 KGS");
   });
 
-  it("AC-12: gộp chuyến B (20RF) vào A thành cont thêm", () => {
+  it("AC-12 (v1.1): gộp chuyến B (20RF) vào A thành cont thêm — B giữ bản ghi, không mất mục / lệnh", () => {
     const a = ship("a", { kind: "40RF" });
-    const b = ship("b", { kind: "20RF", containerNo: "", sealNo: "", loadingDate: "2026-11-08" });
+    const b = ship("b", { kind: "20RF", containerNo: "", sealNo: "", loadingDate: "2026-11-08", plannedKg: 8000 });
     const lines = [sline("la", a, L1, 1200), sline("lb", b, L2, 800)];
+    const links = [{ id: "ol1", orderId: "o1", shipmentId: "b", createdAt: T0 }];
     const d = base({ shipments: [a, b], shipmentLines: lines, items: [blankItem("b", "export-order", "ib", T0)] });
     expect(mergeShipmentGate(d, a, b)).toEqual({ ok: true });
-    const out = mergeShipmentInto(d, a, b, "k-new", T0);
-    expect(out.shipments.map((s) => s.id)).toEqual(["a"]);
-    expect(out.items).toHaveLength(0);
+    const out = mergeShipmentInto(d, a, b, { containerId: "k-new", now: T0, keepLabel: "lô A", orderLinks: links });
+    // B không xóa: hủy + dấu chuyến chung ⇒ mọi luật bỏ chuyến hủy vẫn đúng; kg / booking / mục bước còn nguyên.
+    expect(out.shipments.map((s) => s.id)).toEqual(["a", "b"]);
+    const rec = out.shipments.find((s) => s.id === "b")!;
+    expect(rec).toMatchObject({ status: "cancelled", plannedKg: 8000, bookingNo: b.bookingNo });
+    expect(mergedIntoId(rec)).toBe("a");
+    expect(visibleActivitySummary(rec.cancelReason)).toBe("Đã gộp làm cont thêm của chuyến lô A");
+    expect(out.items.map((i) => i.id)).toEqual(["ib"]);
+    expect(out.orderLinks).toEqual([{ ...links[0], shipmentId: "a" }]);
     expect(out.shipmentContainers).toHaveLength(1);
-    expect(out.shipmentContainers[0]).toMatchObject({ shipmentId: "a", kind: "20RF", loadingDate: "2026-11-08" });
+    expect(out.shipmentContainers[0]).toMatchObject({ id: "k-new", shipmentId: "a", kind: "20RF", loadingDate: "2026-11-08" });
     expect(out.shipmentLines.find((l) => l.id === "lb")).toMatchObject({ shipmentId: "a", containerId: "k-new" });
     const merged = { ...d, ...out };
     expect(shipmentContainers(merged, a)).toHaveLength(2);
     expect(contractCoverage(merged, "c1").missingContainers).toBe(0);
+    expect(mergedContainerChildren(merged, a).map((s) => s.id)).toEqual(["b"]);
+    // Số cont / seal / ngày đóng của bản ghi là của cont thêm ⇒ không hiện là "ô khác nhau".
+    expect(fieldDifferences(merged, a).map((f) => f.key)).not.toContain("containerNo");
     // Chuyến B đã có file ⇒ chặn; khác booking ⇒ chặn.
     expect(mergeShipmentGate({ ...d, files: [photo("b")] }, a, b)).toEqual({ ok: false, reason: "has-progress" });
     expect(mergeShipmentGate(d, a, { ...b, bookingNo: "OTHER" })).toEqual({ ok: false, reason: "other-booking" });
+  });
+
+  it("audit B4: tách cont thêm ra lại chuyến riêng — mở lại đúng bản ghi, hàng / ảnh / lệnh của cont quay về", () => {
+    const a = ship("a", { kind: "40RF" });
+    const b = ship("b", { kind: "20RF", containerNo: "", sealNo: "", loadingDate: "2026-11-08" });
+    const d0 = base({ shipments: [a, b], shipmentLines: [sline("la", a, L1, 1200), sline("lb", b, L2, 800)], shipmentContainers: [cont("kb2", "b", { kind: "40RF" })] });
+    const links = [{ id: "ol1", orderId: "o1", shipmentId: "b", createdAt: T0 }];
+    const out = mergeShipmentInto(d0, a, b, { containerId: "k-new", now: T0, keepLabel: "lô A", orderLinks: links });
+    // Sau gộp: đóng cont điền số cont / seal cho cont thêm, đính ảnh seal của cont đó, Phòng KH thêm 1 dòng vào cont đó.
+    const merged: ExportData = {
+      ...d0,
+      ...out,
+      shipmentContainers: out.shipmentContainers.map((c) => (c.id === "k-new" ? { ...c, containerNo: "TGHU7654321", sealNo: "VN1" } : c)),
+      shipmentLines: [...out.shipmentLines, sline("lx", a, L1, 10, "k-new")],
+      files: [photo("a", "k-new"), photo("a")],
+    };
+    const rec = merged.shipments.find((s) => s.id === "b")!;
+    expect(splitContainerGate(merged, a, rec)).toEqual({ ok: true });
+    const back = splitMergedContainer(merged, a, rec, { orderLinks: out.orderLinks });
+    expect(back.child).toMatchObject({ id: "b", status: "open", cancelReason: "", kind: "20RF", containerNo: "TGHU7654321", sealNo: "VN1", loadingDate: "2026-11-08" });
+    expect(back.shipmentLines.filter((l) => l.shipmentId === "b").map((l) => l.id).sort()).toEqual(["lb", "lx"]);
+    expect(back.shipmentLines.find((l) => l.id === "lb")?.containerId).toBeUndefined();
+    expect(back.shipmentLines.find((l) => l.id === "la")?.shipmentId).toBe("a");
+    expect(back.shipmentContainers.map((c) => [c.id, c.shipmentId])).toEqual([["kb2", "b"]]);
+    expect(back.files.find((f) => f.id === "p-a-k-new")).toMatchObject({ shipmentId: "b" });
+    expect(back.files.find((f) => f.id === "p-a-k-new")?.containerId).toBeUndefined();
+    expect(back.files.find((f) => f.id === "p-a-1")?.shipmentId).toBe("a");
+    expect(back.orderLinks).toEqual(links);
+    // Hàng đã vào chứng từ ⇒ chặn, nói vì sao.
+    const ci = { ...blankItem("a", "document", "ci", T0), docKind: "commercial-invoice", state: "done" as const };
+    expect(splitContainerGate({ ...merged, items: [ci] }, a, rec)).toEqual({ ok: false, reason: "invoice-done" });
+    expect(splitContainerGate({ ...merged, shipmentContainers: [] }, a, rec)).toEqual({ ok: false, reason: "container-removed" });
+    expect(splitContainerGate(merged, a, b)).toEqual({ ok: false, reason: "not-merged-container" });
+  });
+
+  it("audit B5: xóa dòng hàng của chuyến — chặn khi invoice / SI / tiền về đã có", () => {
+    const a = ship("a");
+    const d = base({ shipments: [a], shipmentLines: [sline("la", a, L1, 1200)] });
+    expect(removeShipmentLineGate(d, "la")).toEqual({ ok: true });
+    expect(removeShipmentLineGate(d, "zz")).toEqual({ ok: false, reason: "not-found" });
+    expect(removeShipmentLineGate({ ...d, shipments: [{ ...a, status: "cancelled" }] }, "la")).toEqual({ ok: false, reason: "not-open" });
+    const ci = { ...blankItem("a", "document", "ci", T0), docKind: "commercial-invoice" };
+    expect(shipmentGoodsLock({ ...d, items: [ci] }, "a")).toBeNull();
+    expect(removeShipmentLineGate({ ...d, items: [{ ...ci, state: "done" }] }, "la")).toEqual({ ok: false, reason: "invoice-done" });
+    expect(removeShipmentLineGate({ ...d, files: [{ ...photo("a"), step: "shipping-instruction" }] }, "la")).toEqual({ ok: false, reason: "si-done" });
+    const pay: ExportPayment = { id: "p1", contractId: "c1", shipmentId: "a", kind: "documents-sent", date: "2026-11-10", amount: null, currency: "USD", method: "", note: "", filePath: "", fileName: "", recordedBy: "", createdAt: T0 };
+    expect(removeShipmentLineGate({ ...d, payments: [pay] }, "la")).toEqual({ ok: false, reason: "paid" });
   });
 
   it("AC-13: báo cáo tháng đếm cont", () => {

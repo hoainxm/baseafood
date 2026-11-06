@@ -72,7 +72,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Ảnh và sơ đồ đóng cont",
     needs: ["export-plans.loading", "create"],
     actors: ["loader", ...KH],
-    text: "Lúc đóng cont: chụp ảnh lớp hàng, seal, số cont; đính sơ đồ container (mục 4a, 4b). Đóng xong, bộ phận đóng cont tự Điền số thực đóng theo dòng hàng của hợp đồng (không chờ Kế hoạch), chứng từ lấy số này làm invoice.",
+    text: "Lúc đóng cont: chụp ảnh lớp hàng, seal, số cont; đính sơ đồ container (mục 4a, 4b). Đóng xong, bộ phận đóng cont tự Điền số thực đóng theo dòng hàng của hợp đồng (không chờ Kế hoạch), chứng từ lấy số này làm invoice (thêm nhầm dòng: báo Phòng Kế hoạch xóa ở Nhập hàng của chuyến).",
     done: "Có file là mục tự Xong; số thực đóng không chặn bước Đóng cont",
   },
   {
@@ -80,7 +80,7 @@ export const EXPORT_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Hàng của chuyến · invoice",
     needs: ["export-plans", "update"],
     actors: KH,
-    text: "Nhập hàng của chuyến từ dòng hàng hợp đồng (số kiện, kg cả bì, hạn dùng); cont chở hàng của nhiều hợp đồng cùng khách thì thêm hàng của hợp đồng đó vào cùng chuyến, mỗi hợp đồng tự tính đã giao theo dòng của mình. Ở mục Commercial Invoice chọn tài khoản nhận tiền, sửa Tên / Địa chỉ bên mua nếu chuyến này cần ghi khác khách hàng của hợp đồng (Lấy theo hợp đồng để bỏ phần sửa), gõ Số B/L nếu cần, sửa đơn giá, thêm thông tin riêng của khách rồi tải file Invoice · Packing list; mục Packing List có nút Tạo file Packing list từ invoice (gross theo SI; chuyến gộp: mỗi dòng ghi số hợp đồng gốc).",
+    text: "Nhập hàng của chuyến từ dòng hàng hợp đồng (số kiện, kg cả bì, hạn dùng); cont chở hàng của nhiều hợp đồng cùng khách thì thêm hàng của hợp đồng đó vào cùng chuyến, mỗi hợp đồng tự tính đã giao theo dòng của mình; dòng ghi nhầm (kể cả dòng đóng cont thêm) thì người có quyền Xóa chọn nút xóa ở dòng rồi Lưu, có Hoàn tác (invoice chưa Xong, chưa đính SI, chưa gửi chứng từ). Ở mục Commercial Invoice chọn tài khoản nhận tiền, sửa Tên / Địa chỉ bên mua nếu chuyến này cần ghi khác khách hàng của hợp đồng (Lấy theo hợp đồng để bỏ phần sửa), gõ Số B/L nếu cần, sửa đơn giá, thêm thông tin riêng của khách rồi tải file Invoice · Packing list; mục Packing List có nút Tạo file Packing list từ invoice (gross theo SI; chuyến gộp: mỗi dòng ghi số hợp đồng gốc).",
     done: "Ô tổng trống tự điền theo invoice lập",
   },
   {
@@ -213,7 +213,9 @@ export const exportPlanningGuide: PageGuide = {
             mỗi dòng chọn <b>Đi cont</b>, dòng đi hai cont thì <b>Chia sang cont khác</b>; bộ phận đóng cont thấy hàng theo từng cont và không
             đổi được cont của dòng. Hàng Số cont + seal mỗi cont một dòng, một nút ảnh; Xong khi <b>mọi</b> cont có số, seal và ảnh. Lệnh
             xuất ghi "1 x 40HC-RF + 1 x 20RF", invoice kê mọi số cont / seal, packing list nhóm hàng theo cont, SI mỗi cont một dòng. Lịch đã
-            chia 2 chuyến mà booking ra một lần: ở chuyến chưa làm chọn <b>Gộp làm cont thêm</b>. Khách đòi chứng từ riêng từng cont thì giữ
+            chia 2 chuyến mà booking ra một lần: ở chuyến chưa làm chọn <b>Gộp làm cont thêm</b> — chuyến kia giữ bản ghi "Đã gộp làm cont thêm…"; gộp nhầm thì ở chuyến
+            chung, khối <b>Cont thêm gộp từ chuyến khác</b>, chọn <b>Tách ra chuyến riêng</b> (hàng, ảnh của cont đó quay về; chặn khi invoice
+            Xong, đã đính SI hoặc đã gửi chứng từ). Khách đòi chứng từ riêng từng cont thì giữ
             nhiều chuyến cùng booking, chứng từ dùng chung.
           </li>
           <li>
@@ -228,7 +230,7 @@ export const exportPlanningGuide: PageGuide = {
       <GuideSection title="Trong chuỗi Nhập khẩu → Lệnh sản xuất → Xuất khẩu">
         <GuideList>
           <li>Lập lệnh <b>ngay khi lên hợp đồng</b>: ở hộp Lập hợp đồng chọn <b>Lưu &amp; lập lệnh sản xuất</b> (lưu xong mở luôn hộp lập lệnh), hoặc về sau ở hồ sơ hợp đồng chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng). Không cần chờ đính kèm hay ghi chuyến; dòng hàng phải nối mặt hàng danh mục.</li>
-          <li>Bước <b>Lệnh sản xuất</b> của chuyến: chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng và chuyến) hoặc <b>Gắn lệnh có sẵn</b>. Chuyến chở hàng của nhiều hợp đồng: mỗi hợp đồng một nút Lập lệnh sản xuất, gắn được lệnh của mọi hợp đồng trên chuyến. Lệnh nháp chưa tính; phát hành thì bước tự xong.</li>
+          <li>Bước <b>Lệnh sản xuất</b> của chuyến: chọn <b>Lập lệnh sản xuất</b> (mở trang Lệnh sản xuất, chọn sẵn hợp đồng và chuyến) hoặc <b>Gắn / bỏ gắn lệnh</b> (gắn nhầm ⇒ <b>Bỏ gắn</b> ngay trong hộp đó, cả lệnh đã hủy; có Hoàn tác). Chuyến chở hàng của nhiều hợp đồng: mỗi hợp đồng một nút Lập lệnh sản xuất, gắn được lệnh của mọi hợp đồng trên chuyến. Lệnh nháp chưa tính; phát hành thì bước tự xong.</li>
           <li>Dòng hàng hợp đồng có cột <b>Đã ra lệnh (kg)</b>: còn bao nhiêu kg chưa ra lệnh, vượt dung sai thì báo.</li>
           <li>NL của lệnh lấy từ các lần <b>Nhập khẩu</b> đã ghi thực nhập.</li>
         </GuideList>
@@ -269,7 +271,7 @@ export const exportPlanningGuide: PageGuide = {
       </GuideSection>
       <GuideSection title="Mẹo">
         <GuideList>
-          <li>Việc ít dùng nằm ở <b>Thao tác khác</b>: Sửa hợp đồng (khi chưa có chuyến nào đã ghi mã lô, booking, ngày, số cont hay file), Ghi bản sửa, Gia hạn giao hàng, hủy.</li>
+          <li>Việc ít dùng nằm ở <b>Thao tác khác</b>: Sửa hợp đồng (khi chưa có chuyến nào đã ghi mã lô, booking, ngày, số cont hay file), Ghi bản sửa, Gia hạn giao hàng, hủy. Gia hạn ghi nhầm: mục Bản HĐ &amp; duyệt → <b>Cập nhật</b> ở lần gia hạn mới nhất → sửa, hoặc <b>Xóa</b> (hỏi lại, có Hoàn tác) — hạn giao quay về lần trước, không có thì hạn của hợp đồng.</li>
           <li>Phần <b>6 Lịch xuất hàng</b> ngay trong hộp Lập hợp đồng (mặc định Có): chia sẵn số chuyến = số cont, kg chia đều, tháng rải từ tháng sau ngày ký tới hạn giao; tự chia lại khi đổi số cont / hạn giao / dòng hàng cho tới khi sửa tay. Mỗi chuyến gõ luôn được <b>Số booking</b>, <b>Ngày đóng cont</b>, <b>ETD</b>, <b>ETA</b> nếu đã có. Lưu hợp đồng là ghi luôn các chuyến; chọn Không thì tạo sau. Chưa cần đủ hồ sơ; hợp đồng chưa có chuyến thì tạo lại được ở hồ sơ (Thao tác khác). Chuyến của lịch còn trống thì vẫn Sửa hợp đồng, Xóa hợp đồng được (xóa kèm các chuyến đó).</li>
           <li>Thanh toán <b>Khác</b> thì ghi Hình thức thanh toán; L/C thì ghi Số L/C. Đính <b>Hồ sơ khác</b> thì ghi Tên hồ sơ.</li>
           <li>Dòng hàng chép được (Chép dòng — chỉ đổi size); có ô Loại hàng (danh mục) khi máy chủ đã bật.</li>

@@ -54,7 +54,7 @@ export const ORDER_GUIDE_STEPS: readonly GuideFlowStep[] = [
     title: "Phát hành, gắn chuyến",
     needs: ["production-orders", "update"],
     actors: ["planning"],
-    text: "Chọn Phát hành và tick các chuyến xuất mà lệnh lo; chưa có chuyến thì gắn sau. In lệnh A4 gửi Phòng Kỹ thuật.",
+    text: "Chọn Phát hành và tick các chuyến xuất mà lệnh lo; chưa có chuyến thì gắn sau, gắn nhầm thì bỏ tick ở Gắn chuyến hoặc chọn Bỏ gắn ở chuyến xuất (cả lệnh đã hủy). In lệnh A4 gửi Phòng Kỹ thuật.",
     done: "Quản đốc, thủ kho đọc được lệnh; chuyến đã gắn xong bước Lệnh sản xuất",
     result: { label: ORDER_STATUS_LABELS.issued, tone: "done" },
   },

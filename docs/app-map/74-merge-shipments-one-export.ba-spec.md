@@ -3,6 +3,7 @@
 > Load khi: hai hay nhiều chuyến của các HĐ cùng khách thật ra là **một lần xuất** (cùng booking, cùng ngày đóng cont) mà app đang ghi thành nhiều chuyến; gộp chuyến đã có file / mục / lệnh sản xuất; lập lịch xuất hàng cho HĐ mới khi khách đã có chuyến cùng ngày; Lịch xuất hàng hiện một dòng cho một lần xuất.
 covers: src/lib/exportConsolidate.ts, src/lib/exportPlanning.ts, src/lib/exportDaySchedule.ts, src/features/export-planning/
 last_verified: 2026-11-06
+<!-- updated: 2026-11-06 (audit B4) — Gộp làm cont thêm của ba-spec 73 R13 nay cũng giữ bản ghi (R7a áp dụng, lý do "Đã gộp làm cont thêm …" + dấu ⟦as-container⟧), tách lại bằng 73 R13b; `fieldDifferences` bỏ số cont / seal / ngày đóng của bản ghi đó. -->
 ttl_days: 90
 status: **v1.1 ĐÃ BUILD** (2026-11-06 — chủ dự án: "gộp về mặt giao diện nhưng thông tin khác nhau vẫn giữ nguyên… đảm bảo dùng chung nhưng những gì đã có không bị mất, tách riêng dữ liệu mỗi hợp đồng được": R6, R7, R8, R11, R12 sửa; thêm R17 Tách). v1 ĐÃ CHỐT + ĐÃ BUILD (2026-11-06 — chủ dự án "Duyệt, build luôn": §11 theo đề xuất). Luật `lib/exportMergeShipments.ts` (+ `productionOrderMissingContracts` ở `exportPlanning.ts`, `issuedOrderContracts` ở `productionOrder.ts`), test `lib/exportMergeShipments.test.ts` (AC-1…17; AC-18 = `pageTourCoverage`; AC-19 thử tay trên dữ liệu thật sau deploy); hộp `MergeExportDialog.tsx`, Lịch xuất hàng `MonthView.tsx`, hồ sơ chuyến, lịch HĐ `ScheduleRowsEditor`. Mở rộng [70](70-call-off-schedule-multi-contract.ba-spec.md) (mô hình B: chuyến nhiều HĐ cùng khách) và [73](73-shipment-multi-container.ba-spec.md) R13 (gộp làm cont thêm); không đổi mô hình dữ liệu, không migration.
 
@@ -168,6 +169,7 @@ Không thêm user, không đổi ma trận quyền.
 | R14 | **GC5**: chuyến ≥ 2 HĐ ⇒ bước 2 Xong khi mọi HĐ có dòng trên chuyến có ≥ 1 lệnh đã phát hành của HĐ đó gắn chuyến, hoặc mục Lệnh sản xuất Không áp dụng. Chuyến một HĐ ⇒ 48 R6 không đổi | 06/11 sau gộp: có lệnh BD-008, chưa có BD-007 ⇒ Đang làm |
 | R15 | Quyền: gộp cần `export-plans` **sửa + xóa** (gộp bỏ chuyến). Không đổi ma trận quyền | Kế toán không gộp được |
 | R17 | **Tách ra chuyến riêng (v1.1)**: HĐ không phải HĐ chính, có hàng trên chuyến chung, chưa gửi chứng từ / tiền về. Có bản ghi chuyến cũ của HĐ ⇒ mở lại đúng bản ghi đó (kg = kg dòng hàng mang đi); không có (đi chung từ lịch) ⇒ chuyến mới chép booking / ngày, không chép số cont / seal / xe. Đi theo: dòng hàng của HĐ, file đính cho HĐ đó (`contractId` của file), lệnh sản xuất của HĐ gắn chuyến. Mục chứng từ đã làm chung ở lại chuyến chung (chuyến mới nhận mục trống theo HĐ). Kg chuyến chung trừ phần mang đi. Một Hoàn tác | tách BD-007 ⇒ bản ghi A mở lại, 4.000 kg, file booking của A về A |
+| R7b | **Gộp làm cont thêm (73 R13 v1.1, 06/11)** dùng chung R7a: bản ghi giữ, dấu `⟦merged-into⟧` + `⟦as-container:…⟧`; `mergedChildren` / `mergedInto` / tra cứu / Mở lần xuất áp như nhau. Tách lại: 73 R13b (`splitMergedContainer`), không qua R17 (cùng HĐ chính). Ô khác nhau (R6) không kể số cont / seal / ngày đóng của bản ghi này (là của cont thêm) | Booking 1X20RF & 1X40RF gộp nhầm |
 | R16 | Chế độ demo: chạy trên `site-demo` như mọi thao tác; không bảng mới ⇒ không đổi DemoBundle | — |
 
 ## 9b. Kiểm kê nội dung (GC6)
@@ -331,6 +333,7 @@ Văn phong theo [`src/design-system/README.md`](../../src/design-system/README.m
 
 ## History
 
+- 2026-11-06 — R7b: Gộp làm cont thêm (73 R13) cũng giữ bản ghi + tách lại (audit "làm nhầm phải gỡ được").
 - 2026-11-06 — v1.1 (chủ dự án sau khi xem bản v1: chọn một giá trị / chuyến giữ thì cái kia mất). Sửa: không bắt chọn ô lệch, giữ cả hai; chuyến của HĐ kia giữ bản ghi (không xóa); bản ghi gốc của chuyến HĐ chính khi có ô khác nhau; Dùng giá trị này; Tách ra chuyến riêng (R17). Test AC-5, 5b, 9, 11, 17 sửa; thêm AC-20, AC-21. Chưa ai gộp trên DB thật trước bản này (kiểm 2 chuyến 06/11 còn mở).
 - 2026-11-06 — ĐÃ BUILD v1 (chủ dự án duyệt theo đề xuất). Lệch so với v1 đề xuất: cổng gộp chặn cả khi chuyến **giữ** đã gửi chứng từ / tiền về; Giữ riêng ghi trong nhật ký. Máy chủ chưa có Hàng của chuyến (0096) ⇒ không gộp / không đi chung.
 - 2026-11-06 — v1 đề xuất. Nguồn: chủ dự án (chuyến 06/11 BD-007 / BD-008 hiện 2 dòng, phải nhập 2 lần). Đọc DB thật: DAIREI 35 chuyến mở / 13 lần xuất, cặp 06/11 cùng booking SGNGCZ486800, booking đã gõ 2 lần và lệch forwarder. Phương án B (gộp tổng quát) thay giới hạn "chỉ Đóng ghép, chưa file" của Đưa vào cont và "cùng HĐ" của Gộp làm cont thêm.

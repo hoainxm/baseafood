@@ -1270,7 +1270,7 @@ export function MergeShipmentDialog({ target, onClose, onConfirm }: { target: Me
           ? ""
           : target.mode === "consolidate"
             ? `${target.fromLabel} đóng chung cont với chuyến được chọn: hàng của chuyến này thành dòng hàng của hợp đồng này trên chuyến cont (mỗi hợp đồng vẫn tự tính đã giao), số cont / seal và bộ chứng từ làm ở chuyến cont; chuyến Đóng ghép không còn. Hoàn tác được ngay sau khi đưa.`
-            : `${target.fromLabel} thành một cont của chuyến khác cùng hợp đồng: loại, số, seal, ngày đóng và hàng của chuyến này chuyển sang; chuyến này không còn. Hoàn tác được ngay sau khi gộp.`
+            : `${target.fromLabel} thành một cont của chuyến khác cùng hợp đồng: loại, số, seal, ngày đóng, hàng và lệnh sản xuất của chuyến này chuyển sang. Chuyến này giữ bản ghi (Đã gộp làm cont thêm); gộp nhầm thì Hoàn tác ngay, hoặc về sau chọn Tách ra chuyến riêng.`
       }
       icon={Container}
       footer={

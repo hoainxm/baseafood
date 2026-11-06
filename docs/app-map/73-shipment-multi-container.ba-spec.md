@@ -2,7 +2,8 @@
 
 > Load khi: chuyến xuất có hơn một cont (booking "1X20RF & 1X40RF"), sửa danh sách cont của chuyến, gán dòng hàng vào cont, hàng Số cont + seal, Lệnh xuất / invoice / Packing list / SI của chuyến nhiều cont, độ phủ cont của HĐ.
 covers: src/lib/exportContainers.ts, src/lib/exportPlanning.ts, src/lib/exportInvoice.ts, src/lib/shippingInstruction.ts, src/lib/shippingInstructionExcel.ts, src/lib/documentTypes/exportOrderForm.ts, src/lib/bookingReader.ts, src/lib/exportReports.ts, src/features/export-planning/ShipmentDialogs.tsx, src/features/export-planning/ShipmentPanel.tsx, src/features/export-planning/ShipmentGoods.tsx, src/features/export-planning/LoadingView.tsx, src/features/export-planning/invoiceDocument.ts, src/features/export-planning/BookingDialogs.tsx, src/features/export-planning/ShippingInstructionDialog.tsx, src/lib/demoGenerator.ts, supabase/migrations/0106_export_shipment_containers.sql
-last_verified: 2026-11-05
+last_verified: 2026-11-06
+<!-- updated: 2026-11-06 (audit B4, chủ dự án: "gộp phải giữ bản ghi bị gộp, tách lại được") — R13 v1.1: Gộp làm cont thêm KHÔNG xóa chuyến B (giữ bản ghi, hủy + dấu chuyến chung như ba-spec 74 R7a); R13b Tách ra chuyến riêng. Không migration (dấu trong lý do hủy). -->
 ttl_days: 90
 status: v1.1 ĐÃ BUILD 2026-11-05 — mig `0106` (🔴 RLS bảng mới; ✅ ĐÃ chạy DB thật 2026-11-05 (kiểm chỉ-đọc: bảng, 4 policy, 2 cột, trigger); PGlite chuỗi 0001→0106 chạy 2 lần không lỗi mới, thử quyền: đóng cont không thêm cont / không đổi cont của dòng, vẫn ghi số thực đóng; chỉ-xem không ghi). Thay luật A5 của [41](41-export-planning.ba-spec.md). Luật thuần `lib/exportContainers.ts` + `validateExtraContainers` · `mergeShipmentGate` · `mergeShipmentInto` (`exportPlanning.ts`). Test: `exportContainers.test.ts` (AC-1…AC-10, AC-12…AC-15), `demoGenerator.test.ts` (AC-16), tour / hộp "?" qua `exportTour.test.ts` + `pageTourCoverage` (AC-17). AC-11 kiểm tay sau khi chạy 0106.
 
@@ -72,7 +73,8 @@ status: v1.1 ĐÃ BUILD 2026-11-05 — mig `0106` (🔴 RLS bảng mới; ✅ Đ
 ### Flow NV6 — Gộp chuyến thành cont · owner U1
 - **Input:** chuyến A và B cùng HĐ chính, đều mở; B chưa có file, chưa bước nào Xong (như luật xóa chuyến 41).
 - **Steps:** ở chuyến B chọn "Gộp vào chuyến A làm cont thêm".
-- **Output:** A có thêm cont (loại, số, seal của B); dòng hàng của B chuyển sang A, gán cont mới; B bị xóa; một Hoàn tác trả lại như trước.
+- **Output:** A có thêm cont (loại, số, seal của B); dòng hàng + cont thêm của B chuyển sang A, gán cont mới; lệnh SX chỉ gắn B chuyển sang A; **B không xóa** (v1.1 — giữ bản ghi, trạng thái "Đã gộp làm cont thêm của chuyến A"); một Hoàn tác trả lại như trước.
+- **Tách lại (v1.1):** gộp nhầm ⇒ ở A, khối "Cont thêm gộp từ chuyến khác" (hoặc ở bản ghi B) → **Tách ra chuyến riêng** ⇒ B mở lại đúng bản ghi cũ, cont đó + hàng / ảnh của nó + lệnh đã chuyển về B.
 
 ## 6. Flow optimization log
 
@@ -115,7 +117,8 @@ status: v1.1 ĐÃ BUILD 2026-11-05 — mig `0106` (🔴 RLS bảng mới; ✅ Đ
 | R10 | Độ phủ cont của HĐ = số cont HĐ − Σ **số cont** của các chuyến mở loại cont lạnh có hàng của HĐ (thay "số chuyến"). Báo cáo tháng đếm cont theo cùng luật. | sửa 41 `contractCoverage`, `exportReports` |
 | R11 | Thực xuất, đã giao, tiền về, trễ hạn: **không đổi** — tính theo chuyến (invoice của chuyến; chuyến gộp nhiều HĐ theo dòng, ba-spec 70). | |
 | R12 | Người đóng hàng (U4) **không** sửa danh sách cont, không đổi cont của dòng; dòng U4 tự thêm lúc đóng (mig 0102) phải chọn cont thuộc chính chuyến đó. Máy chủ chặn bằng trigger như 0102. | |
-| R13 | Gộp chuyến (NV6): chỉ khi B cùng HĐ chính với A, cả hai mở, B chưa có file, chưa bước nào Xong; B có booking khác A ⇒ chặn. Ghi + Hoàn tác một lần. | |
+| R13 | Gộp chuyến (NV6): chỉ khi B cùng HĐ chính với A, cả hai mở, B chưa có file, chưa bước nào Xong; B có booking khác A ⇒ chặn. Ghi + Hoàn tác một lần. **v1.1 (2026-11-06, không mất gì):** B **không xóa** — giữ nguyên bản ghi (kg, booking, ngày, mục bước như lúc nhập), `status = cancelled`, lý do "Đã gộp làm cont thêm của chuyến A ⟦merged-into:A⟧ ⟦as-container:k,…⟧ ⟦orders:…⟧" (dấu máy đọc: cont của A đến từ B — đầu là cont mới, sau là cont thêm vốn của B; lệnh đã chuyển). Mọi luật bỏ chuyến hủy (độ phủ, báo cáo, khép HĐ, tra cứu) vẫn đúng; Khôi phục / Xóa bản ghi bị chặn (như 74 R7a). Lệnh SX chỉ gắn B ⇒ sang A; lệnh gắn cả hai ⇒ link của B nằm lại bản ghi. Ô "khác nhau" (74 R6) bỏ qua số cont / seal / ngày đóng của bản ghi này. | `mergeShipmentInto` (exportMergeShipments.ts) |
+| R13b | **Tách ra chuyến riêng (v1.1)**: chuyến A mở; B là bản ghi gộp làm cont thêm vào A; cont mới còn trên A; hàng chưa vào chứng từ (`shipmentGoodsLock`: chưa gửi chứng từ / tiền về, Commercial Invoice chưa Xong, chưa đính SI). Kết quả: B mở lại (số cont / seal / loại / ngày đóng / ghi chú theo cont lúc tách — có thể đã điền sau khi gộp); dòng hàng của các cont đến từ B (cả dòng thêm sau gộp vào cont đó), ảnh cont / seal của cont đó, cont thêm vốn của B, lệnh đã chuyển ⇒ về B; cont mới bị bỏ khỏi A. Quyền `export-plans` Sửa + Xóa; một Hoàn tác; nhật ký ghi. | `splitContainerGate` · `splitMergedContainer` |
 | R14 | Booking (ba-spec 71): ô loại cont đọc được nhiều loại "1X20RF & 1X40RF" ⇒ đề xuất cont 1 = loại lớn nhất, cont thêm cho phần còn lại; người dùng xác nhận mới ghi. | NV7 |
 | R15 | Chế độ demo: bảng mới vào `DemoBundle` + `DemoPackLoader` + `TableMapping.refColumns` (`shipment_id`); bộ demo có ≥ 1 chuyến 40 + 20. | QT 15 |
 | R16 | Migration chỉ-thêm: tạo `export_shipment_containers` (RLS + trigger quyền như `export_shipments`); thêm cột null `container_id` vào `export_shipment_lines` và `export_files`; sửa trigger 0102 để U4 không đổi `container_id`. Cột chưa có trên máy chủ ⇒ app không gửi (như mig 0101). | 🔴 RLS bảng mới |
@@ -203,8 +206,14 @@ status: v1.1 ĐÃ BUILD 2026-11-05 — mig `0106` (🔴 RLS bảng mới; ✅ Đ
 ### AC-12 — Gộp chuyến thành cont · R13 · Test: unit
 - **Given** HĐ 2 cont, lịch ra chuyến A (40RF) + B (20RF), B chưa file, có 1 dòng hàng
 - **When** gộp B vào A; rồi Hoàn tác
-- **Then** A có 2 cont, dòng của B nằm ở A gán cont mới, B không còn; Hoàn tác ⇒ như trước
-- **Assert** `A.containers.length == 2` · `shipments.includes(B) == false` · sau Hoàn tác `shipments.length == 2`
+- **Then** A có 2 cont, dòng của B nằm ở A gán cont mới, B còn là bản ghi "Đã gộp làm cont thêm…" (v1.1); Hoàn tác ⇒ như trước
+- **Assert** `A.containers.length == 2` · `B.status == "cancelled"` · `mergedIntoId(B) == A` · mục bước + lệnh gắn không mất
+
+### AC-12b — Tách cont ra lại chuyến riêng · R13b · Test: unit (`exportContainers.test.ts` "audit B4") + manual
+- **Given** B đã gộp làm cont thêm của A; sau đó đóng cont điền số cont của cont đó, đính ảnh seal, Phòng KH thêm 1 dòng vào cont đó
+- **When** Tách ra chuyến riêng
+- **Then** B mở lại với số cont / seal mới; 2 dòng của cont đó + ảnh seal + lệnh về B; A còn 1 cont; Commercial Invoice của A Xong ⇒ chặn + lý do
+- **Assert** `splitMergedContainer(...).child.status == "open"` · `splitContainerGate == invoice-done` khi CI Xong
 
 ### AC-13 — Báo cáo tháng đếm cont · R10 · Test: unit
 - **Given** tháng 11 có chuyến 40HC-RF + 20RF và chuyến 40RF
@@ -248,5 +257,6 @@ status: v1.1 ĐÃ BUILD 2026-11-05 — mig `0106` (🔴 RLS bảng mới; ✅ Đ
 
 ## History
 
+- v1.2 (2026-11-06): audit "gộp phải giữ bản ghi, tách lại được" — R13 v1.1 (không xóa B) + R13b (Tách ra chuyến riêng). Không migration.
 - v1 (2026-11-05): khởi tạo từ phân tích HĐ 23.26/BSF-SCM.2026 (dữ liệu thật, chỉ đọc) + test hai cách ghi; chủ dự án chọn hướng 2 (chuyến = booking, nhiều cont).
 - v1.1 (2026-11-05): ĐÃ BUILD. Khác đặc tả: (a) AC-8 đo trên trang Invoice (đầu trang kê "Container / Seal" từng cont khi ≥ 2 cont) và Expiry date list; chuyến 1 cont giữ đúng mẫu cũ; (b) R9: mẫu SI không chèn dòng — 2 cont đầu dùng A33/A34 + A35/A36 (cột C: loại + số kiện + gross), cont thứ 3 trở đi ghi thêm vào A36 / C35; (c) R5 Lệnh xuất: bảng hàng chia theo cont, file Word ghi "[Cont n · loại]" trước tên hàng (Q1 tạm: một lệnh cho cả chuyến); (d) Packing list: dòng tiêu đề cont + dòng cộng dùng kiểu dòng "item" để bản Word / PDF không cắt bảng; (e) R14 hỏi Có / Không ở hộp Cập nhật booking, Có ⇒ thêm cont thêm chưa có số; (f) NV6 nút **Gộp làm cont thêm** ở thẻ chuyến (chỉ hiện khi có chuyến nhận hợp lệ), cont thêm của chuyến bị gộp đi theo.

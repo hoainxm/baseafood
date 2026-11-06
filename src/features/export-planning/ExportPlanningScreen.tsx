@@ -29,6 +29,11 @@ import {
   fieldDifferences,
   mergeConflicts,
   mergedIntoId,
+  mergeShipmentInto,
+  mergedContainerChildren,
+  mergedContainerIds,
+  splitContainerGate,
+  splitMergedContainer,
   plannedKgByContract,
   sameExportShipments,
   splitContract,
@@ -50,7 +55,6 @@ import {
   CONTRACT_ATTACHMENT_LABELS,
   SUB_STEP_LABELS,
   mergeShipmentGate,
-  mergeShipmentInto,
   applyProductMapping,
   contractClosure,
   documentKindLabel,
@@ -74,6 +78,7 @@ import {
   canCancel,
   canDeleteContract,
   canDeleteShipment,
+  extensionChangeGate,
   cancelContract,
   contractTotals,
   effectiveRevision,
@@ -88,6 +93,9 @@ import {
   openShipmentsOf,
   shipmentMonth,
   termsOf,
+  SHIPMENT_GOODS_LOCK_TEXT,
+  removeShipmentLineGate,
+  shipmentGoodsLock,
   workingRevision,
   blankItem,
   stepItem,
@@ -474,20 +482,57 @@ export default function ExportPlanningScreen() {
 
   const saveExtension = (e: ExportDeadlineExtension, extra: ExportFile[]): boolean => {
     const prev = d.extensions;
-    if (!store.saveExtensions([...prev, e])) return false;
+    const old = prev.find((x) => x.id === e.id);
+    // Sửa lần đã ghi (audit B3): chỉ lần mới nhất — lần cũ là chuỗi khách đã xác nhận.
+    if (old && !extensionChangeGate(d, e.id).ok) {
+      notify.error("Chỉ sửa được lần gia hạn mới nhất.");
+      return false;
+    }
+    if (!store.saveExtensions(old ? prev.map((x) => (x.id === e.id ? e : x)) : [...prev, e])) return false;
     const undoFiles = saveExtraFiles(extra);
     if (!undoFiles) {
       store.saveExtensions(prev);
       return false;
     }
-    const what = `Gia hạn giao hàng tới ${e.newDeadline.split("-").reverse().join("/")}${e.note ? ` — ${e.note}` : ""}`;
+    const dmy = (iso: string) => iso.split("-").reverse().join("/");
+    const what = old
+      ? `Sửa lần gia hạn giao hàng: tới ${dmy(old.newDeadline)} → ${dmy(e.newDeadline)}${e.note ? ` — ${e.note}` : ""}`
+      : `Gia hạn giao hàng tới ${dmy(e.newDeadline)}${e.note ? ` — ${e.note}` : ""}`;
     track(e.contractId, "", "update", what);
-    notify.saved(`Đã gia hạn giao hàng tới ${e.newDeadline.split("-").reverse().join("/")}`, undoTracked(e.contractId, "", what, () => {
+    notify.saved(old ? "Đã lưu lần gia hạn" : `Đã gia hạn giao hàng tới ${dmy(e.newDeadline)}`, undoTracked(e.contractId, "", what, () => {
         store.saveExtensions(prev);
         undoFiles();
       }));
     setExtensionTarget(null);
     return true;
+  };
+  /** Mở một lần gia hạn đã ghi: lần mới nhất sửa / xóa được, lần cũ chỉ xem (audit B3). */
+  const openExtension = (e: ExportDeadlineExtension) => {
+    const contract = d.contracts.find((c) => c.id === e.contractId);
+    const gate = extensionChangeGate(d, e.id);
+    setExtensionTarget({
+      contractId: e.contractId,
+      contractNo: contract?.contractNo ?? "",
+      currentDeadline: termsOf(d, e.contractId).latestShipmentDate,
+      existing: e,
+      fallback: gate.ok ? gate.fallback : undefined,
+      lockedReason: gate.ok ? undefined : "Lần gia hạn cũ — chỉ sửa / xóa được lần mới nhất (các lần sau dựa trên lần này). Muốn gỡ lần này thì xóa dần từ lần mới nhất.",
+    });
+  };
+  /** Xóa lần gia hạn ghi nhầm: hạn giao quay về lần trước / hạn HĐ; hỏi lại ở hộp, có Hoàn tác, nhật ký ghi. */
+  const deleteExtension = (e: ExportDeadlineExtension) => {
+    const gate = extensionChangeGate(d, e.id);
+    if (!gate.ok) {
+      notify.error("Chỉ xóa được lần gia hạn mới nhất.");
+      return;
+    }
+    const prev = d.extensions;
+    if (!store.saveExtensions(prev.filter((x) => x.id !== e.id))) return;
+    const dmy = (iso: string) => (iso ? iso.split("-").reverse().join("/") : "chưa ghi");
+    const what = `Xóa lần gia hạn giao hàng tới ${dmy(e.newDeadline)} — hạn giao quay về ${dmy(gate.fallback)}${e.fileName ? ` (file xác nhận ${e.fileName} vẫn giữ trên máy chủ)` : ""}`;
+    track(e.contractId, "", "delete", what);
+    notify.deleted(`Đã xóa lần gia hạn — hạn giao ${dmy(gate.fallback)}`, undoTracked(e.contractId, "", what, () => store.saveExtensions(prev)));
+    setExtensionTarget(null);
   };
 
   /* ---------- ba-spec 73 R13: gộp chuyến thành cont thêm ---------- */
@@ -539,21 +584,22 @@ export default function ExportPlanningScreen() {
       notify.error("Không gộp được — chuyến đã có file hoặc bước đã xong, hoặc khác booking / hợp đồng.");
       return;
     }
-    const prev = { shipments: d.shipments, items: d.items, lines: d.shipmentLines ?? [], conts: d.shipmentContainers ?? [] };
-    const out = mergeShipmentInto(d, into, from, newId(), new Date().toISOString());
+    const prev = { shipments: d.shipments, lines: d.shipmentLines ?? [], conts: d.shipmentContainers ?? [], o: store.orderLinks };
+    // 73 R13 v1.1: chuyến gộp vào KHÔNG xóa — giữ bản ghi (Đã gộp làm cont thêm…), tách lại được ở chuyến chung.
+    const out = mergeShipmentInto(d, into, from, { containerId: newId(), now: new Date().toISOString(), keepLabel: shipName(into), orderLinks: store.orderLinks });
     if (!store.saveShipmentContainers(out.shipmentContainers)) return;
     store.saveShipmentLines(out.shipmentLines);
-    store.saveItems(out.items);
+    if (JSON.stringify(out.orderLinks) !== JSON.stringify(prev.o)) store.saveOrderLinks(out.orderLinks);
     store.saveShipments(out.shipments);
-    const what = `Gộp chuyến ${shipName(from)} vào chuyến ${shipName(into)} làm cont thêm (${from.kind})`;
+    const what = `Gộp chuyến ${shipName(from)} vào chuyến ${shipName(into)} làm cont thêm (${from.kind}) — chuyến kia giữ bản ghi (Đã gộp), tách lại được`;
     track(into.contractId, into.id, "update", what);
     notify.saved(
       "Đã gộp làm cont thêm",
       undoTracked(into.contractId, into.id, what, () => {
         store.saveShipments(prev.shipments);
-        store.saveItems(prev.items);
         store.saveShipmentLines(prev.lines);
         store.saveShipmentContainers(prev.conts);
+        store.saveOrderLinks(prev.o);
       }),
     );
     setMergeTarget(null);
@@ -662,6 +708,41 @@ export default function ExportPlanningScreen() {
     );
     setParam({ contract: cid, shipment: out.child.id }, true);
   };
+  /** 73 R13 v1.1 (audit B4): cont thêm gộp từ chuyến khác ra lại chuyến riêng — mở lại đúng bản ghi đó, hàng của cont đi theo. */
+  const splitContainer = (keep: ExportShipment, child: ExportShipment) => {
+    const gate = splitContainerGate(d, keep, child);
+    if (!gate.ok) {
+      notify.error(
+        gate.reason === "paid" || gate.reason === "invoice-done" || gate.reason === "si-done"
+          ? SHIPMENT_GOODS_LOCK_TEXT[gate.reason]
+          : gate.reason === "container-removed"
+            ? "Cont này đã bỏ khỏi chuyến — không tách được."
+            : "Không tách được cont này khỏi chuyến.",
+      );
+      return;
+    }
+    const prev = { s: d.shipments, f: d.files, l: d.shipmentLines ?? [], c: d.shipmentContainers ?? [], o: store.orderLinks };
+    const out = splitMergedContainer(d, keep, child, { orderLinks: store.orderLinks });
+    if (!store.saveShipmentLines(out.shipmentLines)) return;
+    store.saveShipmentContainers(out.shipmentContainers);
+    store.saveFiles(out.files);
+    if (JSON.stringify(out.orderLinks) !== JSON.stringify(prev.o)) store.saveOrderLinks(out.orderLinks);
+    store.saveShipments(out.shipments);
+    const moved = out.shipmentLines.filter((l) => l.shipmentId === child.id).length;
+    const what = `Tách cont ${out.child.kind}${out.child.containerNo ? ` ${out.child.containerNo}` : ""} khỏi chuyến ${shipName(keep)} ra lại chuyến riêng ${shipName(child)} (mở lại bản ghi, ${moved} dòng hàng đi theo)`;
+    track(keep.contractId, keep.id, "update", what);
+    notify.saved(
+      "Đã tách cont ra chuyến riêng",
+      undoTracked(keep.contractId, keep.id, what, () => {
+        store.saveShipments(prev.s);
+        store.saveFiles(prev.f);
+        store.saveShipmentLines(prev.l);
+        store.saveShipmentContainers(prev.c);
+        store.saveOrderLinks(prev.o);
+      }),
+    );
+    setParam({ contract: child.contractId, shipment: child.id }, true);
+  };
   /** R6 v1.1: chuyến chung dùng giá trị của HĐ khác cho một ô — giá trị đang dùng vẫn còn ở bản ghi gốc. */
   const applyDifferentValue = (keep: ExportShipment, sourceId: string, key: string) => {
     const src = d.shipments.find((x) => x.id === sourceId);
@@ -762,15 +843,31 @@ export default function ExportPlanningScreen() {
     const addable = addableContracts(d, s, opts).map((c) => group(c, c.id));
     // ba-spec 73: cont của chuyến (máy chủ đã chạy 0106) — ≥ 2 cont thì mỗi dòng chọn cont.
     const containers = store.containersAvailable ? shipmentContainers(d, s).map((c) => ({ id: c.id, label: containerLabel(c) })) : undefined;
-    setLinesTarget({ shipment: s, label: goodsLabel(s), groups, addable, lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), otherShipmentUnits: other, containers });
+    // Audit B5: quyền Xóa ⇒ xóa được dòng đã lưu (kể cả dòng đóng cont thêm nhầm); hàng đã vào chứng từ ⇒ nói vì sao.
+    const lock = shipmentGoodsLock(d, s.id);
+    const removeLines = can.delete ? { blockedText: lock ? SHIPMENT_GOODS_LOCK_TEXT[lock] : "" } : undefined;
+    setLinesTarget({ shipment: s, label: goodsLabel(s), groups, addable, lines: shipmentLinesOf(d.shipmentLines ?? [], s.id), otherShipmentUnits: other, containers, removeLines });
   };
 
   const saveShipmentLines = (s: ExportShipment, lines: ExportShipmentLine[]): boolean => {
     const prev = d.shipmentLines ?? [];
+    // Dòng đã có số thực đóng bị xóa (audit B5): cần quyền Xóa + hàng chưa vào chứng từ (kiểm lại lúc lưu).
+    const removed = prev.filter((l) => l.shipmentId === s.id && !lines.some((x) => x.id === l.id));
+    const removedLoaded = removed.filter((l) => l.loadedUnits != null);
+    if (removedLoaded.length) {
+      const g = removeShipmentLineGate(d, removedLoaded[0].id);
+      if (!can.delete || !g.ok) {
+        notify.error(!can.delete ? "Chưa có quyền xóa dòng hàng đã có số thực đóng." : g.ok ? "" : g.reason === "paid" || g.reason === "invoice-done" || g.reason === "si-done" ? SHIPMENT_GOODS_LOCK_TEXT[g.reason] : "Chuyến không còn mở — không xóa dòng được.");
+        return false;
+      }
+    }
     if (!store.saveShipmentLines([...prev.filter((l) => l.shipmentId !== s.id), ...lines])) return false;
-    const what = `Cập nhật hàng của chuyến ${shipName(s)} — ${lines.length} dòng`;
-    track(s.contractId, s.id, "update", what);
-    notify.saved(`Đã lưu hàng của chuyến (${lines.length} dòng)`, undoTracked(s.contractId, s.id, what, () => store.saveShipmentLines(prev)));
+    const lineName = (l: ExportShipmentLine) => [l.description, l.size].filter((t) => t.trim()).join(" · ") || "(chưa có tên hàng)";
+    const what =
+      `Cập nhật hàng của chuyến ${shipName(s)} — ${lines.length} dòng` +
+      (removedLoaded.length ? ` · xóa ${removedLoaded.length} dòng đã có số thực đóng: ${removedLoaded.map((l) => `${lineName(l)} (thực đóng ${l.loadedUnits})`).join(", ")}` : "");
+    track(s.contractId, s.id, removedLoaded.length ? "delete" : "update", what);
+    notify.saved(`Đã lưu hàng của chuyến (${lines.length} dòng${removed.length ? ` · xóa ${removed.length} dòng` : ""})`, undoTracked(s.contractId, s.id, what, () => store.saveShipmentLines(prev)));
     setLinesTarget(null);
     return true;
   };
@@ -797,8 +894,10 @@ export default function ExportPlanningScreen() {
     if (!store.saveShipmentLines([...prev.map((l) => byId.get(l.id) ?? l), ...added])) return false;
     const what = `Điền số thực đóng của chuyến ${shipName(s)}${added.length ? ` — thêm ${added.length} dòng hàng từ hợp đồng` : ""}`;
     track(s.contractId, s.id, "update", what);
-    // Có dòng mới ⇒ không Hoàn tác: người đóng cont không có quyền xóa dòng (policy delete), hoàn tác sẽ không gỡ được.
-    notify.saved("Đã lưu số thực đóng", added.length ? undefined : undoTracked(s.contractId, s.id, what, () => store.saveShipmentLines(prev)));
+    // Có dòng mới: người đóng cont không có quyền xóa dòng (policy delete, trigger 0096–0106) ⇒ hoàn tác không gỡ được dòng
+    // ⇒ không Hoàn tác, câu báo chỉ cách gỡ (audit B5: Phòng KH xóa ở Hàng của chuyến). Người có quyền Xóa thì Hoàn tác như thường.
+    if (added.length && !can.delete) notify.saved(`Đã lưu số thực đóng — thêm ${added.length} dòng hàng từ hợp đồng. Thêm nhầm: báo Phòng Kế hoạch xóa dòng ở Hàng của chuyến.`);
+    else notify.saved("Đã lưu số thực đóng", undoTracked(s.contractId, s.id, what, () => store.saveShipmentLines(prev)));
     setCountTarget(null);
     return true;
   };
@@ -1445,6 +1544,7 @@ export default function ExportPlanningScreen() {
             const base = effectiveRevision(d, contract.id);
             if (base) setContractForm({ mode: "revise", contract, base, revisionNo: nextRevisionNo(d, contract.id) });
           }}
+          onOpenExtension={can.update ? openExtension : undefined}
           onExtend={() => setExtensionTarget({ contractId: contract.id, contractNo: contract.contractNo, currentDeadline: termsOf(d, contract.id).latestShipmentDate })}
           onAddShipment={() => setShipmentTarget({ contractId: contract.id, contractNo: contract.contractNo, defaults: shipmentDefaults(contract) })}
           onSchedule={() => openSchedule(contract)}
@@ -1543,7 +1643,25 @@ export default function ExportPlanningScreen() {
                 return {
                   text: visibleActivitySummary(sel.cancelReason) + " — bản ghi giữ nguyên thông tin lúc trước khi gộp",
                   onOpen: keep ? () => setParam({ contract: keep.contractId, shipment: keep.id }) : undefined,
+                  // 73 R13 v1.1: bản ghi gộp làm cont thêm ⇒ tách lại ngay tại đây được.
+                  onSplit: keep && can.update && can.delete && splitContainerGate(d, keep, sel).ok ? () => splitContainer(keep, sel) : undefined,
                 };
+              })()}
+              mergedContainers={(() => {
+                const sel = dossier.selected;
+                if (!sel || sel.status !== "open") return undefined;
+                const kids = mergedContainerChildren(d, sel);
+                if (!kids.length) return undefined;
+                const conts = shipmentContainers(d, sel);
+                return kids.map((k) => {
+                  const g = splitContainerGate(d, sel, k);
+                  const cont = conts.find((c) => c.id === mergedContainerIds(k)[0]);
+                  return {
+                    label: `${cont ? containerLabel(cont) : k.kind} — gộp từ chuyến ${shipName(k)}`,
+                    onSplit: can.update && can.delete && g.ok ? () => splitContainer(sel, k) : undefined,
+                    blockedText: g.ok ? "" : g.reason === "paid" || g.reason === "invoice-done" || g.reason === "si-done" ? SHIPMENT_GOODS_LOCK_TEXT[g.reason] : g.reason === "container-removed" ? "Cont đã bỏ khỏi chuyến." : "",
+                  };
+                });
               })()}
               exportGroup={(() => {
                 const sel = dossier.selected;
@@ -1627,7 +1745,7 @@ export default function ExportPlanningScreen() {
       />
       <FinalReviewDialog target={finalTarget} approverName={approverName} onClose={() => setFinalTarget(null)} onSave={saveFinalReview} />
       <AttachmentDialog target={attachTarget} recordedBy={recordedBy} onClose={() => setAttachTarget(null)} onSave={saveAttachments} />
-      <ExtensionDialog target={extensionTarget} recordedBy={recordedBy} onClose={() => setExtensionTarget(null)} onSave={saveExtension} />
+      <ExtensionDialog target={extensionTarget} recordedBy={recordedBy} onClose={() => setExtensionTarget(null)} onSave={saveExtension} onDelete={can.delete ? deleteExtension : undefined} />
       <ShipmentFormDialog
         target={shipmentTarget}
         onClose={() => setShipmentTarget(null)}

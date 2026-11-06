@@ -5,6 +5,7 @@ covers: src/features/export-planning/*, src/lib/exportConsolidate.ts, src/lib/ex
 tours: src/features/export-planning/exportTour.ts
 guides: src/features/shared/guides/exportPlanningGuide.tsx
 last_verified: 2026-11-06
+<!-- re-verified: 2026-11-06 (audit "thêm thừa / làm nhầm phải gỡ được") — gia hạn: Cập nhật lần mới nhất (sửa / Xóa, hạn quay về lần trước); Gộp làm cont thêm không xóa chuyến kia (Đã gộp làm cont thêm…) + Tách ra chuyến riêng; Hàng của chuyến: quyền Xóa xóa được dòng đã lưu (cả dòng đóng cont thêm), chặn khi invoice Xong / SI / tiền về; bước 2: Gắn / bỏ gắn lệnh (cả lệnh đã hủy). -->
 <!-- re-verified: 2026-11-06 (chủ dự án) — bước 5: bỏ nút Bỏ khỏi danh sách ở hàng (dễ bấm nhầm, khác cách xóa của hệ thống) ⇒ Xóa trong hộp Cập nhật, cả chứng từ HĐ yêu cầu; lưu bản sửa HĐ không thêm lại. -->
 <!-- re-verified: 2026-11-06 (chị Thảo) — bước 5: Bỏ khỏi danh sách cho mọi chứng từ chưa Xong (cả HĐ yêu cầu; mục không xóa, Không áp dụng + ẩn, Hiện lại). Thay R21 cũ "chứng từ HĐ yêu cầu không xóa được — chỉ Không áp dụng". -->
 <!-- re-verified: 2026-11-06 (ba-spec 74 v1.1, chủ dự án: "gộp nhưng thông tin khác nhau vẫn giữ nguyên") — gộp KHÔNG mất gì: chuyến của HĐ kia giữ bản ghi (Đã gộp vào lần xuất), ô khác nhau giữ cả hai (+ bản ghi gốc của chuyến HĐ chính), Dùng giá trị này, Tách ra chuyến riêng. -->
@@ -79,6 +80,8 @@ Hồ sơ chỉ tính theo **loại** (`missingAttachmentKinds`). File ký đính
 | Số hợp đồng | mọi lần Sửa / Ghi bản sửa; không trùng số HĐ khác của cùng khách | Đã đóng HĐ · Đã hủy | `validateContract` |
 | Khách | tới khi một chuyến xong bước 4 Đóng cont | có chuyến xong bước 4 | `customerChangeGate` |
 | Mở lại HĐ đã đóng | Trưởng / Phó phòng KH | — | |
+| Gia hạn giao hàng (khách xác nhận, không cần duyệt lại) | Quyền Sửa: menu **Gia hạn giao hàng**. Hạn hiệu lực = lần gia hạn mới nhất (theo ngày khách xác nhận) | — | `effectiveDeadline` · `extensionsOf` |
+| Sửa / xóa lần gia hạn ghi nhầm | Mục Bản HĐ & duyệt → lần gia hạn → **Cập nhật**: sửa ngày / ghi chú; **Xóa** (quyền Xóa, hỏi lại, Hoàn tác, nhật ký) ⇒ hạn giao quay về lần trước, không có thì hạn của HĐ. File xác nhận giữ trên máy chủ | Lần gia hạn **cũ** (không phải mới nhất) ⇒ chỉ xem — gỡ dần từ lần mới nhất | `extensionChangeGate` |
 
 Mỗi lần lưu, nhật ký Xuất khẩu ghi từng ô đổi **cũ → mới**: Số HĐ, Khách, Ngày ký, Số PO, điều khoản (cảng, thanh toán, hạn giao, dung sai, cont…), dòng hàng thêm / bớt / sửa (`contractChangeSummary`). Bản sửa không lưu riêng số HĐ ⇒ số cũ chỉ còn ở nhật ký.
 ## 2. Một chuyến (một booking · một hay nhiều cont) đi qua 6 bước
@@ -96,7 +99,7 @@ Mỗi mục trong bước có một trong 4 nhãn: **Chưa làm** · **Đang là
 | Bước | Mục bên trong | Xong khi (code `stepState`) | Ai làm |
 |---|---|---|---|
 | 1 · Hợp đồng | Hồ sơ đính kèm của HĐ | Hồ sơ bắt buộc của HĐ đủ (`contractStepState`) | Nhân viên Kế hoạch |
-| 2 · Lệnh sản xuất | Lệnh sản xuất | Mục Lệnh sản xuất Xong / Không áp dụng (`subStepState`); lệnh lập ở trang Lệnh sản xuất. Chuyến **nhiều HĐ** (2026-11-06, ba-spec 74 R14): Xong khi **mọi** HĐ trên chuyến có lệnh đã phát hành gắn chuyến; mới một phần ⇒ Đang làm + kể HĐ thiếu (`productionOrderMissingContracts`) | Nhân viên Kế hoạch |
+| 2 · Lệnh sản xuất | Lệnh sản xuất | Mục Lệnh sản xuất Xong / Không áp dụng (`subStepState`); lệnh lập ở trang Lệnh sản xuất. Chuyến **nhiều HĐ** (2026-11-06, ba-spec 74 R14): Xong khi **mọi** HĐ trên chuyến có lệnh đã phát hành gắn chuyến; mới một phần ⇒ Đang làm + kể HĐ thiếu (`productionOrderMissingContracts`). Gắn nhầm ⇒ **Gắn / bỏ gắn lệnh** → mục Đang gắn → Bỏ gắn (mọi trạng thái lệnh, cả Đã hủy; hỏi lại, Hoàn tác; MSL chuyến giữ nguyên — `unlinkShipmentOrder`) | Nhân viên Kế hoạch |
 | 3 · Bao bì | Bao bì | Mục Bao bì Xong / Không áp dụng (`subStepState`) | Nhân viên Kế hoạch |
 | 4 · Đóng cont | Theo trình tự đóng thật (`LOADING_STEPS`): Lệnh xuất → (số cont + seal) → **SI** (ba-spec [72](../app-map/72-export-order-and-si.ba-spec.md), ngay sau số cont + seal; máy chủ đã chạy 0103) → Sơ đồ container → Hình ảnh đóng cont → Tờ khai | Cả các mục Xong / Không áp dụng **và** hàng Số cont + seal Xong (`containerSealState`): số container + seal hợp lệ (`containerIdentityOk`; xe tải: biển số) **và có ≥ 1 ảnh cont / seal** (từ 04/11/2026, Phòng KH yêu cầu; đóng ghép, máy chủ chưa chạy 0103, chuyến tạo trước 05/11/2026 đã có B/L hoặc đã xong 4 mục cũ + số ⇒ không bắt ảnh — `containerSealPhotoRequired`); mới có số hoặc ảnh ⇒ Đang làm. Lệnh xuất Xong khi có file — xuất Word từ **Lập lệnh xuất** là đủ. SI (`shippingInstructionState`) Xong khi có file SI; xe tải / đóng ghép ⇒ Không áp dụng; chuyến tạo trước 05/11/2026 đã xong bước 4 cũ hoặc có B/L ⇒ Không áp dụng nhưng vẫn lập SI được (lập xong ⇒ Xong) — `shippingInstructionExemption` cho lý do | Kế hoạch: lệnh xuất, SI, tờ khai, số cont + seal, file booking. **Bộ phận đóng cont**: sơ đồ, ảnh, ảnh cont / seal |
 | 4 · (không chặn) | Booking (12 trường + file booking, ba-spec [71](../app-map/71-export-booking-details.ba-spec.md)) · Thông tin xe vận chuyển · Số lượng thực đóng · Hình ảnh bao bì + cân gross | Không tính vào bước 4. Thông tin xe chỉ lưu khi đủ 4 ô bắt buộc (công ty vận chuyển, nơi lấy rỗng, nơi đóng, nơi hạ bãi) | Kế hoạch (booking, thông tin xe; bộ phận đóng cont chỉ xem) · **Bộ phận đóng cont** (số thực đóng, ảnh) |
@@ -152,7 +155,8 @@ flowchart LR
 | Invoice / PL | Đầu trang kê mọi cont; Packing list mỗi cont một nhóm + dòng cộng; cộng các cont == tổng invoice | `buildInvoiceDocument` (`containerTotals`) |
 | SI | Mỗi cont: số, seal, loại, số kiện, gross; 2 cont đầu ở A33–A36, cont thứ 3 trở đi ghi thêm ở A36 / C35 | `siContainerRows` · `fillShippingInstruction` |
 | Độ phủ HĐ, báo cáo | Đếm **cont**, không đếm chuyến | `containerCountOf` · `contractCoverage` · `buildExportReport` |
-| Gộp chuyến | Lịch chia 2 chuyến mà booking ra một lần: chuyến cùng HĐ, chưa file, chưa bước Xong, không khác booking ⇒ **Gộp làm cont thêm** (hàng đi theo, một Hoàn tác) | `mergeShipmentGate` · `mergeShipmentInto` |
+| Gộp chuyến | Lịch chia 2 chuyến mà booking ra một lần: chuyến cùng HĐ, chưa file, chưa bước Xong, không khác booking ⇒ **Gộp làm cont thêm** (hàng, cont thêm, lệnh SX gắn chuyến đi theo; một Hoàn tác). Chuyến kia **không xóa** (v1.1, 06/11): giữ bản ghi (kg, booking, mục bước như lúc nhập), trạng thái "Đã gộp làm cont thêm của chuyến …" (hủy + dấu chuyến chung ⇒ mọi luật bỏ chuyến hủy vẫn đúng) | `mergeShipmentGate` · `mergeShipmentInto` |
+| Tách cont ra chuyến riêng | Gộp nhầm ⇒ khối **Cont thêm gộp từ chuyến khác** ở chuyến chung (hoặc nút trên bản ghi đã gộp) → **Tách ra chuyến riêng**: mở lại đúng bản ghi cũ (số cont / seal / loại / ngày đóng theo cont lúc tách), dòng hàng của cont đó, ảnh cont / seal của cont đó, lệnh SX đã chuyển sang quay về; Hoàn tác được. Chặn khi chuyến đã gửi chứng từ / tiền về, Commercial Invoice Xong, đã đính SI, hoặc cont đã bỏ — kể lý do. Quyền Sửa + Xóa | `splitContainerGate` · `splitMergedContainer` · `shipmentGoodsLock` |
 | Đã giao, tiền về, trễ | Không đổi — theo chuyến (invoice), chuyến gộp nhiều HĐ theo dòng | — |
 | Người đóng hàng | Xem cont, điền số thực đóng, đính ảnh từng cont; **không** thêm cont, không đổi cont của dòng (trigger 0106) | `export_shipment_lines_loading_guard` |
 
@@ -202,6 +206,8 @@ sequenceDiagram
 - Chuyến chưa có hàng ⇒ hộp lấy sẵn dòng hàng của HĐ; để trống = dòng đó không đóng vào chuyến.
 - Bộ phận đóng cont chỉ ghi số thực đóng (thêm dòng từ dòng HĐ được, không ghi kế hoạch, kg gross, hạn dùng, ghi chú, không xóa) — trigger `export_shipment_lines_loading_guard` (0096 → 0098).
 - Phòng KH lưu Hàng của chuyến để trống kế hoạch ⇒ dòng đóng cont đã điền vẫn giữ (`linesFromDraft`).
+- Dòng ghi nhầm (kể cả dòng bộ phận đóng cont thêm nhầm): người có quyền `export-plans` **Xóa** mở **Hàng của chuyến** → nút xóa ở dòng (hỏi lại) → **Lưu** (có Hoàn tác, nhật ký ghi tên dòng + số thực đóng). Chặn khi hàng đã vào chứng từ: gửi chứng từ / tiền về, Commercial Invoice **Xong**, đã đính SI — hộp nói vì sao và cách mở lại (`removeShipmentLineGate` · `shipmentGoodsLock`). Trigger đóng cont (0096 → 0106) không đổi.
+- Đóng cont điền số thêm dòng mới ⇒ người không có quyền Xóa không có Hoàn tác (không gỡ được dòng), toast chỉ cách: báo Phòng KH xóa ở Hàng của chuyến; người có quyền Xóa thì có Hoàn tác.
 
 ## 4. Danh sách chọn (ba-spec 62)
 
@@ -272,6 +278,7 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 
 ## Lịch sử
 
+- 2026-11-06 — audit gỡ được: xóa lần gia hạn, gộp cont thêm không mất + tách lại, xóa dòng hàng của chuyến, bỏ gắn lệnh ở chuyến.
 - 2026-11-06 — §2d một lần xuất nhiều HĐ = một chuyến (ba-spec 74).
 - 2026-11-05 — §2c chuyến nhiều cont (ba-spec 73, mig 0106).
 

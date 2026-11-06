@@ -56,6 +56,23 @@ export function buildMonthlyStockTour(ctx: MonthlyStockTourContext): PageTour {
         "Hộp xem trước cho chọn Năm và Kho, kèm số dòng từng tháng. Một file là một kho: chọn ĐÚNG kho của file, đừng theo mặc định Kho 1500 tấn. Nạp nhầm kho sẽ tạo bản sao ở kho khác và Tất cả kho bị cộng đôi.\n" +
         "Nạp lại cùng file, cùng năm, cùng kho chỉ cập nhật, không nhân đôi. Hệ thống không chép tồn cuối của file: nạp xong, mở tháng đầu rồi chọn Dồn sang tháng sau lần lượt từng tháng để tồn đầu các tháng sau đúng.",
     });
+    steps.push({
+      id: "import-nxt",
+      target: "monthly-stock-nxt-import",
+      optional: true,
+      title: "Nạp báo cáo XNT của kế toán",
+      body:
+        "Chọn Nạp báo cáo XNT rồi chọn file PDF hoặc Excel \"Báo cáo xuất nhập tồn\" in từ phần mềm kế toán. Một file là một kho, trọn một tháng (từ ngày 01 tới ngày cuối tháng).\n" +
+        "Hộp xem trước kiểm chính file trước: đọc đủ số mã, tổng khớp dòng SL mặt hàng, mọi dòng cân. File lỗi thì báo đỏ và không nạp.\n" +
+        "Sau đó so từng mã kế toán với dòng sổ cùng tháng, cùng kho. Mỗi mã có một tình trạng:\n" +
+        "• Khớp: tồn đầu bằng nhau, chỉ điền nhập và xuất.\n" +
+        "• Mã mới: tồn đầu 0, sổ chưa có dòng, hệ thống thêm dòng mới (tên sửa được).\n" +
+        "• Lệch tồn đầu: phải chọn Theo file, Giữ sổ hoặc Bỏ mã này.\n" +
+        "• Chưa có dòng sổ: file có tồn đầu nhưng chưa ghép được dòng sổ nào (không dòng nào có đúng số đó). Sổ có lô này thì chọn ở ô Ghép mã với dòng sổ (cảnh báo gợi ý các dòng tên gần giống); chưa có thì chọn Theo file để thêm dòng, hoặc Bỏ mã này.\n" +
+        "• File không cân: chỉ được Bỏ mã này, sửa file rồi nạp lại.\n" +
+        "Lần đầu, hệ thống gợi ý ghép theo số tồn đầu trùng nhau (nhãn gợi ý theo số), kiểm lại rồi đổi nếu sai. Nạp xong, mã kế toán lưu trên dòng sổ và đi theo khi dồn tháng, nên tháng sau tự khớp.\n" +
+        "Còn chỗ chưa chọn thì nút Nạp liệt kê ra, không ghi. Có ghi đè số đang có thì chọn Nạp lần nữa để xác nhận. Ghi xong vẫn Hoàn tác được.",
+    });
   }
 
   steps.push(

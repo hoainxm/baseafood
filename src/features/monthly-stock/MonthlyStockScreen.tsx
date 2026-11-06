@@ -9,6 +9,9 @@ import { MONTHLY_STOCK_CATEGORIES, BSF1_WAREHOUSES, STORAGE_KIND_LABELS } from "
 import { useMonthlyStock, useMaterialTypes, useProducts, useStorageLocations } from "@/lib/catalogRepo";
 import { usePageTour } from "@/features/shared/PageTourProvider";
 import { buildMonthlyStockTour } from "./monthlyStockTour";
+import { NxtImportDialog, useNxtImportForm } from "./NxtImportDialog";
+import { NXT_FILE_ACCEPT, readNxtReportFile } from "@/lib/nxtReportFile";
+import { warehouseOfReport } from "@/lib/nxtStockImport";
 import { uid } from "@/lib/db";
 import { chuan0, num, formatDateVN } from "@/lib/format";
 import {
@@ -1079,6 +1082,28 @@ export default function MonthlyStockScreen() {
     );
   };
 
+  // ---------- Nạp báo cáo Xuất–Nhập–Tồn (PDF / Excel của phần mềm kế toán) ----------
+  const nxtFileRef = useRef<HTMLInputElement>(null);
+  const nxtImport = useNxtImportForm();
+  const loadNxtFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const report = await readNxtReportFile(file);
+      const fromFile = warehouseOfReport(report.warehouseText);
+      nxtImport.open(file.name, report, fromFile || (warehouse !== ALL_WAREHOUSES ? warehouse : DEFAULT_WAREHOUSE), TEMPORARY_GOODS_CATEGORY);
+    } catch (err) {
+      notify.error(`Không đọc được báo cáo: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  const commitNxtImport = (next: MonthlyStockLine[], message: string, toMonth: string, toWarehouse: string) => {
+    writeLines(next, "nxt-import");
+    setMonth(toMonth);
+    setWarehouse(toWarehouse);
+    notify.saved(message);
+  };
+
   // ---------- Nhập Excel bảng kê ----------
   const pickFile = () => fileRef.current?.click();
   const loadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1536,6 +1561,7 @@ export default function MonthlyStockScreen() {
     <div className="space-y-4">
       <h1 className="sr-only">Sổ kho theo tháng</h1>
       <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={loadFile} />
+      <input ref={nxtFileRef} type="file" accept={NXT_FILE_ACCEPT} className="hidden" onChange={loadNxtFile} />
       {!allowed.create && !allowed.update && <ReadOnlyBadge />}
       {/* Bộ lọc: tháng + kho + nhóm hàng + ô tra (ba-spec 53); nút của trang cuối hàng lọc */}
       <FilterBar
@@ -1551,6 +1577,17 @@ export default function MonthlyStockScreen() {
               >
                 <Upload className="mr-2 h-4 w-4" />
                 Nhập Excel bảng kê
+              </Button>
+            )}
+            {allowed.import && (
+              <Button
+                data-tour="monthly-stock-nxt-import"
+                variant="outline"
+                onClick={() => nxtFileRef.current?.click()}
+                title="Đọc báo cáo Xuất–Nhập–Tồn của phần mềm kế toán (PDF hoặc Excel, một kho · trọn một tháng), so từng mã với sổ rồi mới ghi. Mọi chỗ lệch đều báo rõ và phải chọn cách xử."
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Nạp báo cáo XNT
               </Button>
             )}
             {allowed.update && (
@@ -2306,6 +2343,14 @@ export default function MonthlyStockScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <NxtImportDialog
+        state={nxtImport}
+        lines={lines}
+        warehouseOptions={SYSTEM_WAREHOUSES}
+        categoryOptions={categoryOptions(TEMPORARY_GOODS_CATEGORY)}
+        onCommit={commitNxtImport}
+      />
 
       {/* Dialog nhập Excel bảng kê */}
       <Dialog open={!!loadForm} onOpenChange={(o) => !o && setLoadForm(null)}>

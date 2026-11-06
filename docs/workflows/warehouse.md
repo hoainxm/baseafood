@@ -1,10 +1,10 @@
 # Kho — sơ đồ workflow
 
 > Load khi: review / kiểm lại các trang Kho dự trữ (`/warehouse`), Sổ kho theo tháng (`/monthly-stock`), Mã lô QR (`/qr`), Nhập xuất tồn kho (`/nxt-warehouse`). Trước khi sửa luật duyệt nhập kho, tồn theo lô, dồn tồn tháng, tem QR. Bản đọc nhanh — luật đầy đủ ở ba-spec [34](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [36](../app-map/36-so-kho-thang.md) · [spec qr-truy-xuat-lo](../spec/qr-truy-xuat-lo.md).
-covers: src/features/warehouse/*, src/features/monthly-stock/*, src/features/qr/*, src/features/reports/WarehouseNxtScreen.tsx, src/lib/inventory.ts, src/lib/lotTraceability.ts, src/lib/monthlyStock*.ts, src/lib/frozenStockLines.ts, src/lib/nxtExcel.ts
+covers: src/features/warehouse/*, src/features/monthly-stock/*, src/features/qr/*, src/features/reports/WarehouseNxtScreen.tsx, src/lib/inventory.ts, src/lib/lotTraceability.ts, src/lib/monthlyStock*.ts, src/lib/frozenStockLines.ts, src/lib/nxtExcel.ts, src/lib/nxtStockImport.ts, src/lib/nxtReportFile.ts
 tours: src/features/warehouse/warehouseTour.ts, src/features/monthly-stock/monthlyStockTour.ts, src/features/qr/qrTour.ts, src/features/reports/warehouseNxtTour.ts
 guides: src/features/shared/guideContent.tsx, src/features/shared/guides/warehouseNxtGuide.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-06
 ttl_days: 90
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ).
@@ -63,6 +63,7 @@ flowchart LR
 | 3a · Dồn tháng | **Dồn sang tháng sau** (đẩy, mọi kho) hoặc **Kế thừa & lưu vào sổ** (kéo, ở banner xem trước của tháng trống) | Tồn đầu tháng đích = tồn cuối tháng nguồn. Chỉ dòng có tồn cuối kg ≠ 0. Id `carry|<id nguồn>` nên chạy lại chỉ cập nhật, không nhân đôi (`carryForwardIntoLedger`) | Kế toán |
 | 3b · Thao tác dòng | Hộp: Lấy ra sử dụng · Nhập thêm · Gửi kho ngoài | Lấy ra bị chặn khi vượt tồn cuối. Gửi kho ngoài không đổi tổng tháng (`applyLotAction`) | Kế toán |
 | 3c · Nạp Excel | "Nhập Excel bảng kê", mỗi sheet một tháng | Nạp lại cùng file và cùng kho chỉ cập nhật. Phải chọn đúng kho: mã kho nằm trong id dòng (`loadedRowId`), nhầm kho là cộng đôi | Kế toán |
+| 3d · Nạp báo cáo XNT | "Nạp báo cáo XNT": file PDF / Excel "Báo cáo xuất nhập tồn" của phần mềm kế toán, một kho · trọn một tháng | File phải tự đúng (đủ số mã, tổng khớp "SL mặt hàng", dòng cân) mới nạp (`checkNxtReport`). Từng mã so với dòng sổ cùng tháng + kho (`buildNxtPlan`): **Khớp** điền nhập/xuất · **Mã mới** thêm dòng · **Lệch tồn đầu** / **Chưa có dòng sổ** / **File không cân** PHẢI chọn Theo file · Giữ sổ · Bỏ mã này, còn chỗ chưa chọn hoặc tồn cuối âm thì không ghi (`listNxtBlockers`). Nhập/xuất ghi THAY theo file; mã kế toán lưu trên dòng (`accountingCode`, mig 0107), dồn tháng mang theo. Theo file + file nhiều hơn ⇒ dòng điều chỉnh `nxt-adj|…`; sổ nhiều hơn ⇒ xuất điều chỉnh trên lô (`applyNxtPlan`) | Kế toán (quyền Nhập `monthly-stock`) |
 | 4 · Nhập xuất tồn kho | "Nhập Excel báo cáo" (mẫu 10 cột), lọc Kho / chi nhánh · Kỳ báo cáo · Kho lưu | Tồn cuối = tồn đầu + nhập − xuất, tính ra từng mã. **Tạo kỳ kế tiếp** lấy tồn cuối kỳ này làm tồn đầu kỳ mới; kỳ mới phải có khoảng ngày, đến ngày không trước từ ngày, khác kỳ đang xem (`saveNewPeriod`) | Người có quyền Nhập (`nxt-warehouse`) |
 
 Hàng đông lạnh do xưởng ghi ở `/wip` vào sổ tháng ở nhóm "Hàng tạm" (id bắt đầu `wip|`, `TEMPORARY_GOODS_CATEGORY`). Dòng hiện nhãn "Từ SX · ‹xưởng›". Đừng ghi trùng với "Gửi đông" của Cân đối: cùng một lô vào hai nơi là cộng đôi.
@@ -77,7 +78,7 @@ sequenceDiagram
   XU->>TK: Mẻ BTP ở trạng thái Chờ nhập kho, kèm tem QR
   TK->>TK: Quản đốc quét tem, đối chiếu kg và block thực, Duyệt nhập kho
   TK-->>KT: Tồn dự trữ theo lô, hàng đông lạnh vào nhóm Hàng tạm
-  KT->>KT: Cuối tháng Dồn sang tháng sau, nạp Excel bảng kê, đối chiếu lệch
+  KT->>KT: Cuối tháng Dồn sang tháng sau, nạp Excel bảng kê hoặc báo cáo XNT, đối chiếu lệch
   KT->>KT: Nhập xuất tồn kho: Tạo kỳ kế tiếp
 ```
 

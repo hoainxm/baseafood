@@ -589,6 +589,22 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             </li>
           </Step>
         </Section>
+        <Section title="Cuối tháng: nạp báo cáo XNT của kế toán">
+          <Step>
+            <li>Chọn <b>Nạp báo cáo XNT</b>, chọn file PDF hoặc Excel "Báo cáo xuất nhập tồn" (một kho, trọn một tháng).</li>
+            <li>Soát dòng kiểm file: phải đọc đủ số mã và tổng khớp dòng <b>SL mặt hàng</b>. File lỗi thì không nạp được.</li>
+            <li>
+              Mỗi mã có tình trạng: <b>Khớp</b> (chỉ điền nhập, xuất) · <b>Mã mới</b> (thêm dòng) · <b>Lệch tồn đầu</b> ·{" "}
+              <b>Chưa có dòng sổ</b> · <b>File không cân</b>. Ba tình trạng sau phải chọn <b>Theo file</b>, <b>Giữ sổ</b> hoặc <b>Bỏ mã này</b>.
+            </li>
+            <li>Mã ghép theo gợi ý (nhãn <b>gợi ý theo số</b>) thì kiểm lại; sai thì đổi ở ô <b>Ghép mã … với dòng sổ</b>.</li>
+            <li>Chọn <b>Nạp</b>. Còn chỗ chưa chọn thì app liệt kê, chưa ghi. Có ghi đè số cũ thì bấm Nạp lần nữa để xác nhận.</li>
+          </Step>
+          <p>
+            Nhập, xuất ghi thay theo file nên nạp lại cùng file không nhân đôi. Mã kế toán lưu trên dòng sổ, dồn tháng mang theo, tháng
+            sau tự khớp. Ghi xong vẫn Hoàn tác được.
+          </p>
+        </Section>
         <Section title="Lấy hàng ra sử dụng (xuất)">
           <Step>
             <li>Tìm dòng hàng (gõ tên / invoice / vị trí vào ô <b>Tìm mặt hàng</b>).</li>

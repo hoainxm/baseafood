@@ -1385,6 +1385,8 @@ export const MONTHLY_STOCK_TABLE: TableMapping<MonthlyStockLine> = {
     carried_from_id: x.carriedFromId,
     sort_order: x.sortOrder,
     note: x.note,
+    // Migration 0107 — chỉ gửi khi có mã: máy chủ chưa chạy 0107 thì dòng thường vẫn lên được.
+    ...(x.accountingCode ? { accounting_code: x.accountingCode } : {}),
   }),
   fromRow: (r) => ({
     id: s(r.id),
@@ -1407,6 +1409,7 @@ export const MONTHLY_STOCK_TABLE: TableMapping<MonthlyStockLine> = {
     carriedFromId: s(r.carried_from_id),
     sortOrder: Number(r.sort_order ?? 0),
     note: s(r.note),
+    accountingCode: s(r.accounting_code),
   }),
   // Dòng ghi từ bản app trước khi có sổ tháng: vá field mới để không NaN/undefined.
   patchLegacy: (x) => ({

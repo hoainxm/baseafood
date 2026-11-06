@@ -961,6 +961,11 @@ export interface MonthlyStockLine {
   carriedFromId: string; // id dòng nguồn khi tạo bằng dồn kỳ; rỗng = nhập tay
   sortOrder: number;
   note: string;
+  /**
+   * MÃ KẾ TOÁN của lô (VD "PXĐ.BTNL.TĐ 1001") — khóa ghép với báo cáo Xuất–Nhập–Tồn của phần
+   * mềm kế toán (nạp XNT, `lib/nxtStockImport.ts`). Dồn kỳ mang theo. Rỗng = chưa ghép. Migration 0107.
+   */
+  accountingCode?: string;
 }
 
 /**

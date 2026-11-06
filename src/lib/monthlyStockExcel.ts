@@ -374,6 +374,7 @@ export function mergeReload(lines: MonthlyStockLine[], incoming: MonthlyStockLin
       ...m,
       storageLocation: m.storageLocation || prev.storageLocation || "",
       note: m.note || prev.note || "",
+      ...(prev.accountingCode ? { accountingCode: prev.accountingCode } : {}),
     };
   });
   const staleNonEmpty: MonthlyStockLine[] = [];

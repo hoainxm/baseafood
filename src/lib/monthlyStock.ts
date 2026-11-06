@@ -601,6 +601,7 @@ export function buildCarryForwardLines(source: MonthlyStockRow[], targetMonth: s
       carriedFromId: r.id,
       sortOrder: r.sortOrder,
       note: "",
+      ...(r.accountingCode ? { accountingCode: r.accountingCode } : {}),
     }));
 }
 
@@ -649,7 +650,10 @@ export function carryForwardIntoLedger(lines: MonthlyStockLine[], targetMonth: s
     if (c) {
       existing.add(l.id);
       updatedCount++;
-      result.push(l.openKg === c.openKg && l.openCtn === c.openCtn ? l : { ...l, openKg: c.openKg, openCtn: c.openCtn });
+      // Mã kế toán: dòng đích chưa có thì nhận của nguồn (ghép một lần, các tháng sau tự khớp).
+      const code = l.accountingCode || c.accountingCode;
+      const same = l.openKg === c.openKg && l.openCtn === c.openCtn && (l.accountingCode ?? "") === (code ?? "");
+      result.push(same ? l : { ...l, openKg: c.openKg, openCtn: c.openCtn, ...(code ? { accountingCode: code } : {}) });
       continue;
     }
     if (l.period !== targetMonth || !l.id.startsWith("carry|")) {

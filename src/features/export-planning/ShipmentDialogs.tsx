@@ -41,6 +41,7 @@ import {
   filesOfStep,
   isContainerKind,
   normalizeContainerNo,
+  deleteDocumentGate,
   isRequiredDocumentItem,
   termsOf,
   requiredDocumentLabel,
@@ -901,11 +902,16 @@ export function StepItemDialog({
       hasRequiredFields
       footer={
         <>
-          {/* Chứng từ khách yêu cầu (theo HĐ) không xóa được — chỉ đánh Không áp dụng kèm lý do (R5/R6, XK-07). */}
-          {canDelete && tgt && !tgt.isNew && item?.step === "document" && !isRequiredDocumentItem(termsOf(data, tgt.contractId), item) && (
+          {/* Chuyến không có chứng từ này (kể cả chứng từ HĐ yêu cầu — chị Thảo 2026-11-06): Xóa, hỏi lại trước, có Hoàn tác.
+              Không xóa: Commercial Invoice (thực xuất tính từ đây), mục đã Xong, mục dùng chung. */}
+          {canDelete && tgt && !tgt.isNew && item && deleteDocumentGate(data, item).ok && (
             <InlineConfirmDelete
               recordDescription={title}
-              title="Bỏ chứng từ thêm tay này khỏi chuyến — hỏi lại trước, có Hoàn tác (file đã đính vẫn giữ trên máy chủ)."
+              title={
+                isRequiredDocumentItem(termsOf(data, tgt.contractId), item)
+                  ? "Chuyến này không có chứng từ hợp đồng yêu cầu này: xóa khỏi chuyến — hỏi lại trước, có Hoàn tác; lưu bản sửa hợp đồng không tự thêm lại."
+                  : "Xóa chứng từ thêm tay này khỏi chuyến — hỏi lại trước, có Hoàn tác (file đã đính vẫn giữ trên máy chủ)."
+              }
               onConfirm={() => {
                 if (!item) return;
                 draft.cancel();

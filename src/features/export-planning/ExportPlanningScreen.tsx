@@ -56,10 +56,8 @@ import {
   documentKindLabel,
   documentItems,
   shipmentKindLabel,
-  REMOVED_DOCUMENT_DEFAULT_REASON,
-  removeDocumentGate,
-  removeDocumentItem,
-  restoreDocumentItem,
+  deleteDocumentGate,
+  newlyRequiredDocumentItems,
   finalReviewGate,
   missingAttachmentKinds,
   validateDeferral,
@@ -287,9 +285,11 @@ export default function ExportPlanningScreen() {
   /** Bước 5: chuyến còn mở chưa khép của HĐ nhận thêm mục chứng từ mà bản hiệu lực mới yêu cầu (R6). */
   const syncDocumentItems = (contractIdToSync: string, items: readonly ExportStepItem[], data = d) => {
     const terms = termsOf(data, contractIdToSync);
+    // Chỉ chứng từ MỚI được yêu cầu (bản trước chưa có) — chứng từ chuyến đã xóa vì không có thì không tự thêm lại.
+    const prevTerms = d.revisions.some((r) => r.contractId === contractIdToSync) ? termsOf(d, contractIdToSync) : null;
     const add = openShipmentsOf(data, contractIdToSync)
       .filter((s) => !isShipmentClosed(data, s, opts))
-      .flatMap((s) => missingDocumentItems(s.id, terms, items, newId));
+      .flatMap((s) => newlyRequiredDocumentItems(s.id, prevTerms, terms, items, newId));
     return add;
   };
 
@@ -858,6 +858,10 @@ export default function ExportPlanningScreen() {
   };
 
   const deleteItem = (item: ExportStepItem) => {
+    if (!deleteDocumentGate(d, item).ok) {
+      notify.error("Commercial Invoice, chứng từ đã Xong hoặc đang dùng chung không xóa được.");
+      return;
+    }
     const prevI = d.items;
     const prevF = d.files;
     if (!store.saveItems(prevI.filter((x) => x.id !== item.id))) return;
@@ -873,28 +877,6 @@ export default function ExportPlanningScreen() {
       }),
     );
     setItemTarget(null);
-  };
-
-  /** Bỏ chứng từ khỏi danh sách của chuyến (Phòng KH 2026-11-06) — mục không xóa, Hiện lại được. */
-  const removeDocument = (item: ExportStepItem) => {
-    if (!removeDocumentGate(d, item).ok) {
-      notify.error("Commercial Invoice, chứng từ đã Xong hoặc đang dùng chung không bỏ được (mở Cập nhật để đổi).");
-      return;
-    }
-    const prevI = d.items;
-    if (!store.saveItems(prevI.map((x) => (x.id === item.id ? removeDocumentItem(x) : x)))) return;
-    const cid = contractIdOfShipment(item.shipmentId);
-    const what = `Bỏ ${itemName(item)} khỏi danh sách chứng từ của chuyến ${shipName(d.shipments.find((x) => x.id === item.shipmentId))} (${REMOVED_DOCUMENT_DEFAULT_REASON.toLowerCase()})`;
-    track(cid, item.shipmentId, "update", what);
-    notify.saved(`Đã bỏ ${itemName(item)} khỏi danh sách — Hiện lại ở cuối bước Bộ chứng từ`, undoTracked(cid, item.shipmentId, what, () => store.saveItems(prevI)));
-  };
-  const restoreDocument = (item: ExportStepItem) => {
-    const prevI = d.items;
-    if (!store.saveItems(prevI.map((x) => (x.id === item.id ? restoreDocumentItem(x) : x)))) return;
-    const cid = contractIdOfShipment(item.shipmentId);
-    const what = `Hiện lại ${itemName(item)} trong danh sách chứng từ của chuyến ${shipName(d.shipments.find((x) => x.id === item.shipmentId))}`;
-    track(cid, item.shipmentId, "update", what);
-    notify.saved(`Đã hiện lại ${itemName(item)}`, undoTracked(cid, item.shipmentId, what, () => store.saveItems(prevI)));
   };
 
   const savePayment = (p: ExportPayment, extra: ExportFile[]): boolean => {
@@ -1605,8 +1587,6 @@ export default function ExportPlanningScreen() {
                   : undefined
               }
               onOpenItem={setItemTarget}
-              onRemoveDocument={removeDocument}
-              onRestoreDocument={restoreDocument}
               onUploadLoading={setLoadingTarget}
               bookingFilesEnabled={bookingFilesEnabled}
               bookingDetailsEnabled={bookingDetailsEnabled}

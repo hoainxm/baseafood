@@ -191,9 +191,10 @@ export const exportPlanningGuide: PageGuide = {
             khách: hàng thành dòng của hợp đồng đó trên chuyến cont, kg từng hợp đồng giữ nguyên, chuyến Đóng ghép bỏ đi (Hoàn tác được).
           </li>
           <li>
-            <b>Bỏ chứng từ chuyến không có</b>: ở bước Bộ chứng từ, hàng chứng từ đó chọn <b>Bỏ khỏi danh sách</b> (được cả chứng từ hợp
-            đồng yêu cầu). Chứng từ rời danh sách, tính Không áp dụng; số, ghi chú, file vẫn giữ; cuối bước có <b>Hiện lại</b>. Hợp đồng
-            không cần chứng từ đó cho mọi chuyến thì sửa Chứng từ khách yêu cầu ở hồ sơ hợp đồng. Commercial Invoice, chứng từ đã Xong / dùng chung không bỏ được.
+            <b>Xóa chứng từ chuyến không có</b>: ở bước Bộ chứng từ, hàng chứng từ đó chọn <b>Cập nhật</b> rồi <b>Xóa</b> trong hộp (được cả
+            chứng từ hợp đồng yêu cầu), xác nhận lại; xóa nhầm thì bấm Hoàn tác. Lưu bản sửa hợp đồng không tự thêm lại. Hợp đồng không cần
+            chứng từ đó cho mọi chuyến thì sửa Chứng từ khách yêu cầu ở hồ sơ hợp đồng. Commercial Invoice, chứng từ đã Xong / dùng chung
+            không xóa được.
           </li>
           <li>
             <b>Có thể trùng lần xuất</b>: một khách có từ 2 chuyến đang mở cùng booking, hoặc cùng ngày đóng mà một chuyến chưa có booking.

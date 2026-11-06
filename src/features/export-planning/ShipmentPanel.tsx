@@ -37,13 +37,11 @@ import {
   type StepNo,
   productionOrderMissingContracts,
   isRemovedDocumentItem,
-  removeDocumentGate,
-  removedDocumentReason,
 } from "@/lib/exportPlanning";
 import { formatDateTimeVN, formatDateVN, formatMoney } from "@/lib/format";
 import { BOOKING_LABELS, TRANSPORT_LABELS, cutoffOverdue, hasTransport, localNowMinute } from "@/lib/exportBooking";
 import type { ExportContract, ExportFile, ExportItemState, ExportLoadingExtraStep, ExportPayment, ExportShipment, ExportStep, ExportStepItem } from "@/types";
-import { Ban, Boxes, Camera, Container, Eye, EyeOff, Layers, ClipboardCheck, ClipboardList, Download, FilePlus2, FileSpreadsheet, FileText, Pencil, Plus, RotateCcw, Send, Ship, Trash2, Truck, Wallet } from "lucide-react";
+import { Ban, Boxes, Camera, Container, Layers, ClipboardCheck, ClipboardList, Download, FilePlus2, FileSpreadsheet, FileText, Pencil, Plus, RotateCcw, Send, Ship, Trash2, Truck, Wallet } from "lucide-react";
 import { loadingCountSummary, shipmentLinesOf } from "@/lib/exportInvoice";
 import { containerLabel, filesOfContainer, isMultiContainer, shipmentContainerSummary, shipmentContainers } from "@/lib/exportContainers";
 import { ShipmentLineSummary } from "./ShipmentGoods";
@@ -150,8 +148,7 @@ export function ShipmentPanel({
   mergedRecord,
   exportGroup,
   onOpenItem,
-  onRemoveDocument,
-  onRestoreDocument,
+
   onUploadLoading,
   onPayment,
   onDeletePayment,
@@ -196,9 +193,7 @@ export function ShipmentPanel({
     differences: { key: string; label: string; values: { value: string; contractNo: string; inUse: boolean; original?: boolean; onUse?: () => void }[] }[];
   };
   onOpenItem: (t: StepItemTarget) => void;
-  /** Bỏ chứng từ khỏi danh sách của chuyến / hiện lại (mục không xóa — Phòng KH 2026-11-06). Không truyền ⇒ không hiện nút. */
-  onRemoveDocument?: (item: ExportStepItem) => void;
-  onRestoreDocument?: (item: ExportStepItem) => void;
+
   onUploadLoading: (t: LoadingUploadTarget) => void;
   onPayment: (t: PaymentTarget) => void;
   onDeletePayment: (p: ExportPayment) => void;
@@ -585,9 +580,8 @@ export function ShipmentPanel({
     );
   };
   const docs = documentItems(data, shipment.id);
-  // Chứng từ đã bỏ khỏi danh sách: không hiện ở danh sách, kê riêng bên dưới (Hiện lại được).
+  // Mục "bỏ khỏi danh sách" bằng nút cũ (06/11) ẩn như đã xóa.
   const shownDocs = docs.filter((x) => !isRemovedDocumentItem(x));
-  const removedDocs = docs.filter((x) => isRemovedDocumentItem(x));
   const payments = data.payments.filter((p) => p.shipmentId === shipment.id).sort((a, b) => a.date.localeCompare(b.date));
   const goTo = (n: StepNo) => document.getElementById(`ship-step-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -921,7 +915,6 @@ export function ShipmentPanel({
         {shownDocs.map((d) => {
           const title = requiredDocumentLabel({ kind: d.docKind, form: d.docForm, issuer: d.docIssuer }, data.documentKinds);
           const st = itemState(data, d);
-          const canRemove = canWrite && !!onRemoveDocument && removeDocumentGate(data, d).ok;
           return (
             <ChecklistRow
               key={d.id}
@@ -929,23 +922,7 @@ export function ShipmentPanel({
               state={st}
               extraTag={d.sharedFromId ? <Tag variant="source">Dùng chung</Tag> : undefined}
               tourMark={isTourStep(5)}
-              actions={
-                <>
-                  {updateButton(() => onOpenItem({ shipment, contractId: contract.id, item: d, isNew: false }), `Cập nhật ${title}: số, ngày, file, trạng thái (${ITEM_STATE_LABELS[st]}).`)}
-                  {canRemove && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      data-tour={isTourStep(5) && d === shownDocs[0] ? "document-remove" : undefined}
-                      onClick={() => onRemoveDocument!(d)}
-                      title={`Chuyến này không có ${title}: bỏ khỏi danh sách (tính Không áp dụng, bước 5 không chờ nữa). Số, ghi chú, file vẫn giữ — Hiện lại được, có Hoàn tác.`}
-                    >
-                      <EyeOff className="mr-1 h-4 w-4" aria-hidden />
-                      Bỏ khỏi danh sách
-                    </Button>
-                  )}
-                </>
-              }
+              actions={updateButton(() => onOpenItem({ shipment, contractId: contract.id, item: d, isNew: false }), `Cập nhật ${title}: số, ngày, file, trạng thái (${ITEM_STATE_LABELS[st]}); chuyến không có chứng từ này thì Xóa trong hộp Cập nhật.`)}
             >
               {itemDetail(d, filesOfItem(data, d.id), title)}
               {d.docKind === "commercial-invoice" && d.netKg != null && (
@@ -957,27 +934,6 @@ export function ShipmentPanel({
             </ChecklistRow>
           );
         })}
-        {removedDocs.length > 0 && (
-          <div className="grid min-w-0 gap-1.5 border-t border-border py-3 text-sm">
-            <span className="text-muted-foreground">Đã bỏ khỏi danh sách ({removedDocs.length}) — tính Không áp dụng:</span>
-            {removedDocs.map((d) => {
-              const title = requiredDocumentLabel({ kind: d.docKind, form: d.docForm, issuer: d.docIssuer }, data.documentKinds);
-              return (
-                <span key={d.id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="break-words">
-                    {title} <span className="text-muted-foreground">· {removedDocumentReason(d)}</span>
-                  </span>
-                  {canWrite && onRestoreDocument && (
-                    <Button size="sm" variant="edit" onClick={() => onRestoreDocument(d)} title={`Đưa ${title} trở lại danh sách chứng từ của chuyến (số, ghi chú, file vẫn còn).`}>
-                      <Eye className="mr-1 h-4 w-4" aria-hidden />
-                      Hiện lại
-                    </Button>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        )}
         {canWrite && (
           <div className="border-t border-border py-3">
             <Button

@@ -573,26 +573,22 @@ export function isRequiredDocumentItem(terms: Pick<ExportContractTerms, "require
   return terms.requiredDocuments.some((w) => sameDoc(item, w));
 }
 
-/* ---------- Bỏ chứng từ khỏi danh sách của chuyến (Phòng KH 2026-11-06) ---------- */
-
-/** Dấu "đã bỏ khỏi danh sách" trong lý do Không áp dụng — không cột mới, mục vẫn còn (Hiện lại được). */
-const REMOVED_DOCUMENT_TAG = "⟦removed⟧";
-export const REMOVED_DOCUMENT_DEFAULT_REASON = "Chuyến này không có chứng từ này";
-
-/** Mục chứng từ đã bỏ khỏi danh sách của chuyến: ẩn khỏi danh sách, tính như Không áp dụng (bước 5 không chờ nó). */
-export const isRemovedDocumentItem = (i: Pick<ExportStepItem, "step" | "state" | "naReason">) =>
-  i.step === "document" && i.state === "not-applicable" && i.naReason.startsWith(REMOVED_DOCUMENT_TAG);
-
-/** Lý do bỏ (chữ cho người đọc). */
-export const removedDocumentReason = (i: Pick<ExportStepItem, "naReason">) => i.naReason.replace(REMOVED_DOCUMENT_TAG, "").trim();
-
-export type RemoveDocumentGate = { ok: true } | { ok: false; reason: "not-document" | "invoice" | "done" | "shared" };
+/* ---------- Xóa chứng từ chuyến không có (Phòng KH 2026-11-06) ---------- */
 
 /**
- * Bỏ được khi là mục chứng từ chưa Xong, không phải mục "dùng chung" (bỏ bằng cách bỏ dùng chung) và không phải Commercial
- * Invoice (thực xuất, khép HĐ tính từ invoice — R7).
+ * Mục đã "bỏ khỏi danh sách" bằng nút cũ (bản b3e2ff7, vài giờ ngày 06/11): Không áp dụng + dấu `⟦removed⟧` trong lý do.
+ * Từ bản sau chứng từ xóa thật trong hộp Cập nhật; mục cũ mang dấu vẫn ẩn như đã xóa (không sửa dữ liệu thật).
  */
-export function removeDocumentGate(d: Pick<ExportData, "items" | "shipments" | "files">, item: ExportStepItem): RemoveDocumentGate {
+export const isRemovedDocumentItem = (i: Pick<ExportStepItem, "step" | "state" | "naReason">) =>
+  i.step === "document" && i.state === "not-applicable" && i.naReason.startsWith("⟦removed⟧");
+
+export type DeleteDocumentGate = { ok: true } | { ok: false; reason: "not-document" | "invoice" | "done" | "shared" };
+
+/**
+ * Xóa được mục chứng từ của chuyến (kể cả chứng từ HĐ yêu cầu — chuyến không có loại đó) khi: chưa Xong, không phải mục
+ * "dùng chung" (bỏ dùng chung trước) và không phải Commercial Invoice (thực xuất, khép HĐ tính từ invoice — R7).
+ */
+export function deleteDocumentGate(d: Pick<ExportData, "items" | "shipments" | "files">, item: ExportStepItem): DeleteDocumentGate {
   if (item.step !== "document") return { ok: false, reason: "not-document" };
   if (item.docKind === "commercial-invoice") return { ok: false, reason: "invoice" };
   if (item.sharedFromId) return { ok: false, reason: "shared" };
@@ -601,16 +597,18 @@ export function removeDocumentGate(d: Pick<ExportData, "items" | "shipments" | "
 }
 
 /**
- * Bỏ chứng từ khỏi danh sách của MỘT chuyến — cả chứng từ hợp đồng yêu cầu. Mục KHÔNG xóa: số, ngày, ghi chú, file giữ
- * nguyên; trạng thái Không áp dụng + dấu bỏ ⇒ ẩn khỏi danh sách, lưu bản sửa HĐ cũng không tự thêm lại (mục còn đó).
+ * Lưu bản sửa / sửa HĐ: chuyến đang mở chỉ nhận mục chứng từ MỚI được yêu cầu (bản trước chưa yêu cầu) — chứng từ đã yêu
+ * cầu từ trước mà chuyến không có là chuyến đã xóa có chủ đích, không tự thêm lại.
  */
-export function removeDocumentItem(item: ExportStepItem, reason = ""): ExportStepItem {
-  return { ...item, state: "not-applicable", naReason: `${REMOVED_DOCUMENT_TAG} ${reason.trim() || REMOVED_DOCUMENT_DEFAULT_REASON}` };
-}
-
-/** Hiện lại chứng từ đã bỏ: về Chưa làm (số, ngày, file vẫn còn nên tự lên Đang làm / Xong như cũ). */
-export function restoreDocumentItem(item: ExportStepItem): ExportStepItem {
-  return { ...item, state: "not-started", naReason: "" };
+export function newlyRequiredDocumentItems(
+  shipmentId: string,
+  prevTerms: Pick<ExportContractTerms, "requiredDocuments" | "incoterm"> | null,
+  nextTerms: Pick<ExportContractTerms, "requiredDocuments" | "incoterm">,
+  existing: readonly ExportStepItem[],
+  makeId: () => string,
+): ExportStepItem[] {
+  const missing = missingDocumentItems(shipmentId, nextTerms, existing, makeId);
+  return prevTerms ? missing.filter((i) => !isRequiredDocumentItem(prevTerms, i)) : missing;
 }
 
 export function missingDocumentItems(

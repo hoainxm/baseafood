@@ -283,7 +283,8 @@ export function buildExportTour(ctx: ExportTourContext): PageTour {
           "• Sơ đồ container, Hình ảnh đóng cont: tự Xong khi có file.\n" +
           "• Tờ khai: có số tờ khai và file. Lệnh xuất: có file đã có chữ ký Ban Giám đốc.\n" +
           "• Chứng từ bước 5: có số, ngày và file (chứng từ công ty tự cấp không bắt số).\n" +
-          "Không áp dụng phải ghi lý do. Thẻ Dùng chung: mục lấy từ chuyến khác cùng hợp đồng hoặc cùng booking.",
+          "Không áp dụng phải ghi lý do. Thẻ Dùng chung: mục lấy từ chuyến khác cùng hợp đồng hoặc cùng booking.\n" +
+          "Chuyến không có một chứng từ trong danh sách (kể cả chứng từ hợp đồng yêu cầu): chọn Bỏ khỏi danh sách ở hàng đó. Chứng từ rời danh sách, tính Không áp dụng nên bước Bộ chứng từ không chờ nó; số, ghi chú, file vẫn giữ. Cuối bước kê Đã bỏ khỏi danh sách, chọn Hiện lại để đưa về. Commercial Invoice, chứng từ đã Xong hoặc đang dùng chung không bỏ được.",
       }),
     );
     if (can.update) {

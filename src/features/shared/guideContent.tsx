@@ -388,10 +388,33 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
           Trang theo dõi hàng bán thành phẩm đã cấp đông cất trong kho dự trữ, chờ
           gom đủ đơn đặt để xuất.
         </p>
-        <Y>
-          <li>Duyệt các đợt nhập kho.</li>
-          <li>Theo dõi lượng tồn đông còn lại theo mặt hàng.</li>
-        </Y>
+        <Section title="Hai trạng thái của một lô">
+          <Y>
+            <li>
+              <b>Chờ nhập kho</b>: xưởng đã ghi mẻ ở Sản xuất, chưa tính vào tồn. Xong bước này khi thủ kho bấm{" "}
+              <b>Duyệt nhập kho</b>, chọn kho, gõ kg và block thực.
+            </li>
+            <li>
+              <b>Đã nhập kho</b>: tính vào tồn, từ đây mới xuất, bán lẻ hoặc đóng gói được. Số xưởng ghi vẫn được giữ để đối
+              chiếu với số kho nhận.
+            </li>
+          </Y>
+        </Section>
+        <Section title="Duyệt nhầm thì hủy duyệt">
+          <Step>
+            <li>
+              Ở bảng tồn, chọn <b>Xem</b> ở dòng lô. Hộp chi tiết ghi số <b>Kho nhận</b>, số <b>Xưởng ghi</b>, đã xuất / còn.
+            </li>
+            <li>
+              Chọn <b>Hủy duyệt nhập kho</b>, xác nhận. Lô về Chờ nhập kho với đúng số xưởng ghi. Toast có nút{" "}
+              <b>Hoàn tác</b> nếu chọn nhầm.
+            </li>
+          </Step>
+          <p className="text-muted-foreground">
+            Lô đã đi thì chưa hủy được: đang nằm trong lệnh xuất (Hủy lệnh xuất ở Đơn đặt trước), đã gắn cho dòng bán / phiếu
+            đóng gói, đã bị bán lẻ hoặc đóng gói trừ vào, hoặc kỳ Cân đối đã hút mẻ. Hộp chi tiết ghi rõ phải sửa ở đâu.
+          </p>
+        </Section>
       </>
     ),
   },
@@ -406,6 +429,37 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
           trữ theo từng đơn rồi lập lệnh xuất container (nhiều block, nhiều quy
           cách).
         </p>
+        <Section title="Trạng thái đơn">
+          <Y>
+            <li>
+              <b>Đang gom</b>: đơn mới tạo, hoặc đã xuất một phần còn thiếu. Việc tiếp: <b>Xác nhận đủ</b> khi gom đủ, hoặc{" "}
+              <b>Lệnh xuất</b> để xuất phần đang có.
+            </li>
+            <li>
+              <b>Đủ</b>: đã xác nhận gom đủ, chưa trừ tồn. Chọn nhầm thì <b>Mở lại đơn</b> về Đang gom.
+            </li>
+            <li>
+              <b>Đã xuất</b>: lệnh xuất đã lấy đủ kg cho mọi dòng.
+            </li>
+          </Y>
+        </Section>
+        <Section title="Làm nhầm thì gỡ ở chi tiết đơn">
+          <Y>
+            <li>
+              <b>Hủy lệnh xuất</b> (mục Lệnh xuất đã lập): ghi lý do rồi xác nhận. Tồn trả về đúng các lô, phiếu bán Xuất khẩu
+              đi kèm bị gỡ khỏi Bán hàng, đơn tính lại trạng thái. Lệnh vẫn hiện với nhãn <b>Đã hủy</b>. Kỳ Cân đối đã hút phiếu
+              bán thì gỡ ở Cân đối trước. Trang còn đang tải sổ Cân đối thì đợi rồi thử lại. Lệnh lập trước 06/11/2026 mà có
+              nhiều phiếu bán giống hệt nhau thì app chỉ trả tồn, không tự gỡ phiếu — vào Bán hàng xóa tay đúng một phiếu.
+            </li>
+            <li>
+              <b>Bỏ kiểm</b> (hộp Kiểm lô bằng quét): quét nhầm thì đưa lô về Chưa quét.
+            </li>
+            <li>
+              <b>Xóa đơn</b>: chỉ khi đơn không còn lệnh xuất đang hiệu lực. Có hỏi lại.
+            </li>
+          </Y>
+          <p className="text-muted-foreground">Mọi thao tác gỡ đều có nút Hoàn tác trong vài giây.</p>
+        </Section>
         <p className="text-muted-foreground">
           Phí xuất khẩu do phòng kế hoạch tính riêng, không tính ở đây.
         </p>

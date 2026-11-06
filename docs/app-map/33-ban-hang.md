@@ -1,6 +1,7 @@
 > Load khi: sửa màn Bán hàng — phiếu bán, dòng bán, quy cách, ghi bù, hoặc hút bán vào cân đối.
 covers: src/features/sales/SalesScreen.tsx, src/features/sales/SalesReport.tsx, src/features/sales/SalesTab.tsx, src/types.ts, src/lib/repo.ts, src/lib/inventory.ts, src/lib/salesTotals.ts
-last_verified: 2026-11-03
+last_verified: 2026-11-06
+<!-- updated: 2026-11-06 — phiếu bán handoff Đơn đặt: lệnh xuất mới đặt `sales_invoices.id` = id lệnh xuất (liên kết tất định, không thêm cột; `ORDER_HANDOFF_SOURCE` = "Đơn đặt"). **Hủy lệnh xuất** ở Đơn đặt gỡ phiếu + dòng bán đi kèm (như Xóa phiếu ở đây; lệnh cũ dò phiếu theo khách · ngày giao = ngày xuất · bộ mặt hàng × quy cách × kg), chặn khi Cân đối đã hút dòng bán (`balancing_outputs.sales_item_id`) — `lib/orderExportReversal.ts`, sơ đồ docs/workflows/sales.md. `ExportOrderStatus` thêm `cancelled` (types.ts). -->
 <!-- updated: 2026-11-03 — rà UX đợt 2: kỳ chưa có phiếu ⇒ không hiện ba thẻ số "0" (khối trống đã nói đủ); bước tour "Ba chỉ số của kỳ" thành tùy chọn. -->
 <!-- updated: 2026-11-03 — rà UX đợt 1: ô chọn kỳ của Sổ bán hàng và Báo cáo = `PeriodPicker` chung (nhãn "Kỳ xem", nút ‹ › lùi / tới kỳ, "Đang xem: Tháng 11/2026"). -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): Sổ bán thêm Khách · Kênh bán · ô Tra; Báo cáo thêm Khách · Kênh (rowMarkKey ghép lọc). Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->

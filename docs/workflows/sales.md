@@ -1,10 +1,10 @@
 # Kinh doanh — sơ đồ workflow
 
 > Load khi: review / kiểm lại trang Bán hàng (`/sales`) và Đơn đặt (`/orders`), trước khi sửa luật phiếu bán, ghi bù, trừ tồn, lệnh xuất. Bản đọc nhanh — luật đầy đủ ở [33-ban-hang](../app-map/33-ban-hang.md) · ba-spec [34](../app-map/34-btp-san-xuat-kho.ba-spec.md) · [53](../app-map/53-filters.ba-spec.md).
-covers: src/features/sales/*, src/features/orders/*, src/lib/salesTotals.ts, src/lib/inventory.ts
+covers: src/features/sales/*, src/features/orders/*, src/lib/salesTotals.ts, src/lib/inventory.ts, src/lib/orderExportReversal.ts
 tours: src/features/sales/salesTour.ts, src/features/orders/ordersTour.ts
 guides: src/features/shared/guideContent.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-06
 ttl_days: 90
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ).
@@ -21,8 +21,10 @@ stateDiagram-v2
   collecting --> complete: Xác nhận đủ
   collecting --> closed: Lệnh xuất lấy đủ số kg đặt
   complete --> closed: Lệnh xuất lấy đủ số kg đặt
-  complete --> collecting: Lệnh xuất mà còn thiếu
+  complete --> collecting: Lệnh xuất mà còn thiếu · Mở lại đơn
   collecting --> collecting: Lệnh xuất mà còn thiếu
+  closed --> collecting: Hủy lệnh xuất, còn thiếu
+  collecting --> [*]: Xóa đơn (không còn lệnh hiệu lực)
   state "Đang gom" as collecting
   state "Đủ" as complete
   state "Đã xuất" as closed
@@ -31,8 +33,21 @@ stateDiagram-v2
 | Trạng thái | Nghĩa | Sang bước sau khi | Ai làm | Code |
 |---|---|---|---|---|
 | Đang gom | Đơn mới, còn thiếu hàng so với số đã đặt | Bấm **Xác nhận đủ**; hoặc **Lệnh xuất (một phần được)** lấy đủ kg đặt của mọi dòng | Người có quyền Sửa (xác nhận) / Thêm (lệnh xuất) trên Đơn đặt | `STATUS_LABELS` · `confirmFulfilled` |
-| Đủ | Đã đánh dấu gom đủ hàng, chưa xuất kho | **Lệnh xuất**: đủ kg ⇒ Đã xuất; còn thiếu ⇒ quay về Đang gom | Người có quyền Thêm | `createExportOrder` |
-| Đã xuất | Đơn đóng, ẩn hai nút Xác nhận đủ và Lệnh xuất | — | — | `createExportOrder` (đủ khi còn lại ≤ 0,001 kg) |
+| Đủ | Đã đánh dấu gom đủ hàng, chưa xuất kho | **Lệnh xuất**: đủ kg ⇒ Đã xuất; còn thiếu ⇒ quay về Đang gom. Bấm nhầm Xác nhận đủ ⇒ **Mở lại đơn** về Đang gom (không đụng tồn, có Hoàn tác) | Người có quyền Thêm (lệnh xuất) / Sửa (mở lại) | `createExportOrder` · `reopenOrder` · `canReopenOrder` |
+| Đã xuất | Đơn đóng, ẩn hai nút Xác nhận đủ và Lệnh xuất | Hủy lệnh xuất làm đơn thiếu lại ⇒ về Đang gom | — | `createExportOrder` (đủ khi còn lại ≤ 0,001 kg) · `orderStatusFromExports` |
+
+Sau lệnh xuất, mỗi dòng đơn so `requiredQuantityKg` với số đã xuất (`exportedKg`). Còn thiếu dòng nào ⇒ đơn vẫn **Đang gom**.
+
+### Lệnh xuất: Đã lập → Đã hủy
+
+| Trạng thái lệnh | Nghĩa | Sang bước sau khi | Ai làm | Code |
+|---|---|---|---|---|
+| Đã lập (`closed`) | Dòng lệnh đã trừ tồn từng lô; phiếu bán kênh Xuất khẩu mang **đúng id của lệnh** (lệnh lập trước 06/11/2026: dò phiếu cùng khách · ngày giao = ngày xuất · đủ bộ mặt hàng × quy cách × kg · nguồn "Đơn đặt") | **Hủy lệnh xuất** ở mục Lệnh xuất đã lập: ghi **Lý do hủy** (bắt buộc, có nháp), xác nhận | Người có quyền Xóa ở **cả** Đơn đặt **lẫn** Bán hàng (mặc định: Kế toán trưởng) | `openCancelExport` · `checkExportReversal` · `findLinkedSalesInvoice` |
+| Đã hủy (`cancelled`) | Dòng lệnh bị xóa ⇒ tồn trả về đúng lô, đúng kg; phiếu bán + dòng bán đi kèm bị gỡ; dấu quét kiểm của lệnh bị gỡ. Đầu lệnh còn lại với nhãn **Đã hủy** + ghi chú "Đã hủy ‹ngày› · ‹người›: ‹lý do› (đã trả … kg về … lô, gỡ phiếu bán … dòng)". Đơn tính lại trạng thái theo các lệnh còn hiệu lực | Hết (muốn xuất lại thì lập lệnh mới). Toast **Hoàn tác** trả nguyên mọi sổ | — | `reverseExportOrder` · `orderStatusFromExports` |
+
+Hủy lệnh xuất **bị chặn** khi Cân đối kỳ đã hút dòng bán của phiếu (`balancing_outputs.sales_item_id`) — gỡ dòng ở Cân đối trước — và khi **sổ Cân đối chưa tải xong / lỗi tải** (`balancingOutputsReady`: mảng rỗng lúc đầu không có nghĩa là chưa hút; báo "Đang tải sổ Cân đối… thử lại"). Phiếu bán đã bị xóa ở Bán hàng ⇒ vẫn hủy được, chỉ trả tồn. Lệnh cũ mà dò ra **mơ hồ** (hơn một phiếu giống hệt, hoặc còn lệnh cũ khác chưa hủy cùng khách · ngày · bộ hàng — `resolveLinkedSalesInvoice` kind `ambiguous`) ⇒ hủy chỉ trả tồn, **không tự gỡ phiếu nào**; hộp hủy, toast và ghi chú lệnh nhắc vào Bán hàng xóa tay đúng một phiếu. Giá đã ghi trên dòng bán mất theo phiếu (hộp hủy báo trước số dòng có giá).
+
+**Xóa đơn** (nút trong chi tiết đơn, `ConfirmDelete` + Hoàn tác — không còn nút Bỏ trên dòng bảng): chỉ khi đơn **không còn lệnh xuất hiệu lực**; còn ⇒ báo phải Hủy lệnh xuất trước (`checkOrderDelete`). Đầu lệnh đã hủy đi theo đơn.
 
 Sau lệnh xuất, mỗi dòng đơn so `requiredQuantityKg` với số đã xuất (`exportedKg`). Còn thiếu dòng nào ⇒ đơn vẫn **Đang gom**.
 
@@ -72,8 +87,8 @@ sequenceDiagram
   BH-->>KT: Hút dòng bán trong kỳ vào khối thành phẩm ra
 ```
 
-- Lệnh xuất **không hoàn tác được** (chạm hai sổ cùng lúc), nên có hộp xác nhận. Chưa có tồn khả dụng ⇒ cảnh báo, không tạo gì.
-- **Kiểm lô bằng quét** (quét tem từng block lúc xếp container) là bước thêm sau lệnh xuất, không đổi trạng thái đơn.
+- Lệnh xuất chạm hai sổ cùng lúc nên có hộp xác nhận; lập nhầm thì **Hủy lệnh xuất** (đảo cả hai sổ, xem §1). Chưa có tồn khả dụng ⇒ cảnh báo, không tạo gì.
+- **Kiểm lô bằng quét** (quét tem từng block lúc xếp container) là bước thêm sau lệnh xuất, không đổi trạng thái đơn. Quét nhầm ⇒ **Bỏ kiểm** ở dòng lô (hỏi lại + Hoàn tác): xóa dấu `export_item` của lô trong lệnh, lô về Chưa quét; dòng lệnh, tồn không đổi.
 - Hút vào cân đối là bản sao. Sửa giá ở sổ bán sau khi hút thì bản sao không tự đổi.
 
 ## 5. Ai được làm gì
@@ -116,3 +131,5 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 ## Lịch sử
 
 - 2026-11-03 — tạo.
+- 2026-11-06 (b) — chặn hủy khi sổ Cân đối chưa tải; lệnh cũ khớp mơ hồ không tự gỡ phiếu.
+- 2026-11-06 — gỡ được việc làm nhầm: Hủy lệnh xuất (trả tồn + gỡ phiếu bán, giữ đầu lệnh Đã hủy), Mở lại đơn, Xóa đơn trong chi tiết (chặn khi còn lệnh), Bỏ kiểm lô.

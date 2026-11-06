@@ -628,6 +628,20 @@ export interface WipProductionItem {
   /** Bột tẩm ĐÃ DÙNG cho dòng này theo loại `{ "<tên loại bột>": kg }` (migration
    *  0051). Phụ gia — KHÔNG cộng vào quantityKg. Lưu theo TÊN như còn-dở 0038. */
   batterKg?: Record<string, number>;
+  /** Số XƯỞNG GHI trước khi kho duyệt nhập (migration 0108). Duyệt ghi đè kg/block/kho/ghi
+   *  chú bằng số thực ⇒ chụp bản gốc ở đây để đối chiếu và để Hủy duyệt trả về đúng số.
+   *  undefined = DB/bộ đệm chưa có cột · null = chưa duyệt (hoặc đã hủy duyệt). */
+  preApproval?: WipPreApproval | null;
+}
+
+/** Bản chụp mẻ lúc duyệt nhập kho — xem `WipProductionItem.preApproval`. */
+export interface WipPreApproval {
+  quantityKg: number;
+  blocksCount: number;
+  warehouse: string;
+  note: string;
+  approvedBy: string;
+  approvedAt: string; // ISO
 }
 
 /**
@@ -698,8 +712,9 @@ export function computePackagingLoss(p: Pick<Packaging, "inputKg" | "outputKg">)
 
 /** collecting = đang gom · complete = đủ · closed = đóng (trước mig 0059: dang-gom / du / dong). */
 export type SalesOrderStatus = "collecting" | "complete" | "closed";
-/** open = mở · closed = đóng (trước mig 0059: mo / dong). */
-export type ExportOrderStatus = "open" | "closed";
+/** open = mở · closed = đóng (trước mig 0059: mo / dong) · cancelled = đã hủy (gỡ hết dòng
+ *  lệnh + phiếu bán đi kèm, giữ đầu lệnh làm dấu vết — lib/orderExportReversal.ts). */
+export type ExportOrderStatus = "open" | "closed" | "cancelled";
 
 export interface SalesOrder {
   id: string;

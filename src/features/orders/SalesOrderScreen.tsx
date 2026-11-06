@@ -27,8 +27,18 @@ import {
   usePackagings,
   useLotInputs,
   useLotDispatches,
+  useBalancingOutputs,
   isServerConnected,
 } from "@/lib/catalogRepo";
+import {
+  canReopenOrder,
+  checkExportReversal,
+  checkOrderDelete,
+  isCancelledExport,
+  reverseExportOrder,
+  ORDER_HANDOFF_SOURCE,
+  type ExportReversalData,
+} from "@/lib/orderExportReversal";
 import { listLotsWithStock, computeWipStock, collectWipDeductions } from "@/lib/inventory";
 import { ALL, activeFilterCount, countedLabel, filterRows, matchesSearch, matchesValue, statusOptions } from "@/lib/recordFilters";
 import {
@@ -54,6 +64,7 @@ import {
   RecordTable,
   StatCardGrid,
   ConfirmAction,
+  ConfirmDelete,
   ReadOnlyBadge,
   notify,
   type RecordTableColumn,
@@ -63,10 +74,11 @@ import {
 import { useQuickCatalogEdit } from "@/features/catalog/QuickCatalogEdit";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
-import { useFormDraft } from "@/lib/formDraft";
+import { useDialogDraft, useFormDraft } from "@/lib/formDraft";
+import { recordName } from "@/lib/personName";
 import { useAuth } from "@/lib/auth";
 import { kg, num, todayISO, formatDateVN } from "@/lib/format";
-import { CheckCircle, ClipboardList, Package, PackageCheck, Plus, ScanLine, Truck } from "lucide-react";
+import { Ban, CheckCircle, ClipboardList, Package, PackageCheck, Plus, ScanLine, Trash2, Truck, Undo2 } from "lucide-react";
 import { ExportLotCheck } from "./ExportLotCheck";
 import { readParam } from "@/lib/legacyUrls";
 import { usePageTour } from "@/features/shared/PageTourProvider";
@@ -84,6 +96,11 @@ interface NewOrder {
   note: string;
   rows: NewWeighRow[];
 }
+/** Hộp Hủy lệnh xuất — lý do bắt buộc, có nháp (quy tắc 17). */
+interface CancelExportForm {
+  exportId: string;
+  reason: string;
+}
 
 const STATUS_LABELS: Record<SalesOrder["status"], string> = {
   collecting: "Đang gom",
@@ -96,6 +113,9 @@ export default function SalesOrderScreen() {
   // không thêm/sửa ⇒ nhãn "Chỉ xem".
   const allowed = useCan("orders");
   const isReadOnly = !allowed.create && !allowed.update;
+  // Hủy lệnh xuất gỡ cả phiếu ở sổ Bán hàng ⇒ cần quyền xóa ở CẢ hai khu.
+  const salesAllowed = useCan("sales");
+  const canCancelExport = allowed.delete && salesAllowed.delete;
   const [don, persistDon, { status }] = useSalesOrders();
   const isLoading = status === "loading" && don.length === 0;
   const [orderItems, persistOrderItems] = useOrderItems();
@@ -154,7 +174,8 @@ export default function SalesOrderScreen() {
 
   const [packagings] = usePackagings();
   const [lotInputs] = useLotInputs();
-  const [lotDispatches] = useLotDispatches();
+  const [lotDispatches, persistLotDispatches] = useLotDispatches();
+  const [balancingOutputs, , balancingOutputsMeta] = useBalancingOutputs();
   // Trừ đúng lô đã gắn (truy xuất QR) trước khi lập lệnh FIFO — lệnh không lấy lô đã đi.
   const retailSales = useMemo(
     () => collectWipDeductions(salesItems, packagings, lotInputs, lotDispatches),
@@ -327,7 +348,9 @@ export default function SalesOrderScreen() {
       note: "",
     };
     // Handoff sổ Bán hàng: 1 phiếu bán (kênh Xuất khẩu), mỗi dòng lệnh = 1 dòng bán.
-    const salesInvoiceId = newId();
+    // Phiếu mang ĐÚNG id của lệnh ⇒ Hủy lệnh xuất tìm lại đúng phiếu mà khỏi thêm cột
+    // (lib/orderExportReversal.ts#findLinkedSalesInvoice; lệnh cũ dò theo nội dung).
+    const salesInvoiceId = exportOrderId;
     const salesInvoice: SalesInvoice = {
       id: salesInvoiceId,
       deliveryDate: todayISO(),
@@ -346,7 +369,7 @@ export default function SalesOrderScreen() {
       spec: item.spec,
       quantityKg: item.quantityKg,
       unitPrice: null,
-      sourceWarehouse: "Đơn đặt", // đánh dấu handoff — NXT/tồn kho không đếm hai lần
+      sourceWarehouse: ORDER_HANDOFF_SOURCE, // đánh dấu handoff — NXT/tồn kho không đếm hai lần
     }));
 
     persistExportItems([...exportItems, ...newExportItems]);
@@ -383,16 +406,122 @@ export default function SalesOrderScreen() {
     notify.saved("Đã đánh dấu đơn đủ — bấm Lệnh xuất để xuất container");
   };
 
+  /** Mở lại đơn đã "Xác nhận đủ" về Đang gom (bấm nhầm Xác nhận đủ). */
+  const reopenOrder = (d: SalesOrder) => {
+    if (!canReopenOrder(d)) return;
+    const prevOrders = don;
+    persistDon(don.map((x) => (x.id === d.id ? { ...x, status: "collecting" } : x)));
+    notify.saved(`Đã mở lại đơn ${tenKH(d.customerId)} — về Đang gom`, () => persistDon(prevOrders));
+  };
+
+  /* ---- Xóa đơn: chỉ khi không còn lệnh xuất hiệu lực (còn thì hủy lệnh trước) ---- */
+  const [deletingOrder, setDeletingOrder] = useState<SalesOrder | null>(null);
+  const requestDeleteOrder = (d: SalesOrder) => {
+    const c = checkOrderDelete(d.id, exportOrders);
+    if (!c.ok) {
+      notify.warning(c.reason);
+      return;
+    }
+    setDeletingOrder(d);
+  };
   const deleteOrder = (d: SalesOrder) => {
+    const c = checkOrderDelete(d.id, exportOrders);
+    if (!c.ok) {
+      notify.warning(c.reason);
+      return;
+    }
     const prevOrders = don;
     const prevRows = orderItems;
+    const prevExportOrders = exportOrders;
+    const cancelledIds = new Set(c.cancelledExportIds);
     persistDon(don.filter((x) => x.id !== d.id));
     persistOrderItems(orderItems.filter((x) => x.orderId !== d.id));
+    if (cancelledIds.size) persistExportOrders(exportOrders.filter((x) => !cancelledIds.has(x.id)));
     if (selectedId === d.id) setSelectedId(null);
     notify.deleted(`Đã xóa đơn ${tenKH(d.customerId)}`, () => {
       persistDon(prevOrders);
       persistOrderItems(prevRows);
+      if (cancelledIds.size) persistExportOrders(prevExportOrders);
     });
+  };
+
+  /* ---- Hủy lệnh xuất: trả tồn về đúng lô, gỡ phiếu bán đi kèm, giữ đầu lệnh làm dấu vết ---- */
+  const [cancelling, setCancelling] = useState<CancelExportForm | null>(null);
+  const [cancelErrors, setCancelErrors] = useState<FieldError[]>([]);
+  const cancelDraft = useDialogDraft<CancelExportForm>({
+    form: "orders-export-cancel",
+    value: cancelling,
+    setValue: setCancelling,
+    isEmpty: (v) => !v.reason.trim(),
+  });
+  const reversalData: ExportReversalData = {
+    salesOrders: don,
+    orderItems,
+    exportOrders,
+    exportItems,
+    salesInvoices,
+    salesItems,
+    lotDispatches,
+    balancingOutputs,
+    // Sổ Cân đối chưa tải xong (hoặc lỗi tải) ⇒ chưa biết phiếu đã bị hút ⇒ Hủy lệnh xuất bị chặn.
+    balancingOutputsReady: balancingOutputsMeta.status === "ready",
+  };
+  const cancelCheck = cancelling ? checkExportReversal(cancelling.exportId, reversalData) : null;
+  const openCancelExport = (l: ExportOrder) => {
+    const c = checkExportReversal(l.id, reversalData);
+    if (!c.ok) {
+      notify.warning(c.reason);
+      return;
+    }
+    const kept = cancelDraft.takeKept();
+    setCancelling(kept && kept.exportId === l.id ? kept : { exportId: l.id, reason: "" });
+    setCancelErrors([]);
+  };
+  const confirmCancelExport = () => {
+    if (!cancelling) return;
+    if (!cancelling.reason.trim()) {
+      setCancelErrors([{ field: "Lý do hủy", message: "Ghi lý do hủy lệnh xuất (VD xuất nhầm đơn, nhầm ngày)" }]);
+      return;
+    }
+    const c = checkExportReversal(cancelling.exportId, reversalData);
+    if (!c.ok) {
+      notify.warning(c.reason);
+      cancelDraft.cancel();
+      return;
+    }
+    const prev = { don, exportOrders, exportItems, salesInvoices, salesItems, lotDispatches };
+    const r = reverseExportOrder(cancelling.exportId, reversalData, {
+      reason: cancelling.reason,
+      cancelledBy: recordName(profile),
+      cancelledAt: new Date().toISOString(),
+    });
+    persistExportItems(r.exportItems);
+    persistExportOrders(r.exportOrders);
+    if (r.preview.invoice) {
+      persistSalesInvoices(r.salesInvoices);
+      persistBan(r.salesItems);
+    }
+    if (r.preview.checkCount) persistLotDispatches(r.lotDispatches);
+    persistDon(r.salesOrders);
+    cancelDraft.done();
+    notify.deleted(
+      `Đã hủy lệnh xuất ${formatDateVN(r.preview.exportOrder.exportDate)} — trả ${kg(r.preview.totalKg)} về kho` +
+        (r.preview.invoice
+          ? ", gỡ phiếu bán đi kèm"
+          : r.preview.ambiguousInvoiceCount
+            ? " · phiếu bán CHƯA gỡ — vào Bán hàng xóa tay đúng một phiếu"
+            : ""),
+      () => {
+        persistExportItems(prev.exportItems);
+        persistExportOrders(prev.exportOrders);
+        if (r.preview.invoice) {
+          persistSalesInvoices(prev.salesInvoices);
+          persistBan(prev.salesItems);
+        }
+        if (r.preview.checkCount) persistLotDispatches(prev.lotDispatches);
+        persistDon(prev.don);
+      }
+    );
   };
 
   // Hướng dẫn thao tác (ba-spec 43): đơn minh họa chọn từ dữ liệu đang có; bước chỉ đổi đơn đang
@@ -403,11 +532,11 @@ export default function SalesOrderScreen() {
     () =>
       buildOrdersTour({
         pick: tourPick,
-        can: { create: allowed.create, update: allowed.update, delete: allowed.delete },
+        can: { create: allowed.create, update: allowed.update, delete: allowed.delete, cancelExport: canCancelExport },
         openOrder: (id) => setSelectedId(id),
         restoreView: () => setSelectedId(selectedId),
       }),
-    [tourPick, allowed.create, allowed.update, allowed.delete, selectedId],
+    [tourPick, allowed.create, allowed.update, allowed.delete, canCancelExport, selectedId],
   );
   usePageTour(isLoading ? null : tour);
 
@@ -519,19 +648,11 @@ export default function SalesOrderScreen() {
           getKey={(r) => r.id}
           rowMarkKey="don-dat"
           actions={(r) => (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                data-tour="orders-view"
-                title="Mở đơn này để xem chi tiết các mặt hàng cần và đối chiếu với tồn kho hiện có." variant="outline" size="sm" onClick={() => setSelectedId(r.id)}>
-                Xem
-              </Button>
-              {allowed.delete && (
-              <Button
-                title="Xóa đơn đặt này. Có hỏi xác nhận trước." variant="danger" size="sm" onClick={() => deleteOrder(r)}>
-                Bỏ
-              </Button>
-              )}
-            </div>
+            <Button
+              data-tour="orders-view"
+              title="Mở đơn này để xem chi tiết các mặt hàng cần, đối chiếu tồn kho, lập / hủy lệnh xuất hoặc xóa đơn." variant="outline" size="sm" onClick={() => setSelectedId(r.id)}>
+              Xem
+            </Button>
           )}
         />
       )}
@@ -552,19 +673,29 @@ export default function SalesOrderScreen() {
             <div className="flex min-w-0 flex-wrap gap-2">
               {selectedOrder.status !== "closed" && (
                 <div data-tour="orders-detail-actions" className="flex min-w-0 flex-wrap gap-2">
-                  {allowed.update && (
+                  {allowed.update && selectedOrder.status === "collecting" && (
                   <Button
                     title="Đánh dấu đơn này đã gom đủ hàng — chuyển trạng thái, chưa xuất kho." variant="outline" onClick={() => confirmFulfilled(selectedOrder)}>
                     <PackageCheck />
                     Xác nhận đủ
                   </Button>
                   )}
+                  {allowed.update && canReopenOrder(selectedOrder) && (
+                  <Button
+                    title="Bấm nhầm Xác nhận đủ? Đưa đơn về Đang gom. Không đụng tồn kho; vẫn còn nút Hoàn tác."
+                    variant="edit"
+                    onClick={() => reopenOrder(selectedOrder)}
+                  >
+                    <Undo2 />
+                    Mở lại đơn
+                  </Button>
+                  )}
                   {/* Lệnh xuất TRỪ TỒN KHO + đẻ phiếu ở sổ Bán hàng — chạm hai
-                      sổ cùng lúc, không có nút hoàn tác. Phải hỏi lại. */}
+                      sổ cùng lúc. Phải hỏi lại; gỡ bằng Hủy lệnh xuất ở danh sách lệnh. */}
                   {allowed.create && (
                   <ConfirmAction
                     title="Xuất hàng cho đơn này?"
-                    description="Sẽ trừ tồn kho dự trữ theo FIFO và tạo một phiếu bán (kênh Xuất khẩu) ở sổ Bán hàng. Không hoàn tác được — sai thì phải sửa tay ở cả hai sổ."
+                    description="Sẽ trừ tồn kho dự trữ theo FIFO và tạo một phiếu bán (kênh Xuất khẩu) ở sổ Bán hàng. Làm nhầm thì bấm Hủy lệnh xuất ở mục Lệnh xuất đã lập: tồn trả về đúng lô, phiếu bán đi kèm được gỡ."
                     detail={`${tenKH(selectedOrder.customerId)} · đặt ${formatDateVN(selectedOrder.orderDate)} · ${selectedOrderItems.length} dòng hàng`}
                     confirmLabel="Xuất hàng"
                     icon={Truck}
@@ -580,6 +711,17 @@ export default function SalesOrderScreen() {
                   />
                   )}
                 </div>
+              )}
+              {allowed.delete && (
+              <Button
+                data-tour="orders-delete"
+                title="Xóa đơn đặt này. Có hỏi xác nhận trước, xóa xong vẫn Hoàn tác được. Đơn còn lệnh xuất thì phải Hủy lệnh xuất trước."
+                variant="danger"
+                onClick={() => requestDeleteOrder(selectedOrder)}
+              >
+                <Trash2 />
+                Xóa đơn
+              </Button>
               )}
               <Button variant="outline" onClick={() => setSelectedId(null)}>
                 Đóng
@@ -640,6 +782,16 @@ export default function SalesOrderScreen() {
                   {exportOrderList.map((l) => {
                     const items = exportItems.filter((d) => d.exportId === l.id);
                     const lotCount = new Set(items.map((d) => d.wipId)).size;
+                    if (isCancelledExport(l)) {
+                      return (
+                        <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                          <span className="min-w-0 text-base text-muted-foreground">
+                            {formatDateVN(l.exportDate)} · {l.note || "Đã hủy"}
+                          </span>
+                          <Tag variant="muted">Đã hủy</Tag>
+                        </li>
+                      );
+                    }
                     return (
                       <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
                         <span className="min-w-0 text-base">
@@ -647,6 +799,7 @@ export default function SalesOrderScreen() {
                           <span className="tnum font-semibold">{kg(items.reduce((t, d) => t + (d.quantityKg || 0), 0))}</span>
                           <span className="text-muted-foreground"> · {lotCount} lô</span>
                         </span>
+                        <div className="flex flex-wrap gap-2">
                         {allowed.update && (
                         <Button
                           title="Quét tem từng block khi xếp container: đúng lô của lệnh thì đánh dấu, sai lô thì báo ngay."
@@ -658,6 +811,19 @@ export default function SalesOrderScreen() {
                           Kiểm lô bằng quét
                         </Button>
                         )}
+                        {canCancelExport && (
+                        <Button
+                          data-tour="orders-export-cancel"
+                          title="Lập nhầm lệnh xuất? Hủy để trả tồn về đúng lô và gỡ phiếu bán Xuất khẩu đi kèm. Có hỏi lý do, xong vẫn Hoàn tác được."
+                          variant="danger"
+                          size="sm"
+                          onClick={() => openCancelExport(l)}
+                        >
+                          <Ban />
+                          Hủy lệnh xuất
+                        </Button>
+                        )}
+                        </div>
                       </li>
                     );
                   })}
@@ -680,6 +846,97 @@ export default function SalesOrderScreen() {
           onClose={() => setLotCheckOrder(null)}
         />
       )}
+
+      {/* Hủy lệnh xuất — hỏi lý do, nói rõ gỡ những gì */}
+      <Dialog open={cancelling !== null} onOpenChange={(o) => !o && cancelDraft.dismiss()}>
+        <DialogContent className="w-full sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Hủy lệnh xuất này?</DialogTitle>
+            <DialogDescription className="text-base">
+              Tồn kho dự trữ trả về đúng các lô lệnh đã lấy, phiếu bán Xuất khẩu đẻ từ lệnh bị gỡ khỏi sổ Bán hàng. Đầu lệnh vẫn
+              giữ trong danh sách với nhãn Đã hủy và lý do. Hủy xong vẫn Hoàn tác được trong vài giây.
+            </DialogDescription>
+          </DialogHeader>
+          <DraftRestoredNotice savedAt={cancelDraft.restoredAt} onDiscard={cancelDraft.cancel} />
+          {cancelling && cancelCheck && (
+            <div className="space-y-4 py-2">
+              <ErrorSummary errors={cancelErrors} />
+              {cancelCheck.ok ? (
+                <ul className="space-y-1 rounded-lg bg-muted px-4 py-3 text-base">
+                  <li>
+                    Lệnh {formatDateVN(cancelCheck.preview.exportOrder.exportDate)} · {tenKH(cancelCheck.preview.order.customerId)}
+                  </li>
+                  <li>
+                    Trả về kho <span className="tnum font-semibold">{kg(cancelCheck.preview.totalKg)}</span> ·{" "}
+                    <span className="tnum">{cancelCheck.preview.lotCount}</span> lô
+                  </li>
+                  {!cancelCheck.preview.ambiguousInvoiceCount && (
+                    <li>
+                      {cancelCheck.preview.invoice
+                        ? `Gỡ phiếu bán ${formatDateVN(cancelCheck.preview.invoice.deliveryDate)} — ${cancelCheck.preview.invoiceLines.length} dòng`
+                        : "Không thấy phiếu bán đi kèm (có thể đã xóa ở Bán hàng) — chỉ trả tồn"}
+                    </li>
+                  )}
+                  {cancelCheck.preview.ambiguousInvoiceCount > 0 && (
+                    <li className="text-warning">
+                      Lệnh lập trước 06/11/2026 và có {cancelCheck.preview.ambiguousInvoiceCount} phiếu bán Xuất khẩu giống hệt nhau
+                      (cùng khách, cùng ngày, cùng hàng) — app KHÔNG tự gỡ phiếu nào để khỏi gỡ nhầm phiếu của lệnh khác. Hủy xong,
+                      vào Bán hàng xóa tay đúng một phiếu của lệnh này.
+                    </li>
+                  )}
+                  {cancelCheck.preview.pricedLineCount > 0 && (
+                    <li className="text-warning">
+                      {cancelCheck.preview.pricedLineCount} dòng bán đã ghi giá — giá mất theo phiếu (Hoàn tác vẫn trả lại)
+                    </li>
+                  )}
+                  {cancelCheck.preview.checkCount > 0 && (
+                    <li>Bỏ {cancelCheck.preview.checkCount} dấu đã quét kiểm lô của lệnh</li>
+                  )}
+                </ul>
+              ) : (
+                <p className="rounded-lg bg-warning-surface px-4 py-3 text-base text-warning">{cancelCheck.reason}</p>
+              )}
+              <Field label="Lý do hủy" required>
+                <Input
+                  value={cancelling.reason}
+                  onChange={(e) => setCancelling((c) => (c ? { ...c, reason: e.target.value } : c))}
+                  placeholder="VD xuất nhầm đơn, nhầm ngày"
+                />
+              </Field>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" size="lg" onClick={cancelDraft.cancel}>
+              Quay lại
+            </Button>
+            <Button
+              variant="destructive"
+              size="lg"
+              title="Hủy lệnh xuất: trả tồn về lô, gỡ phiếu bán đi kèm, ghi lý do vào lệnh."
+              onClick={confirmCancelExport}
+            >
+              <Ban />
+              Hủy lệnh xuất
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDelete
+        open={deletingOrder !== null}
+        onOpenChange={(o) => !o && setDeletingOrder(null)}
+        title="Xóa đơn đặt này?"
+        confirmLabel="Xóa đơn"
+        recordDescription={
+          deletingOrder
+            ? `${tenKH(deletingOrder.customerId)} — đặt ${formatDateVN(deletingOrder.orderDate)} — ${orderItems.filter((x) => x.orderId === deletingOrder.id).length} dòng hàng`
+            : ""
+        }
+        onConfirm={() => {
+          if (deletingOrder) deleteOrder(deletingOrder);
+          setDeletingOrder(null);
+        }}
+      />
 
       {/* Dialog tạo đơn */}
       <Dialog

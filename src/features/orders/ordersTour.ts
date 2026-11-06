@@ -40,8 +40,10 @@ export interface OrdersTourContext {
     create: boolean;
     /** Xác nhận đủ, kiểm lô bằng quét. */
     update: boolean;
-    /** Bỏ (xóa) đơn. */
+    /** Xóa đơn (nút trong chi tiết đơn). */
     delete: boolean;
+    /** Hủy lệnh xuất — cần quyền xóa ở Đơn đặt LẪN Bán hàng (gỡ phiếu bán). */
+    cancelExport: boolean;
   };
   /** Mở chi tiết đơn minh họa (chỉ đổi chỗ xem). */
   openOrder: (orderId: string) => void;
@@ -101,7 +103,7 @@ export function buildOrdersTour(ctx: OrdersTourContext): PageTour {
         "• Đủ: người phụ trách đã chọn Xác nhận đủ — chỉ đổi trạng thái, chưa trừ tồn, chưa xuất.\n" +
         "• Đã xuất: lệnh xuất đã lấy đủ kg cần cho mọi dòng; đơn đóng, không lập lệnh xuất nữa.\n" +
         "Chọn Xem để mở chi tiết đơn" +
-        (can.delete ? "; Bỏ để xóa đơn (có hỏi lại và Hoàn tác)." : ".") +
+        (can.delete ? " — nút Xóa đơn nằm trong chi tiết, không nằm trên dòng để khỏi chọn nhầm." : ".") +
         " Phía trên bảng: lọc Trạng thái (kèm số đơn), Khách hàng và ô Tra khách, mặt hàng, quy cách, ghi chú; ba thẻ số tính theo phần đang lọc. Ô vuông đầu dòng dùng để chọn dòng rồi tô màu.",
     }),
   );
@@ -138,10 +140,13 @@ export function buildOrdersTour(ctx: OrdersTourContext): PageTour {
     if (can.update || can.create) {
       const parts: string[] = [];
       if (can.update)
-        parts.push("• Xác nhận đủ: đánh dấu đơn đã gom đủ hàng — trạng thái sang Đủ, chưa trừ tồn, chưa xuất.");
+        parts.push(
+          "• Xác nhận đủ (đơn Đang gom): đánh dấu đơn đã gom đủ hàng — trạng thái sang Đủ, chưa trừ tồn, chưa xuất.\n" +
+            "• Mở lại đơn (đơn Đủ): chọn nhầm Xác nhận đủ thì đưa đơn về Đang gom. Không đụng tồn kho, còn nút Hoàn tác.",
+        );
       if (can.create)
         parts.push(
-          "• Lệnh xuất (một phần được): hỏi lại trước khi làm. Hàng lấy theo lô sản xuất sớm trước, lấy được tới đâu xuất tới đó. Lệnh trừ tồn kho dự trữ và tạo một phiếu bán kênh Xuất khẩu ở Bán hàng (dòng chưa có giá — ghi giá ở Bán hàng). Không hoàn tác được; sai phải sửa tay ở cả hai sổ.\n" +
+          "• Lệnh xuất (một phần được): hỏi lại trước khi làm. Hàng lấy theo lô sản xuất sớm trước, lấy được tới đâu xuất tới đó. Lệnh trừ tồn kho dự trữ và tạo một phiếu bán kênh Xuất khẩu ở Bán hàng (dòng chưa có giá — ghi giá ở Bán hàng). Lập nhầm thì Hủy lệnh xuất ở mục Lệnh xuất đã lập.\n" +
             "Xuất xong mà còn dòng thiếu ⇒ đơn về Đang gom; đủ mọi dòng ⇒ Đã xuất. Không còn tồn khả dụng ⇒ trang báo, không lập lệnh.",
         );
       steps.push(
@@ -150,7 +155,20 @@ export function buildOrdersTour(ctx: OrdersTourContext): PageTour {
           target: "orders-detail-actions",
           optional: true,
           title: "Xác nhận đủ và lệnh xuất",
-          body: `Hai việc của đơn chưa xuất xong (đơn Đã xuất không còn các nút này):\n${parts.join("\n")}`,
+          body: `Các việc của đơn chưa xuất xong (đơn Đã xuất không còn các nút này):\n${parts.join("\n")}`,
+        }),
+      );
+    }
+    if (can.delete) {
+      steps.push(
+        detail({
+          id: "detail-delete",
+          target: "orders-delete",
+          optional: true,
+          title: "Xóa đơn",
+          body:
+            "Xóa đơn nằm ở đầu chi tiết đơn: có hỏi lại, xóa xong vẫn Hoàn tác được trong vài giây.\n" +
+            "Đơn còn lệnh xuất đang hiệu lực thì không xóa được (tồn kho và sổ Bán hàng đang mang số của đơn) — trang báo phải Hủy lệnh xuất từng lệnh trước. Đơn chỉ còn lệnh đã hủy thì xóa được.",
         }),
       );
     }
@@ -161,9 +179,12 @@ export function buildOrdersTour(ctx: OrdersTourContext): PageTour {
         optional: true,
         title: "Lệnh xuất đã lập",
         body:
-          "Mỗi dòng là một lệnh xuất của đơn: ngày lệnh · tổng kg · số lô bán thành phẩm lệnh lấy." +
+          "Mỗi dòng là một lệnh xuất của đơn: ngày lệnh · tổng kg · số lô bán thành phẩm lệnh lấy. Lệnh đã hủy hiện nhãn Đã hủy kèm ngày, người hủy, lý do và những gì đã gỡ." +
           (can.update
-            ? "\nChọn Kiểm lô bằng quét khi xếp container: hộp liệt kê các lô của lệnh, mỗi lô Chưa quét hoặc Đã quét. Quét đúng lô ⇒ Đã quét (ghi lại, mở lại hộp vẫn còn); quét đủ ⇒ Đủ lô. Lô khác cùng mặt hàng và quy cách còn đủ tồn ⇒ hỏi Thay lô cho lệnh. Lô khác mặt hàng hoặc hết tồn ⇒ báo đỏ, đừng xếp lên xe."
+            ? "\nChọn Kiểm lô bằng quét khi xếp container: hộp liệt kê các lô của lệnh, mỗi lô Chưa quét hoặc Đã quét. Quét đúng lô ⇒ Đã quét (ghi lại, mở lại hộp vẫn còn); quét đủ ⇒ Đủ lô. Lô khác cùng mặt hàng và quy cách còn đủ tồn ⇒ hỏi Thay lô cho lệnh. Lô khác mặt hàng hoặc hết tồn ⇒ báo đỏ, đừng xếp lên xe. Ghi kiểm nhầm ⇒ Bỏ kiểm ở dòng lô (hỏi lại, có Hoàn tác): lô về Chưa quét."
+            : "") +
+          (can.cancelExport
+            ? "\nHủy lệnh xuất (lập nhầm): ghi lý do rồi xác nhận. Tồn kho dự trữ trả về đúng các lô lệnh đã lấy; phiếu bán Xuất khẩu đẻ từ lệnh bị gỡ khỏi Bán hàng (giá đã ghi cũng mất theo — Hoàn tác vẫn trả lại); đơn tính lại trạng thái. Kỳ Cân đối đã hút phiếu bán đó thì không hủy được — gỡ dòng ở Cân đối trước. Lệnh lập trước 06/11/2026 mà có nhiều phiếu bán giống hệt thì app chỉ trả tồn, không tự gỡ phiếu — vào Bán hàng xóa tay đúng một phiếu."
             : ""),
       }),
     );
@@ -188,7 +209,7 @@ export const tourSpec: PageTourSpec = {
   build: () =>
     buildOrdersTour({
       pick: "o",
-      can: { create: true, update: true, delete: true },
+      can: { create: true, update: true, delete: true, cancelExport: true },
       openOrder: () => {},
       restoreView: () => {},
     }),

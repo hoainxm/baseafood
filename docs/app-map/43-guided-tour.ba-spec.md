@@ -236,12 +236,13 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
 | Kết quả | Đạt · Cần khắc phục · Không đạt (`RESULT_OPTIONS`); thang điểm chỉ là quy ước | họp 02/09 QĐ-8 | criteria |
 | Chốt | cần ít nhất một chỉ tiêu đã lưu | màn `lockDay` | lock-action |
 
-### `/warehouse` Kho dự trữ — 11 bước · `warehouse/warehouseTour.ts`
+### `/warehouse` Kho dự trữ — 12 bước · `warehouse/warehouseTour.ts`
 | Khu vực | Lời phải nói | Nguồn | Bước |
 |---|---|---|---|
 | Chỉ số · tồn lô | lô chờ nhập chưa tính tồn; tồn = kg thực − lệnh xuất − bán lẻ − đóng gói; có lô gắn trừ đúng lô | 34 F-N2; spec QR §6d | stats, stock |
 | Bán vượt | phần vượt không nằm trong Tổng tồn; kiểm phiếu bán / duyệt mẻ chờ | 34 (10-12 b) | oversold |
 | Duyệt nhập | chờ nhập kho → đã nhập kho bằng Xác nhận nhập kho, kg thực; quản đốc chỉ xưởng mình | 34 F-N2, AC-3; 35 | pending, scan, approve |
+| Chi tiết lô · Hủy duyệt | Xem lô: Kho nhận · Xưởng ghi · đã xuất / còn; Hủy duyệt (quyền Duyệt) về Chờ nhập kho đúng số xưởng ghi; các trường hợp bị chặn + chỗ sửa | 34 AC-17; workflows/warehouse | approve, lot-detail |
 | Tuổi tồn · dung tích | đếm từ ngày SX; xanh / vàng > 85 % / đỏ vượt | 34 (10-13); màn | age, capacity |
 
 ### `/orders` Đơn đặt — 10 bước · `orders/ordersTour.ts` (mở đơn minh họa, `onExit` trả lại)
@@ -249,7 +250,8 @@ Cột: khu vực · lời phải nói (tóm) · nguồn · bước tour. Lời �
 |---|---|---|---|
 | Trạng thái đơn | Đang gom · Đủ (chỉ đổi trạng thái) · Đã xuất (đủ kg mọi dòng) | 34 F-N5, AC-9/10 | table, detail-actions |
 | Dòng hàng | Còn thiếu = Cần − Đã xuất; Khả dụng không tính lô chờ nhập | 34 H3 | detail-lines |
-| Lệnh xuất · kiểm lô | lô sản xuất sớm trước; tạo phiếu bán Xuất khẩu chưa có giá; quét lô, Thay lô | 34 F-N5, H5; spec QR §6c §6d | detail-actions, export-list |
+| Lệnh xuất · kiểm lô | lô sản xuất sớm trước; tạo phiếu bán Xuất khẩu chưa có giá; quét lô, Thay lô, Bỏ kiểm | 34 F-N5, H5; spec QR §6c §6d | detail-actions, export-list |
+| Gỡ việc nhầm | Mở lại đơn (Đủ → Đang gom); Xóa đơn trong chi tiết, chặn khi còn lệnh; Hủy lệnh xuất (quyền xóa Đơn đặt + Bán hàng): trả tồn, gỡ phiếu bán, nhãn Đã hủy, chặn khi Cân đối đã hút | 34 AC-16; workflows/sales | detail-actions, detail-delete, export-list |
 
 ### `/sales` Bán hàng — 14 bước, hai tab · `sales/salesTour.ts` (đăng ký ở `SalesTab`, đổi `?tab=`)
 | Khu vực | Lời phải nói | Nguồn | Bước |

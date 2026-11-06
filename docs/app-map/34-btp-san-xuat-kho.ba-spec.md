@@ -1,6 +1,7 @@
 > Load khi: thiết kế/xây module WIP — sản xuất bán thành phẩm ngày, kho dự trữ đông, đơn đặt, xuất container.
 covers: src/features/production/WipProductionScreen.tsx, src/features/warehouse/ReserveWarehouseScreen.tsx, src/features/orders/SalesOrderScreen.tsx, src/features/packaging/PackagingScreen.tsx, src/features/catalog/CatalogScreen.tsx, src/lib/inventory.ts, supabase/migrations/0011_wip_san_xuat_kho_don.sql, supabase/migrations/0026_dong_goi_thanh_pham.sql, supabase/migrations/0030_production_customer_components.sql, supabase/migrations/0031_product_split_blockspec.sql, src/features/production/wipHelpers.ts, src/features/production/ProductionLinesTable.tsx, src/features/production/BatterSection.tsx, src/lib/batter.ts, src/features/production/DomesticSaleSection.tsx, src/features/production/SessionLotsSection.tsx, src/features/production/FrozenStockSection.tsx, src/lib/frozenStockLines.ts
-last_verified: 2026-11-03
+last_verified: 2026-11-06
+<!-- updated: 2026-11-06 — gỡ được việc làm nhầm (audit chủ dự án): AC-16 Hủy lệnh xuất · AC-17 Hủy duyệt nhập kho giữ số xưởng ghi (mig 0108) · Mở lại đơn · Xóa đơn chặn khi còn lệnh · Bỏ kiểm lô. Sơ đồ: docs/workflows/sales.md · warehouse.md. -->
 <!-- updated: 2026-11-03 — rà UX đợt 1: Sản xuất thành phẩm — tab Ghi nhập / Sổ ngày & báo cáo dùng `Tabs` chung (trái, bỏ emoji); kỳ xem = `PeriodPicker`. Đóng gói: kỳ xem = `PeriodPicker`. Kho dự trữ: thứ tự khối duyệt → `FilterBar` (Kho + ô Tra mặt hàng, quy cách, kho) → thẻ Số lô · Tổng tồn theo dòng đang hiện → bảng; bỏ thẻ "Chờ nhập" (số đã ở đầu khối duyệt); tra không khớp ⇒ "Không có dòng nào khớp bộ lọc". -->
 <!-- updated: 2026-11-02 (nhật ký 56) — `/wip` và `/packaging` có khối "Nhật ký thao tác" khi xem một ngày × một xưởng (bảng `production_activity_log`, mig 0092; hồ sơ `production-day` / `packaging-day`): ghi / sửa / xóa thành phẩm, bán nội địa, hàng đông lạnh, gửi báo cáo, chốt / mở lại; ghi / xóa phiếu đóng gói + Hoàn tác. -->
 <!-- updated: 2026-10-19 — link mở thẳng một ngày `?date=&workshop=` ở `/wip` (sang "Sổ ngày & báo cáo" đúng ngày + xưởng, đợi nháp; xưởng của link KHÔNG ghi đè xưởng nhớ theo máy) và `/packaging` (bộ lọc về đúng ngày + xưởng). Từ Việc của tôi / Tổng quan. Xem 39-my-tasks.md. -->
@@ -203,6 +204,14 @@ Nhóm **"III HÀNG TẠM"** của bảng kê kho là hàng **sơ chế đã cấ
 *Given* lô XK giá USD; *When* định giá tồn/handoff; *Then* quy VND theo tỉ giá lưu tại thời điểm giao dịch, không tra lại.
 - **Assert** giaTriTon_VND == kg * donGiaUSD * tiGiaLuu && tiGiaLuu != null
 
+### AC-16 — Hủy lệnh xuất đảo đúng hai sổ, giữ dấu vết · Test: unit (`lib/orderExportReversal.test.ts`)
+*Given* lệnh xuất đã trừ 300 kg lô A + 300 kg lô B và đẻ phiếu bán Xuất khẩu; *When* Hủy lệnh xuất (lý do bắt buộc); *Then* tồn từng lô bằng đúng trước khi xuất, phiếu bán + dòng bán + dấu quét kiểm của lệnh bị gỡ, phiếu khác không đổi, đầu lệnh còn với trạng thái `cancelled` + lý do / người / ngày, đơn tính lại trạng thái. Cân đối đã hút dòng bán ⇒ chặn. Xóa đơn còn lệnh hiệu lực ⇒ chặn.
+- **Assert** tồn_sau_hủy == tồn_trước_xuất (từng lô, kg + block); reverseExportOrder không sửa mảng vào (Hoàn tác = ghi lại mảng cũ)
+
+### AC-17 — Hủy duyệt nhập kho trả đúng số xưởng ghi · Test: unit (`lib/wipIntakeReversal.test.ts`)
+*Given* mẻ xưởng ghi 500 kg / 50 block, kho duyệt 488,5 kg / 49 block; *When* Hủy duyệt; *Then* mẻ về `pending` với 500 kg / 50 block / kho + ghi chú gốc, rời khỏi tồn. Lô đã vào lệnh xuất / gắn bán / đầu vào đóng gói / bị FIFO trừ / kỳ Cân đối đã hút mà kg đổi ⇒ chặn kèm chỗ sửa.
+- **Assert** revertWipIntake(approveWipIntake(w)) == { ...w, preApproval: null }
+
 ## Assumptions (fail-closed — safe default; ⚠️ = cần xí nghiệp chốt)
 
 1. Đơn vị tồn = **kg** chuẩn + **block** song song (không quy đổi cứng). Giá vốn theo **mẻ**.
@@ -221,3 +230,4 @@ Nhóm **"III HÀNG TẠM"** của bảng kê kho là hàng **sơ chế đã cấ
 ## History
 - 2026-08-07 — tạo ba-spec (team-agent: Flow-Optimizer+Cross-User-Integrity, Domain-Specialist kho đông lạnh). Chưa design, chưa code.
 - 2026-08-07 — chốt 3 open decision với user: nhiều phòng đông (thêm chiều `kho`), FIFO gợi ý+ghi đè, hai người hai sự kiện. Mô hình tồn → 5 chiều.
+- 2026-11-06 — thêm AC-16 (Hủy lệnh xuất) + AC-17 (Hủy duyệt nhập kho, mig 0108 `production_wips.pre_approval`) theo audit "thêm thừa / làm nhầm thì phải gỡ được".

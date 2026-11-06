@@ -18,9 +18,14 @@ export const DOCUMENT_BUCKET = "documents";
 /** true khi có máy chủ ⇒ tải / mở file được. */
 export const hasDocumentStorage = Boolean(supabase);
 
-/** `<site>/documents/<id tài liệu>/<id lần ban hành>/<pdf|source>-<tên file>` — demo ⇒ `site-demo/…`. */
-export function documentFilePath(documentId: string, versionId: string, kind: "pdf" | "source", fileName: string): string {
-  return `${IS_DEMO ? SITE_DEMO : "bsf1"}/documents/${documentId}/${versionId}/${kind}-${safeFileName(fileName)}`;
+/**
+ * `<site>/documents/<id tài liệu>/<id lần ban hành>/<pdf|source>-<tên file>` — demo ⇒ `site-demo/…`.
+ * `stamp` (đính / thay file cho lần đã có): chèn `<pdf|source>-<stamp>-<tên>` — file cũ gỡ / thay
+ * vẫn nằm ở đường dẫn cũ (DOC-R11, để Hoàn tác), tải lại cùng tên file không đụng độ.
+ */
+export function documentFilePath(documentId: string, versionId: string, kind: "pdf" | "source", fileName: string, stamp?: number): string {
+  const name = stamp ? `${kind}-${stamp}-${safeFileName(fileName)}` : `${kind}-${safeFileName(fileName)}`;
+  return `${IS_DEMO ? SITE_DEMO : "bsf1"}/documents/${documentId}/${versionId}/${name}`;
 }
 
 /** Câu báo lỗi dễ hiểu cho người dùng (thiếu bucket / thiếu quyền / quá cỡ). */
@@ -52,7 +57,7 @@ export async function getDocumentFileUrl(path: string, seconds = 600, downloadNa
   return data?.signedUrl ?? null;
 }
 
-/** Gỡ file vừa tải khi ghi dòng lần ban hành thất bại (không để file mồ côi). */
+/** Gỡ file VỪA tải khi ghi dòng lần ban hành thất bại (không để file mồ côi). Không dùng để gỡ file đã đính (DOC-R11 giữ file). */
 export async function removeDocumentFiles(paths: readonly string[]): Promise<boolean> {
   const xs = paths.filter(Boolean);
   if (!supabase || !xs.length) return false;

@@ -6,7 +6,8 @@
 /**
  * Bucket RIÊNG `company-assets` (0099): ai đăng nhập cũng đọc; ghi / gỡ khi có `company-profile:update`.
  * Logo lưu thành JPEG đã nén (`compressImage`) ⇒ Word / PDF / Excel của chứng từ cùng dùng được một file.
- * Đường dẫn `<site>/logo/logo-<thời điểm>.jpg` — mỗi lần đổi một file mới, file cũ gỡ sau khi lưu xong.
+ * Đường dẫn `<site>/logo/logo-<thời điểm>.jpg` — mỗi lần đổi một file mới. File cũ KHÔNG xóa (đổi / gỡ logo có
+ * Hoàn tác — audit 2026-11-06, mỗi file vài chục KB nên giữ lại rẻ hơn mất logo cũ).
  * Chưa nối máy chủ ⇒ báo lỗi (chứng từ dùng logo đóng gói sẵn).
  */
 import { supabase } from "./supabase";
@@ -49,11 +50,4 @@ export async function fetchCompanyLogoBytes(path: string): Promise<ArrayBuffer |
   return fetch(url)
     .then((r) => (r.ok ? r.arrayBuffer() : null))
     .catch(() => null);
-}
-
-/** Gỡ file logo cũ sau khi đã đổi sang file mới. */
-export async function removeCompanyAsset(path: string): Promise<boolean> {
-  if (!supabase || !path) return false;
-  const { error } = await supabase.storage.from(COMPANY_ASSET_BUCKET).remove([path]);
-  return !error;
 }

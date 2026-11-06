@@ -187,8 +187,8 @@ export function recordPaperVersion(
 
 /**
  * Đính file cho một lần ban hành CÒN THIẾU file (vd QTI-KH-01 nạp từ bản giấy ở mig 0072).
- * Ngoại lệ duy nhất của DOC-R2 "không sửa lần đã ban hành": chỉ điền ô file đang TRỐNG,
- * không thay file đã có (muốn đổi file ⇒ ghi lần ban hành mới). Trả null nếu ô đã có file.
+ * Ngoại lệ của DOC-R2 "không sửa lần đã ban hành": chỉ điền ô file đang TRỐNG. Ô đã có file ⇒
+ * null (thay file là việc khác, có hỏi + Hoàn tác — `replaceVersionFile`, DOC-R11).
  */
 export function attachVersionFile(
   versions: readonly DocumentVersion[],
@@ -201,6 +201,86 @@ export function attachVersionFile(
   if (!v || !path || (kind === "pdf" ? v.pdfPath : v.sourcePath)) return null;
   const patch = kind === "pdf" ? { pdfPath: path, pdfFileName: fileName } : { sourcePath: path, sourceFileName: fileName };
   return versions.map((x) => (x.id === versionId ? { ...x, ...patch } : x));
+}
+
+/* ---------- Gỡ / thay file, xóa lần ban hành ghi nhầm (DOC-R11, R12 — audit 2026-11-06) ---------- */
+
+export type VersionFileKind = "pdf" | "source";
+
+/**
+ * DOC-R11: thay file đã đính của một lần ban hành (scan nhầm, đính nhầm file). Được cả với PDF đã
+ * ký của lần ĐANG hiệu lực — nội dung lần ban hành (ngày, người ký, nội dung sửa) vẫn không sửa.
+ * File cũ KHÔNG xóa khỏi kho file: đường dẫn cũ nằm ở nhật ký thao tác, Hoàn tác trỏ lại được.
+ * Trả null khi: không thấy lần đó, ô chưa có file (dùng attachVersionFile), hay trùng đường dẫn.
+ */
+export function replaceVersionFile(
+  versions: readonly DocumentVersion[],
+  versionId: string,
+  kind: VersionFileKind,
+  path: string,
+  fileName: string,
+): DocumentVersion[] | null {
+  const v = versions.find((x) => x.id === versionId);
+  const current = v ? (kind === "pdf" ? v.pdfPath : v.sourcePath) : "";
+  if (!v || !path || !current || current === path) return null;
+  const patch = kind === "pdf" ? { pdfPath: path, pdfFileName: fileName } : { sourcePath: path, sourceFileName: fileName };
+  return versions.map((x) => (x.id === versionId ? { ...x, ...patch } : x));
+}
+
+/**
+ * DOC-R11: gỡ file đã đính khỏi một lần ban hành (đính nhầm). Chỉ bỏ đường dẫn trên dòng — file
+ * vẫn ở kho file, đường dẫn ở nhật ký, Hoàn tác đưa lại. Ô đang trống / không thấy lần đó ⇒ null.
+ */
+export function removeVersionFile(versions: readonly DocumentVersion[], versionId: string, kind: VersionFileKind): DocumentVersion[] | null {
+  const v = versions.find((x) => x.id === versionId);
+  if (!v || !(kind === "pdf" ? v.pdfPath : v.sourcePath)) return null;
+  const patch = kind === "pdf" ? { pdfPath: "", pdfFileName: "" } : { sourcePath: "", sourceFileName: "" };
+  return versions.map((x) => (x.id === versionId ? { ...x, ...patch } : x));
+}
+
+/** Lần ban hành mới nhất (số lần lớn nhất) của tài liệu. */
+export function latestVersionOf(versions: readonly DocumentVersion[], documentId: string): DocumentVersion | undefined {
+  return versionsOf(versions, documentId)[0];
+}
+
+/**
+ * DOC-R12: vì sao KHÔNG xóa được lần ban hành này (null = xóa được). Chỉ lần MỚI NHẤT — xóa lần
+ * giữa thì chuỗi 01, 02, 03 đứt và không biết lần nào thay lần nào. Tài liệu đã thu hồi ⇒ mở lại
+ * trước (tránh xóa trên tài liệu không còn dùng mà không ai thấy).
+ */
+export function versionDeleteBlocker(
+  doc: Pick<CompanyDocument, "id" | "isWithdrawn">,
+  versions: readonly DocumentVersion[],
+  versionId: string,
+): string | null {
+  const v = versions.find((x) => x.id === versionId && x.documentId === doc.id);
+  if (!v) return "Không thấy lần ban hành này.";
+  if (doc.isWithdrawn) return "Tài liệu đã thu hồi — mở lại tài liệu trước khi xóa lần ban hành.";
+  if (latestVersionOf(versions, doc.id)?.id !== v.id) return "Chỉ xóa được lần ban hành mới nhất. Muốn bỏ lần này thì xóa các lần sau nó trước.";
+  return null;
+}
+
+/**
+ * DOC-R12: xóa lần ban hành MỚI NHẤT ghi nhầm. Lần đó đang hiệu lực ⇒ lần ngay trước (đã bị nó
+ * đẩy sang Hết hiệu lực) trở lại Đang hiệu lực, bỏ ngày hết hiệu lực. Còn lần khác đang hiệu lực
+ * (dữ liệu cũ lỡ có hai) thì không đụng. File của lần bị xóa giữ ở kho file, đúng thư mục
+ * `<site>/documents/<id tài liệu>/<id lần>/` (nhật ký xóa hiện chỉ ghi khóa dòng, không ghi nội dung —
+ * id lần nằm ở dòng "Thêm" của nhật ký) để Hoàn tác mở lại được.
+ */
+export function deleteLatestVersion(
+  doc: Pick<CompanyDocument, "id" | "isWithdrawn">,
+  versions: readonly DocumentVersion[],
+  versionId: string,
+): { versions: DocumentVersion[]; removed: DocumentVersion; restored?: DocumentVersion } | { error: string } {
+  const blocker = versionDeleteBlocker(doc, versions, versionId);
+  if (blocker) return { error: blocker };
+  const removed = versions.find((x) => x.id === versionId)!;
+  const rest = versions.filter((x) => x.id !== versionId);
+  const previous = removed.status === "active" ? versionsOf(rest, doc.id)[0] : undefined;
+  const stillActive = activeVersionOf(rest, doc.id);
+  if (!previous || previous.status !== "obsolete" || stillActive) return { versions: rest, removed };
+  const restored: DocumentVersion = { ...previous, status: "active", obsoletedOn: "" };
+  return { versions: rest.map((x) => (x.id === previous.id ? restored : x)), removed, restored };
 }
 
 /** yyyy-mm-dd + n năm. */

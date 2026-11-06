@@ -16,7 +16,7 @@ export interface DocumentsTourContext {
     create: boolean;
     /** Thêm hoặc sửa: ghi lần ban hành, đính file, sửa thông tin, thu hồi / mở lại. */
     write: boolean;
-    /** Xóa tài liệu chưa từng ban hành. */
+    /** Xóa tài liệu chưa từng ban hành; xóa lần ban hành mới nhất ghi nhầm (cùng ô ghi). */
     delete: boolean;
   };
 }
@@ -123,15 +123,21 @@ export function buildDocumentsTour(ctx: DocumentsTourContext): PageTour {
   if (can.write || can.create || can.delete) {
     const lines = [
       can.write
-        ? "• Ghi lần ban hành mới: Lần ban hành, Ngày hiệu lực, Nội dung sửa đổi, Người soạn, Người xem xét, Người phê duyệt, PDF đã ký (bắt buộc), File gốc. Lưu xong lần mới có hiệu lực ngay; lần đang hiệu lực trước đó chuyển Hết hiệu lực từ ngày hiệu lực của lần mới. Lần đã ban hành không sửa, muốn sửa thì ghi lần mới."
+        ? "• Ghi lần ban hành mới: Lần ban hành, Ngày hiệu lực, Nội dung sửa đổi, Người soạn, Người xem xét, Người phê duyệt, PDF đã ký (bắt buộc), File gốc. Lưu xong lần mới có hiệu lực ngay; lần đang hiệu lực trước đó chuyển Hết hiệu lực từ ngày hiệu lực của lần mới. Nội dung lần đã ban hành không sửa, muốn sửa thì ghi lần mới."
         : "",
       can.write
-        ? "• Đính PDF đã ký, Đính file gốc: cho lần ban hành còn thiếu file. Chỉ điền ô đang trống, không thay file đã có."
+        ? "• Đính PDF đã ký, Đính file gốc: cho lần ban hành còn thiếu file."
+        : "",
+      can.write
+        ? "• Thay PDF, Thay file gốc · Gỡ PDF, Gỡ file gốc: sửa file đính nhầm (scan nhầm, nhầm tài liệu), kể cả PDF của lần đang hiệu lực. Thay: chọn file mới, hộp hỏi hiện tên file cũ → mới. Gỡ: lần đó trở lại thiếu file, đính lại được. Cả hai hỏi trước, có Hoàn tác và ghi nhật ký; file cũ không bị xóa khỏi kho file."
+        : "",
+      can.write && can.delete
+        ? "• Xóa lần 0x: chỉ ở lần ban hành MỚI NHẤT, dùng khi ghi nhầm cả lần. Xóa xong lần ngay trước trở lại Đang hiệu lực (hộp hỏi nói trước lần nào); xóa lần duy nhất thì tài liệu về Chưa ban hành. Hỏi trước, có Hoàn tác. Tài liệu đã thu hồi phải mở lại trước."
         : "",
       can.write ? "• Sửa thông tin: mã, tên, phòng sở hữu, ai được xem, thời hạn lưu, ngày hết hạn." : "",
       can.create ? "• Thêm biểu mẫu con: biểu mẫu thuộc quy trình này, mặc định cùng phòng và cùng phạm vi xem." : "",
       can.write ? `• Thu hồi: chuyển cả tài liệu sang ${S.withdrawn}, hỏi trước, có Hoàn tác; Mở lại tài liệu đưa về Đang dùng.` : "",
-      can.delete ? "• Xóa: chỉ tài liệu chưa từng ban hành (ghi nhầm) và không còn biểu mẫu con; hỏi trước, có Hoàn tác." : "",
+      can.delete ? "• Xóa: chỉ tài liệu chưa từng ban hành (ghi nhầm) và không còn biểu mẫu con; hỏi trước, có Hoàn tác. Tài liệu đã ban hành nhầm: xóa lần ban hành trước, nút Xóa tài liệu hiện ra." : "",
     ].filter(Boolean);
     steps.push({
       id: "detail-actions",
@@ -184,7 +190,9 @@ export function buildCompanyProfileTour(ctx: { canEdit: boolean }): PageTour {
       title: "Logo",
       body:
         "Logo in trên Invoice, Packing list bản PDF và Word. Chưa lưu logo riêng thì chứng từ dùng logo có sẵn của phần mềm.\n" +
-        (ctx.canEdit ? "Đổi logo: chọn một ảnh PNG, JPG hoặc WEBP tối đa 5 MB — không cần điền gì thêm. Ảnh cũ được thay." : "Bạn đang chỉ xem; người có quyền sửa đổi logo ở đây."),
+        (ctx.canEdit
+          ? "Đổi logo: chọn một ảnh PNG, JPG hoặc WEBP tối đa 5 MB — không cần điền gì thêm. Đổi nhầm thì chọn Hoàn tác trên thông báo.\nGỡ logo (chỉ hiện khi đã lưu logo riêng): hỏi trước, chứng từ lập từ giờ quay về logo có sẵn của phần mềm; có Hoàn tác. File logo cũ không bị xóa."
+          : "Bạn đang chỉ xem; người có quyền sửa đổi logo ở đây."),
     },
     {
       id: "info",

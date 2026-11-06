@@ -20,6 +20,11 @@ import {
   safeFileName,
   attachVersionFile,
   filePreviewKind,
+  deleteLatestVersion,
+  latestVersionOf,
+  removeVersionFile,
+  replaceVersionFile,
+  versionDeleteBlocker,
 } from "./documents";
 import { DUE_OFFSET_DAYS, defaultDueDate, taskRequirements } from "./myTasks";
 
@@ -167,6 +172,79 @@ describe("đính file cho lần ban hành còn thiếu file (ngoại lệ DOC-R2
     expect(attachVersionFile([ver({ pdfPath: "cu.pdf" })], "v1", "pdf", "moi.pdf", "moi.pdf")).toBeNull();
     expect(attachVersionFile([ver()], "x", "pdf", "a.pdf", "a.pdf")).toBeNull();
     expect(attachVersionFile([ver()], "v1", "pdf", "", "a.pdf")).toBeNull();
+  });
+});
+
+describe("gỡ / thay file đã đính (DOC-R11)", () => {
+  const withFiles = ver({ pdfPath: "cu.pdf", pdfFileName: "cu.pdf", sourcePath: "cu.docx", sourceFileName: "cu.docx" });
+  it("thay PDF của lần đang hiệu lực, giữ nguyên nội dung lần ban hành", () => {
+    const next = replaceVersionFile([withFiles, ver({ id: "v2", documentId: "d2", pdfPath: "x.pdf" })], "v1", "pdf", "moi.pdf", "moi.pdf");
+    expect(next?.find((v) => v.id === "v1")).toMatchObject({ pdfPath: "moi.pdf", pdfFileName: "moi.pdf", sourcePath: "cu.docx", status: "active", revisionNo: 1, approvedByName: "Giám đốc" });
+    expect(next?.find((v) => v.id === "v2")?.pdfPath).toBe("x.pdf");
+    expect(replaceVersionFile([withFiles], "v1", "source", "moi.docx", "moi.docx")?.[0]).toMatchObject({ sourcePath: "moi.docx", pdfPath: "cu.pdf" });
+  });
+  it("thay: ô còn trống / trùng đường dẫn / không thấy lần / đường dẫn rỗng ⇒ null", () => {
+    expect(replaceVersionFile([ver()], "v1", "pdf", "moi.pdf", "moi.pdf")).toBeNull();
+    expect(replaceVersionFile([withFiles], "v1", "pdf", "cu.pdf", "cu.pdf")).toBeNull();
+    expect(replaceVersionFile([withFiles], "x", "pdf", "moi.pdf", "moi.pdf")).toBeNull();
+    expect(replaceVersionFile([withFiles], "v1", "pdf", "", "moi.pdf")).toBeNull();
+  });
+  it("gỡ: bỏ đường dẫn + tên của đúng loại file, ô kia giữ nguyên; ô trống ⇒ null", () => {
+    expect(removeVersionFile([withFiles], "v1", "pdf")?.[0]).toMatchObject({ pdfPath: "", pdfFileName: "", sourcePath: "cu.docx", status: "active" });
+    expect(removeVersionFile([withFiles], "v1", "source")?.[0]).toMatchObject({ sourcePath: "", sourceFileName: "", pdfPath: "cu.pdf" });
+    expect(removeVersionFile([ver()], "v1", "pdf")).toBeNull();
+    expect(removeVersionFile([withFiles], "x", "pdf")).toBeNull();
+  });
+});
+
+describe("xóa lần ban hành mới nhất ghi nhầm (DOC-R12)", () => {
+  const v1 = ver({ id: "v1", revisionNo: 1, effectiveDate: "2023-01-02" });
+  it("lần mới ghi nhầm ⇒ xóa, lần trước trở lại Đang hiệu lực, bỏ ngày hết hiệu lực", () => {
+    const { versions: recorded } = recordPaperVersion([v1, ver({ id: "o1", documentId: "d2" })], { ...ver({ id: "v2", revisionNo: 2, effectiveDate: "2026-11-06" }) });
+    expect(recorded.find((v) => v.id === "v1")).toMatchObject({ status: "obsolete", obsoletedOn: "2026-11-06" });
+    const r = deleteLatestVersion(doc(), recorded, "v2");
+    if ("error" in r) throw new Error(r.error);
+    expect(r.removed.id).toBe("v2");
+    expect(r.restored).toMatchObject({ id: "v1", status: "active", obsoletedOn: "" });
+    expect(r.versions.map((v) => v.id).sort()).toEqual(["o1", "v1"]);
+    expect(r.versions.find((v) => v.id === "v1")).toEqual(v1);
+    expect(documentState(doc(), r.versions)).toBe("active");
+    expect(activeVersionOf(r.versions, "d1")?.id).toBe("v1");
+  });
+  it("ba lần: xóa lần 03 chỉ đưa lần 02 về hiệu lực, lần 01 vẫn Hết hiệu lực", () => {
+    const xs = [
+      ver({ id: "v1", revisionNo: 1, status: "obsolete", obsoletedOn: "2024-05-01" }),
+      ver({ id: "v2", revisionNo: 2, effectiveDate: "2024-05-01", status: "obsolete", obsoletedOn: "2024-05-01" }),
+      ver({ id: "v3", revisionNo: 3, effectiveDate: "2024-05-01" }),
+    ];
+    const r = deleteLatestVersion(doc(), xs, "v3");
+    if ("error" in r) throw new Error(r.error);
+    expect(r.restored?.id).toBe("v2");
+    expect(r.versions.find((v) => v.id === "v1")).toMatchObject({ status: "obsolete", obsoletedOn: "2024-05-01" });
+  });
+  it("lần duy nhất ⇒ tài liệu về Chưa ban hành và xóa được tài liệu (DOC-R8)", () => {
+    const r = deleteLatestVersion(doc(), [v1], "v1");
+    if ("error" in r) throw new Error(r.error);
+    expect(r.restored).toBeUndefined();
+    expect(documentState(doc(), r.versions)).toBe("not-issued");
+    expect(canDeleteDocument("d1", r.versions)).toBe(true);
+  });
+  it("còn lần khác đang hiệu lực (dữ liệu cũ lỡ có hai) ⇒ không đụng lần trước", () => {
+    const xs = [ver({ id: "v1", revisionNo: 1 }), ver({ id: "v2", revisionNo: 2, status: "obsolete", obsoletedOn: "2025-01-01" }), ver({ id: "v3", revisionNo: 3 })];
+    const r = deleteLatestVersion(doc(), xs, "v3");
+    if ("error" in r) throw new Error(r.error);
+    expect(r.restored).toBeUndefined();
+    expect(r.versions.find((v) => v.id === "v2")?.status).toBe("obsolete");
+  });
+  it("chặn: không phải lần mới nhất · tài liệu đã thu hồi · không thấy lần / lần của tài liệu khác", () => {
+    const xs = [ver({ id: "v1", revisionNo: 1, status: "obsolete" }), ver({ id: "v2", revisionNo: 2 })];
+    expect(latestVersionOf(xs, "d1")?.id).toBe("v2");
+    expect(versionDeleteBlocker(doc(), xs, "v1")).toMatch(/mới nhất/);
+    expect(deleteLatestVersion(doc(), xs, "v1")).toHaveProperty("error");
+    expect(versionDeleteBlocker(doc({ isWithdrawn: true }), xs, "v2")).toMatch(/thu hồi/);
+    expect(versionDeleteBlocker(doc(), xs, "x")).not.toBeNull();
+    expect(versionDeleteBlocker(doc({ id: "d2" }), xs, "v2")).not.toBeNull();
+    expect(versionDeleteBlocker(doc(), xs, "v2")).toBeNull();
   });
 });
 

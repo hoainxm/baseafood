@@ -2,7 +2,7 @@
 
 > Load khi: sửa tab Thông tin công ty ở `/documents`, bảng `company_profile`, bucket `company-assets`, hoặc chứng từ (Invoice / Packing list / Expiry list xuất khẩu, về sau nhập khẩu, lệnh SX) lấy tên, địa chỉ, MST, người ký, logo, tài khoản ngân hàng của công ty.
 covers: src/lib/companyProfile.ts, src/lib/companyProfile.test.ts, src/features/documents/CompanyProfileView.tsx, supabase/migrations/0099_company_profile.sql, src/lib/exportInvoice.ts
-last_verified: 2026-11-03
+last_verified: 2026-11-06
 ttl_days: 90
 status: v1 CHỐT + BUILD 2026-11-03 — thay NV3 (hoãn) của ba-spec [64](64-company-profile.ba-spec.md).
 
@@ -65,7 +65,7 @@ IN: NV1–NV5 cho chứng từ Xuất khẩu (Excel / PDF / Word). OUT (đợt s
 |---|---|
 | R1 | Mỗi site MỘT bản ghi thông tin công ty (`company_profile`, id `company`). Chưa có ⇒ app dùng giá trị mặc định (tên, địa chỉ, nơi lập, người ký đang in trên invoice 236/26) |
 | R2 | Xem: ai có vai trò (tự cấp như Tài liệu công ty). Sửa: quyền `company-profile` Sửa (admin luôn được) — máy chủ chặn bằng RLS |
-| R3 | Logo: một ảnh (PNG / JPG / WEBP ≤ 5 MB) ở bucket `company-assets`; đổi logo không bắt điền trường khác. Chứng từ PDF / Word dùng logo đã lưu, chưa có ⇒ logo đóng gói sẵn |
+| R3 | Logo: một ảnh (PNG / JPG / WEBP ≤ 5 MB) ở bucket `company-assets`; đổi logo không bắt điền trường khác. Chứng từ PDF / Word dùng logo đã lưu, chưa có ⇒ logo đóng gói sẵn. *(audit 2026-11-06)* Đổi logo có Hoàn tác; **Gỡ logo** (hỏi trước + Hoàn tác) ⇒ về logo đóng gói sẵn. File logo cũ không xóa khỏi bucket (để Hoàn tác) |
 | R4 | Tài khoản ngân hàng = danh sách `export_options` loại `bank-account` (mig 0095 / 0096); ghi được bởi người ghi Xuất khẩu HOẶC người có `company-profile` Sửa (mig 0099); invoice chọn từ đó như cũ |
 | R5 | Đổi thông tin không sửa chứng từ đã tải; chứng từ lập sau dùng thông tin mới; mọi lần sửa có nhật ký (trigger audit) |
 | R6 | Chữ in trên chứng từ: tên EN viết hoa, địa chỉ EN viết hoa (như mẫu 236/26), người ký = viết tắt EN, nơi lập (VD "Ba Ria") |

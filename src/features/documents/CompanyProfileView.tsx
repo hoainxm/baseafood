@@ -3,20 +3,21 @@
 // Tên tiếng Việt: Tab Thông tin công ty — logo, pháp nhân, người ký, tài khoản ngân hàng (một nguồn cho chứng từ)
 // Description: Company profile tab of /documents (mig 0099, ba-spec 67)
 // ============================================================
-// Đổi logo = chỉ chọn một ảnh (R3). Sửa thông tin = một phiếu (nháp tự lưu — luật 17). Tài khoản ngân hàng =
+// Đổi logo = chỉ chọn một ảnh (R3). Gỡ logo ⇒ chứng từ về logo có sẵn của phần mềm (audit 2026-11-06). Cả hai có
+// Hoàn tác: file logo cũ KHÔNG xóa khỏi kho file (vài chục KB) để Hoàn tác trỏ lại được. Sửa thông tin = một phiếu (nháp tự lưu — luật 17). Tài khoản ngân hàng =
 // danh sách chọn `bank-account` mà invoice Xuất khẩu dùng (R4), quản lý ở đây theo quyền Sửa thông tin công ty.
 import { useEffect, useRef, useState } from "react";
-import { Button, Field, FormDialog, Input, ReadOnlyBadge, notify } from "@/design-system";
+import { Button, ConfirmAction, Field, FormDialog, Input, ReadOnlyBadge, notify } from "@/design-system";
 import { CatalogCrudFor } from "@/features/catalog/CatalogCrudFor";
 import { exportOptionListConfig, useCatalogConfigs } from "@/features/catalog/catalogConfig";
 import { DraftRestoredNotice } from "@/features/shared/DraftRestoredNotice";
 import { useCan } from "@/features/shared/PermissionProvider";
 import { useCompanyProfileStore } from "@/lib/catalogRepo";
-import { getCompanyAssetUrl, removeCompanyAsset, uploadCompanyLogo } from "@/lib/companyAssets";
+import { getCompanyAssetUrl, uploadCompanyLogo } from "@/lib/companyAssets";
 import { COMPANY_LOGO_TYPES, logoErrors } from "@/lib/companyProfile";
 import { useDialogDraft } from "@/lib/formDraft";
 import type { CompanyProfile } from "@/types";
-import { Building2, ImageUp, Pencil, Save } from "lucide-react";
+import { Building2, ImageOff, ImageUp, Pencil, Save } from "lucide-react";
 
 type Key = Exclude<keyof CompanyProfile, "id" | "logoPath">;
 const FIELDS: readonly { key: Key; label: string; hint?: string }[] = [
@@ -48,6 +49,7 @@ export function CompanyProfileView() {
   const c = useCatalogConfigs();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isRemovingLogo, setIsRemovingLogo] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<InfoForm | null>(null);
   const draft = useDialogDraft({ form: "company-profile", value: form, setValue: setForm, isEmpty: (f) => JSON.stringify(f.value) === f.initial });
@@ -92,10 +94,18 @@ export function CompanyProfileView() {
       notify.error(r.error);
       return;
     }
-    const old = profile.logoPath;
+    const prev = profile;
     if (saveProfile({ ...profile, logoPath: r.path })) {
-      notify.saved("Đã đổi logo — chứng từ PDF / Word lập từ giờ dùng logo mới");
-      if (old) void removeCompanyAsset(old);
+      notify.saved("Đã đổi logo — chứng từ PDF / Word lập từ giờ dùng logo mới", () => saveProfile(prev));
+    }
+  };
+
+  /** Gỡ logo riêng ⇒ chứng từ dùng logo có sẵn của phần mềm. File giữ ở kho để Hoàn tác. */
+  const removeLogo = () => {
+    const prev = profile;
+    if (!prev.logoPath) return;
+    if (saveProfile({ ...prev, logoPath: "" })) {
+      notify.deleted("Đã gỡ logo — chứng từ lập từ giờ dùng logo có sẵn của phần mềm", () => saveProfile(prev));
     }
   };
 
@@ -124,8 +134,32 @@ export function CompanyProfileView() {
                 <ImageUp className="mr-2 h-4 w-4" aria-hidden />
                 {uploading ? "Đang tải lên…" : "Đổi logo"}
               </Button>
+              {profile.logoPath && (
+                <Button
+                  variant="danger"
+                  className="ml-2"
+                  onClick={() => setIsRemovingLogo(true)}
+                  title="Gỡ logo đã lưu, chứng từ quay về logo có sẵn của phần mềm. Hỏi trước, có Hoàn tác."
+                >
+                  <ImageOff className="mr-2 h-4 w-4" aria-hidden />
+                  Gỡ logo
+                </Button>
+              )}
             </div>
           )}
+          <ConfirmAction
+            open={isRemovingLogo}
+            onOpenChange={setIsRemovingLogo}
+            title="Gỡ logo đã lưu?"
+            description="Invoice, Packing list bản PDF / Word lập từ giờ dùng logo có sẵn của phần mềm. Chứng từ đã tải không đổi. File logo không bị xóa, bấm Hoàn tác là dùng lại."
+            confirmLabel="Gỡ logo"
+            destructive
+            icon={ImageOff}
+            onConfirm={() => {
+              setIsRemovingLogo(false);
+              removeLogo();
+            }}
+          />
         </div>
       </section>
 

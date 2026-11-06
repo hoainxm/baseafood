@@ -710,7 +710,7 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             </li>
             <li>Mã ghép theo gợi ý (nhãn <b>gợi ý theo số</b>) thì kiểm lại; sai thì đổi ở ô <b>Ghép mã … với dòng sổ</b>.</li>
             <li>
-              Soát các ô sẽ ghi (mặt hàng, size, ngày nhập, invoice, KG/kiện). Chấm xanh = lấy từ file vì sổ trống; dấu cảnh báo = sổ khác file, giữ sổ.
+              Soát các ô sẽ ghi (mặt hàng; dòng nhỏ size, ngày nhập, invoice, KG/kiện) và cột Tồn đầu File / Sổ đặt chồng nhau (lệch thì tô đỏ). Chấm xanh = lấy từ file vì sổ trống; dấu cảnh báo = sổ khác file, giữ sổ.
             </li>
             <li>
               Sổ nhiều hơn file: chọn <b>Sổ đã tính trước nhập</b> (khi sổ đã ghi phần nhập vào tồn đầu) hoặc <b>Xuất điều chỉnh</b>.

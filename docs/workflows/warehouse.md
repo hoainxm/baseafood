@@ -5,6 +5,7 @@ covers: src/features/warehouse/*, src/features/monthly-stock/*, src/features/qr/
 tours: src/features/warehouse/warehouseTour.ts, src/features/monthly-stock/monthlyStockTour.ts, src/features/qr/qrTour.ts, src/features/reports/warehouseNxtTour.ts
 guides: src/features/shared/guideContent.tsx, src/features/shared/guides/warehouseNxtGuide.tsx
 last_verified: 2026-11-06
+<!-- re-verified: 2026-11-06 — hộp Nạp báo cáo XNT: bảng xem trước 7 cột (mô tả gộp dòng phụ, tồn đầu File / Sổ chồng nhau) vừa khung, hết cuộn ngang ở màn ≥ ~1.000 px; luật nạp không đổi. -->
 ttl_days: 90
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ).

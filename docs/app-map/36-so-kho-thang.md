@@ -1,6 +1,7 @@
 > Load khi: sửa màn Sổ kho theo tháng (/monthly-stock), logic dồn tồn cuối kỳ → đầu kỳ sau, hay công thức tồn cuối/tiền còn lại theo tháng.
 covers: src/features/monthly-stock/MonthlyStockScreen.tsx, src/features/monthly-stock/NxtImportDialog.tsx, src/features/monthly-stock/index.ts, src/lib/monthlyStock.ts, src/lib/monthlyStockExcel.ts, src/lib/frozenStockLines.ts, src/lib/nxtStockImport.ts, src/lib/nxtReportFile.ts, src/lib/monthlyStockCatalogSync.ts, src/lib/nxtPeriods.ts, src/features/monthly-stock/CatalogSyncUsageProbe.tsx
 last_verified: 2026-11-06
+<!-- updated: 2026-11-06 — hộp Nạp báo cáo XNT (`NxtImportDialog`): bảng xem trước gộp còn 7 cột (Mã + tình trạng · Mặt hàng + dòng phụ Size / Ngày nhập / Invoice / KG/kiện · Tồn đầu File / Sổ chồng nhau + "lệch …" · Nhập · Xuất · Cuối sau nạp · Xử lý), `table-fixed` min 58rem ⇒ không cuộn ngang ở desktop; vẫn sắp được theo từng trường. Không đổi luật. -->
 <!-- updated: 2026-11-06 (gỡ khi nhầm) — Đồng bộ danh mục có Hoàn tác gỡ đúng lần đó (`lib/monthlyStockCatalogSync.ts`); /nxt-warehouse xóa cả kỳ tạo nhầm + Hoàn tác xóa một mã (`lib/nxtPeriods.ts`). -->
 <!-- updated: 2026-11-03 — rà UX đợt 3: Nhập xuất tồn kho — Ghi nhập/xuất · Tạo kỳ kế tiếp ra khỏi hàng ô lọc, thành nút trang qua `OverflowActions` (điện thoại: Ghi nhập/xuất + "Thêm"). -->
 <!-- updated: 2026-10-31 (bộ lọc) — thêm bộ lọc theo ba-spec [53](53-filters.ba-spec.md): thêm Nhóm hàng; ô tìm cũ đổi sang SearchField (bỏ dấu). Khung chung FilterBar / SearchField, tổng theo dòng đang hiện, "Bỏ hết bộ lọc". -->

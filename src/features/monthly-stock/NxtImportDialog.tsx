@@ -249,20 +249,22 @@ export function NxtImportDialog({
   };
 
   /** Ô mô tả: giá trị sẽ ghi; lấy từ file ⇒ chấm xanh; khác file ⇒ cảnh báo. */
-  const fieldCell = (it: NxtPlanItem, f: NxtField) => {
+  /** Một ô mô tả viết gọn trong dòng phụ dưới tên mặt hàng (giữ dấu • lấy từ file, ⚠ sổ khác file). */
+  const fieldMeta = (it: NxtPlanItem, f: NxtField) => {
     const v = it.fields[f];
     const text = v == null || v === "" ? "—" : f === "importDate" ? formatDateVN(String(v)) : f === "kgPerCtn" ? num(Number(v)) : String(v);
     const conflict = it.fields.conflicts.find((c) => c.field === f);
     const filled = it.fields.filled.includes(f);
     return (
-      <td
-        className={`whitespace-nowrap px-2 py-2 ${f === "kgPerCtn" ? "tnum text-right" : ""} ${conflict ? "font-semibold text-warning" : ""}`}
-        title={conflict ? `Sổ "${conflict.ledger}" · file "${conflict.file}" — giữ sổ` : filled ? `${FIELD_LABEL[f]} lấy từ file` : undefined}
+      <span
+        key={f}
+        className={`whitespace-nowrap ${f === "kgPerCtn" ? "tnum" : ""} ${conflict ? "font-semibold text-warning" : ""}`}
+        title={`${FIELD_LABEL[f]}${conflict ? `: sổ "${conflict.ledger}" · file "${conflict.file}" — giữ sổ` : filled ? " lấy từ file" : ""}`}
       >
-        {conflict && <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />}
-        {text}
-        {filled && <span className="ml-1 text-info">•</span>}
-      </td>
+        {conflict && <AlertTriangle className="mr-0.5 inline h-3.5 w-3.5" />}
+        <span className="text-muted-foreground">{FIELD_LABEL[f]}:</span> {text}
+        {filled && <span className="ml-0.5 text-info">•</span>}
+      </span>
     );
   };
 
@@ -389,19 +391,38 @@ export function NxtImportDialog({
                   </div>
                 )}
 
+                {/* 7 cột (gộp mô tả vào dòng phụ, tồn đầu file / sổ chồng nhau) ⇒ vừa khung hộp từ ~1.000 px, không phải cuộn ngang
+                    để đối chiếu; màn hẹp hơn vẫn cuộn ngang có thanh trên + dưới (QT 14). */}
                 <HorizontalScroll>
-                  <table className="w-full min-w-[1280px] text-sm">
+                  <table className="w-full min-w-[58rem] table-fixed text-sm">
+                    <colgroup>
+                      <col className="w-[11rem]" />
+                      <col />
+                      <col className="w-[8rem]" />
+                      <col className="w-[6rem]" />
+                      <col className="w-[6rem]" />
+                      <col className="w-[6.5rem]" />
+                      <col className="w-[14.5rem]" />
+                    </colgroup>
                     <thead>
-                      <tr className="border-b border-border bg-muted/40 text-left text-muted-foreground">
-                        <th className="px-2 py-2" aria-sort={sort.ariaSortOf("status")}>{sort.header("status", "Tình trạng")}</th>
-                        <th className="px-2 py-2" aria-sort={sort.ariaSortOf("code")}>{sort.header("code", "Mã kế toán")}</th>
-                        <th className="px-2 py-2" aria-sort={sort.ariaSortOf("item")}>{sort.header("item", "Mặt hàng (sẽ ghi)")}</th>
-                        <th className="px-2 py-2" aria-sort={sort.ariaSortOf("size")}>{sort.header("size", "Size")}</th>
-                        <th className="px-2 py-2" aria-sort={sort.ariaSortOf("date")}>{sort.header("date", "Ngày nhập")}</th>
-                        <th className="px-2 py-2" aria-sort={sort.ariaSortOf("invoice")}>{sort.header("invoice", "Invoice")}</th>
-                        <th className="px-2 py-2 text-right">KG/kiện</th>
-                        <th className="px-2 py-2 text-right" aria-sort={sort.ariaSortOf("fileOpen")}>{sort.header("fileOpen", "Đầu (file)", "right")}</th>
-                        <th className="px-2 py-2 text-right" aria-sort={sort.ariaSortOf("ledgerOpen")}>{sort.header("ledgerOpen", "Đầu (sổ)", "right")}</th>
+                      <tr className="border-b border-border bg-muted/40 text-left align-bottom text-muted-foreground">
+                        <th className="px-2 py-2" aria-sort={sort.ariaSortOf("code")}>
+                          <span className="block">{sort.header("code", "Mã kế toán")}</span>
+                          <span className="block">{sort.header("status", "Tình trạng")}</span>
+                        </th>
+                        <th className="px-2 py-2" aria-sort={sort.ariaSortOf("item")}>
+                          <span className="block">{sort.header("item", "Mặt hàng (sẽ ghi)")}</span>
+                          <span className="flex flex-wrap gap-x-3 font-normal">
+                            {sort.header("size", "Size")}
+                            {sort.header("date", "Ngày nhập")}
+                            {sort.header("invoice", "Invoice")}
+                          </span>
+                        </th>
+                        <th className="px-2 py-2 text-right" aria-sort={sort.ariaSortOf("fileOpen")}>
+                          <span className="block">Tồn đầu</span>
+                          <span className="block">{sort.header("fileOpen", "File", "right")}</span>
+                          <span className="block">{sort.header("ledgerOpen", "Sổ", "right")}</span>
+                        </th>
                         <th className="px-2 py-2 text-right" aria-sort={sort.ariaSortOf("in")}>{sort.header("in", "Nhập", "right")}</th>
                         <th className="px-2 py-2 text-right" aria-sort={sort.ariaSortOf("out")}>{sort.header("out", "Xuất", "right")}</th>
                         <th className="px-2 py-2 text-right" aria-sort={sort.ariaSortOf("close")}>{sort.header("close", "Cuối sau nạp", "right")}</th>
@@ -424,19 +445,36 @@ export function NxtImportDialog({
                           <Fragment key={it.code}>
                             <tr className="border-t border-border align-top">
                               <td className="px-2 py-2">
-                                <Tag variant={needsChoice(it.status) && !it.choice ? "error" : STATE_VARIANT[st]}>{STATE_LABEL[st]}</Tag>
+                                <span className="block break-words font-mono" title={it.fileName}>
+                                  {it.code}
+                                </span>
+                                <span className="mt-1 block [&>*]:max-w-full [&>*]:whitespace-normal">
+                                  <Tag variant={needsChoice(it.status) && !it.choice ? "error" : STATE_VARIANT[st]}>{STATE_LABEL[st]}</Tag>
+                                </span>
                               </td>
-                              <td className="whitespace-nowrap px-2 py-2 font-mono" title={it.fileName}>{it.code}</td>
-                              <td className="px-2 py-2">
-                                {it.fields.itemName}
-                                {!it.rowIds.length && st !== "skipped" && <span className="ml-1 text-info">(dòng mới)</span>}
+                              <td className="min-w-0 px-2 py-2">
+                                <span className="block break-words font-medium">
+                                  {it.fields.itemName}
+                                  {!it.rowIds.length && st !== "skipped" && <span className="ml-1 font-normal text-info">(dòng mới)</span>}
+                                </span>
+                                <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-sm">
+                                  {fieldMeta(it, "size")}
+                                  {fieldMeta(it, "importDate")}
+                                  {fieldMeta(it, "origin")}
+                                  {fieldMeta(it, "kgPerCtn")}
+                                </span>
                               </td>
-                              {fieldCell(it, "size")}
-                              {fieldCell(it, "importDate")}
-                              {fieldCell(it, "origin")}
-                              {fieldCell(it, "kgPerCtn")}
-                              <td className="tnum px-2 py-2 text-right">{num(it.file.openKg)}</td>
-                              <td className={`tnum px-2 py-2 text-right ${diffOpen ? "font-semibold text-destructive" : ""}`}>{it.rowIds.length ? num(it.ledgerOpenKg) : "—"}</td>
+                              <td className="tnum px-2 py-2 text-right">
+                                <span className="block" title="Tồn đầu trên file kế toán">
+                                  <span className="text-sm text-muted-foreground">File </span>
+                                  {num(it.file.openKg)}
+                                </span>
+                                <span className={`block ${diffOpen ? "font-semibold text-destructive" : ""}`} title="Tồn đầu trên sổ kho tháng">
+                                  <span className="text-sm font-normal text-muted-foreground">Sổ </span>
+                                  {it.rowIds.length ? num(it.ledgerOpenKg) : "—"}
+                                </span>
+                                {diffOpen && <span className="block text-sm font-semibold text-destructive">lệch {num(diff)}</span>}
+                              </td>
                               <td className="tnum px-2 py-2 text-right">{num(it.file.inKg)}</td>
                               <td className="tnum px-2 py-2 text-right">{num(it.file.outKg)}</td>
                               <td className={`tnum px-2 py-2 text-right ${it.resultCloseKg < -0.001 ? "font-semibold text-destructive" : ""}`}>{num(it.resultCloseKg)}</td>
@@ -470,7 +508,7 @@ export function NxtImportDialog({
                             {isOpen && (
                               <tr className="bg-muted/20">
                                 <td />
-                                <td colSpan={12} className="px-2 pb-3">
+                                <td colSpan={6} className="px-2 pb-3">
                                   <p className="mb-1 text-muted-foreground">Tên trên file: {it.fileName}</p>
                                   {rowLabel && <p className="mb-1 text-muted-foreground">Dòng sổ đang ghép: {rowLabel}</p>}
                                   {it.warnings.length > 0 && (
@@ -504,7 +542,7 @@ export function NxtImportDialog({
                       })}
                       {!sort.rows.length && (
                         <tr>
-                          <td colSpan={13} className="px-2 py-4 text-center text-success">
+                          <td colSpan={7} className="px-2 py-4 text-center text-success">
                             Không còn chỗ cần xem — chọn "Hiện cả {items.length} mã" để xem chi tiết.
                           </td>
                         </tr>

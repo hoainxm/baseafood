@@ -1,10 +1,12 @@
 // AC của ba-spec 51 (docs/app-map/51-supplier-invoice-matching.ba-spec.md §10) — số thật tháng 10/2026.
 import { describe, expect, it } from "vitest";
-import type { AccountingCodeMap, MaterialImportItem, Supplier, SupplierInvoice, SupplierInvoiceLine } from "@/types";
+import type { AccountingCodeMap, ImportShipment, MaterialImportItem, Supplier, SupplierInvoice, SupplierInvoiceLine } from "@/types";
 import {
   accountingCodeMapId,
   applyInvoiceToTripLine,
   buildTripsFromInvoice,
+  decodeTripBefore,
+  encodeTripBefore,
   excelDateToIso,
   indexLinesByTripLine,
   lineStateNow,
@@ -13,9 +15,14 @@ import {
   parseInvoiceFileName,
   parseLedgerSheets,
   parseVatInvoiceText,
+  planInvoiceRemoval,
   planLedgerImport,
+  removeInvoiceTrace,
   supplierInvoiceId,
+  tripBeforeFromTrace,
   tripInvoiceInfo,
+  tripsCreatedFromInvoice,
+  unlinkRemovedTripLines,
   type LedgerRow,
 } from "./supplierInvoice";
 
@@ -385,3 +392,148 @@ const PDF_936 = [
   "Tổng cộng tiền thanh toán (Total payment): 556.859.000",
   "Mã của cơ quan thuế (Tax authority code): 00F90DD256EDD14F2F990DD550DAB19A86",
 ];
+
+/** Đầu chuyến tối thiểu cho các ca gỡ HĐ. */
+const ship = (id: string, supplierName: string, backdateReason: string): ImportShipment => ({
+  id,
+  deliveryDate: day(1),
+  postingDate: day(30),
+  backdateReason,
+  workshop: "Đông",
+  supplierName,
+  driverName: "",
+  licensePlate: "",
+  note: "",
+  lotCode: "",
+  ssccCode: "",
+  scanPath: "",
+  operator: "",
+});
+
+describe("gỡ hóa đơn gắn nhầm", () => {
+  it("gỡ HĐ 936 ⇒ bỏ HĐ + 3 dòng, chuyến Hồng Phú về Chờ HĐ, sổ chuyến không đổi", () => {
+    const p = plan(L936, HP_0110);
+    const other = saved(plan(ledger([["HUONGPHAP", "229", 8, 6, "1", 2318, 144000]]), []));
+    const invoices = [...p.invoices, ...other.invoices];
+    const lines = [...saved(p).lines, ...other.lines];
+    const r = planInvoiceRemoval(p.invoices[0].id, { invoices, lines, trips: HP_0110, shipments: [] })!;
+    expect(r.blockingShipments).toEqual([]);
+    expect(r.lines).toHaveLength(3);
+    expect(new Set(r.linkedTripLineIds)).toEqual(new Set(["hp1", "hp2", "hp3"]));
+    expect(r.nextInvoices.map((i) => i.invoiceNo)).toEqual(["229"]);
+    expect(r.nextLines).toEqual(other.lines);
+    const after = tripInvoiceInfo(HP_0110, indexLinesByTripLine(r.nextLines), new Map(r.nextInvoices.map((i) => [i.id, i])), new Set([ONE, SMALL, LARGE]));
+    expect(after?.status).toBe("awaiting");
+    expect(planInvoiceRemoval("không-có", { invoices, lines, trips: HP_0110, shipments: [] })).toBeNull();
+  });
+
+  it("dòng gắn chuyến đã xóa không tính; dòng 'updated' thiếu số cũ ⇒ không trả, nêu lý do", () => {
+    const p = saved(plan(L936, HP_0110));
+    const lines = p.lines.map((l) => (l.tripLineId === "hp1" ? { ...l, resolution: "updated" as const } : l));
+    const r = planInvoiceRemoval(p.invoices[0].id, { invoices: p.invoices, lines, trips: HP_0110.filter((t) => t.id !== "hp3"), shipments: [] })!;
+    expect(new Set(r.linkedTripLineIds)).toEqual(new Set(["hp1", "hp2"]));
+    expect(r.restores).toEqual([]);
+    expect(r.unrestorable.map((u) => u.trip.id)).toEqual(["hp1"]);
+    expect(r.nextTrips).toEqual(HP_0110.filter((t) => t.id !== "hp3"));
+  });
+
+  it("Cập nhật theo HĐ rồi gỡ HĐ ⇒ trả đúng số cũ, bỏ dòng vết (số lưu chính xác, kể cả số lẻ)", () => {
+    const wrong = HP_0110.map((t) => (t.id === "hp1" ? { ...t, quantityKg: 1700.125, unitPrice: 154000, note: "cân lại" } : t));
+    const p = saved(plan(L936, wrong));
+    const line = p.lines.find((l) => l.tripLineId === "hp1")!;
+    const trip = wrong[0];
+    const updated = applyInvoiceToTripLine(trip, line, { invoiceNo: "936", stamp: "06/11/2026 09:00", editor: "Thảo", dayLocked: false });
+    const trips = [updated, ...wrong.slice(1)];
+    const lines = p.lines.map((l) => (l.id === line.id ? { ...l, resolution: "updated" as const, resolutionReason: encodeTripBefore(trip) } : l));
+    const r = planInvoiceRemoval(p.invoices[0].id, { invoices: p.invoices, lines, trips, shipments: [] })!;
+    expect(r.restores).toHaveLength(1);
+    expect(r.restores[0].before).toEqual({ quantityKg: 1700.125, unitPrice: 154000 });
+    expect(r.nextTrips[0]).toEqual(trip);
+    expect(r.nextTrips.slice(1)).toEqual(wrong.slice(1));
+    expect(r.unrestorable).toEqual([]);
+  });
+
+  it("dữ liệu cũ (không lưu số trước) ⇒ đọc số cũ từ dòng vết; vết chỉ có giá ⇒ kg giữ; chưa có giá ⇒ null", () => {
+    const base = { ...HP_0110[0], quantityKg: 1707, unitPrice: 152000 };
+    const note = "ghi chú xưởng\n[Sửa theo HĐ 93 · 01/10/2026] giá 1 → 2\n[Sửa theo HĐ 936 · SAU KHI CHỐT NGÀY 01/10/2026 · 30/10/2026 14:05 · Trúc] kg 1.710,5 → 1.707; giá 154.000 → 152.000";
+    expect(tripBeforeFromTrace({ ...base, note }, "936")).toEqual({ quantityKg: 1710.5, unitPrice: 154000 });
+    expect(tripBeforeFromTrace({ ...base, note: "[Sửa theo HĐ 936 · x] giá — → 152.000" }, "936")).toEqual({ quantityKg: 1707, unitPrice: null });
+    expect(tripBeforeFromTrace({ ...base, note: "[Sửa theo HĐ 9361 · x] giá 1 → 2" }, "936")).toBeNull();
+    expect(removeInvoiceTrace(note, "936")).toBe("ghi chú xưởng\n[Sửa theo HĐ 93 · 01/10/2026] giá 1 → 2");
+    expect(decodeTripBefore(encodeTripBefore({ quantityKg: 75, unitPrice: null }))).toEqual({ quantityKg: 75, unitPrice: null });
+    expect(decodeTripBefore("cân xưởng đúng")).toBeNull();
+    // Gỡ HĐ dùng vết khi dòng HĐ không lưu số trước.
+    const p = saved(plan(L936, HP_0110));
+    const lines = p.lines.map((l) => (l.tripLineId === "hp1" ? { ...l, resolution: "updated" as const } : l));
+    const trips = [{ ...HP_0110[0], note: "[Sửa theo HĐ 936 · x] giá 154.000 → 152.000" }, ...HP_0110.slice(1)];
+    const r = planInvoiceRemoval(p.invoices[0].id, { invoices: p.invoices, lines, trips, shipments: [] })!;
+    expect(r.restores.map((x) => [x.next.id, x.next.unitPrice, x.next.note])).toEqual([["hp1", 154000, ""]]);
+  });
+
+  it("dòng chuyến sửa tay sau khi cập nhật theo HĐ ⇒ không trả (khỏi đè số mới của xưởng)", () => {
+    const p = saved(plan(L936, HP_0110));
+    const lines = p.lines.map((l) => (l.tripLineId === "hp1" ? { ...l, resolution: "updated" as const, resolutionReason: encodeTripBefore({ quantityKg: 1707, unitPrice: 154000 }) } : l));
+    const trips = [{ ...HP_0110[0], quantityKg: 1690 }, ...HP_0110.slice(1)];
+    const r = planInvoiceRemoval(p.invoices[0].id, { invoices: p.invoices, lines, trips, shipments: [] })!;
+    expect(r.restores).toEqual([]);
+    expect(r.unrestorable[0].reason).toContain("sửa tay");
+  });
+
+  it("HĐ đã Tạo chuyến từ HĐ ⇒ chặn gỡ; HĐ 93 không bắt chuyến của HĐ 936; khác đại lý không bắt", () => {
+    const p = saved(plan(L936, HP_0110));
+    const inv = p.invoices[0];
+    const s936 = ship("s1", "Hồng Phú", "Theo HĐ 936 (phiếu kế toán 0/008/10)");
+    const shipments = [s936, ship("s2", "Hồng Phú", "Theo HĐ 9361"), ship("s3", "Mậu", "Theo HĐ 936"), ship("s4", "Hồng Phú", "chờ hóa đơn")];
+    expect(tripsCreatedFromInvoice(inv, shipments)).toEqual([s936]);
+    expect(tripsCreatedFromInvoice({ ...inv, invoiceNo: "93" }, shipments)).toEqual([]);
+    expect(planInvoiceRemoval(inv.id, { invoices: p.invoices, lines: p.lines, trips: HP_0110, shipments })!.blockingShipments).toEqual([s936]);
+  });
+
+  it("chuyến tạo từ HĐ mang đúng lý do mà tripsCreatedFromInvoice nhận lại", () => {
+    const rows = ledger([["HOACHUONG", "242", 9, 1, "s", 2201, 134000, "86A 20964"]]);
+    const p = plan(rows, []);
+    let n = 0;
+    const made = buildTripsFromInvoice({
+      invoice: p.invoices[0],
+      lines: p.lines.map((l) => l.line),
+      materialByCode: new Map(maps.filter((m) => m.kind === "material").map((m) => [m.code, m.targetName])),
+      categoryOf: () => "Bạch tuộc",
+      workshop: "Đông",
+      postingDate: "2026-10-30",
+      operator: "Trúc",
+      lotCodeFor: (d, k) => `Đ-${d}-${k}`,
+      newId: () => `id${++n}`,
+    });
+    expect(tripsCreatedFromInvoice(p.invoices[0], made.map((m) => m.shipment))).toHaveLength(1);
+  });
+});
+
+describe("R14 — xóa dòng chuyến ⇒ dòng HĐ về Không có chuyến", () => {
+  it("bỏ liên kết + quyết định cũ của đúng dòng bị xóa; không đổi gì ⇒ trả mảng cũ", () => {
+    const p = saved(plan(L936, HP_0110));
+    const lines = p.lines.map((l) => (l.tripLineId === "hp1" ? { ...l, resolution: "explained" as const, resolutionReason: "cân xưởng đúng", resolvedBy: "Trúc", resolvedAt: "x" } : l));
+    const r = unlinkRemovedTripLines(lines, ["hp1", "không-gắn"]);
+    expect(r.changed).toBe(1);
+    const hp1 = r.lines.find((l) => l.materialCode === "BT-1DANL")!;
+    expect(hp1).toMatchObject({ tripLineId: "", resolution: "", resolutionReason: "", resolvedBy: "", resolvedAt: "" });
+    expect(r.lines.filter((l) => l.tripLineId).map((l) => l.tripLineId).sort()).toEqual(["hp2", "hp3"]);
+    expect(unlinkRemovedTripLines(lines, ["zz"]).lines).toBe(lines);
+    expect(unlinkRemovedTripLines(lines, []).changed).toBe(0);
+    const inv = new Map(p.invoices.map((i) => [i.id, i]));
+    expect(lineStateNow(hp1, inv.get(hp1.invoiceId), new Map(HP_0110.map((t) => [t.id, t])))).toBe("no-trip");
+  });
+
+  it("nạp lại sau khi chuyến cũ bị xóa: ghép sang chuyến mới thì bỏ quyết định cũ, cùng chuyến thì giữ", () => {
+    const first = saved(plan(L936, HP_0110));
+    const decided = { ...first, lines: first.lines.map((l) => ({ ...l, resolution: "explained" as const, resolutionReason: "cân xưởng đúng" })) };
+    const keep = plan(L936, HP_0110, decided);
+    expect(keep.lines.every((l) => l.line.resolution === "explained")).toBe(true);
+    // hp1 bị xóa, thủ kho ghi lại thành dòng mới hp1b ⇒ liên kết cũ treo.
+    const reEntered = [...HP_0110.filter((t) => t.id !== "hp1"), { ...HP_0110[0], id: "hp1b" }];
+    const again = plan(L936, reEntered, decided);
+    const l1 = again.lines.find((l) => l.line.materialCode === "BT-1DANL")!;
+    expect(l1.line.tripLineId).toBe("hp1b");
+    expect(l1.line.resolution).toBe("");
+    expect(again.lines.filter((l) => l.line.tripLineId !== "hp1b").every((l) => l.line.resolution === "explained")).toBe(true);
+  });
+});

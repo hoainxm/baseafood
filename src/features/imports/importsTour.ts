@@ -104,7 +104,8 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
             "Có phiếu viết tay thì chọn Đọc ảnh phiếu rồi chụp hoặc chọn ảnh. Máy đọc ra ngày, đại lý, xưởng, xe và các dòng loại nguyên liệu kèm kg.\n" +
             "• Hộp kết quả để ảnh phiếu cạnh bảng đối chiếu: cột Trên phiếu là chữ máy chép y, cột Điền vào sổ là giá trị sẽ điền, kèm nhãn Khớp danh mục · Đã có trong sổ · Mới, kiểm kỹ · Chưa khớp, chọn tay.\n" +
             "• Dòng tổng so với tổng chân phiếu: Khớp hoặc Lệch.\n" +
-            "• Bỏ tick ô đọc sai rồi chọn “Điền … ô đã chọn vào phiếu”. Số chỉ điền vào phiếu như bản nháp — soát lại rồi mới lưu. Riêng phế liệu đọc được thì nút Ghi phế liệu ghi thẳng vào sổ phế liệu của ngày.",
+            "• Bỏ tick ô đọc sai rồi chọn “Điền … ô đã chọn vào phiếu”. Số chỉ điền vào phiếu như bản nháp — soát lại rồi mới lưu. Riêng phế liệu đọc được thì nút Ghi phế liệu ghi thẳng vào sổ phế liệu của ngày.\n" +
+            "• Đọc xong, đầu chuyến hiện nhãn Đã đính ảnh phiếu: Xem để mở ảnh, Thay ảnh để chọn ảnh khác (không đọc lại số), Gỡ ảnh để bỏ ảnh đính nhầm (hỏi xác nhận, có Hoàn tác). Đổi ảnh chỉ vào sổ khi lưu chuyến; chuyến của ngày đã chốt thì Mở lại ngày trước.",
         }),
       );
     }
@@ -318,7 +319,8 @@ export function buildImportsTour(ctx: ImportsTourContext): PageTour {
           "• Lệch giá / Lệch kg — chọn Cập nhật theo HĐ (đổi số chuyến, Ghi chú dòng ghi vết “[Sửa theo HĐ …]”, ngày đã chốt ghi thêm “SAU KHI CHỐT NGÀY”, có Hoàn tác) hoặc Giữ số xưởng (bắt ghi lý do ⇒ Lệch đã giải trình).\n" +
           "• Không có chuyến — chọn Tạo chuyến từ HĐ (chuyến ghi bù, lý do điền sẵn “Theo HĐ …”) hoặc Không thuộc chuyến (hàng đông gửi kho lạnh, không đi qua Nhập hàng; Bỏ xếp để ghép lại).\n" +
           "• Chưa ánh xạ — mã kế toán chưa chọn đại lý / loại, nạp lại sau khi chọn.\n" +
-          "Nhãn Không còn trong file: lần nạp sau không còn dòng đó, liên kết vẫn giữ. Mở file để xem PDF hóa đơn.",
+          "Nhãn Không còn trong file: lần nạp sau không còn dòng đó, liên kết vẫn giữ. Mở file để xem PDF hóa đơn.\n" +
+          "Chi tiết (dòng đầu mỗi hóa đơn) mở đủ thông tin hóa đơn. Gắn nhầm thì chọn Gỡ hóa đơn trong hộp đó (cần quyền Xóa hóa đơn, hỏi xác nhận, có Hoàn tác): bỏ hóa đơn cùng các dòng sổ chi tiết và file, chuyến về Chờ HĐ; dòng chuyến đã Cập nhật theo HĐ được trả số cũ (hộp xác nhận kể từng dòng), dòng đã sửa tay sau đó thì giữ số. Hóa đơn đã Tạo chuyến từ HĐ thì xóa chuyến đó trước. Xóa một chuyến đã gắn hóa đơn thì dòng hóa đơn về Không có chuyến.",
       }),
     );
   }

@@ -4,7 +4,7 @@
 covers: src/features/imports/*, src/features/reports/MaterialNxtScreen.tsx, src/lib/supplierInvoice*.ts, src/lib/inventoryMaterial.ts, src/lib/periodUtils.ts
 tours: src/features/imports/importsTour.ts, src/features/reports/materialStockTour.ts
 guides: src/features/shared/guideContent.tsx, src/features/shared/guides/materialStockGuide.tsx
-last_verified: 2026-11-03
+last_verified: 2026-11-06
 ttl_days: 90
 
 Sửa code trong `covers:` mà không sửa file này ⇒ commit bị chặn ([README](README.md) § Luật đồng bộ).
@@ -59,6 +59,17 @@ stateDiagram-v2
 | Không thuộc chuyến | Kế toán xếp HĐ ra ngoài sổ nhập | Bấm bỏ xếp để ghép lại |
 | Chưa ánh xạ | Mã đại lý hoặc mã vật tư chưa có trong danh mục | Ánh xạ mã kế toán trước |
 
+**Gỡ hóa đơn gắn nhầm** (ba-spec 51 NV7 · R17): **Chi tiết** ở dòng đầu hóa đơn → **Gỡ hóa đơn** trong hộp chi tiết (không có nút trên dòng bảng). Cần quyền Xóa `imports.invoices` (Kế toán trưởng). Hỏi xác nhận, có Hoàn tác, ghi nhật ký ở hồ sơ hóa đơn và hồ sơ ngày × xưởng của chuyến đang gắn.
+
+| Trường hợp | Kết quả | Code |
+|---|---|---|
+| HĐ chưa tạo chuyến ghi bù | Bỏ HĐ + mọi dòng sổ chi tiết + thông tin file. Chuyến đang gắn về **Chờ HĐ** | `planInvoiceRemoval` |
+| HĐ đã **Tạo chuyến từ HĐ**, chuyến còn trong sổ | **Chặn**, báo xóa chuyến đó trước (mở chuyến → Xóa chuyến) | `tripsCreatedFromInvoice` |
+| Dòng chuyến đã **Cập nhật theo HĐ** | **Trả số cũ** (kg, đơn giá) và bỏ vết "[Sửa theo HĐ ‹số› …]". Hộp xác nhận kể từng dòng. Cần thêm quyền Sửa Nhập hàng, thiếu ⇒ chặn gỡ. Số cũ: lưu chính xác lúc cập nhật (từ 2026-11-06), dữ liệu cũ đọc từ dòng vết | `restores` · `encodeTripBefore` · `tripBeforeFromTrace` |
+| Dòng đó đã sửa tay sau khi cập nhật, hoặc mất dòng vết | Giữ số, hộp chi tiết nêu lý do | `unrestorable` |
+
+File PDF trên kho file giữ nguyên để Hoàn tác được; nạp lại đúng file thì gắn lại.
+
 Nạp lại file không nhân đôi dòng. Mỗi dòng so với lần nạp trước: Mới · Đổi · Như cũ · Không còn trong file (R9). PDF kiểm chéo với sổ kế toán, cảnh báo: PDF chưa có trong sổ kế toán · MST danh mục khác hóa đơn · PDF lệch sổ kế toán · Nhiều HĐ cùng số — chưa biết của đại lý nào. Code: `tripInvoiceInfo` · `lineStateNow` · `isOpenMismatch` · `TRIP_INVOICE_STATUS_LABELS` · `SUPPLIER_INVOICE_LINE_STATE_LABELS` · `IMPORT_CHANGE_LABELS` · `PDF_WARNING_LABELS`.
 
 ## 2. Các bước ghi một ngày nhập
@@ -79,6 +90,8 @@ flowchart LR
 | 5 · Chốt ngày | Nút "Chốt ngày" (chỉ hiện khi xem MỘT ngày của MỘT xưởng) | Có bản ghi `isLocked = true` và `totalKgAtLock` = tổng thật của ngày (`dayWorkshopTotal`, không theo bộ lọc) | Thủ kho nhập hàng · Kế toán |
 | Sau đó · Hóa đơn | Nạp sổ chi tiết NL, PDF; ghép, xử lệch | Chuyến đạt "Đã có HĐ" (xem § 1) | Kế toán (quyền `imports.invoices`) |
 
+**Ảnh phiếu tay** (nhãn "Đã đính ảnh phiếu" ở Đầu chuyến, đính khi Đọc ảnh phiếu): **Xem** · **Thay ảnh** (chọn ảnh khác, không đọc lại số, có Hoàn tác) · **Gỡ ảnh** (hỏi xác nhận, có Hoàn tác). Đổi ảnh là sửa phiếu, chỉ vào sổ khi Lưu chuyến (nhật ký ghi "· gỡ / thay ảnh phiếu"). Chuyến của ngày đã chốt ⇒ Mở lại ngày trước. File ảnh trên kho giữ nguyên.
+
 Phiếu "Báo cáo ngày" (in A4 ngang) và tab "Báo cáo" chỉ đọc, không đổi dữ liệu. Tab "Hóa đơn" chỉ hiện khi có quyền Xem `imports.invoices`.
 
 ## 3. Bàn giao giữa bộ phận
@@ -97,7 +110,7 @@ sequenceDiagram
 ```
 
 - Xưởng chỉ thấy nhãn trạng thái HĐ trên chuyến. File PDF và tiền hóa đơn chỉ người có quyền `imports.invoices` thấy (R12).
-- Không tự đổi số chuyến theo HĐ (R6): chỉ đổi khi kế toán chọn Cập nhật theo HĐ. Xóa chuyến ⇒ dòng HĐ về "Không có chuyến" (R14).
+- Không tự đổi số chuyến theo HĐ (R6): chỉ đổi khi kế toán chọn Cập nhật theo HĐ. Xóa chuyến, hoặc bỏ dòng khi sửa chuyến ⇒ dòng HĐ về "Không có chuyến", bỏ quyết định cũ (R14, `unlinkRemovedTripLines`). Người xóa không có quyền ghi hóa đơn ⇒ tab Hóa đơn vẫn hiện "Không có chuyến", lần nạp lại ghép mới. Hoàn tác xóa chuyến ⇒ liên kết trở lại.
 
 ## 4. Tồn kho nguyên liệu (`/nxt-material`)
 
@@ -157,4 +170,5 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 
 ## Lịch sử
 
+- 2026-11-06 — gỡ hóa đơn gắn nhầm (hộp Chi tiết), gỡ / thay ảnh phiếu, xóa dòng chuyến bỏ liên kết HĐ ngay.
 - 2026-11-03 — tạo.

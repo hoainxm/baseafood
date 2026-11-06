@@ -262,6 +262,13 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             </li>
           </Y>
         </Section>
+        <Section title="Ảnh phiếu tay">
+          <p>
+            <b>Đọc ảnh phiếu</b> chụp phiếu viết tay, máy điền nháp và đính ảnh kèm chuyến (nhãn <b>Đã đính ảnh phiếu</b>).
+            Đính nhầm ảnh: <b>Thay ảnh</b> chọn ảnh khác (không đọc lại số) hoặc <b>Gỡ ảnh</b> (hỏi xác nhận, có Hoàn tác).
+            Đổi ảnh chỉ vào sổ khi chọn Lưu chuyến; chuyến của ngày đã chốt phải <b>Mở lại ngày</b> trước.
+          </p>
+        </Section>
         <Section title="Phế liệu (nội tạng, hàng dạt)">
           <p>
             Cân gộp cuối ngày, gõ số kg vào ô <b>Nội tạng</b> và <b>Dạt</b> ở khối{" "}
@@ -295,6 +302,12 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
               (hàng đông gửi kho lạnh).
             </li>
             <li><b>Chưa ánh xạ</b>: chọn đại lý / loại cho mã kế toán rồi nạp lại.</li>
+            <li>
+              <b>Gắn nhầm hóa đơn</b>: chọn <b>Chi tiết</b> ở dòng đầu hóa đơn → <b>Gỡ hóa đơn</b> (hỏi xác nhận, có Hoàn tác, cần quyền Xóa hóa đơn).
+              Hóa đơn, các dòng sổ chi tiết và file bị bỏ; chuyến về <b>Chờ HĐ</b>. Dòng chuyến đã <b>Cập nhật theo HĐ</b> được{" "}
+              <b>trả số cũ</b> (hộp xác nhận kể từng dòng, cần thêm quyền Sửa Nhập hàng); dòng đã sửa tay sau đó thì giữ số. Hóa đơn đã{" "}
+              <b>Tạo chuyến từ HĐ</b> thì xóa chuyến đó trước.
+            </li>
             <li>
               Lọc: <b>Đại lý</b> · <b>Phân xưởng</b> · <b>Trạng thái dòng</b> · ô tra số HĐ, ký hiệu, số phiếu nhập, mã đại lý / vật tư,
               biển số. Bốn thẻ đếm theo bộ lọc; <b>Bỏ hết bộ lọc</b> để về cả khoảng ngày.

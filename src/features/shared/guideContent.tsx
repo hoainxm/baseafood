@@ -448,7 +448,8 @@ const BASE_PAGE_GUIDES: Record<string, PageGuide> = {
             <li>
               <b>Hủy lệnh xuất</b> (mục Lệnh xuất đã lập): ghi lý do rồi xác nhận. Tồn trả về đúng các lô, phiếu bán Xuất khẩu
               đi kèm bị gỡ khỏi Bán hàng, đơn tính lại trạng thái. Lệnh vẫn hiện với nhãn <b>Đã hủy</b>. Kỳ Cân đối đã hút phiếu
-              bán thì gỡ ở Cân đối trước.
+              bán thì gỡ ở Cân đối trước. Trang còn đang tải sổ Cân đối thì đợi rồi thử lại. Lệnh lập trước 06/11/2026 mà có
+              nhiều phiếu bán giống hệt nhau thì app chỉ trả tồn, không tự gỡ phiếu — vào Bán hàng xóa tay đúng một phiếu.
             </li>
             <li>
               <b>Bỏ kiểm</b> (hộp Kiểm lô bằng quét): quét nhầm thì đưa lô về Chưa quét.

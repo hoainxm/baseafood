@@ -45,7 +45,7 @@ Sau lệnh xuất, mỗi dòng đơn so `requiredQuantityKg` với số đã xu�
 | Đã lập (`closed`) | Dòng lệnh đã trừ tồn từng lô; phiếu bán kênh Xuất khẩu mang **đúng id của lệnh** (lệnh lập trước 06/11/2026: dò phiếu cùng khách · ngày giao = ngày xuất · đủ bộ mặt hàng × quy cách × kg · nguồn "Đơn đặt") | **Hủy lệnh xuất** ở mục Lệnh xuất đã lập: ghi **Lý do hủy** (bắt buộc, có nháp), xác nhận | Người có quyền Xóa ở **cả** Đơn đặt **lẫn** Bán hàng (mặc định: Kế toán trưởng) | `openCancelExport` · `checkExportReversal` · `findLinkedSalesInvoice` |
 | Đã hủy (`cancelled`) | Dòng lệnh bị xóa ⇒ tồn trả về đúng lô, đúng kg; phiếu bán + dòng bán đi kèm bị gỡ; dấu quét kiểm của lệnh bị gỡ. Đầu lệnh còn lại với nhãn **Đã hủy** + ghi chú "Đã hủy ‹ngày› · ‹người›: ‹lý do› (đã trả … kg về … lô, gỡ phiếu bán … dòng)". Đơn tính lại trạng thái theo các lệnh còn hiệu lực | Hết (muốn xuất lại thì lập lệnh mới). Toast **Hoàn tác** trả nguyên mọi sổ | — | `reverseExportOrder` · `orderStatusFromExports` |
 
-Hủy lệnh xuất **bị chặn** khi Cân đối kỳ đã hút dòng bán của phiếu (`balancing_outputs.sales_item_id`) — gỡ dòng ở Cân đối trước. Phiếu bán đã bị xóa ở Bán hàng ⇒ vẫn hủy được, chỉ trả tồn. Giá đã ghi trên dòng bán mất theo phiếu (hộp hủy báo trước số dòng có giá).
+Hủy lệnh xuất **bị chặn** khi Cân đối kỳ đã hút dòng bán của phiếu (`balancing_outputs.sales_item_id`) — gỡ dòng ở Cân đối trước — và khi **sổ Cân đối chưa tải xong / lỗi tải** (`balancingOutputsReady`: mảng rỗng lúc đầu không có nghĩa là chưa hút; báo "Đang tải sổ Cân đối… thử lại"). Phiếu bán đã bị xóa ở Bán hàng ⇒ vẫn hủy được, chỉ trả tồn. Lệnh cũ mà dò ra **mơ hồ** (hơn một phiếu giống hệt, hoặc còn lệnh cũ khác chưa hủy cùng khách · ngày · bộ hàng — `resolveLinkedSalesInvoice` kind `ambiguous`) ⇒ hủy chỉ trả tồn, **không tự gỡ phiếu nào**; hộp hủy, toast và ghi chú lệnh nhắc vào Bán hàng xóa tay đúng một phiếu. Giá đã ghi trên dòng bán mất theo phiếu (hộp hủy báo trước số dòng có giá).
 
 **Xóa đơn** (nút trong chi tiết đơn, `ConfirmDelete` + Hoàn tác — không còn nút Bỏ trên dòng bảng): chỉ khi đơn **không còn lệnh xuất hiệu lực**; còn ⇒ báo phải Hủy lệnh xuất trước (`checkOrderDelete`). Đầu lệnh đã hủy đi theo đơn.
 
@@ -131,4 +131,5 @@ Sinh từ ma trận quyền mặc định (vai đã chỉnh ở /roles có thể
 ## Lịch sử
 
 - 2026-11-03 — tạo.
+- 2026-11-06 (b) — chặn hủy khi sổ Cân đối chưa tải; lệnh cũ khớp mơ hồ không tự gỡ phiếu.
 - 2026-11-06 — gỡ được việc làm nhầm: Hủy lệnh xuất (trả tồn + gỡ phiếu bán, giữ đầu lệnh Đã hủy), Mở lại đơn, Xóa đơn trong chi tiết (chặn khi còn lệnh), Bỏ kiểm lô.

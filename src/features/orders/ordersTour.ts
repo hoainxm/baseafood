@@ -184,7 +184,7 @@ export function buildOrdersTour(ctx: OrdersTourContext): PageTour {
             ? "\nChọn Kiểm lô bằng quét khi xếp container: hộp liệt kê các lô của lệnh, mỗi lô Chưa quét hoặc Đã quét. Quét đúng lô ⇒ Đã quét (ghi lại, mở lại hộp vẫn còn); quét đủ ⇒ Đủ lô. Lô khác cùng mặt hàng và quy cách còn đủ tồn ⇒ hỏi Thay lô cho lệnh. Lô khác mặt hàng hoặc hết tồn ⇒ báo đỏ, đừng xếp lên xe. Ghi kiểm nhầm ⇒ Bỏ kiểm ở dòng lô (hỏi lại, có Hoàn tác): lô về Chưa quét."
             : "") +
           (can.cancelExport
-            ? "\nHủy lệnh xuất (lập nhầm): ghi lý do rồi xác nhận. Tồn kho dự trữ trả về đúng các lô lệnh đã lấy; phiếu bán Xuất khẩu đẻ từ lệnh bị gỡ khỏi Bán hàng (giá đã ghi cũng mất theo — Hoàn tác vẫn trả lại); đơn tính lại trạng thái. Kỳ Cân đối đã hút phiếu bán đó thì không hủy được — gỡ dòng ở Cân đối trước."
+            ? "\nHủy lệnh xuất (lập nhầm): ghi lý do rồi xác nhận. Tồn kho dự trữ trả về đúng các lô lệnh đã lấy; phiếu bán Xuất khẩu đẻ từ lệnh bị gỡ khỏi Bán hàng (giá đã ghi cũng mất theo — Hoàn tác vẫn trả lại); đơn tính lại trạng thái. Kỳ Cân đối đã hút phiếu bán đó thì không hủy được — gỡ dòng ở Cân đối trước. Lệnh lập trước 06/11/2026 mà có nhiều phiếu bán giống hệt thì app chỉ trả tồn, không tự gỡ phiếu — vào Bán hàng xóa tay đúng một phiếu."
             : ""),
       }),
     );

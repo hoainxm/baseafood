@@ -16,6 +16,7 @@ import {
   checkOrderDelete,
   findLinkedSalesInvoice,
   orderStatusFromExports,
+  resolveLinkedSalesInvoice,
   reverseExportOrder,
   type ExportReversalData,
 } from "./orderExportReversal";
@@ -90,6 +91,7 @@ const data = (over: Partial<ExportReversalData> = {}): ExportReversalData => ({
   salesItems: [...salesLines, otherLine],
   lotDispatches: [check],
   balancingOutputs: [],
+  balancingOutputsReady: true,
   ...over,
 });
 const meta = { reason: "Xuất nhầm container", cancelledBy: "Nguyễn Văn A", cancelledAt: "2026-11-06T09:00:00Z" };
@@ -154,6 +156,13 @@ describe("Hủy lệnh xuất", () => {
     expect(() => reverseExportOrder("x1", data({ balancingOutputs: [{ salesItemId: "s1", periodId: "k1" }] }), meta)).toThrow();
   });
 
+  test("CHẶN khi sổ Cân đối chưa tải xong (mảng rỗng lúc đầu không có nghĩa là chưa hút)", () => {
+    const c = checkExportReversal("x1", data({ balancingOutputsReady: false }));
+    expect(c.ok).toBe(false);
+    if (!c.ok) expect(c.reason).toContain("Đang tải sổ Cân đối");
+    expect(() => reverseExportOrder("x1", data({ balancingOutputsReady: false }), meta)).toThrow();
+  });
+
   test("CHẶN khi lệnh đã hủy rồi", () => {
     const c = checkExportReversal("x1", data({ exportOrders: [{ ...exportOrder, status: "cancelled" }] }));
     expect(c.ok).toBe(false);
@@ -171,19 +180,19 @@ describe("Hủy lệnh xuất", () => {
 describe("dò phiếu bán của lệnh cũ (id phiếu ngẫu nhiên)", () => {
   const legacyInvoice = { ...invoice, id: "rand-123" };
   const legacyLines = salesLines.map((b) => ({ ...b, invoiceId: "rand-123" }));
+  const look = (over: Partial<ExportReversalData> = {}, ex: ExportOrder = exportOrder, o: Pick<SalesOrder, "customerId"> = order) =>
+    resolveLinkedSalesInvoice(ex, o, data({ salesInvoices: [otherInvoice, legacyInvoice], salesItems: [otherLine, ...legacyLines], ...over }));
 
   test("khớp theo khách + ngày + bộ (mặt hàng × quy cách × kg) + nguồn Đơn đặt", () => {
-    const found = findLinkedSalesInvoice(exportOrder, order, exportItems, [exportOrder], [otherInvoice, legacyInvoice], [otherLine, ...legacyLines]);
-    expect(found?.id).toBe("rand-123");
+    expect(look()).toEqual({ kind: "legacy", invoice: legacyInvoice });
+    expect(findLinkedSalesInvoice(exportOrder, order, data({ salesInvoices: [legacyInvoice], salesItems: legacyLines }))?.id).toBe("rand-123");
   });
 
   test("lệch kg / khác khách / khác ngày ⇒ không nhận", () => {
     const lines = legacyLines.map((b, i) => (i === 0 ? { ...b, quantityKg: 299 } : b));
-    expect(findLinkedSalesInvoice(exportOrder, order, exportItems, [exportOrder], [legacyInvoice], lines)).toBeUndefined();
-    expect(findLinkedSalesInvoice(exportOrder, { customerId: "c2" }, exportItems, [exportOrder], [legacyInvoice], legacyLines)).toBeUndefined();
-    expect(
-      findLinkedSalesInvoice({ ...exportOrder, exportDate: "2026-11-04" }, order, exportItems, [exportOrder], [legacyInvoice], legacyLines),
-    ).toBeUndefined();
+    expect(look({ salesInvoices: [legacyInvoice], salesItems: lines }).kind).toBe("none");
+    expect(look({}, exportOrder, { customerId: "c2" }).kind).toBe("none");
+    expect(look({}, { ...exportOrder, exportDate: "2026-11-04" }).kind).toBe("none");
   });
 
   test("không lấy phiếu đã thuộc lệnh khác (id phiếu = id lệnh khác)", () => {
@@ -192,7 +201,50 @@ describe("dò phiếu bán của lệnh cũ (id phiếu ngẫu nhiên)", () => {
     const x2Lines = salesLines.map((b) => ({ ...b, id: `${b.id}-x2`, invoiceId: "x2" }));
     const legacyOrder = { ...exportOrder, id: "x-old" };
     const legacyItems = exportItems.map((d) => ({ ...d, exportId: "x-old" }));
-    expect(findLinkedSalesInvoice(legacyOrder, order, legacyItems, [legacyOrder, x2], [x2Invoice], x2Lines)).toBeUndefined();
+    const r = resolveLinkedSalesInvoice(
+      legacyOrder,
+      order,
+      data({ exportOrders: [legacyOrder, x2], exportItems: legacyItems, salesInvoices: [x2Invoice], salesItems: x2Lines }),
+    );
+    expect(r.kind).toBe("none");
+  });
+
+  // Hai lệnh cũ A, B cùng khách · cùng ngày · cùng bộ hàng ⇒ hai phiếu id ngẫu nhiên giống hệt.
+  const exA: ExportOrder = { ...exportOrder, id: "xA" };
+  const exB: ExportOrder = { ...exportOrder, id: "xB" };
+  const itemsA = exportItems.map((d) => ({ ...d, id: `${d.id}A`, exportId: "xA" }));
+  const itemsB = exportItems.map((d) => ({ ...d, id: `${d.id}B`, exportId: "xB", wipId: "w2" }));
+  const invA = { ...invoice, id: "randA" };
+  const invB = { ...invoice, id: "randB" };
+  const linesA = salesLines.map((b) => ({ ...b, id: `${b.id}A`, invoiceId: "randA" }));
+  const linesB = salesLines.map((b) => ({ ...b, id: `${b.id}B`, invoiceId: "randB" }));
+  const twoLegacy = (over: Partial<ExportReversalData> = {}) =>
+    data({ exportOrders: [exA, exB], exportItems: [...itemsA, ...itemsB], salesInvoices: [invA, invB], salesItems: [...linesA, ...linesB], lotDispatches: [], ...over });
+
+  test("MƠ HỒ: hai phiếu giống hệt ⇒ không nhận phiếu nào; hủy B chỉ trả tồn, phiếu của A còn nguyên", () => {
+    const r0 = resolveLinkedSalesInvoice(exB, order, twoLegacy());
+    expect(r0.kind).toBe("ambiguous");
+    expect(findLinkedSalesInvoice(exB, order, twoLegacy())).toBeUndefined();
+    const r = reverseExportOrder("xB", twoLegacy(), meta);
+    expect(r.preview.ambiguousInvoiceCount).toBe(2);
+    expect(r.salesInvoices.map((v) => v.id)).toEqual(["randA", "randB"]);
+    expect(r.salesItems).toHaveLength(linesA.length + linesB.length);
+    expect(r.exportItems.map((d) => d.exportId)).toEqual(["xA", "xA"]);
+    expect(r.exportOrders.find((e) => e.id === "xB")?.note).toContain("xóa tay");
+  });
+
+  test("MƠ HỒ: chỉ còn một phiếu nhưng hai lệnh cũ cùng khớp ⇒ vẫn không tự gỡ", () => {
+    const r = resolveLinkedSalesInvoice(exB, order, twoLegacy({ salesInvoices: [invA], salesItems: linesA }));
+    expect(r.kind).toBe("ambiguous");
+  });
+
+  test("lệnh còn lại đã hủy ⇒ không còn tranh chấp, nhận đúng phiếu", () => {
+    const r = resolveLinkedSalesInvoice(
+      exB,
+      order,
+      twoLegacy({ exportOrders: [{ ...exA, status: "cancelled" }, exB], exportItems: itemsB, salesInvoices: [invB], salesItems: linesB }),
+    );
+    expect(r).toEqual({ kind: "legacy", invoice: invB });
   });
 });
 

@@ -40,38 +40,65 @@ const sameMultiset = (a: string[], b: string[]) => {
   return x.every((v, i) => v === y[i]);
 };
 
+export type LinkedInvoiceResult =
+  | { kind: "direct"; invoice: SalesInvoice }
+  | { kind: "legacy"; invoice: SalesInvoice }
+  | { kind: "none" }
+  /** Lệnh cũ mà nhiều phiếu (hoặc nhiều lệnh) giống hệt nhau ⇒ không biết phiếu nào của lệnh này. */
+  | { kind: "ambiguous"; candidates: SalesInvoice[] };
+
 /**
  * Phiếu bán đẻ từ lệnh xuất.
- *  - Lệnh lập từ bản này: phiếu mang ĐÚNG id của lệnh (tất định, khỏi thêm cột).
- *  - Lệnh cũ (trước 2026-11-06, phiếu id ngẫu nhiên): dò phiếu kênh Xuất khẩu, cùng khách,
- *    ngày giao = ngày xuất, mọi dòng nguồn "Đơn đặt" và khớp đúng bộ (mặt hàng × quy cách × kg)
- *    của lệnh. Bỏ qua phiếu đã thuộc một lệnh khác (id trùng id lệnh khác).
+ *  - Lệnh lập từ bản 2026-11-06: phiếu mang ĐÚNG id của lệnh (tất định, khỏi thêm cột).
+ *  - Lệnh cũ (phiếu id ngẫu nhiên): dò phiếu kênh Xuất khẩu, cùng khách, ngày giao = ngày xuất,
+ *    mọi dòng nguồn "Đơn đặt" và khớp đúng bộ (mặt hàng × quy cách × kg) của lệnh. Bỏ qua phiếu
+ *    đã thuộc một lệnh khác (id trùng id lệnh khác).
+ *  - MƠ HỒ ⇒ KHÔNG nhận phiếu nào (gỡ nhầm phiếu của lệnh khác là mất sổ): khớp > 1 phiếu, hoặc
+ *    còn một lệnh cũ khác (chưa hủy, cùng khách, cùng ngày, cùng bộ hàng) cũng khớp được phiếu đó.
  */
+export function resolveLinkedSalesInvoice(
+  exportOrder: ExportOrder,
+  order: Pick<SalesOrder, "customerId">,
+  data: Pick<ExportReversalData, "exportItems" | "exportOrders" | "salesOrders" | "salesInvoices" | "salesItems">,
+): LinkedInvoiceResult {
+  const direct = data.salesInvoices.find((v) => v.id === exportOrder.id);
+  if (direct) return { kind: "direct", invoice: direct };
+  const bagOf = (exportId: string) =>
+    data.exportItems.filter((d) => d.exportId === exportId).map((d) => lineKey(d.productId, d.spec, d.quantityKg));
+  const wanted = bagOf(exportOrder.id);
+  if (wanted.length === 0) return { kind: "none" };
+  const exportIds = new Set(data.exportOrders.map((e) => e.id));
+  const candidates = data.salesInvoices.filter((v) => {
+    if (exportIds.has(v.id)) return false; // phiếu của lệnh khác (id = id lệnh) hoặc của chính lệnh (đã xét ở trên)
+    if (v.channel !== "Xuất khẩu" || v.customerId !== order.customerId) return false;
+    if (v.deliveryDate !== exportOrder.exportDate) return false;
+    const lines = data.salesItems.filter((b) => b.invoiceId === v.id);
+    if (lines.length === 0 || lines.some((b) => b.sourceWarehouse !== ORDER_HANDOFF_SOURCE)) return false;
+    return sameMultiset(lines.map((b) => lineKey(b.productId, b.spec, b.quantityKg)), wanted);
+  });
+  if (candidates.length === 0) return { kind: "none" };
+  if (candidates.length > 1) return { kind: "ambiguous", candidates };
+  const customerOf = (orderId: string) => data.salesOrders.find((d) => d.id === orderId)?.customerId;
+  const hasRival = data.exportOrders.some(
+    (e) =>
+      e.id !== exportOrder.id &&
+      !isCancelledExport(e) &&
+      e.exportDate === exportOrder.exportDate &&
+      customerOf(e.orderId) === order.customerId &&
+      !data.salesInvoices.some((v) => v.id === e.id) &&
+      sameMultiset(bagOf(e.id), wanted),
+  );
+  return hasRival ? { kind: "ambiguous", candidates } : { kind: "legacy", invoice: candidates[0]! };
+}
+
+/** Phiếu bán chắc chắn thuộc lệnh (undefined khi không có hoặc mơ hồ). */
 export function findLinkedSalesInvoice(
   exportOrder: ExportOrder,
   order: Pick<SalesOrder, "customerId">,
-  exportItems: readonly ExportItem[],
-  exportOrders: readonly ExportOrder[],
-  salesInvoices: readonly SalesInvoice[],
-  salesItems: readonly SalesItem[],
+  data: Pick<ExportReversalData, "exportItems" | "exportOrders" | "salesOrders" | "salesInvoices" | "salesItems">,
 ): SalesInvoice | undefined {
-  const direct = salesInvoices.find((v) => v.id === exportOrder.id);
-  if (direct) return direct;
-  const own = exportItems.filter((d) => d.exportId === exportOrder.id);
-  if (own.length === 0) return undefined;
-  const wanted = own.map((d) => lineKey(d.productId, d.spec, d.quantityKg));
-  const otherExportIds = new Set(exportOrders.filter((e) => e.id !== exportOrder.id).map((e) => e.id));
-  return salesInvoices.find((v) => {
-    if (otherExportIds.has(v.id)) return false;
-    if (v.channel !== "Xuất khẩu" || v.customerId !== order.customerId) return false;
-    if (v.deliveryDate !== exportOrder.exportDate) return false;
-    const lines = salesItems.filter((b) => b.invoiceId === v.id);
-    if (lines.length === 0 || lines.some((b) => b.sourceWarehouse !== ORDER_HANDOFF_SOURCE)) return false;
-    return sameMultiset(
-      lines.map((b) => lineKey(b.productId, b.spec, b.quantityKg)),
-      wanted,
-    );
-  });
+  const r = resolveLinkedSalesInvoice(exportOrder, order, data);
+  return r.kind === "direct" || r.kind === "legacy" ? r.invoice : undefined;
 }
 
 /** Trạng thái đơn theo các lệnh còn hiệu lực: đủ hết ⇒ "closed", còn thiếu ⇒ `whenMissing`. */
@@ -101,6 +128,8 @@ export interface ExportReversalData {
   salesItems: SalesItem[];
   lotDispatches: LotDispatch[];
   balancingOutputs: readonly Pick<BalancingOutputItem, "salesItemId" | "periodId">[];
+  /** Sổ Cân đối đã tải xong từ máy chủ. Chưa xong ⇒ KHÔNG biết phiếu đã bị hút chưa ⇒ chặn. */
+  balancingOutputsReady: boolean;
 }
 
 export interface ExportReversalPreview {
@@ -110,6 +139,8 @@ export interface ExportReversalPreview {
   totalKg: number;
   lotCount: number;
   invoice: SalesInvoice | undefined;
+  /** > 0 ⇒ lệnh cũ khớp mơ hồ với chừng này phiếu: KHÔNG tự gỡ, người dùng xóa tay ở Bán hàng. */
+  ambiguousInvoiceCount: number;
   invoiceLines: SalesItem[];
   /** Số dòng bán đã có đơn giá (sẽ mất theo phiếu — Hoàn tác vẫn trả lại). */
   pricedLineCount: number;
@@ -127,8 +158,15 @@ export function checkExportReversal(exportOrderId: string, data: ExportReversalD
   if (isCancelledExport(exportOrder)) return { ok: false, reason: "Lệnh xuất này đã hủy rồi." };
   const order = data.salesOrders.find((d) => d.id === exportOrder.orderId);
   if (!order) return { ok: false, reason: "Không tìm thấy đơn của lệnh xuất này." };
+  if (!data.balancingOutputsReady) {
+    return {
+      ok: false,
+      reason: "Đang tải sổ Cân đối kỳ — chưa kiểm được phiếu bán của lệnh đã bị hút vào kỳ nào chưa. Đợi trang tải xong (hoặc có mạng lại) rồi thử lại.",
+    };
+  }
   const items = data.exportItems.filter((d) => d.exportId === exportOrder.id);
-  const invoice = findLinkedSalesInvoice(exportOrder, order, data.exportItems, data.exportOrders, data.salesInvoices, data.salesItems);
+  const link = resolveLinkedSalesInvoice(exportOrder, order, data);
+  const invoice = link.kind === "direct" || link.kind === "legacy" ? link.invoice : undefined;
   const invoiceLines = invoice ? data.salesItems.filter((b) => b.invoiceId === invoice.id) : [];
   const lineIds = new Set(invoiceLines.map((b) => b.id));
   const pulledBy = data.balancingOutputs.filter((o) => o.salesItemId && lineIds.has(o.salesItemId));
@@ -149,6 +187,7 @@ export function checkExportReversal(exportOrderId: string, data: ExportReversalD
       totalKg: items.reduce((s, d) => s + (d.quantityKg || 0), 0),
       lotCount: new Set(items.map((d) => d.wipId)).size,
       invoice,
+      ambiguousInvoiceCount: link.kind === "ambiguous" ? link.candidates.length : 0,
       invoiceLines,
       pricedLineCount: invoiceLines.filter((b) => b.unitPrice != null).length,
       checkCount: data.lotDispatches.filter((x) => x.docKind === "export_item" && itemIds.has(x.docId)).length,
@@ -183,7 +222,11 @@ export function reverseExportOrder(
   const by = meta.cancelledBy ? ` · ${meta.cancelledBy}` : "";
   const removed =
     `đã trả ${preview.totalKg.toLocaleString("vi-VN")} kg về ${preview.lotCount} lô` +
-    (invoiceId ? `, gỡ phiếu bán ${preview.invoiceLines.length} dòng` : ", không thấy phiếu bán đi kèm");
+    (invoiceId
+      ? `, gỡ phiếu bán ${preview.invoiceLines.length} dòng`
+      : preview.ambiguousInvoiceCount
+        ? `, phiếu bán CHƯA gỡ: ${preview.ambiguousInvoiceCount} phiếu giống nhau, xóa tay đúng một phiếu ở Bán hàng`
+        : ", không thấy phiếu bán đi kèm");
   const cancelNote = `Đã hủy ${meta.cancelledAt.slice(0, 10)}${by}: ${meta.reason.trim()} (${removed})`;
   const exportOrders = data.exportOrders.map((e) =>
     e.id === preview.exportOrder.id

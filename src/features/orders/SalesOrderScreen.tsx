@@ -175,7 +175,7 @@ export default function SalesOrderScreen() {
   const [packagings] = usePackagings();
   const [lotInputs] = useLotInputs();
   const [lotDispatches, persistLotDispatches] = useLotDispatches();
-  const [balancingOutputs] = useBalancingOutputs();
+  const [balancingOutputs, , balancingOutputsMeta] = useBalancingOutputs();
   // Trừ đúng lô đã gắn (truy xuất QR) trước khi lập lệnh FIFO — lệnh không lấy lô đã đi.
   const retailSales = useMemo(
     () => collectWipDeductions(salesItems, packagings, lotInputs, lotDispatches),
@@ -463,6 +463,8 @@ export default function SalesOrderScreen() {
     salesItems,
     lotDispatches,
     balancingOutputs,
+    // Sổ Cân đối chưa tải xong (hoặc lỗi tải) ⇒ chưa biết phiếu đã bị hút ⇒ Hủy lệnh xuất bị chặn.
+    balancingOutputsReady: balancingOutputsMeta.status === "ready",
   };
   const cancelCheck = cancelling ? checkExportReversal(cancelling.exportId, reversalData) : null;
   const openCancelExport = (l: ExportOrder) => {
@@ -504,7 +506,11 @@ export default function SalesOrderScreen() {
     cancelDraft.done();
     notify.deleted(
       `Đã hủy lệnh xuất ${formatDateVN(r.preview.exportOrder.exportDate)} — trả ${kg(r.preview.totalKg)} về kho` +
-        (r.preview.invoice ? ", gỡ phiếu bán đi kèm" : ""),
+        (r.preview.invoice
+          ? ", gỡ phiếu bán đi kèm"
+          : r.preview.ambiguousInvoiceCount
+            ? " · phiếu bán CHƯA gỡ — vào Bán hàng xóa tay đúng một phiếu"
+            : ""),
       () => {
         persistExportItems(prev.exportItems);
         persistExportOrders(prev.exportOrders);
@@ -864,11 +870,20 @@ export default function SalesOrderScreen() {
                     Trả về kho <span className="tnum font-semibold">{kg(cancelCheck.preview.totalKg)}</span> ·{" "}
                     <span className="tnum">{cancelCheck.preview.lotCount}</span> lô
                   </li>
-                  <li>
-                    {cancelCheck.preview.invoice
-                      ? `Gỡ phiếu bán ${formatDateVN(cancelCheck.preview.invoice.deliveryDate)} — ${cancelCheck.preview.invoiceLines.length} dòng`
-                      : "Không thấy phiếu bán đi kèm (có thể đã xóa ở Bán hàng) — chỉ trả tồn"}
-                  </li>
+                  {!cancelCheck.preview.ambiguousInvoiceCount && (
+                    <li>
+                      {cancelCheck.preview.invoice
+                        ? `Gỡ phiếu bán ${formatDateVN(cancelCheck.preview.invoice.deliveryDate)} — ${cancelCheck.preview.invoiceLines.length} dòng`
+                        : "Không thấy phiếu bán đi kèm (có thể đã xóa ở Bán hàng) — chỉ trả tồn"}
+                    </li>
+                  )}
+                  {cancelCheck.preview.ambiguousInvoiceCount > 0 && (
+                    <li className="text-warning">
+                      Lệnh lập trước 06/11/2026 và có {cancelCheck.preview.ambiguousInvoiceCount} phiếu bán Xuất khẩu giống hệt nhau
+                      (cùng khách, cùng ngày, cùng hàng) — app KHÔNG tự gỡ phiếu nào để khỏi gỡ nhầm phiếu của lệnh khác. Hủy xong,
+                      vào Bán hàng xóa tay đúng một phiếu của lệnh này.
+                    </li>
+                  )}
                   {cancelCheck.preview.pricedLineCount > 0 && (
                     <li className="text-warning">
                       {cancelCheck.preview.pricedLineCount} dòng bán đã ghi giá — giá mất theo phiếu (Hoàn tác vẫn trả lại)

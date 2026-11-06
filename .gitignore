@@ -30,3 +30,7 @@ dist-ssr
 
 # Cài đặt Claude Code cá nhân (không commit)
 .claude/settings.local.json
+
+# File tạm khi thử nạp file trên trình duyệt + báo cáo soát giao diện (không phải code, có thể chứa số liệu thật)
+public/zz-tmp-*
+test-reports/
